@@ -291,27 +291,30 @@ function migrate(s) {
     if (!Array.isArray(p.th)) p.th = [];
     if ((p.s === 'growing' || p.s === 'withered') && !CROP[p.c]) Object.assign(p, emptyPlot('plowed'));
     p.h = p.h || 0; p.adult = !!p.adult; p.poda = !!p.poda;
+    p.w = 0; // não tem mais mato
+    if (p.b && p.dry) p.dry = false; // nunca os dois problemas juntos
+    p.b = Math.min(1, p.b || 0);
     if (p.s === 'growing' && !p.id) p.id = newId();
   }
   s.owned = s.plots.filter(p => p.s !== 'locked').length;
   if (!CROP[s.seed]) s.seed = 'nabo';
-  if (!s.tool) s.tool = 'hand';
+  if (!s.tool || s.tool === 'weed') s.tool = 'hand';
   return s;
 }
 
 // O tempo passou enquanto a roça estava fechada.
 // Tempo da fase atual: árvore adulta usa o tempo das próximas colheitas.
 function phaseTempo(p) { const c = CROP[p.c]; return c.arvore && p.adult ? c.tempo2 : c.tempo; }
-// Faz a planta crescer "sec" segundos. Terra seca cresce mais devagar; mato e pragas
+// Faz a planta crescer "sec" segundos. Terra seca cresce mais devagar; pragas
 // vão comendo parte da colheita (no máximo 35%), proporcional ao tempo da planta.
 function growPlot(p, sec, events) {
   if (p.s !== 'growing' || p.poda) return;
   const crop = CROP[p.c], T = phaseTempo(p);
   if (p.g >= T) return;
   if (events) {
-    if (p.w < 2 && Math.random() < 0.45 / T * sec) p.w++;
-    if (p.b < 1 && Math.random() < 0.12 / T * sec) p.b++; // insetos só de vez em quando
-    if (!p.dry && Math.random() < 0.5 / T * sec) p.dry = true;
+    // Um problema de cada vez: ou a terra seca, ou aparecem insetos (de vez em quando).
+    if (!p.dry && !p.b && Math.random() < 0.12 / T * sec) p.b = 1;
+    else if (!p.dry && !p.b && Math.random() < 0.5 / T * sec) p.dry = true;
   }
   p.g = Math.min(T, p.g + sec * (p.dry ? 0.7 : 1));
   const trouble = p.w + p.b + (p.dry ? 0.5 : 0);
@@ -856,13 +859,12 @@ function genNeighbor() {
     const pool = CROPS.filter(c => !c.arvore && c.nivel <= Math.max(5, state.level + 3));
     const crop = pool[Math.floor(Math.random() * pool.length)];
     if (Math.random() < 0.12) { plots[i] = emptyPlot('plowed'); continue; }
-    const mature = Math.random() < 0.5;
+    const mature = Math.random() < 0.5, bug = Math.random() < 0.08;
     plots[i] = Object.assign(emptyPlot('growing'), {
       c: crop.id, id: newId(),
       g: mature ? crop.tempo : crop.tempo * rand(0.15, 0.95),
-      w: Math.random() < 0.25 ? 1 + Math.floor(Math.random() * 2) : 0,
-      b: Math.random() < 0.08 ? 1 : 0,
-      dry: !mature && Math.random() < 0.25,
+      b: bug ? 1 : 0,
+      dry: !bug && !mature && Math.random() < 0.25,
     });
   }
   const animals = [];
@@ -883,7 +885,7 @@ function genNeighbor() {
 function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
   const cur = state.nb[id];
-  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos) state.nb[id] = genNeighbor();
+  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry))) state.nb[id] = genNeighbor();
   view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id] };
   afterVisit();
   save();
@@ -908,7 +910,7 @@ async function visitFriend(uid) {
 function afterVisit() {
   hover = null; setScene('roca');
   if (['seed', 'hoe', 'fert'].includes(state.tool)) state.tool = 'hand';
-  $('#bannerTxt').textContent = `Você está na roça de ${view.nome}. Tire mato e pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
+  $('#bannerTxt').textContent = `Você está na roça de ${view.nome}. Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
   $('#banner').hidden = false;
   cv.setAttribute('aria-label', `Roça de ${view.nome}`);
   renderTools(); renderPane(); renderSceneInfo();
@@ -2813,7 +2815,7 @@ const TOOL_ICONS = {
 const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 const TOOLS = [
   { id: 'hand', nome: 'Mão' }, { id: 'hoe', nome: 'Enxada' }, { id: 'water', nome: 'Regar' },
-  { id: 'pest', nome: 'Inseticida' }, { id: 'weed', nome: 'Arrancar' }, { id: 'seed', nome: 'Semente' },
+  { id: 'pest', nome: 'Inseticida' }, { id: 'seed', nome: 'Semente' },
   { id: 'fert', nome: 'Adubo' },
 ];
 const HOME_ONLY = ['seed', 'hoe', 'fert'];
@@ -2836,7 +2838,7 @@ function renderTools() {
     const label = t.id === 'seed' ? CROP[state.seed].nome
       : t.id === 'fert' ? `${FERT[state.fertSel].curto} ×${state.fert[state.fertSel] || 0}` : t.nome;
     b.innerHTML = `<span class="ic">${icon}</span><span class="lb">${label}</span>`;
-    b.title = (t.id === 'hand' ? 'Faz a ação certa: colhe, rega, tira mato e pragas, planta' : t.nome) + ` (tecla ${k + 1})`;
+    b.title = (t.id === 'hand' ? 'Faz a ação certa: colhe, rega, tira pragas, planta' : t.nome) + ` (tecla ${k + 1})`;
     b.addEventListener('click', () => setTool(t.id));
     box.appendChild(b);
   });
@@ -3113,7 +3115,7 @@ function renderPane() {
         <div><div class="name">+${extra} canteiros (total ${e.total})</div><div class="meta">${e.preco.toLocaleString('pt-BR')} moedas · nível ${e.nivel}</div></div>
         ${have ? '<button class="btn ghost" disabled>Comprada</button>' : next ? `<button class="btn gold" data-expand ${state.level >= e.nivel && state.coins >= e.preco ? '' : 'disabled'}>Comprar</button>` : `<button class="btn" disabled>Nível ${e.nivel}</button>`}</div>`;
     });
-    html += `<p class="hint">Mato e pragas comem parte da colheita enquanto ficam lá. Terra seca faz a planta crescer mais devagar. Cada planta dá XP em até ${XP_CAP} colheitas por dia.</p>
+    html += `<p class="hint">Pragas comem parte da colheita enquanto ficam lá. Terra seca faz a planta crescer mais devagar. Nunca acontecem os dois juntos. Cada planta dá XP em até ${XP_CAP} colheitas por dia.</p>
       <button class="btn danger" data-reset>${resetArmed ? 'Clique de novo para apagar tudo' : 'Recomeçar do zero'}</button>`;
   } else if (tab === 'amigos') {
     if (state.news.length) {

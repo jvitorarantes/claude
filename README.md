@@ -9,7 +9,7 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 ## O que tem no jogo
 
 - **Roça de até 100 canteiros.** Você começa no nível 1 com 2.000 moedas e 6 canteiros. As expansões (nível 5, 10, 15, 20, 30, 40 e 50) liberam mais canteiros, e você escolhe onde colocar cada um, encostado na sua terra.
-- **19 plantações** (do nabo de 2 minutos ao maracujá de 36 horas) e **8 árvores frutíferas** (morangueiro, videira, macieira, laranjeira, bananeira, coqueiro, mangueira e goiabeira). A árvore é plantada uma vez, dá 15 colheitas e depois pede uma poda. Mato e terra seca atrapalham, e insetos aparecem de vez em quando. XP para o próximo nível: 100 + 50 × (nível − 1). Cada planta dá XP em até 50 colheitas por dia.
+- **19 plantações** (do nabo de 2 minutos ao maracujá de 36 horas) e **8 árvores frutíferas** (morangueiro, videira, macieira, laranjeira, bananeira, coqueiro, mangueira e goiabeira). A árvore é plantada uma vez, dá 15 colheitas e depois pede uma poda. A terra seca atrapalha, e insetos aparecem de vez em quando, nunca os dois ao mesmo tempo. XP para o próximo nível: 100 + 50 × (nível − 1). Cada planta dá XP em até 50 colheitas por dia.
 - **Enxada** (100 moedas) para arrancar plantações e árvores.
 - **3 fertilizantes**: básico (corta 10% do tempo, 50 moedas), rápido (25%, 200) e premium (50%, 1.000). Um por colheita.
 - **Música e sons**: 3 músicas calmas de roça e sons para cliques, regar, enxada, colher e mais. Tudo é sintetizado no navegador (`js/audio.js`), sem arquivos de áudio.
@@ -26,7 +26,7 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **Login com Google, salvamento na nuvem e amigos de verdade** (precisa do Firebase, veja abaixo).
   - Cada jogador ganha um **código de amigo** de 6 letras. Digitar o código de alguém manda um **pedido de amizade**, que a pessoa pode **aceitar ou recusar** na aba Amigos. Dá para cancelar um pedido enviado e desfazer uma amizade.
   - Só amigos veem e visitam a sua roça. Quem recebe um pedido pode espiar a roça de quem pediu antes de aceitar.
-  - Na roça de um amigo você pode tirar mato e pragas, regar, alimentar os animais ou pegar um pouquinho: até 3 itens da plantação e 2 dos animais por amigo por dia (se o cachorro deixar!). O dono recebe um aviso em "Novidades da sua roça", na aba Amigos.
+  - Na roça de um amigo você pode tirar pragas, regar, alimentar os animais ou pegar um pouquinho: até 3 itens da plantação e 2 dos animais por amigo por dia (se o cachorro deixar!). O dono recebe um aviso em "Novidades da sua roça", na aba Amigos.
 
 Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no navegador e não tem amigos de verdade.
 
