@@ -1520,7 +1520,9 @@ function line(a, b, color, w) { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.
 // ============================================================
 // Cenário
 // ============================================================
-const TUFTS = Array.from({ length: 140 }, () => [Math.random(), Math.random(), Math.random()]);
+// Tufos de grama, flores e folhas ficam presos ao chão (coordenadas da grade), para acompanhar o zoom.
+const TUFTS = Array.from({ length: 420 }, () => [Math.random(), Math.random(), Math.random()]);
+const tuftAt = (x, y) => iso(-8 + x * 28, -8 + y * 28);
 const STARS = Array.from({ length: 40 }, () => [Math.random(), Math.random() * 0.9, Math.random()]);
 
 function timeOfDay() {
@@ -1573,22 +1575,26 @@ function drawGround() {
   g.addColorStop(0, est.grama[0]); g.addColorStop(1, est.grama[1]);
   ctx.fillStyle = g; ctx.fillRect(0, horizon, cw, ch - horizon);
   // outono: folhas caídas; inverno: montinhos de neve
+  const visivel = q => q.x > -20 && q.x < cw + 20 && q.y > horizon + 6 && q.y < ch + 20;
   if (est.folhas || est.neve) TUFTS.forEach(([x, y, k], n) => {
     if (n % (est.neve ? 5 : 3)) return;
-    const px = x * cw, py = horizon + 10 + y * (ch - horizon - 10);
+    const q0 = tuftAt(x, y); if (!visivel(q0)) return;
+    const px = q0.x, py = q0.y;
     ctx.fillStyle = est.neve ? 'rgba(255,255,255,.8)' : ['#d9822b', '#c8502a', '#e8b04a'][n % 3];
     ctx.beginPath(); ctx.ellipse(px, py, est.neve ? W * (0.08 + k * 0.1) : W * 0.035, est.neve ? W * (0.025 + k * 0.03) : W * 0.018, est.neve ? 0 : k * 3, 0, 7); ctx.fill();
   });
   const FL = ['#ffffff', '#ffd54a', '#f06292', '#ffffff', '#ba68c8'];
   TUFTS.forEach(([x, y, k], n) => {
     if (!est.flores || n % Math.round(27 / est.flores)) return;
-    const px = x * cw, py = horizon + 10 + y * (ch - horizon - 10), r = Math.max(1.8, W * 0.025);
+    const q0 = tuftAt(x, y); if (!visivel(q0)) return;
+    const px = q0.x, py = q0.y, r = Math.max(1.8, W * 0.025);
     for (let f = 0; f < 3; f++) { ctx.fillStyle = FL[(n + f) % FL.length]; ctx.beginPath(); ctx.arc(px + f * r * 2.4 - r * 2.4, py + (f % 2) * r * 1.5, r, 0, 7); ctx.fill(); }
     ctx.fillStyle = '#f2b705'; ctx.beginPath(); ctx.arc(px, py, r * 0.45, 0, 7); ctx.fill();
   });
   ctx.strokeStyle = est.neve ? 'rgba(80,120,70,.35)' : est.folhas ? 'rgba(110,100,30,.45)' : 'rgba(46,110,30,.45)'; ctx.lineWidth = 1.2;
   for (const [x, y, k] of TUFTS) {
-    const px = x * cw, py = horizon + 6 + y * (ch - horizon - 6), s = W * (0.04 + k * 0.04);
+    const q0 = tuftAt(x, y); if (!visivel(q0)) continue;
+    const px = q0.x, py = q0.y, s = W * (0.04 + k * 0.04);
     ctx.beginPath();
     ctx.moveTo(px - s, py - s); ctx.lineTo(px - s * 0.3, py);
     ctx.moveTo(px, py - s * 1.3); ctx.lineTo(px, py);
@@ -4074,30 +4080,119 @@ function drawWeather(t) {
   ctx.stroke();
 }
 
-// ---------- Borboletas, passarinhos e vaga-lumes ----------
-const BUGS = Array.from({ length: 5 }, (_, k) => ({ x: Math.random(), y: 0.4 + Math.random() * 0.5, s: Math.random() * 10, cor: ['#ffd54a', '#ffffff', '#ff9a3c', '#6fb6ff', '#f48fb1'][k] }));
-const PASSAROS = Array.from({ length: 3 }, () => ({ x: Math.random(), y: 0.55 + Math.random() * 0.35, hop: Math.random() * 5, dir: Math.random() < 0.5 ? 1 : -1 }));
+// ---------- Borboletas, sapos, porquinhos-da-índia, grilos e vaga-lumes ----------
 let bando = { t0: -1e9, y: 0.4 };
+// Os bichinhos moram no chão da cena (coordenadas da grade), então acompanham o zoom e o arrasto.
+// Sapos pulam, porquinhos-da-índia passeiam e mordiscam, grilos dão pulinhos; borboletas voam por cima.
+const CRIT_TIPOS = ['sapo', 'sapo', 'preá', 'preá', 'grilo', 'grilo', 'grilo'];
+const CRIT_CORES = [['#c98a4b', '#fff4e0'], ['#5a3a22', '#e8c9a0'], ['#e8e0d0', '#c98a4b']];
+const critters = {};
+// Lugares de grama onde eles podem ficar: na roça, os lotes ainda sem canteiro; no rancho, em volta dos cercados.
+function critterHome(sc) {
+  if (sc === 'roca') {
+    const livres = [];
+    S().plots.forEach((p, i) => { if (p.s === 'locked') livres.push([i % COLS + 0.5, Math.floor(i / COLS) + 0.5]); });
+    if (livres.length) return livres[Math.floor(Math.random() * livres.length)];
+    return [-1.5, 2 + Math.random() * 6];
+  }
+  return Math.random() < 0.6 ? [Math.random() * RANCH_C, RANCH_R + 0.5 + Math.random() * 1.2] : [-1.2 - Math.random(), Math.random() * RANCH_R];
+}
+function crittersOf(sc) {
+  if (critters[sc]) return critters[sc];
+  const list = CRIT_TIPOS.map((tipo, k) => {
+    const [u, v] = critterHome(sc);
+    return { tipo, u, v, hu: u, hv: v, fu: u, fv: v, tu: u, tv: v, t0: 0, dur: 1, wait: Math.random() * 3, dir: Math.random() < 0.5 ? 1 : -1, cor: CRIT_CORES[k % 3] };
+  });
+  const flies = Array.from({ length: 5 }, (_, k) => ({ u: Math.random() * 6, v: Math.random() * 6, s: Math.random() * 10, cor: ['#ffd54a', '#ffffff', '#ff9a3c', '#6fb6ff', '#f48fb1'][k] }));
+  return (critters[sc] = { list, flies });
+}
+function moveCritter(c, t) {
+  const age = (t - c.t0) / 1000;
+  if (age < c.dur) return age / c.dur;
+  c.u = c.tu; c.v = c.tv;
+  if (age < c.dur + c.wait) return 1;
+  // escolhe o próximo passo perto de casa
+  const far = c.tipo === 'preá' ? 0.5 : c.tipo === 'sapo' ? 0.45 : 0.25;
+  c.fu = c.u; c.fv = c.v;
+  c.tu = clamp(c.u + (Math.random() - 0.5) * far * 2, c.hu - 0.9, c.hu + 0.9);
+  c.tv = clamp(c.v + (Math.random() - 0.5) * far * 2, c.hv - 0.9, c.hv + 0.9);
+  const sx = (c.tu - c.fu) - (c.tv - c.fv); if (Math.abs(sx) > 0.01) c.dir = sx > 0 ? 1 : -1;
+  c.dur = c.tipo === 'preá' ? 1.6 : c.tipo === 'sapo' ? 0.45 : 0.25;
+  c.wait = c.tipo === 'preá' ? 1 + Math.random() * 3 : c.tipo === 'sapo' ? 2 + Math.random() * 4 : 1 + Math.random() * 2.5;
+  c.t0 = t;
+  return 0;
+}
+function drawFrog(x, y, s, dir, t, jump) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(dir * s, s);
+  ctx.fillStyle = '#3f8a2a';
+  ctx.beginPath(); ctx.ellipse(-6, -2, 5, 3, -0.4, 0, 7); ctx.fill(); // perna de trás
+  ctx.fillStyle = '#5cb043';
+  ctx.beginPath(); ctx.ellipse(0, -6, 8, 5.5, -0.15, 0, 7); ctx.fill();
+  if (!jump) { const puff = Math.max(0, Math.sin(t / 250)) ** 6; ctx.fillStyle = '#e8f0a0'; ctx.beginPath(); ctx.ellipse(5, -3, 3 + puff * 2.5, 2 + puff * 2, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#5cb043'; ctx.beginPath(); ctx.arc(3, -11, 3, 0, 7); ctx.arc(7, -10.5, 2.8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(3.3, -11.5, 1.8, 0, 7); ctx.arc(7.3, -11, 1.7, 0, 7); ctx.fill();
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(3.8, -11.5, 0.9, 0, 7); ctx.arc(7.7, -11, 0.9, 0, 7); ctx.fill();
+  ctx.fillStyle = '#3f8a2a'; ctx.fillRect(3, -1, 2, 2.5); ctx.fillRect(-2, -1, 2, 2.5);
+  ctx.restore();
+}
+function drawCavy(x, y, s, dir, t, cor, moving) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(dir * s, s);
+  const nib = moving ? 0 : Math.max(0, Math.sin(t / 180)) * 0.8;
+  ctx.fillStyle = cor[0]; ctx.beginPath(); ctx.ellipse(0, -6, 10, 6.5, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = cor[1]; ctx.beginPath(); ctx.ellipse(-3, -7, 5, 4, 0.3, 0, 7); ctx.fill();
+  ctx.fillStyle = cor[0]; ctx.beginPath(); ctx.ellipse(8, -6 + nib, 5, 4.5, 0.2, 0, 7); ctx.fill();
+  ctx.fillStyle = '#e9a0a0'; ctx.beginPath(); ctx.ellipse(6, -11 + nib, 2, 1.5, -0.4, 0, 7); ctx.fill();
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(10, -7.5 + nib, 1, 0, 7); ctx.fill();
+  ctx.fillStyle = '#d87a7a'; ctx.beginPath(); ctx.arc(12.8, -5 + nib, 0.9, 0, 7); ctx.fill();
+  ctx.fillStyle = '#5a3a22'; const k = moving ? Math.sin(t / 90) * 1.2 : 0; ctx.fillRect(-6 + k, -1, 2.5, 1.5); ctx.fillRect(5 - k, -1, 2.5, 1.5);
+  ctx.restore();
+}
+function drawCricket(x, y, s, dir, t) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(dir * s, s);
+  ctx.strokeStyle = '#3b2a14'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-2, -3); ctx.lineTo(-6, -8); ctx.lineTo(-8, 0); ctx.stroke(); // perna de pulo
+  ctx.beginPath(); ctx.moveTo(4, -4); ctx.quadraticCurveTo(9, -12, 13, -9 + Math.sin(t / 120)); ctx.moveTo(4, -4); ctx.quadraticCurveTo(8, -13, 11, -13); ctx.stroke();
+  ctx.fillStyle = '#6b4a1e'; ctx.beginPath(); ctx.ellipse(0, -3.5, 5.5, 2.3, -0.1, 0, 7); ctx.fill();
+  ctx.fillStyle = '#4a3212'; ctx.beginPath(); ctx.arc(4.5, -4, 2, 0, 7); ctx.fill();
+  ctx.restore();
+}
 function drawCritters(t, tod) {
-  const { cw, ch, horizon, W } = L;
-  if (raining()) return;
+  const W = L.W, est = estacao(), chuva = raining(), cena = crittersOf(scene), s = W / 100 * (scene === 'animais' ? 1.5 : 1.1);
+  // Se o lote onde o bichinho morava virou canteiro, ele muda para outro pedaço de grama.
+  if (scene === 'roca') for (const c of cena.list) {
+    const i = Math.floor(c.hv) * COLS + Math.floor(c.hu);
+    if (c.hu >= 0 && c.hu < COLS && c.hv >= 0 && c.hv < ROWS && S().plots[i].s !== 'locked') {
+      const [u, v] = critterHome('roca'); Object.assign(c, { u, v, hu: u, hv: v, fu: u, fv: v, tu: u, tv: v });
+    }
+  }
   if (tod === 'noite') {
-    // vaga-lumes
+    // vaga-lumes, presos ao chão da cena
     for (let k = 0; k < 14; k++) {
-      const x = (hash01(k) * cw + Math.sin(t / 1700 + k) * 30), y = horizon + (0.2 + hash01(k + 50) * 0.75) * (ch - horizon) + Math.cos(t / 1300 + k * 2) * 20;
+      const q = P(cena.flies[k % 5].u + hash01(k) * 6 - 2 + Math.sin(t / 1700 + k) * 0.4, cena.flies[k % 5].v + hash01(k + 50) * 6 - 2 + Math.cos(t / 1300 + k * 2) * 0.4, 0.4 + 0.3 * Math.sin(t / 900 + k));
       ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t / 500 + k * 3));
-      ctx.fillStyle = 'rgba(255,240,120,.35)'; ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill();
-      ctx.fillStyle = '#fff59a'; ctx.beginPath(); ctx.arc(x, y, 2, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,120,.35)'; ctx.beginPath(); ctx.arc(q.x, q.y, W * 0.06, 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff59a'; ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(1.5, W * 0.02), 0, 7); ctx.fill();
     }
     ctx.globalAlpha = 1;
-    return;
   }
-  const est = estacao(), sz = clamp(W * 0.07, 5, 10);
+  // bichinhos do chão (no inverno só os porquinhos-da-índia; na chuva, só os sapos)
+  const vivos = cena.list.filter(c => !(est.neve && c.tipo !== 'preá') && !(chuva && c.tipo !== 'sapo') && !(tod === 'noite' && c.tipo === 'preá'));
+  vivos.map(c => ({ c, k: moveCritter(c, t) })).sort((a, b) => (a.c.u + a.c.v) - (b.c.u + b.c.v)).forEach(({ c, k }) => {
+    const u = c.fu + (c.tu - c.fu) * k, v = c.fv + (c.tv - c.fv) * k;
+    const pulo = c.tipo !== 'preá' && k > 0 && k < 1 ? Math.sin(k * Math.PI) * (c.tipo === 'sapo' ? 0.35 : 0.18) : 0;
+    const g = iso(u, v), q = P(u, v, pulo);
+    ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(g.x, g.y, W * (c.tipo === 'grilo' ? 0.05 : 0.1), W * 0.03, 0, 0, 7); ctx.fill();
+    if (c.tipo === 'sapo') drawFrog(q.x, q.y, s, c.dir, t, pulo > 0);
+    else if (c.tipo === 'preá') drawCavy(q.x, q.y, s * 0.95, c.dir, t, c.cor, k > 0 && k < 1);
+    else drawCricket(q.x, q.y, s * 0.8, c.dir, t);
+  });
+  if (tod === 'noite' || chuva) return;
   // borboletas (não aparecem no inverno)
-  if (!est.neve) for (const b of BUGS) {
-    const x = ((b.x + t / 60000 * (0.5 + (b.s % 1))) % 1.2 - 0.1) * cw + Math.sin(t / 900 + b.s) * 40;
-    const y = horizon + b.y * (ch - horizon) + Math.sin(t / 600 + b.s * 3) * 25;
-    const flap = Math.abs(Math.sin(t / 90 + b.s));
+  const sz = clamp(W * 0.07, 4, 12);
+  if (!est.neve) for (const b of cena.flies) {
+    const u = b.u + Math.sin(t / 5000 + b.s) * 2.5, v = b.v + Math.cos(t / 6200 + b.s * 2) * 2.5;
+    const q = P(u, v, 0.6 + 0.25 * Math.sin(t / 600 + b.s * 3));
+    const x = q.x, y = q.y, flap = Math.abs(Math.sin(t / 90 + b.s));
     ctx.fillStyle = b.cor; ctx.strokeStyle = 'rgba(60,40,20,.5)'; ctx.lineWidth = 0.8;
     for (const sgn of [-1, 1]) {
       ctx.beginPath(); ctx.ellipse(x + sgn * sz * 0.55 * flap, y - sz * 0.2, sz * 0.6 * flap + 0.5, sz * 0.5, sgn * 0.4, 0, 7); ctx.fill(); ctx.stroke();
@@ -4105,19 +4200,8 @@ function drawCritters(t, tod) {
     }
     ctx.fillStyle = '#3a2412'; ctx.fillRect(x - 0.8, y - sz * 0.5, 1.6, sz);
   }
-  // passarinhos ciscando na grama
-  for (const p of PASSAROS) {
-    const hop = Math.max(0, Math.sin(t / 400 + p.hop * 7)) ** 8;
-    p.x += p.dir * hop * 0.0004; if (p.x < 0.05 || p.x > 0.95) p.dir *= -1;
-    const x = p.x * cw, y = horizon + p.y * (ch - horizon) - hop * sz * 1.2, r = sz * 0.75;
-    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, horizon + p.y * (ch - horizon) + r * 0.8, r, r * 0.3, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#8a5a33'; ctx.beginPath(); ctx.ellipse(x, y, r * 1.1, r * 0.8, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(x + p.dir * r * 0.8, y - r * 0.5, r * 0.55, 0, 7); ctx.fill();
-    ctx.fillStyle = '#e8b04a'; ctx.beginPath(); ctx.moveTo(x + p.dir * r * 1.3, y - r * 0.55); ctx.lineTo(x + p.dir * r * 1.8, y - r * 0.4); ctx.lineTo(x + p.dir * r * 1.3, y - r * 0.3); ctx.fill();
-    ctx.fillStyle = '#e25a3a'; ctx.beginPath(); ctx.ellipse(x + p.dir * r * 0.3, y + r * 0.1, r * 0.5, r * 0.4, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x + p.dir * r * 0.95, y - r * 0.6, r * 0.1, 0, 7); ctx.fill();
-  }
-  // um bando passa voando no céu de vez em quando
+  // um bando de passarinhos passa lá no céu de vez em quando
+  const { cw, horizon } = L;
   if (t - bando.t0 > 26000) bando = { t0: t, y: 0.25 + Math.random() * 0.4 };
   const age = (t - bando.t0) / 14000;
   if (age < 1) {

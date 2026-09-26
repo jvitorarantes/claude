@@ -42,7 +42,7 @@ Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no nav
 - **Estações do ano**: mudam toda segunda-feira (primavera, verão, outono e inverno). A grama e as árvores mudam, e 5 plantas da estação rendem 30% a mais.
 - **Colheita dourada**: rara (3%), a planta brilha e rende 5 vezes mais.
 - **Chuva** (neve no inverno): de vez em quando chove por 5 minutos e rega a roça toda, com som de chuva.
-- **Borboletas, passarinhos** e, de noite, **vaga-lumes**.
+- **Borboletas, sapos, porquinhos-da-índia e grilos** pela grama, um bando de passarinhos no céu e, de noite, **vaga-lumes**. Eles ficam presos ao chão e acompanham o zoom.
 
 ## Arquivos
 
