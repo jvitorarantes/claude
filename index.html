@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roça Feliz</title>
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="31">
-<script src="firebase-config.js?v=31"></script>
+<meta name="rf-version" content="32">
+<script src="firebase-config.js?v=32"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -137,9 +137,10 @@
   .roundbtn .badge { position: absolute; top: -2px; right: 6px; margin: 0; }
   .scenes { left: 10px; top: 92px; display: grid; gap: 6px; }
   .zoom {
-    right: 18px; top: 602px; display: grid; gap: 4px; justify-items: center;
+    right: 12px; bottom: 12px; display: flex; gap: 4px; align-items: center;
     background: rgba(74,42,16,.55); border: 2px solid rgba(255,235,190,.45); border-radius: 24px; padding: 5px;
   }
+  .zoom #zoomIn { order: 3; } .zoom #zoomReset { order: 2; } .zoom #zoomOut { order: 1; }
   .zbtn {
     width: 40px; height: 40px; border-radius: 50%; border: 2px solid #8a5a2b; padding: 0;
     background: radial-gradient(circle at 50% 35%, #fffdf2, #f1ddb0); color: #5a3614;
@@ -148,7 +149,7 @@
   .zbtn.small { width: 44px; height: 24px; border-radius: 12px; font-size: 11px; background: #fff3c4; }
   .zbtn:disabled { opacity: .45; cursor: default; }
   .menu { right: 10px; top: 70px; display: grid; gap: 6px; }
-  .giftwrap { left: 10px; top: 330px; }
+  .giftwrap { left: 10px; top: 330px; display: grid; gap: 6px; }
   .gdays { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .gday { display: grid; justify-items: center; gap: 2px; text-align: center; background: var(--card); border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px 4px; font-size: 12px; }
   .gday img { width: 44px; height: 44px; }
@@ -392,7 +393,7 @@
     .roundbtn .ic svg, .roundbtn .ic img { width: 26px; height: 26px; }
     .roundbtn .lb { font-size: 10px; max-width: 50px; }
     .scenes { left: 2px; top: 80px; gap: 4px; }
-    .zoom { right: 4px; top: 460px; padding: 3px; }
+    .zoom { right: 4px; bottom: 6px; padding: 3px; }
     .giftwrap { left: 2px; top: 262px; }
     .zbtn { width: 34px; height: 34px; font-size: 20px; }
     .zbtn.small { width: 38px; height: 20px; font-size: 10px; }
@@ -410,20 +411,46 @@
     .penactions { gap: 6px; padding: 6px 8px; }
     .penactions .btn { font-size: 13px; padding: 5px 10px; }
   }
+  /* Computador com a janela mais baixa (notebook a 100%): botões menores para caber tudo */
+  @media (min-width: 700px) and (max-height: 780px) and (min-height: 521px) {
+    .roundbtn { width: 62px; }
+    .roundbtn .ic { width: 46px; height: 46px; }
+    .roundbtn .ic svg, .roundbtn .ic img { width: 28px; height: 28px; }
+    .roundbtn .lb { font-size: 11px; }
+    .menu { top: 62px; gap: 2px; }
+    .scenes { top: 84px; gap: 2px; }
+    .giftwrap { top: 272px; gap: 2px; }
+    .panel { top: 62px; right: 80px; }
+  }
+  @media (min-width: 700px) and (max-height: 640px) and (min-height: 521px) {
+    .player { top: 6px; padding: 2px 12px 2px 2px; }
+    .avatar-ring, .avatar-ring .face { width: 48px; height: 48px; }
+    .roundbtn { width: 56px; }
+    .roundbtn .ic { width: 40px; height: 40px; border-width: 2px; }
+    .roundbtn .ic svg, .roundbtn .ic img { width: 24px; height: 24px; }
+    .roundbtn .lb { font-size: 10px; }
+    .menu { top: 54px; gap: 1px; }
+    .scenes { top: 70px; gap: 1px; }
+    .giftwrap { top: 238px; gap: 1px; }
+    .tool .ic { width: 44px; height: 44px; }
+    .panel { top: 54px; right: 72px; bottom: 8px; }
+    .banner, .toasts { top: 64px; }
+  }
   /* Celular em pé: menu numa fileira no alto; lugares, presente e zoom numa fileira embaixo */
   @media (max-width: 699px) and (orientation: portrait) {
     .topright .iconbtn { width: 40px; height: 40px; }
     .menu { top: 78px; left: 4px; right: 4px; display: flex; justify-content: space-around; gap: 0; }
-    .menu .roundbtn { width: 50px; }
-    .menu .roundbtn .ic { width: 38px; height: 38px; }
-    .menu .roundbtn .lb { font-size: 9px; }
+    .menu .roundbtn { width: 46px; }
+    .menu .roundbtn .ic { width: 36px; height: 36px; }
+    .menu .roundbtn .ic svg { width: 22px; height: 22px; }
+    .menu .roundbtn .lb { font-size: 8.5px; max-width: 48px; }
     .scenes { top: auto; bottom: 94px; left: 4px; display: flex; gap: 0; }
-    .giftwrap { top: auto; bottom: 94px; left: 150px; }
+    .giftwrap { top: auto; bottom: 94px; left: 150px; display: flex; gap: 0; }
     .scenes .roundbtn { width: 48px; }
     .giftwrap .roundbtn { width: 58px; }
     .giftwrap .roundbtn .lb { max-width: 60px; }
-    .zoom { top: auto; bottom: 100px; right: 6px; display: flex; align-items: center; gap: 3px; }
-    .zoom #zoomIn { order: 3; } .zoom #zoomReset { order: 2; } .zoom #zoomOut { order: 1; }
+    .zoom { top: auto; bottom: 160px; right: 4px; display: grid; gap: 3px; }
+    .zoom #zoomIn { order: 1; } .zoom #zoomReset { order: 2; } .zoom #zoomOut { order: 3; }
     .panel { top: 138px; left: 4px; right: 4px; bottom: 4px; }
     .banner { top: 138px; max-width: calc(100% - 16px); }
     .toasts { top: 142px; }
@@ -442,10 +469,11 @@
     .roundbtn .ic svg, .roundbtn .ic img { width: 24px; height: 24px; }
     .roundbtn .lb { font-size: 9.5px; }
     .scenes { top: 56px; left: 2px; gap: 1px; }
-    .giftwrap { top: 218px; left: 2px; }
+    .giftwrap { top: 218px; left: 2px; gap: 1px; }
     .menu { top: 48px; right: 2px; gap: 2px; }
     .menu .roundbtn .lb { display: none; }
-    .zoom { top: auto; bottom: 6px; left: 6px; right: auto; display: flex; align-items: center; gap: 3px; padding: 3px; }
+    .menu .roundbtn .ic { width: 34px; height: 34px; }
+    .zoom { top: auto; bottom: 6px; left: 58px; right: auto; display: flex; align-items: center; gap: 3px; padding: 3px; }
     .zoom #zoomIn { order: 3; } .zoom #zoomReset { order: 2; } .zoom #zoomOut { order: 1; }
     .zbtn { width: 32px; height: 32px; font-size: 18px; }
     .zbtn.small { width: 38px; height: 20px; font-size: 10px; }
@@ -512,7 +540,8 @@
       <button class="roundbtn" type="button" role="tab" data-scene="animais" aria-selected="false"><span class="ic"></span><span class="lb">Rancho</span></button>
       <button class="roundbtn" type="button" role="tab" data-scene="casa" aria-selected="false"><span class="ic"></span><span class="lb">Casa</span></button>
     </nav>
-    <div class="giftwrap over outline"><button class="roundbtn" type="button" id="giftBtn"><span class="ic"></span><span class="lb">Presente</span></button></div>
+    <div class="giftwrap over outline"><button class="roundbtn" type="button" id="giftBtn"><span class="ic"></span><span class="lb">Presente</span></button>
+      <button class="roundbtn" type="button" id="moveBtn" aria-pressed="false" title="Mudar casas, árvores e enfeites de lugar"><span class="ic"></span><span class="lb">Mover</span></button></div>
     <nav class="menu over outline" aria-label="Menu">
       <button class="roundbtn tab" type="button" data-tab="loja" aria-selected="false"><span class="ic"></span><span class="lb">Loja</span></button>
       <button class="roundbtn tab" type="button" data-tab="celeiro" aria-selected="false"><span class="ic"></span><span class="lb">Celeiro</span></button>
@@ -521,6 +550,7 @@
       <button class="roundbtn tab" type="button" data-tab="missoes" aria-selected="false"><span class="ic"></span><span class="lb">Missões</span></button>
       <button class="roundbtn tab" type="button" data-tab="correio" aria-selected="false"><span class="ic"></span><span class="lb">Correio</span></button>
       <button class="roundbtn tab" type="button" data-tab="fabrica" aria-selected="false"><span class="ic"></span><span class="lb">Fábrica</span></button>
+      <button class="roundbtn tab" type="button" data-tab="inventario" aria-selected="false"><span class="ic"></span><span class="lb">Inventário</span></button>
     </nav>
 
     <div class="zoom over" role="group" aria-label="Zoom">
@@ -608,8 +638,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=31"></script>
-<script src="js/cloud.js?v=31"></script>
-<script src="js/game.js?v=31"></script>
+<script src="js/audio.js?v=32"></script>
+<script src="js/cloud.js?v=32"></script>
+<script src="js/game.js?v=32"></script>
 </body>
 </html>

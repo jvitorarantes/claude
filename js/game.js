@@ -259,7 +259,7 @@ function newState() {
     v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0,
     tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
     animals: [], decor: {}, abrigos: { galinheiro: 1 }, racaoEsp: 0,
-    enfeites: {}, lugares: {}, skins: {}, skin: null,
+    enfeites: {}, objetos: { roca: [], animais: [] }, pos: {}, invNovos: 0, skins: {}, skin: null,
     missions: null, gift: { i: 0, ciclo: 0, last: -1 }, owe: {}, col: {}, stamps: {}, temas: { classico: true }, tema: 'classico', helpDay: -1,
     friends: [], sent: {}, code: null, owner: null, log: {},
     fert: { basico: 2 }, fertSel: 'basico',
@@ -294,6 +294,17 @@ function migrate(s) {
   s.enfeites = s.enfeites && typeof s.enfeites === 'object' ? s.enfeites : {};
   s.lugares = s.lugares && typeof s.lugares === 'object' ? s.lugares : {};
   s.skins = s.skins && typeof s.skins === 'object' ? s.skins : {};
+  s.objetos = s.objetos && typeof s.objetos === 'object' ? s.objetos : {};
+  s.pos = s.pos && typeof s.pos === 'object' ? s.pos : {};
+  for (const sc of ['roca', 'animais']) {
+    if (!Array.isArray(s.objetos[sc])) s.objetos[sc] = [];
+    // saves de antes: os enfeites dos lugares fixos viram posições livres
+    const velho = s.lugares && Array.isArray(s.lugares[sc]) ? s.lugares[sc] : [];
+    velho.forEach((id, k) => { if (ENFEITE[id] && LUGARES[sc][k]) s.objetos[sc].push({ id, u: LUGARES[sc][k][0], v: LUGARES[sc][k][1] }); });
+    s.objetos[sc] = s.objetos[sc].filter(o => o && ENFEITE[o.id] && isFinite(o.u) && isFinite(o.v));
+  }
+  delete s.lugares;
+  s.invNovos = Math.max(0, Number(s.invNovos) || 0);
   s.banca = Array.isArray(s.banca) ? s.banca.filter(x => x && item(x.item) && x.qtd > 0) : [];
   s.fab = s.fab && Array.isArray(s.fab.fila) ? { fila: s.fab.fila.filter(x => x && RECEITA[x.r]).slice(0, FILA_MAX) } : { fila: [] };
   if (s.truck && !Array.isArray(s.truck.pedidos)) s.truck = null;
@@ -1028,6 +1039,7 @@ function afterVisit() {
 }
 function goHome() {
   view = { kind: 'home' }; hover = null;
+  setScene('roca'); // voltar para a sua fazenda sempre começa na roça
   $('#banner').hidden = true; cv.setAttribute('aria-label', 'Sua roça');
   renderTools(); renderPane(); renderSceneInfo();
 }
@@ -1548,7 +1560,8 @@ function layout(sc) {
     });
     if (c0 > c1) { c0 = 0; c1 = COLS; r0 = 0; r1 = ROWS; }
     // os enfeites colocados também entram no enquadramento
-    lugaresDe(S(), 'roca').forEach((id, k) => { if (!id) return; const [u, v] = LUGARES.roca[k]; c1 = Math.max(c1, Math.ceil(u)); r1 = Math.max(r1, Math.ceil(v)); });
+    const objs = objList(S(), 'roca');
+    for (const o of objs) if (o.u >= 0 && o.v >= 0) { c1 = Math.max(c1, Math.ceil(o.u)); r1 = Math.max(r1, Math.ceil(o.v)); }
     c0 = Math.max(0, c0 - 1); c1 = Math.min(COLS, c1 + 1); r0 = Math.max(0, r0 - 1); r1 = Math.min(ROWS, r1 + 1);
     const span = (c1 - c0) + (r1 - r0);
     // No celular os botões do lado ficam por cima da grama: a roça usa a largura toda.
@@ -1559,7 +1572,8 @@ function layout(sc) {
     L.ox = cx - (cc - rc) * L.W / 2;
     L.oy = Math.min(I.t + ah * 0.6 - (cc + rc) * L.W / 4, I.t + ah - (c1 + r1) * L.W / 4 - 0.25 * L.W);
     // Se sobrar espaço à direita, empurra a roça para a casinha do cachorro caber na tela.
-    const falta = (cw < 700 ? 6 : I.l) + 2.95 * L.W - L.ox, sobra = I.l + aw - (L.ox + (c1 - r0) * L.W / 2);
+    const esq = Math.min(...objs.map(o => (o.u - o.v) / 2)) - 0.45; // o que fica mais à esquerda (casinha, celeiro…)
+    const falta = (cw < 700 ? 6 : I.l) - esq * L.W - L.ox, sobra = I.l + aw - (L.ox + (c1 - r0) * L.W / 2);
     if (falta > 0 && (sobra > 0 || cw < 700)) L.ox += cw < 700 ? falta : Math.min(falta, sobra);
   } else if (sc === 'animais') {
     // O rancho inteiro cabe na tela; no celular fica maior e dá para arrastar.
@@ -1838,8 +1852,8 @@ function drawKennel(x, y, s) {
 }
 // Onde fica o cachorro de cada lugar (na cena atual).
 // A casinha fica à esquerda do celeiro, com o cachorro na frente dela.
-const KENNEL_AT = () => ({ x: L.ox - L.W * 2.65, y: L.oy + L.W * 0.5 });
-const DOG_AT = () => ({ x: L.ox - L.W * 2.4, y: L.oy + L.W * 0.95 });
+const KENNEL_AT = () => { const [u, v] = posOf(S(), scene === 'animais' ? 'animais' : 'roca', 'canil'); return iso(u, v); };
+const DOG_AT = () => { const [u, v] = posOf(S(), scene === 'animais' ? 'animais' : 'roca', 'canil'); return iso(u + 1.15, v + 0.65); };
 function dogPos(slot) {
   if (scene !== (slot === 'roca' ? 'roca' : 'animais')) return null;
   const p = DOG_AT(); return { x: p.x, y: p.y - L.W * 0.25 };
@@ -2700,24 +2714,16 @@ function drawLake(x, y, W, t) {
 function drawRoca(s, t, home) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
-  // a casa fica atrás da roça, do lado das árvores; o celeiro, à esquerda
-  const hx = L.ox + W * 1.35, hy = L.oy - W * 0.05, skin = s.skin;
-  drawHouse(hx, hy, W * 0.95, home ? '#f1dcae' : view.casa, skin);
-  const hovCasa = hover && hover.kind === 'casa';
-  if (hovCasa) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(hx, hy, W * 0.6, W * 0.16, 0, 0, 7); ctx.stroke(); }
-  hits.push({ kind: 'casa', x: hx, y: hy - W * 0.35, r: W * 0.45 });
-  drawBarn(L.ox - W * 1.55, L.oy + W * 0.3, W * 1.15, skin);
-  const tm = temaDe(s);
-  if (tm.lago) { drawLake(L.ox + W * 2.75, L.oy + W * 0.4, W * 0.72, t); drawTree(L.ox + W * 4.0, L.oy + W * 1.4, W * 0.9, t); }
-  else { drawTree(L.ox + W * 2.6, L.oy + W * 0.5, W * 1.0, t, tm.coqueiro); drawTree(L.ox + W * 3.6, L.oy + W * 1.1, W * 0.8, t, tm.coqueiro); }
-  if (view.kind === 'npc') { const q = DOG_AT(); drawDog(q.x, q.y, W * 0.7, t); }
-  else drawKennelSpot('roca', s, home);
-  drawLugares(s, 'roca', t, home);
+  if (temaDe(s).lago) { const q = iso(...LAGO_POS); drawLake(q.x, q.y, W * 0.72, t); }
+  // casa, celeiro, casinha, árvores e enfeites: cada um no seu lugar (dá para mudar no modo Mover)
+  const cachorroDepois = drawObjetos(s, 'roca', t, home, 'tras');
   drawFence(COLS, ROWS, 'back');
-  if (view.kind !== 'npc') drawDogSpot('roca', s, t, home);
+  if (cachorroDepois) drawDogSpot('roca', s, t, home);
   if (home) drawLandSign();
   for (let sum = 0; sum <= COLS + ROWS - 2; sum++)
     for (let c = 0; c < COLS; c++) { const r = sum - c; if (r >= 0 && r < ROWS) drawPlot(r * COLS + c, s.plots[r * COLS + c], t, home); }
+  drawObjetos(s, 'roca', t, home, 'frente');
+  drawMoving('roca', t);
   drawCritters(t, tod);
   nightOverlay(tod);
   drawWeather(t);
@@ -2866,14 +2872,12 @@ function drawYard(b, s, t, home, dt, bubbles) {
 function drawPen(s, t, home, dt) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
-  drawTree(iso(-0.9, RANCH_R - 0.6).x, iso(-0.9, RANCH_R - 0.6).y, W * 1.0, t);
-  drawTree(iso(RANCH_C + 0.8, 0.8).x, iso(RANCH_C + 0.8, 0.8).y, W * 1.1, t);
-  if (view.kind === 'npc') { const q = DOG_AT(); drawDog(q.x, q.y, W * 0.72, t); }
-  else { drawKennelSpot('animais', s, home); drawDogSpot('animais', s, t, home); }
+  drawObjetos(s, 'animais', t, home, 'tras');
   const bubbles = [];
   const order = ABRIGOS.slice().sort((a, b) => { const p = yardOf(a.id), q = yardOf(b.id); return (p.u0 + p.v0) - (q.u0 + q.v0); });
   for (const b of order) drawYard(b, s, t, home, dt, bubbles);
-  drawLugares(s, 'animais', t, home);
+  drawObjetos(s, 'animais', t, home, 'frente');
+  drawMoving('animais', t);
   drawCritters(t, tod);
   nightOverlay(tod);
   drawWeather(t);
@@ -3195,8 +3199,10 @@ function setTool(id) {
   state.tool = id; renderTools(); renderPane();
 }
 function setScene(sc) {
-  if (sc !== scene) L.pan = { x: 0, y: 0 };
+  if (sc !== scene) { L.pan = { x: 0, y: 0 }; if (moving && !moving.novo) moving = null; }
   scene = sc; hover = null; renderZoom();
+  if (sc === 'casa' && moveMode) { moveMode = false; moving = null; }
+  renderMoveBtn();
   document.querySelectorAll('#scenes button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.scene === sc)));
   renderTools(); renderSceneInfo();
 }
@@ -3292,6 +3298,7 @@ function renderTabs() {
   setBadge(document.querySelector('.tab[data-tab="correio"]'), unread, 'cartas novas');
   if (state) {
     setBadge(document.querySelector('.tab[data-tab="celeiro"]'), Object.values(state.barn).reduce((t, q) => t + (q > 0 ? q : 0), 0), 'itens no celeiro');
+    setBadge(document.querySelector('.tab[data-tab="inventario"]'), state.invNovos || 0, 'coisas novas no inventário');
     setBadge(document.querySelector('.tab[data-tab="fabrica"]'), prontosFab() + entregaveis(), 'coisas prontas na fábrica ou pedidos para entregar');
   }
   const mb = document.querySelector('.tab[data-tab="missoes"]'), mn = missoesProntas();
@@ -3312,7 +3319,7 @@ function renderTabs() {
 }
 // Preço nos botões da loja: ícone de moeda + valor (e a quantidade, quando tem).
 const moeda = (n, q) => `${q ? `<span class="qtd">×${q}</span>` : ''}<span class="coin" aria-hidden="true"></span>${n.toLocaleString('pt-BR')}`;
-const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões', correio: 'Correio', fabrica: 'Fábrica' };
+const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões', correio: 'Correio', fabrica: 'Fábrica', inventario: 'Inventário' };
 // A janela abre por cima do jogo. Clicar de novo no mesmo botão fecha.
 function openPanel(t, seg, focus) {
   tab = t; if (seg) shopSeg = seg;
@@ -3334,6 +3341,7 @@ function renderPane() {
   const pane = $('#pane');
   let html = '';
   if (tab === 'abrigo') html = abrigoHTML();
+  else if (tab === 'inventario') html = inventarioHTML();
   else if (tab === 'missoes') html = missoesHTML();
   else if (tab === 'fabrica') html = fabricaHTML();
   else if (tab === 'loja') {
@@ -3459,17 +3467,13 @@ function renderPane() {
           <div class="actions">${locked ? `<button class="btn" disabled>Nível ${b.nivel}</button>` : btn('roca') + btn('animais')}</div></div>`;
       }
     } else if (shopSeg === 'enfeites') {
-      const livre = sc => lugaresDe(state, sc).includes(null);
-      html += `<p class="hint">Enfeites ficam em volta da roça e do rancho, sem atrapalhar os canteiros e os cercados. Cada um dá conforto (+XP). Para guardar, clique duas vezes nele.</p>`;
-      for (const e of ENFEITES) {
-        const tem = state.enfeites[e.id] || 0, postos = ['roca', 'animais'].reduce((t, sc) => t + lugaresDe(state, sc).filter(x => x === e.id).length, 0);
-        if (e.especial && !tem && !postos) continue;
-        const locked = !e.especial && e.nivel > state.level;
-        html += `<div class="row wide ${locked ? 'locked' : ''} ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}">
-          <div><div class="name">${e.nome}${e.especial ? ' <span class="tag">⭐ pioneiros</span>' : ''}</div>
-          <div class="meta">${e.especial ? 'Presente de quem jogou no primeiro mês' : `${e.custo.toLocaleString('pt-BR')} moedas`} · +${e.conforto}% de XP${tem ? ` · guardados: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
-          <div class="actions">${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `${e.especial ? '' : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}
-            ${tem ? `<button class="btn gold" data-enfeite-por="${e.id}" data-sc="roca" ${livre('roca') ? '' : 'disabled'}>Pôr na roça</button><button class="btn gold" data-enfeite-por="${e.id}" data-sc="animais" ${livre('animais') ? '' : 'disabled'}>Pôr no rancho</button>` : ''}`}</div></div>`;
+      html += `<p class="hint">Enfeites vão para o Inventário. De lá você escolhe onde pôr, na roça ou no rancho, fora dos canteiros e cercados. Cada um dá conforto (+XP).</p>`;
+      for (const e of ENFEITES.filter(x => !x.especial)) {
+        const tem = state.enfeites[e.id] || 0, postos = ['roca', 'animais'].reduce((t, sc) => t + objetosDe(state, sc).filter(o => o.id === e.id).length, 0);
+        const locked = e.nivel > state.level;
+        html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}">
+          <div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${tem ? ` · no inventário: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
+          ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
       }
     } else if (shopSeg === 'temas') {
       html += `<p class="hint">Os temas mudam a cerca e o jeito da sua roça. Os amigos veem o seu tema quando visitam.</p>`;
@@ -3528,8 +3532,7 @@ function renderPane() {
         <div><div class="name">+${extra} canteiros (total ${e.total})</div><div class="meta">${e.preco.toLocaleString('pt-BR')} moedas · nível ${e.nivel}</div></div>
         ${have ? '<button class="btn ghost" disabled>Comprada</button>' : next ? `<button class="btn gold" data-expand ${state.level >= e.nivel && state.coins >= e.preco ? '' : 'disabled'}>${moeda(e.preco)}</button>` : `<button class="btn" disabled>Nível ${e.nivel}</button>`}</div>`;
     });
-    html += `<p class="hint">Pragas comem parte da colheita enquanto ficam lá. Terra seca faz a planta crescer mais devagar. Nunca acontecem os dois juntos. Cada planta dá XP em até ${XP_CAP} colheitas por dia.</p>
-      <button class="btn danger" data-reset>${resetArmed ? 'Clique de novo para apagar tudo' : 'Recomeçar do zero'}</button>`;
+    html += `<p class="hint">Pragas comem parte da colheita enquanto ficam lá. Terra seca faz a planta crescer mais devagar. Nunca acontecem os dois juntos. Cada planta dá XP em até ${XP_CAP} colheitas por dia.</p>`;
   } else if (tab === 'correio') {
     // Caixa de correio: as novidades da sua roça (visitas, presentes, cachorro, animais…)
     html += `<p class="hint">Tudo o que aconteceu na sua roça: visitas dos amigos, presentes, o que o cachorro fez e recados da vila.</p>`;
@@ -3614,7 +3617,8 @@ $('#pane').addEventListener('click', e => {
   if (d.temaRoca) return buyTema(d.temaRoca);
   if ('skin' in d) { state.skin = d.skin || null; toast(d.skin ? 'Celeiro e casa dos Pioneiros!' : 'Celeiro e casa clássicos.', 'good'); if (isHome()) setScene('roca'); return done(); }
   if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar);
-  if (d.enfeitePor) return colocarEnfeite(d.enfeitePor, d.sc);
+  if (d.invPor) return invPor(d.invPor, d.sc);
+  if (d.invGuardar) { const [sc, i] = d.invGuardar.split(':'); return invGuardar(sc, Number(i)); }
   if (d.pocao) {
     const n = Number(d.pocao) || 1;
     if (state.coins < POCAO.custo * n) return toast(`Faltam moedas: ${n} ${n > 1 ? 'poções custam' : 'poção custa'} ${POCAO.custo * n}.`, 'bad');
@@ -3717,6 +3721,8 @@ const MENU_ICONS = {
   terreno: '<svg viewBox="0 0 32 32"><path d="M16 9 29 17 16 25 3 17z" fill="#8b5a33" stroke="#4a2c14" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 17l7-4.3M12 19l7-4.3M15 21l7-4.3" stroke="#5e3a1c" stroke-width="1.2"/><circle cx="24" cy="8" r="6" fill="#4f9a2f" stroke="#2f6e1e" stroke-width="1.4"/><path d="M24 5v6M21 8h6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>',
   amigos: '<svg viewBox="0 0 32 32"><circle cx="11" cy="12" r="5" fill="#ffd9b0" stroke="#6b4220" stroke-width="1.5"/><path d="M3 27c0-5 3.5-8 8-8s8 3 8 8z" fill="#4aa3df" stroke="#1d5f8f" stroke-width="1.5"/><circle cx="22" cy="13" r="4.5" fill="#f3c08e" stroke="#6b4220" stroke-width="1.5"/><path d="M15 27c0-4.5 3-7.5 7-7.5s7 3 7 7.5z" fill="#e9a800" stroke="#a87400" stroke-width="1.5"/></svg>',
   missoes: '<svg viewBox="0 0 32 32"><path d="M8 4h16a2 2 0 0 1 2 2v22l-4-2-3 2-3-2-3 2-3-2-4 2V6a2 2 0 0 1 2-2z" fill="#fff4e0" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 11l2 2 3-4M10 18l2 2 3-4" fill="none" stroke="#4f9a2f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 11h5M18 18h5" stroke="#a86b38" stroke-width="2" stroke-linecap="round"/></svg>',
+  inventario: '<svg viewBox="0 0 32 32"><path d="M4 12h24v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="#a86b38" stroke="#5a3614" stroke-width="1.6"/><path d="M3 8h26v5H3z" fill="#c98a4b" stroke="#5a3614" stroke-width="1.6"/><path d="M13 16h6v4h-6z" fill="#ffd54a" stroke="#a87400" stroke-width="1.2"/><path d="M4 12h24" stroke="#5a3614" stroke-width="1.6"/></svg>',
+  mover: '<svg viewBox="0 0 32 32" fill="none" stroke="#7a4a22" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4v24M4 16h24M16 4l-4 4M16 4l4 4M16 28l-4-4M16 28l4-4M4 16l4-4M4 16l4 4M28 16l-4-4M28 16l-4 4"/></svg>',
   fabrica: '<svg viewBox="0 0 32 32"><path d="M3 28V14l7 4v-4l7 4v-4l7 4V6h5v22z" fill="#c8402f" stroke="#6b1f14" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 22h4v4H6zM13 22h4v4h-4zM20 22h4v4h-4z" fill="#ffe08a"/><path d="M25 4c0-2 2-3 3-2" fill="none" stroke="#b7b39c" stroke-width="2" stroke-linecap="round"/></svg>',
   correio: '<svg viewBox="0 0 32 32"><path d="M15 28V17" stroke="#7a4a22" stroke-width="3"/><path d="M5 10a6 6 0 0 1 12 0v8H5z" fill="#4a86c7" stroke="#2c5a8f" stroke-width="1.5" stroke-linejoin="round"/><path d="M11 4h12a6 6 0 0 1 6 6v8H17v-8a6 6 0 0 0-6-6z" fill="#5a9ae0" stroke="#2c5a8f" stroke-width="1.5" stroke-linejoin="round"/><path d="M23 18v-6h4v3h-4" fill="#e0463a" stroke="#8f2a1e" stroke-width="1.2"/><path d="M8 11h6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>',
   presente: '<svg viewBox="0 0 32 32"><rect x="5" y="13" width="22" height="15" rx="2" fill="#e0463a" stroke="#8f2a1e" stroke-width="1.6"/><rect x="3" y="9" width="26" height="6" rx="1.5" fill="#f25a4a" stroke="#8f2a1e" stroke-width="1.6"/><path d="M14 9h4v19h-4z" fill="#ffd54a"/><path d="M16 9c-2-5-8-6-8-2s6 2 8 2zM16 9c2-5 8-6 8-2s-6 2-8 2z" fill="#ffd54a" stroke="#a87400" stroke-width="1.4"/></svg>',
@@ -3727,6 +3733,7 @@ function paintMenuIcons() {
   const sc = { roca: `<img alt="" src="${cropIcon('milho')}">`, animais: `<img alt="" src="${animalIcon('vaca')}">`, casa: MENU_ICONS.casa };
   document.querySelectorAll('#scenes .ic').forEach(el => { el.innerHTML = sc[el.parentNode.dataset.scene]; });
   const g = document.querySelector('#giftBtn .ic'); if (g) g.innerHTML = MENU_ICONS.presente;
+  const m = document.querySelector('#moveBtn .ic'); if (m) m.innerHTML = MENU_ICONS.mover;
 }
 document.querySelectorAll('#scenes button').forEach(b => b.addEventListener('click', () => setScene(b.dataset.scene)));
 $('#goHome').addEventListener('click', () => goHome());
@@ -3805,10 +3812,9 @@ function tipBicho(i) {
   const c = crittersOf(scene).list[i];
   return c ? `<b>${BICHO[c.tipo].nome}</b><br>Clique para ouvir.` : null;
 }
-function tipEnfeite(sc, k) {
-  const id = lugaresDe(S(), sc)[k]; if (!id) return null;
-  const e = ENFEITE[id];
-  return `<b>${e.nome}</b><br>+${e.conforto}% de XP${e.especial ? '<br>Especial dos pioneiros' : ''}${isHome() ? '<br>Clique duas vezes para guardar.' : ''}`;
+function tipEnfeite(id) {
+  const e = ENFEITE[id]; if (!e) return null;
+  return `<b>${e.nome}</b><br>+${e.conforto}% de XP${e.especial ? '<br>Especial dos pioneiros' : ''}${isHome() ? '<br>Mude de lugar com o botão Mover.' : ''}`;
 }
 function tipLand() {
   const next = EXPANSOES[state.exp + 1];
@@ -3824,7 +3830,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'enfeite' ? tipEnfeite(hover.sc, hover.k) : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -3891,6 +3897,7 @@ cv.addEventListener('click', e => {
   if (drag && (drag.moved || drag.dead)) { drag = null; return; }
   drag = null;
   const q = localPos(e); pointer.x = q.x; pointer.y = q.y;
+  if (moveMode && isHome() && scene !== 'casa') return moveClick(q.x, q.y);
   const target = pick(q.x, q.y); hover = target;
   if (pointer.touch) pointer.tipUntil = performance.now() + 2200;
   if (!target) return;
@@ -3901,8 +3908,9 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'abrigo') actAbrigo(target.id);
   else if (target.kind === 'land') openPanel('terreno');
   else if (target.kind === 'bicho') actBicho(target.i);
-  else if (target.kind === 'enfeite') actEnfeite(target.sc, target.k);
+  else if (target.kind === 'enfeite') actEnfeite(target.id);
   else if (target.kind === 'casa') setScene('casa');
+  else if (target.kind === 'celeiro') { if (isHome()) openPanel('celeiro'); else toast(`Celeiro de ${view.nome}.`); }
 });
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input, textarea')) return;
@@ -3976,6 +3984,8 @@ function openSettings() { if ($('#verTxt')) $('#verTxt').textContent = `Versão 
 function closeSettings() { $('#settings').hidden = true; $('#openSettings').focus(); }
 $('#openSettings').addEventListener('click', openSettings);
 $('#giftBtn').addEventListener('click', showGift);
+$('#moveBtn').addEventListener('click', () => setMoveMode(!moveMode));
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && moveMode) { if (moving) { moving = null; toast('Cancelado.'); } else setMoveMode(false); } });
 $('#presente').addEventListener('click', e => {
   const o = e.target.closest('[data-pres]');
   if (o) { $('#presente').hidden = true; return sendFriendGift(presenteParaUid, o.dataset.pres); }
@@ -4796,55 +4806,183 @@ const ENFEITES = [
   { id: 'bolo',       nome: 'Bolo de boas-vindas',    especial: true, conforto: 2 },
 ];
 const ENFEITE = Object.fromEntries(ENFEITES.map(e => [e.id, e]));
-// Lugares (coordenadas da grade) em cada cena.
+// Lugares antigos (saves de antes do modo Mover): viram posições livres.
 const LUGARES = {
   roca: [[2.5, -0.75], [-0.75, 5.9], [5.4, -0.75], [-0.75, 7.1], [6.6, -0.75], [-0.75, 8.3]],
   animais: [[2, RANCH_R + 0.8], [6, RANCH_R + 0.8], [10, RANCH_R + 0.8], [14, RANCH_R + 0.8], [-1.1, 6.2], [RANCH_C + 0.9, 3.2]],
 };
-const lugaresDe = (s, sc) => {
-  const l = s.lugares && Array.isArray(s.lugares[sc]) ? s.lugares[sc] : [];
-  return LUGARES[sc].map((_, k) => ENFEITE[l[k]] ? l[k] : null);
+// ---------- Objetos que dá para mudar de lugar (modo Mover) ----------
+// Posição padrão de cada coisa, em coordenadas da grade da cena.
+const POS_PADRAO = {
+  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], arv1: [3.6, -1.6], arv2: [5.8, -1.4] },
+  animais: { canil: [-1.65, 3.65], arv1: [-0.9, RANCH_R - 0.6], arv2: [RANCH_C + 0.8, 0.8] },
 };
-const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + lugaresDe(s, sc).reduce((u, id) => u + (id ? ENFEITE[id].conforto : 0), 0), 0);
+const LAGO_POS = [3.55, -1.95];
+const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 } };
+function posOf(s, sc, key) {
+  const p = s.pos && s.pos[sc] && s.pos[sc][key];
+  if (Array.isArray(p)) return p;
+  if (sc === 'roca' && key === 'arv1' && temaDe(s).lago) return [6.8, -1.2]; // o lago fica no lugar da árvore
+  return POS_PADRAO[sc][key];
+}
+const objetosDe = (s, sc) => (s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && ENFEITE[o.id]);
+function objList(s, sc) {
+  const l = Object.keys(POS_PADRAO[sc]).map(key => { const [u, v] = posOf(s, sc, key); return { key, u, v, r: OBJ_INFO[key].r }; });
+  objetosDe(s, sc).forEach((o, i) => l.push({ key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: 0.55 }));
+  return l;
+}
+const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + objetosDe(s, sc).reduce((u, o) => u + ENFEITE[o.id].conforto, 0), 0);
+// Dá para pôr fora dos canteiros e dos cercados, sem encostar em outra coisa.
+function validSpot(sc, u, v, ignora, raio = 0.55) {
+  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R];
+  if (u > -0.5 && u < B[0] + 0.5 && v > -0.5 && v < B[1] + 0.5) return false;
+  if (u < -6 || v < -6 || u > B[0] + 6 || v > B[1] + 6) return false;
+  if (sc === 'roca' && temaDe(state).lago && Math.hypot(u - LAGO_POS[0], v - LAGO_POS[1]) < 1.4) return false;
+  return objList(state, sc).every(o => o.key === ignora || Math.hypot(o.u - u, o.v - v) >= (o.r + raio) * 0.75);
+}
+function screenToWorld(x, y) {
+  const a = (x - L.ox) / (L.W / 2), b = (y - L.oy) / (L.W / 4);
+  return [Math.round((a + b) / 2 * 20) / 20, Math.round((b - a) / 2 * 20) / 20];
+}
+let moveMode = false, moving = null; // moving: { key } para mover, { novo: id } para pôr um enfeite do inventário
+function setMoveMode(on) {
+  moveMode = on; moving = null;
+  renderMoveBtn(); renderTools();
+  if (on) toast('Modo Mover: clique numa casa, árvore ou enfeite e depois no lugar novo.');
+}
+function renderMoveBtn() {
+  const b = $('#moveBtn'); if (!b) return;
+  b.hidden = !isHome() || scene === 'casa';
+  b.setAttribute('aria-pressed', String(moveMode));
+}
+function moveClick(x, y) {
+  if (!moving) {
+    const alvo = pick(x, y);
+    if (!alvo || alvo.kind !== 'obj') return toast('Clique numa casa, árvore ou enfeite para mudar de lugar.');
+    moving = { key: alvo.key };
+    return toast(`${alvo.nome || 'Pronto'}: agora clique no lugar novo. Esc cancela.`);
+  }
+  const [u, v] = screenToWorld(x, y);
+  const raio = moving.key && OBJ_INFO[moving.key] ? OBJ_INFO[moving.key].r : 0.55;
+  if (!validSpot(scene, u, v, moving.key, raio)) return toast('Aqui não dá: tem que ser fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
+  if (moving.novo) {
+    if (!(state.enfeites[moving.novo] > 0)) { moving = null; return; }
+    (state.objetos[scene] = objetosDe(state, scene)).push({ id: moving.novo, u, v });
+    state.enfeites[moving.novo]--;
+    toast(`${ENFEITE[moving.novo].nome} colocado! +${ENFEITE[moving.novo].conforto}% de XP.`, 'good');
+    moveMode = false; renderMoveBtn(); // pôr um item do inventário termina o modo
+  } else if (moving.key.startsWith('enf:')) {
+    const o = objetosDe(state, scene)[Number(moving.key.slice(4))]; if (o) { o.u = u; o.v = v; }
+  } else {
+    state.pos = state.pos || {}; (state.pos[scene] = state.pos[scene] || {})[moving.key] = [u, v];
+  }
+  moving = null; sfx('buy'); done();
+}
+// Desenha os objetos da cena. "tras": os que ficam atrás da cerca (u ou v negativos); "frente": o resto.
+function drawObjetos(s, sc, t, home, stage) {
+  const W = L.W, tm = temaDe(s);
+  let cachorroDepois = false;
+  const l = objList(s, sc).filter(o => (o.u < 0 || o.v < 0) === (stage === 'tras')).sort((a, b) => (a.u + a.v) - (b.u + b.v));
+  for (const o of l) {
+    if (moving && !moving.novo && moving.key === o.key) continue; // está na mão do jogador
+    const q = iso(o.u, o.v);
+    if (moveMode && home) {
+      ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(q.x, q.y, W * o.r * 0.55, W * o.r * 0.2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      hits.push({ kind: 'obj', key: o.key, nome: o.id ? ENFEITE[o.id].nome : OBJ_INFO[o.key].nome, x: q.x, y: q.y - W * 0.3, r: W * Math.max(0.35, o.r * 0.5) });
+    }
+    if (o.key === 'casa') {
+      drawHouse(q.x, q.y, W * 0.95, home ? '#f1dcae' : view.casa, s.skin);
+      if (!moveMode) {
+        if (hover && hover.kind === 'casa') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.6, W * 0.16, 0, 0, 7); ctx.stroke(); }
+        hits.push({ kind: 'casa', x: q.x, y: q.y - W * 0.35, r: W * 0.45 });
+      }
+    } else if (o.key === 'celeiro') {
+      drawBarn(q.x, q.y, W * 1.15, s.skin);
+      if (!moveMode) {
+        if (hover && hover.kind === 'celeiro') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.7, W * 0.18, 0, 0, 7); ctx.stroke(); }
+        hits.push({ kind: 'celeiro', x: q.x, y: q.y - W * 0.4, r: W * 0.5 });
+      }
+    } else if (o.key === 'canil') {
+      const slot = sc === 'roca' ? 'roca' : 'animais';
+      if (view.kind === 'npc') { const d = DOG_AT(); drawDog(d.x, d.y, W * 0.7, t); continue; }
+      drawKennelSpot(slot, s, home);
+      if (stage === 'tras' && sc === 'roca') cachorroDepois = true; // o cachorro vai na frente da cerca
+      else drawDogSpot(slot, s, t, home);
+    } else if (o.key === 'arv1' || o.key === 'arv2') drawTree(q.x, q.y, W * (sc === 'roca' ? (o.key === 'arv1' ? 1.0 : 0.8) : (o.key === 'arv1' ? 1.0 : 1.1)), t, sc === 'roca' && tm.coqueiro);
+    else if (o.id) {
+      const hov = !moveMode && hover && hover.kind === 'enfeite' && hover.sc === sc && hover.key === o.key;
+      if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.35, W * 0.12, 0, 0, 7); ctx.stroke(); }
+      drawEnfeite(o.id, q.x, q.y, W / 100, t);
+      if (!moveMode) hits.push({ kind: 'enfeite', sc, key: o.key, id: o.id, x: q.x, y: q.y - W * 0.25, r: W * 0.32 });
+    }
+  }
+  return cachorroDepois;
+}
+// O objeto que está sendo movido acompanha o dedo/mouse, com uma sombra verde (pode) ou vermelha (não pode).
+function drawMoving(sc, t) {
+  if (!moveMode || !moving || !isHome()) return;
+  const W = L.W, [u, v] = screenToWorld(pointer.x, pointer.y), q = iso(u, v);
+  const raio = moving.key && OBJ_INFO[moving.key] ? OBJ_INFO[moving.key].r : 0.55, ok = validSpot(sc, u, v, moving.key, raio);
+  ctx.fillStyle = ok ? 'rgba(80,200,80,.35)' : 'rgba(220,60,50,.35)';
+  ctx.beginPath(); ctx.ellipse(q.x, q.y, W * raio * 0.6, W * raio * 0.25, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = 0.75;
+  const k = moving.key, s = state;
+  if (moving.novo) drawEnfeite(moving.novo, q.x, q.y, W / 100, t);
+  else if (k.startsWith('enf:')) { const o = objetosDe(s, sc)[Number(k.slice(4))]; if (o) drawEnfeite(o.id, q.x, q.y, W / 100, t); }
+  else if (k === 'casa') drawHouse(q.x, q.y, W * 0.95, '#f1dcae', s.skin);
+  else if (k === 'celeiro') drawBarn(q.x, q.y, W * 1.15, s.skin);
+  else if (k === 'canil') drawKennel(q.x, q.y, L.W * 0.85);
+  else drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro);
+  ctx.globalAlpha = 1;
+}
 function comprarEnfeite(id) {
   const e = ENFEITE[id];
   if (e.especial) return;
   if (state.level < e.nivel) return toast(`${e.nome} libera no nível ${e.nivel}.`);
   if (state.coins < e.custo) return toast(`${e.nome} custa ${e.custo.toLocaleString('pt-BR')} moedas.`, 'bad');
-  state.coins -= e.custo; state.enfeites[id] = (state.enfeites[id] || 0) + 1;
+  state.coins -= e.custo; state.enfeites[id] = (state.enfeites[id] || 0) + 1; state.invNovos = (state.invNovos || 0) + 1;
   sfx('buy'); addXP(3, null);
-  toast(`${e.nome} comprado! Coloque na roça ou no rancho.`, 'good');
-  done();
+  toast(`${e.nome} comprado! Está no Inventário.`, 'good');
+  renderTabs(); done();
 }
-function colocarEnfeite(id, sc) {
-  if (!(state.enfeites[id] > 0)) return;
-  const l = state.lugares[sc] = lugaresDe(state, sc), k = l.indexOf(null);
-  if (k < 0) return toast(`Não tem lugar livre ${sc === 'roca' ? 'na roça' : 'no rancho'}. Guarde algum enfeite antes.`);
-  l[k] = id; state.enfeites[id]--;
-  sfx('buy');
-  toast(`${ENFEITE[id].nome} ${sc === 'roca' ? 'na roça' : 'no rancho'}!`, 'good');
-  setScene(sc); closePanel();
-  done();
-}
-function actEnfeite(sc, k) {
-  const id = lugaresDe(S(), sc)[k]; if (!id) return;
+function actEnfeite(id) {
   const e = ENFEITE[id];
-  if (!isHome()) return toast(`${e.nome} de ${view.nome}.`);
-  confirmTwice('guardar' + sc + k, `${e.nome}: +${e.conforto}% de XP. Clique de novo para guardar.`, () => {
-    state.lugares[sc][k] = null; state.enfeites[id] = (state.enfeites[id] || 0) + 1;
-    toast(`${e.nome} guardado. Coloque de novo pela Loja › Enfeites.`); done();
-  });
+  toast(isHome() ? `${e.nome}: +${e.conforto}% de XP. Para mudar de lugar, use o botão Mover; para guardar, o Inventário.` : `${e.nome} de ${view.nome}.`);
 }
-function drawLugares(s, sc, t, home) {
-  const W = L.W, l = lugaresDe(s, sc);
-  LUGARES[sc].forEach(([u, v], k) => {
-    const id = l[k]; if (!id) return;
-    const q = iso(u, v);
-    const hov = hover && hover.kind === 'enfeite' && hover.sc === sc && hover.k === k;
-    if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.35, W * 0.12, 0, 0, 7); ctx.stroke(); }
-    drawEnfeite(id, q.x, q.y, W / 100, t);
-    hits.push({ kind: 'enfeite', sc, k, x: q.x, y: q.y - W * 0.25, r: W * 0.32 });
-  });
+// ---------- Inventário: enfeites guardados e os que estão na roça ou no rancho ----------
+function inventarioHTML() {
+  if (state.invNovos) { state.invNovos = 0; setTimeout(renderTabs, 0); save(); }
+  let html = `<p class="hint">Aqui ficam os enfeites que você comprou ou ganhou. Para pôr um na roça ou no rancho, escolha e clique no lugar. Para mudar de lugar, use o botão Mover.</p>`;
+  const guardados = ENFEITES.filter(e => state.enfeites[e.id] > 0);
+  html += `<h3>Guardados</h3>`;
+  if (!guardados.length) html += `<div class="empty">Nada guardado. Compre enfeites na Loja › Enfeites.</div>`;
+  for (const e of guardados) {
+    html += `<div class="row wide ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome} × ${state.enfeites[e.id]}${e.especial ? ' <span class="tag">⭐ pioneiros</span>' : ''}</div><div class="meta">+${e.conforto}% de XP quando está na roça ou no rancho</div></div>
+      <div class="actions"><button class="btn gold" data-inv-por="${e.id}" data-sc="roca">Pôr na roça</button><button class="btn gold" data-inv-por="${e.id}" data-sc="animais">Pôr no rancho</button></div></div>`;
+  }
+  for (const sc of ['roca', 'animais']) {
+    const l = objetosDe(state, sc);
+    if (!l.length) continue;
+    html += `<h3>${sc === 'roca' ? 'Na roça' : 'No rancho'}</h3>`;
+    l.forEach((o, i) => {
+      const e = ENFEITE[o.id];
+      html += `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP</div></div><button class="btn ghost" data-inv-guardar="${sc}:${i}">Guardar</button></div>`;
+    });
+  }
+  return html;
+}
+function invPor(id, sc) {
+  if (!(state.enfeites[id] > 0)) return;
+  closePanel(); if (!isHome()) goHome(); setScene(sc);
+  moveMode = true; moving = { novo: id }; renderMoveBtn(); renderTools();
+  toast(`Clique onde quer pôr ${ENFEITE[id].nome.toLowerCase()} (fora dos canteiros e cercados). Esc cancela.`);
+}
+function invGuardar(sc, i) {
+  const l = objetosDe(state, sc), o = l[i]; if (!o) return;
+  state.objetos[sc] = l.filter((_, k) => k !== i);
+  state.enfeites[o.id] = (state.enfeites[o.id] || 0) + 1;
+  toast(`${ENFEITE[o.id].nome} guardado no inventário.`); done();
 }
 // Desenho dos enfeites, com a base em (x, y). s = escala (1 = casa de 100px).
 function drawEnfeite(id, x, y, s, t) {
@@ -4920,12 +5058,8 @@ function presentePioneiro() {
   state.enfeites.bandeira = (state.enfeites.bandeira || 0) + 1;
   state.enfeites.bolo = (state.enfeites.bolo || 0) + 1;
   state.skins.pioneiro = true; state.skin = 'pioneiro';
-  // já coloca a bandeira e o bolo na roça, nos primeiros lugares livres
-  for (const id of ['bandeira', 'bolo']) {
-    const l = state.lugares.roca = lugaresDe(state, 'roca'), k = l.indexOf(null);
-    if (k >= 0) { l[k] = id; state.enfeites[id]--; }
-  }
-  const msg = 'Presente de pioneiro! Por jogar no primeiro mês da Roça Feliz você ganhou a Bandeira dos Pioneiros, um Bolo de boas-vindas e o tema azul e dourado para o celeiro e a casa.';
+  state.invNovos = (state.invNovos || 0) + 2; // os enfeites vão para o inventário, você escolhe onde pôr
+  const msg = 'Presente de pioneiro! Por jogar no primeiro mês da Roça Feliz você ganhou a Bandeira dos Pioneiros e um Bolo de boas-vindas (estão no Inventário) e o tema azul e dourado para o celeiro e a casa.';
   addNews(msg);
   setTimeout(() => toast(msg, 'good'), 2500);
   done();
