@@ -3579,7 +3579,8 @@ function renderPane() {
           <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f ? `Roça nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`}
           ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
-          <button class="btn ${armed ? 'danger' : 'ghost'}" data-unfriend="${esc(uid)}">${armed ? 'Confirmar' : 'Excluir'}</button></div></div>`;
+          ${armed ? `<span class="meta">Excluir ${esc(firstName(name))}?</span><button class="btn ghost" data-unfriend-cancel>Cancelar</button><button class="btn danger" data-unfriend="${esc(uid)}">Confirmar</button>`
+            : `<button class="btn ghost" data-unfriend="${esc(uid)}">Excluir</button>`}</div></div>`;
       }
       const sent = Object.entries(state.sent);
       if (sent.length) {
@@ -3673,11 +3674,11 @@ $('#pane').addEventListener('click', e => {
   else if (d.accept) acceptRequest(d.accept);
   else if (d.refuse) refuseRequest(d.refuse);
   else if (d.cancelRequest) cancelRequest(d.cancelRequest);
+  else if ('unfriendCancel' in d) { unfriendArmed = null; renderPane(); }
   else if (d.unfriend) {
-    if (unfriendArmed !== d.unfriend) {
-      unfriendArmed = d.unfriend; renderPane();
-      setTimeout(() => { if (unfriendArmed === d.unfriend) { unfriendArmed = null; if (tab === 'amigos') renderPane(); } }, 4000);
-    } else { unfriendArmed = null; unfriend(d.unfriend); }
+    // primeiro clique pergunta (Cancelar / Confirmar); o segundo exclui
+    if (unfriendArmed !== d.unfriend) { unfriendArmed = d.unfriend; renderPane(); }
+    else { unfriendArmed = null; unfriend(d.unfriend); }
   }
   else if ('home' in d) goHome();
   else if ('login' in d) login();
