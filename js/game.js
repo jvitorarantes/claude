@@ -164,7 +164,10 @@ const DOG = Object.fromEntries(DOGS.map(d => [d.id, d]));
 const DOG_FOOD = { custo: 50, horas: 8 };
 const DOG_NAMES = ['Totó', 'Rex', 'Pipoca', 'Thor', 'Mel', 'Bidu', 'Paçoca', 'Nina', 'Bolinha', 'Faísca', 'Pretinha', 'Caramelo'];
 const SLOT_NAME = { roca: 'plantação', animais: 'criação' };
-const STEAL_MAX = { roca: 3, animais: 2 }; // itens por amigo por dia
+const STEAL_MAX = { roca: 3, animais: 3 }; // itens por amigo por dia
+const STEAL_FARMS = 5;                       // roças diferentes onde dá para pegar por dia
+// Dia pelo relógio do aparelho: os limites voltam à meia-noite.
+const localDay = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / DAY);
 
 const DECOR = [
   { id: 'tapete', nome: 'Tapete de crochê', custo: 600,  nivel: 1, conforto: 3 },
@@ -181,7 +184,7 @@ const DECOR_SPOT = {
   abajur: [0.6, 0.6, 0.6], sofa: [0.55, 1.95, 0.35], tv: [3.65, 0.38, 0.45],
 };
 
-// Fertilizantes: cortam uma parte do tempo total da planta. Um por colheita.
+// Fertilizantes: cada um corta uma parte do tempo total da planta. Dá para usar quantos quiser.
 const FERTS = [
   { id: 'basico',  nome: 'Fertilizante básico',  curto: 'Básico',  corta: 0.1,  custo: 50,   nivel: 1,  cor: '#c98a4b' },
   { id: 'rapido',  nome: 'Fertilizante rápido',  curto: 'Rápido',  corta: 0.25, custo: 200,  nivel: 5,  cor: '#4a8fd0' },
@@ -334,7 +337,7 @@ function load() {
     const s = migrate(JSON.parse(raw));
     if (!s) return null;
     catchUp(s, (Date.now() - (s.t || Date.now())) / 1000);
-    const old = Date.now() - 2 * 86400e3, today = Math.floor(Date.now() / DAY);
+    const old = Date.now() - 2 * 86400e3, today = localDay();
     for (const k of Object.keys(s.log)) if (s.log[k] < old) delete s.log[k];
     for (const k of Object.keys(s.limits)) if (!(s.limits[k] && s.limits[k].d >= today)) delete s.limits[k];
     return s;
@@ -502,7 +505,7 @@ function plant(p, pos) {
 
 // Quantas colheitas de cada planta já deram XP hoje.
 function xpAllowed(id) {
-  const today = Math.floor(Date.now() / DAY);
+  const today = localDay();
   if (state.xpDay.d !== today) state.xpDay = { d: today, c: {} };
   return (state.xpDay.c[id] || 0) < XP_CAP;
 }
@@ -521,7 +524,6 @@ function fertilize(p, pos) {
   const f = FERT[state.fertSel], have = state.fert[f.id] || 0;
   if (p.s !== 'growing') return toast('O adubo é para planta que está crescendo.');
   if (ripe(p)) return toast('Essa planta já está pronta para colher.');
-  if (p.fert) return toast('Essa colheita já foi adubada. Dá para adubar de novo na próxima.');
   if (p.poda) return toast('Essa árvore precisa de poda antes.');
   if (have <= 0) { openPanel('loja', 'adubo'); return toast(`Você não tem ${f.nome}. Compre na Loja.`); }
   const T = phaseTempo(p), corte = Math.min(T - p.g, T * f.corta);
@@ -930,10 +932,17 @@ function goHome() {
 
 const visitKey = id => (view.kind === 'friend' ? view.uid : view.id) + ':' + id;
 function help(pos) { state.stats.ajudas++; addXP(2, pos); addCoins(2, pos); }
-// Limite de itens por amigo por dia: 3 da plantação e 2 dos animais.
+// Limite de itens por amigo por dia: 3 da plantação e 3 dos animais, em até 5 roças.
 function stealLimit() {
-  const today = Math.floor(Date.now() / DAY), key = (view.kind === 'friend' ? view.uid : view.id) + ':' + today;
+  const today = localDay(), key = (view.kind === 'friend' ? view.uid : view.id) + ':' + today;
   return state.limits[key] || (state.limits[key] = { d: today, roca: 0, animais: 0 });
+}
+// Em quantas roças você já pegou algo hoje.
+const farmsToday = () => Object.values(state.limits).filter(l => l && l.d === localDay() && l.roca + l.animais > 0).length;
+function farmBlocked(lim) {
+  if (lim.roca + lim.animais > 0 || farmsToday() < STEAL_FARMS) return false;
+  toast(`Você já pegou de ${STEAL_FARMS} vizinhos hoje. À meia-noite libera de novo!`);
+  return true;
 }
 // O cachorro do dono pode espantar (e às vezes morder) quem tenta pegar.
 // Nos vizinhos da vila o cachorro está sempre acordado; nos amigos, só se tiver comida.
@@ -972,7 +981,8 @@ function awayPlot(i, p) {
   if (ripe(p) && tool === 'hand') {
     const key = visitKey(p.id), lim = stealLimit();
     if (alreadyTook(p, key)) return toast('Você já pegou daqui. Não exagere!');
-    if (lim.roca >= STEAL_MAX.roca) return toast(`Você já pegou ${STEAL_MAX.roca} itens da plantação de ${view.nome} hoje. Volte amanhã!`);
+    if (lim.roca >= STEAL_MAX.roca) return toast(`Você já pegou ${STEAL_MAX.roca} itens da plantação de ${view.nome} hoje. À meia-noite libera de novo!`);
+    if (farmBlocked(lim)) return;
     p.stolen = true; state.log[key] = Date.now(); lim.roca++;
     if (guarded('roca', pos, { t: 'steal', plot: i, pid: p.id, qty: 0 })) return done();
     const crop = CROP[p.c];
@@ -991,7 +1001,8 @@ function awayAnimal(a, def, prod, pos) {
   if (a.ready) {
     const key = visitKey(a.id + ':' + a.n), lim = stealLimit();
     if (alreadyTook(a, key)) return toast('Você já pegou deste bicho. Não exagere!');
-    if (lim.animais >= STEAL_MAX.animais) return toast(`Você já pegou ${STEAL_MAX.animais} itens dos animais de ${view.nome} hoje. Volte amanhã!`);
+    if (lim.animais >= STEAL_MAX.animais) return toast(`Você já pegou ${STEAL_MAX.animais} itens dos animais de ${view.nome} hoje. À meia-noite libera de novo!`);
+    if (farmBlocked(lim)) return;
     a.stolen = true; state.log[key] = Date.now(); lim.animais++;
     if (guarded('animais', pos, { t: 'stealA', animal: a.id })) return done();
     sfx('collect');
@@ -3055,7 +3066,7 @@ function renderPane() {
       html += `<div class="row"><img alt="" src="${bowlIcon()}">
         <div><div class="name">Ração especial</div><div class="meta">${RACAO_ESP} moedas · a próxima produção do animal rende em dobro. É usada quando você alimenta um animal clicando nele. Você tem <b>${state.racaoEsp}</b></div></div>
         <div class="stack"><button class="btn" data-racao-esp="1" ${state.coins < RACAO_ESP ? 'disabled' : ''}>${moeda(RACAO_ESP, 1)}</button><button class="btn ghost" data-racao-esp="5" ${state.coins < RACAO_ESP * 5 ? 'disabled' : ''}>${moeda(RACAO_ESP * 5, 5)}</button></div></div>`;
-      html += `<p class="hint">O regador é grátis. Fertilizante corta uma parte do tempo total da planta; escolha o tipo e clique numa planta com a ferramenta Adubo. Vale um por colheita.</p>`;
+      html += `<p class="hint">O regador é grátis. Fertilizante corta uma parte do tempo total da planta; escolha o tipo e clique numa planta com a ferramenta Adubo. Dá para usar quantos quiser na mesma planta.</p>`;
       for (const f of FERTS) {
         const locked = f.nivel > state.level, have = state.fert[f.id] || 0;
         const sel = state.tool === 'fert' && state.fertSel === f.id;
@@ -3233,6 +3244,7 @@ function renderPane() {
         }
       }
     }
+    html += `<p class="hint">Hoje você pegou coisas em ${farmsToday()} de ${STEAL_FARMS} roças. Em cada uma dá para pegar ${STEAL_MAX.roca} itens da plantação e ${STEAL_MAX.animais} dos animais. Tudo volta à meia-noite.</p>`;
     html += `<h3>Vizinhos da vila</h3><p class="hint">Sempre tem alguém em casa por aqui. Cada vizinho tem um cachorro de guarda.</p>`;
     for (const n of NEIGHBORS) {
       const here = view.kind === 'npc' && view.id === n.id;

@@ -11,7 +11,7 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **Roça de até 100 canteiros.** Você começa no nível 1 com 2.000 moedas e 6 canteiros. As expansões (nível 5, 10, 15, 20, 30, 40 e 50) liberam mais canteiros, e você escolhe onde colocar cada um, encostado na sua terra.
 - **19 plantações** (do nabo de 2 minutos ao maracujá de 36 horas) e **8 árvores frutíferas** (morangueiro, videira, macieira, laranjeira, bananeira, coqueiro, mangueira e goiabeira). A árvore é plantada uma vez, dá 15 colheitas e depois pede uma poda. Cada colheita rende um número sorteado numa faixa (o nabo dá de 3 a 5, por exemplo). A ferramenta escolhida acompanha o cursor e aparece em cima da planta quando é usada, com som. A terra seca atrapalha, e insetos aparecem de vez em quando, nunca os dois ao mesmo tempo. XP para o próximo nível: 100 + 50 × (nível − 1). Cada planta dá XP em até 50 colheitas por dia.
 - **Enxada** (100 moedas) para arrancar plantações e árvores.
-- **3 fertilizantes**: básico (corta 10% do tempo, 50 moedas), rápido (25%, 200) e premium (50%, 1.000). Um por colheita.
+- **3 fertilizantes**: básico (corta 10% do tempo, 50 moedas), rápido (25%, 200) e premium (50%, 1.000). Dá para usar quantos quiser na mesma planta.
 - **Música e sons**: 3 músicas calmas de roça e sons para cliques, regar, enxada, colher e mais. Tudo é sintetizado no navegador (`js/audio.js`), sem arquivos de áudio.
 - **Configurações** (engrenagem no topo): liga e desliga música e sons, volume de cada um, escolha da música e tema (automático, dia ou noite). O botão **Verificar atualizações** confere se o site tem uma versão nova; se tiver, salva a roça, limpa o cache e recarrega o jogo já atualizado. Ao publicar uma mudança, aumente o número em `rf-version` e nos `?v=` do `index.html`.
 - **Rancho com 8 abrigos**, cada um com o seu cercado: galinheiro (galinha e pato), coelheira, chiqueiro (porca e porquinho), apiário (colmeias), redil (cabra e ovelha), curral (bezerro, vaca e búfala), cocheira (cavalo, potro e burro) e viveiro (pavão e avestruz). O galinheiro já vem pronto. Os outros são construídos na Loja (aba Abrigos) ou clicando na placa no rancho. Cada abrigo tem 3 níveis: cabem 4, 6 e 8 animais. No celular, dá para arrastar o rancho para ver tudo.
@@ -26,7 +26,7 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **Login com Google, salvamento na nuvem e amigos de verdade** (precisa do Firebase, veja abaixo).
   - Cada jogador ganha um **código de amigo** de 6 letras. Digitar o código de alguém manda um **pedido de amizade**, que a pessoa pode **aceitar ou recusar** na aba Amigos. Dá para cancelar um pedido enviado e desfazer uma amizade.
   - Só amigos veem e visitam a sua roça. Quem recebe um pedido pode espiar a roça de quem pediu antes de aceitar.
-  - Na roça de um amigo você pode tirar pragas, regar, alimentar os animais ou pegar um pouquinho: até 3 itens da plantação e 2 dos animais por amigo por dia (se o cachorro deixar!). O dono recebe um aviso em "Novidades da sua roça", na aba Amigos.
+  - Na roça de um amigo você pode tirar pragas, regar, alimentar os animais ou pegar um pouquinho: até 3 itens da plantação e 3 dos animais por roça, em no máximo 5 roças por dia (se o cachorro deixar!). Os limites voltam à meia-noite. O dono recebe um aviso em "Novidades da sua roça", na aba Amigos.
 
 Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no navegador e não tem amigos de verdade.
 
