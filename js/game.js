@@ -23,6 +23,7 @@ const CROP_LIST = [
   ['nabo',     'Nabo',           1,  10,   16,   2 * MIN,       2,  4,  'raiz',     '#f5eef7', '#a45bbb'],
   ['cenoura',  'Cenoura',        1,  20,   32,   5 * MIN,       3,  4,  'raiz',     '#f08a24', '#e0761a'],
   ['trigo',    'Trigo',          2,  30,   48,   10 * MIN,      4,  6,  'grao',     '#e8c35a'],
+  ['mandioca', 'Mandioca',       2,  150,  260,  8 * HOUR,      14, 6,  'raiz',     '#c9a06a', '#8a5a33'], // demorada: planta antes de dormir
   ['milho',    'Milho',          3,  50,   80,   20 * MIN,      5,  5,  'alto',     '#f7d046'],
   ['batata',   'Batata',         4,  80,   128,  30 * MIN,      6,  8,  'raiz',     '#c9a06a', '#a47a48'],
   ['tomate',   'Tomate',         5,  120,  192,  HOUR,          8,  8,  'moita',    '#e53b2f'],
@@ -287,6 +288,7 @@ function migrate(s) {
   if (!s.missions || !Array.isArray(s.missions.dia) || !Array.isArray(s.missions.semana)) s.missions = null;
   if (typeof s.helpDay !== 'number') s.helpDay = -1;
   s.changed = Number(s.changed) || 0;
+  s.pocao = Math.max(0, Number(s.pocao) || 0);
   const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
   s.dogs = {};
   for (const slot of ['roca', 'animais']) { const d = dogs[slot]; s.dogs[slot] = d && DOG[d.raca] ? d : null; }
@@ -327,10 +329,15 @@ function migrate(s) {
 function phaseTempo(p) { const c = CROP[p.c]; return c.arvore && p.adult ? c.tempo2 : c.tempo; }
 // Faz a planta crescer "sec" segundos. Terra seca cresce mais devagar; pragas
 // vão comendo parte da colheita (no máximo 35%), proporcional ao tempo da planta.
+// Planta pronta que fica mais de 24h sem colher apodrece. Volta com uma poção ou com a ajuda de amigos.
+const PODRE_APOS = 24 * HOUR, POCAO = { custo: 150 }, CURA_MAX = 3;
 function growPlot(p, sec, events) {
   if (p.s !== 'growing' || p.poda) return;
   const crop = CROP[p.c], T = phaseTempo(p);
-  if (p.g >= T) return;
+  if (p.g >= T) {
+    if (!p.podre) { p.pronto = (p.pronto || 0) + sec; if (p.pronto >= PODRE_APOS) p.podre = true; }
+    return;
+  }
   if (events) {
     // Um problema de cada vez: ou a terra seca, ou aparecem insetos (de vez em quando).
     if (!p.dry && !p.b && Math.random() < 0.12 / T * sec) p.b = 1;
@@ -422,7 +429,7 @@ function stageOf(p) {
   if (CROP[p.c].arvore && p.adult) return !p.poda && k >= 1 ? 4 : 3; // árvore adulta: com ou sem fruta
   return k >= 1 ? 4 : k < 0.12 ? 0 : k < 0.4 ? 1 : k < 0.7 ? 2 : 3;
 }
-const ripe = p => p.s === 'growing' && !p.poda && p.g >= phaseTempo(p);
+const ripe = p => p.s === 'growing' && !p.poda && !p.podre && p.g >= phaseTempo(p);
 // Cada colheita rende um número sorteado numa faixa em volta da média (nabo: 3 a 5).
 const yieldRange = c => { const k = daEstacao(c.id) ? 1 + ESTACAO_BONUS : 1; return [Math.max(1, Math.round(c.rend * 0.75 * k)), Math.max(1, Math.round(c.rend * 1.25 * k))]; };
 const OURO_CHANCE = 0.03, OURO_VEZES = 5; // colheita dourada: rara, rende 5 vezes mais
@@ -492,6 +499,7 @@ function actPlot(i) {
   if (!isHome()) return awayPlot(i, p);
   const tool = state.tool, pos = cellCenter(i);
   if (p.s === 'locked') return clickLot(i);
+  if (p.s === 'growing' && p.podre && tool !== 'hoe') return usePotion(p, pos);
   if (tool === 'fert') return fertilize(p, pos);
   const has = t => tool === 'hand' || tool === t;
   if (p.s === 'growing' && p.b > 0 && has('pest')) { p.b--; sfx('pest'); useFx('pest', pos); track('praga'); addXP(2, pos); addCoins(1, pos); return done(); }
@@ -517,6 +525,17 @@ function actPlot(i) {
   if (hints[tool]) toast(hints[tool]);
 }
 
+function curar(p) { p.podre = false; p.pronto = 0; }
+function usePotion(p, pos) {
+  if ((state.pocao || 0) <= 0) {
+    openPanel('loja', 'adubo');
+    return toast(`${CROP[p.c].nome} apodreceu. Compre uma poção (${POCAO.custo} moedas) ou peça ajuda aos amigos.`, 'bad');
+  }
+  state.pocao--; curar(p);
+  sfx('level'); useFx('pocao', pos); popupAt(pos, 'Novinha de novo!', '#c9a6ff');
+  toast(`Poção usada: ${CROP[p.c].nome.toLowerCase()} voltou a ficar boa. Colha logo!`, 'good');
+  done();
+}
 function plant(p, pos) {
   const crop = CROP[state.seed];
   if (crop.nivel > state.level) return toast(`${crop.nome} libera no nível ${crop.nivel}.`);
@@ -622,7 +641,7 @@ function harvest(p, pos) {
   else if (state.xpDay.c[crop.id] === XP_CAP) { state.xpDay.c[crop.id]++; toast(`Hoje ${crop.nome.toLowerCase()} já deu todo o XP (${XP_CAP} colheitas). Ainda rende moedas; o XP volta amanhã.`); }
   if (crop.arvore) {
     // A árvore fica: volta a produzir. Depois de 15 colheitas, pede poda.
-    Object.assign(p, { g: 0, adult: true, h: p.h + 1, dmg: 0, w: 0, b: 0, dry: false, id: newId(), th: [], fert: false, ouro: Math.random() < OURO_CHANCE });
+    Object.assign(p, { g: 0, adult: true, h: p.h + 1, dmg: 0, w: 0, b: 0, dry: false, id: newId(), th: [], fert: false, ouro: Math.random() < OURO_CHANCE, pronto: 0, podre: false });
     if (p.h >= TREE_HARVESTS) { p.poda = true; toast(`${crop.nome} deu ${TREE_HARVESTS} colheitas e precisa de poda (${crop.poda} moedas).`); }
   } else Object.assign(p, { s: 'withered', g: 0, w: 0, b: 0, dry: false, th: [] });
   done();
@@ -899,6 +918,7 @@ function genNeighbor() {
       g: mature ? crop.tempo : crop.tempo * rand(0.15, 0.95),
       b: bug ? 1 : 0,
       dry: !bug && !mature && Math.random() < 0.25,
+      podre: mature && Math.random() < 0.2, // algumas esquecidas: dá para ajudar a salvar
     });
   }
   const animals = [];
@@ -919,7 +939,7 @@ function genNeighbor() {
 function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
   const cur = state.nb[id];
-  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry))) state.nb[id] = genNeighbor();
+  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry)) || !cur.plots.some(p => 'podre' in p)) state.nb[id] = genNeighbor();
   view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima };
   afterVisit();
   save();
@@ -1002,6 +1022,13 @@ function awayPlot(i, p) {
   if (p.b > 0 && has('pest')) { p.b--; what = 'b'; sfx('pest'); useFx('pest', pos); }
   else if (p.w > 0 && has('weed')) { p.w--; what = 'w'; sfx('weed'); }
   else if (p.dry && has('water')) { p.dry = false; what = 'dry'; sfx('water'); useFx('water', pos); track('regar'); }
+  if (!what && p.podre && tool === 'hand') {
+    const lim = stealLimit();
+    if ((lim.cura || 0) >= CURA_MAX) return toast(`Você já salvou ${CURA_MAX} plantas de ${view.nome} hoje. À meia-noite libera de novo!`);
+    lim.cura = (lim.cura || 0) + 1; curar(p); what = 'podre';
+    state.log[visitKey(p.id)] = Date.now(); // quem salvou a planta não pode pegar dela depois
+    sfx('level'); useFx('pocao', pos); popupAt(pos, 'Salvou a planta!', '#c9a6ff');
+  }
   if (what) { help(pos); sendVisit({ t: 'help', what, plot: i, pid: p.id }); return done(); }
   if (ripe(p) && tool === 'hand') {
     const key = visitKey(p.id), lim = stealLimit();
@@ -1065,6 +1092,7 @@ function applyVisits(list) {
       if (v.what === 'w') p.w = Math.max(0, p.w - 1);
       if (v.what === 'b') p.b = Math.max(0, p.b - 1);
       if (v.what === 'dry') p.dry = false;
+      if (v.what === 'podre') curar(p);
       note('ajudou na sua roça'); helpedBy(v.from, who);
     } else if (v.t === 'steal' && p && p.id === v.pid && p.s === 'growing') {
       const qty = 1;
@@ -2389,6 +2417,13 @@ function drawBubbleAt(x, y, kind, obj, t, seed) {
     ctx.strokeStyle = '#c8402f'; ctx.lineWidth = 1.6 * s;
     ctx.beginPath(); ctx.arc(x - 5 * s, y + 5 * s, 2.2 * s, 0, 7); ctx.moveTo(x + 7.2 * s, y + 5 * s); ctx.arc(x + 5 * s, y + 5 * s, 2.2 * s, 0, 7); ctx.stroke();
     ctx.lineCap = 'butt';
+  } else if (kind === 'podre') {
+    // vidrinho de poção
+    ctx.fillStyle = '#b48ce0'; ctx.strokeStyle = '#5a3a8a'; ctx.lineWidth = 1.2 * s;
+    ctx.beginPath(); ctx.arc(x, y + 2 * s, 5 * s, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#8fdc5a'; ctx.beginPath(); ctx.arc(x, y + 3 * s, 3.5 * s, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#e0d4f5'; ctx.fillRect(x - 1.8 * s, y - 6 * s, 3.6 * s, 4 * s);
+    ctx.fillStyle = '#8a5a2b'; ctx.fillRect(x - 2.2 * s, y - 7.5 * s, 4.4 * s, 2 * s);
   } else if (kind === 'vet') {
     ctx.fillStyle = '#e03a2f'; ctx.fillRect(x - 1.8 * s, y - 6 * s, 3.6 * s, 12 * s); ctx.fillRect(x - 6 * s, y - 1.8 * s, 12 * s, 3.6 * s);
   } else if (kind === 'sell') {
@@ -2482,8 +2517,9 @@ function drawPlot(i, p, t, home) {
     const st = p.s === 'growing' ? stageOf(p) : 4;
     if (crop && crop.arvore && crop.tipo !== 'moita' && p.s === 'growing') {
       const q = iso(c + 0.5, r + 0.58);
-      if (p.ouro) goldGlow(c, r, t, st);
-      drawFruitTree(q.x, q.y, W / 100 * 1.05, crop, st, t);
+      if (p.ouro && !p.podre) goldGlow(c, r, t, st);
+      drawFruitTree(q.x, q.y, W / 100 * 1.05, crop, p.podre ? 2 : st, t);
+      if (p.podre) drawRot(c, r, t);
       if (p.ouro) goldSparkle(c, r, t, st);
       for (let k = 0; k < p.b; k++) { const qb = iso(c + 0.3 + k * 0.15, r + 0.75); drawBug(qb.x, qb.y, W / 100, t, k + i); }
       return;
@@ -2491,7 +2527,8 @@ function drawPlot(i, p, t, home) {
     const big = crop && crop.tipo === 'chao' && st >= 3;
     const s = W / 100 * (big ? 1.25 : 0.72) * (st === 0 ? 1.2 : 1);
     if (p.ouro && p.s === 'growing') goldGlow(c, r, t, st);
-    for (const [u, v] of (big ? BIG_SPOTS : PLANT_SPOTS)) { const q = iso(c + u, r + v); drawPlant(q.x, q.y, s, crop, st, t, p.s === 'withered'); }
+    for (const [u, v] of (big ? BIG_SPOTS : PLANT_SPOTS)) { const q = iso(c + u, r + v); drawPlant(q.x, q.y, s, crop, st, t, p.s === 'withered' || p.podre); }
+    if (p.podre) drawRot(c, r, t);
     if (p.ouro && p.s === 'growing') goldSparkle(c, r, t, st);
     for (let k = 0; k < p.b; k++) { const q = iso(c + 0.45 + k * 0.15, r + 0.5); drawBug(q.x, q.y, W / 100, t, k + i); }
   }
@@ -2524,6 +2561,13 @@ function drawLandSign() {
   ctx.fillStyle = txt[2]; ctx.fillText(txt[1], bx, top + bh * 0.72);
   hits.push({ kind: 'land', x: bx, y: top + bh / 2, r: Math.max(bw / 2, 30) });
 }
+// Planta podre: manchas escuras no chão e mosquinhas voando.
+function drawRot(c, r, t) {
+  const m = iso(c + 0.5, r + 0.5), W = L.W;
+  ctx.fillStyle = 'rgba(70,50,30,.35)'; ctx.beginPath(); ctx.ellipse(m.x, m.y, W * 0.35, W * 0.15, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#222';
+  for (let k = 0; k < 3; k++) { const a = t / 180 + k * 2.1; ctx.beginPath(); ctx.arc(m.x + Math.cos(a) * W * 0.18, m.y - W * 0.3 + Math.sin(a * 1.7) * W * 0.08, Math.max(1.2, W * 0.012), 0, 7); ctx.fill(); }
+}
 // Planta dourada: brilho no chão e estrelinhas piscando (mais fortes quando está pronta).
 function goldGlow(c, r, t, st) {
   const m = iso(c + 0.5, r + 0.5), W = L.W, k = st >= 4 ? 1 : 0.5;
@@ -2542,6 +2586,7 @@ function plotBubble(p, home) {
   if (p.s === 'withered') return home ? 'hoe' : null;
   if (p.s !== 'growing') return null;
   if (p.poda) return home ? 'poda' : null;
+  if (p.podre) return 'podre';
   if (p.b) return 'pest';
   if (p.w) return 'weed';
   if (p.dry) return 'water';
@@ -2867,7 +2912,7 @@ function drawRoom(s, t, home) {
 // O item escolhido acompanha o cursor e, ao usar, aparece em cima da planta (regando, borrifando…).
 const toolImgs = {};
 function toolImg(kind) {
-  const src = kind === 'seed' ? cropIcon(state.seed) : kind === 'fert' ? fertIcon(state.fertSel)
+  const src = kind === 'seed' ? cropIcon(state.seed) : kind === 'fert' ? fertIcon(state.fertSel) : kind === 'pocao' ? potionIcon()
     : TOOL_ICONS[kind] && 'data:image/svg+xml,' + encodeURIComponent(TOOL_ICONS[kind].replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" '));
   if (!src) return null;
   if (!toolImgs[src]) { const im = new Image(); im.src = src; toolImgs[src] = im; }
@@ -2876,7 +2921,7 @@ function toolImg(kind) {
 }
 const fxs = [];
 function useFx(kind, pos) { if (pos) fxs.push({ kind, x: pos.x, y: pos.y, t0: performance.now() }); }
-const FX_COLOR = { water: '#3aa0e8', pest: 'rgba(210,225,235,.9)', fert: '#ffd54a', seed: '#8a5a2b', hoe: '#6b3f1d' };
+const FX_COLOR = { pocao: '#b48ce0', water: '#3aa0e8', pest: 'rgba(210,225,235,.9)', fert: '#ffd54a', seed: '#8a5a2b', hoe: '#6b3f1d' };
 function drawFx(t) {
   const W = L.W, S = clamp(W * 0.42, 30, 60);
   for (let k = fxs.length - 1; k >= 0; k--) {
@@ -2976,6 +3021,14 @@ const abrigoIcon = id => makeIcon('ab:' + id, () => {
   const m = P(SHED.u + SHED.w / 2, SHED.v + SHED.d / 2, 0.3);
   L.ox = 44 - m.x; L.oy = 60 - m.y;
   drawShed(id, 0, 0, 0, 0);
+});
+const potionIcon = () => makeIcon('pocao', () => {
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(48, 86, 24, 6, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#b48ce0'; ctx.strokeStyle = '#5a3a8a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(48, 60, 24, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#8fdc5a'; ctx.beginPath(); ctx.arc(48, 62, 19, 0.1, Math.PI - 0.1); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(38, 50, 5, 8, -0.5, 0, 7); ctx.fill();
+  ctx.fillStyle = '#e0d4f5'; ctx.fillRect(40, 22, 16, 16); ctx.fillStyle = '#8a5a2b'; ctx.fillRect(38, 14, 20, 9);
 });
 const itemIcon = id => PRODUCE[id] ? cropIcon(PRODUCE[id].planta) : productIcon(id);
 const dogIcon = raca => makeIcon('dog:' + raca, () => drawDog(50, 88, 118, 0, raca, false));
@@ -3211,6 +3264,9 @@ function renderPane() {
       html += `<div class="row"><img alt="" src="${bowlIcon()}">
         <div><div class="name">Ração especial</div><div class="meta">${RACAO_ESP} moedas · a próxima produção do animal rende em dobro. É usada quando você alimenta um animal clicando nele. Você tem <b>${state.racaoEsp}</b></div></div>
         <div class="stack"><button class="btn" data-racao-esp="1" ${state.coins < RACAO_ESP ? 'disabled' : ''}>${moeda(RACAO_ESP, 1)}</button><button class="btn ghost" data-racao-esp="5" ${state.coins < RACAO_ESP * 5 ? 'disabled' : ''}>${moeda(RACAO_ESP * 5, 5)}</button></div></div>`;
+      html += `<div class="row"><img alt="" src="${potionIcon()}">
+        <div><div class="name">Poção</div><div class="meta">${POCAO.custo} moedas · salva uma planta que apodreceu (ficou mais de 24h pronta sem colher). Você tem <b>${state.pocao || 0}</b></div></div>
+        <div class="stack"><button class="btn" data-pocao="1" ${state.coins < POCAO.custo ? 'disabled' : ''}>${moeda(POCAO.custo, 1)}</button><button class="btn ghost" data-pocao="3" ${state.coins < POCAO.custo * 3 ? 'disabled' : ''}>${moeda(POCAO.custo * 3, 3)}</button></div></div>`;
       html += `<p class="hint">O regador é grátis. Fertilizante corta uma parte do tempo total da planta; escolha o tipo e clique numa planta com a ferramenta Adubo. Dá para usar quantos quiser na mesma planta.</p>`;
       for (const f of FERTS) {
         const locked = f.nivel > state.level, have = state.fert[f.id] || 0;
@@ -3435,6 +3491,11 @@ $('#pane').addEventListener('click', e => {
   if (d.mseg) { missSeg = d.mseg; renderPane(); $('#pane').scrollTop = 0; return; }
   if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
   if (d.temaRoca) return buyTema(d.temaRoca);
+  if (d.pocao) {
+    const n = Number(d.pocao) || 1;
+    if (state.coins < POCAO.custo * n) return toast(`Faltam moedas: ${n} ${n > 1 ? 'poções custam' : 'poção custa'} ${POCAO.custo * n}.`, 'bad');
+    state.coins -= POCAO.custo * n; state.pocao = (state.pocao || 0) + n; sfx('buy'); toast(`+${n} ${n > 1 ? 'poções' : 'poção'}`, 'good'); return done();
+  }
   if (d.giftPick) { state.giftPick = d.giftPick; save(); return renderPane(); }
   if (d.sendGift) return sendFriendGift(d.sendGift);
   if (d.sellAnimal) {
@@ -3558,10 +3619,11 @@ function tipPlot(i) {
   if (p.s === 'plowed') return home ? `<b>Terra arada</b><br>Clique para plantar ${CROP[state.seed].nome}.` : '<b>Terra arada</b>';
   if (p.s === 'withered') return '<b>Planta seca</b><br>Use a Mão ou a enxada para limpar.';
   const crop = CROP[p.c], st = stageOf(p), T = phaseTempo(p), k = Math.min(1, p.g / T);
+  if (p.podre) return `<b>${crop.nome} podre</b><br>Ficou mais de 24h sem colher.<br>${home ? `Clique para usar uma poção (você tem ${state.pocao || 0}) ou peça ajuda a um amigo.` : 'Clique para salvar a planta do seu amigo!'}`;
   if (p.poda) return `<b>${crop.nome}</b><br>Precisa de poda para voltar a produzir.<br>${home ? `Clique com a Mão para podar (${crop.poda} moedas).` : ''}`;
   let h = `<b>${crop.nome}</b> · ${crop.arvore && p.adult ? (st === 4 ? 'Com frutas' : 'Dando frutas') : STAGE_NAMES[st]}`;
   if (st < 4 || k < 1) h += `<br>Fica pronto em ${fmt((T - p.g) / (p.dry ? 0.7 : 1))}`;
-  else h += !home && (p.stolen || state.log[visitKey(p.id)]) ? '<br>Você já pegou daqui.' : '<br>Pronto para colher!';
+  else h += !home && (p.stolen || state.log[visitKey(p.id)]) ? '<br>Você já pegou daqui.' : `<br>Pronto para colher! Apodrece em ${fmt(Math.max(60, PODRE_APOS - (p.pronto || 0)))}`;
   h += `<div class="bar"><i style="width:${k * 100}%"></i></div>`;
   const probs = [];
   if (p.w) probs.push(`${p.w} mato`); if (p.b) probs.push(`${p.b} praga${p.b > 1 ? 's' : ''}`); if (p.dry) probs.push('terra seca');
@@ -4005,8 +4067,8 @@ function helpBack(pos) {
 function npcHelps() {
   if (Math.random() > 0.6) return;
   const nb = NEIGHBORS[Math.floor(Math.random() * NEIGHBORS.length)];
-  const p = state.plots.find(q => q.s === 'growing' && (q.b || q.dry));
-  if (p) { p.b = 0; p.dry = false; }
+  const p = state.plots.find(q => q.s === 'growing' && (q.b || q.dry || q.podre));
+  if (p) { p.b = 0; p.dry = false; if (p.podre) curar(p); }
   helpedBy(nb.id, nb.nome);
   addNews(`${nb.nome} passou aqui e ${p ? 'cuidou de uma planta sua' : 'deu uma olhada na sua roça'}. Ajude de volta em até 2 dias e ganhe ${AJUDA_BONUS.moedas} moedas!`);
 }
