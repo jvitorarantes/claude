@@ -3562,11 +3562,7 @@ function renderPane() {
         }
       }
       html += `<h3>Seus amigos</h3>`;
-      if (state.friends.length) {
-        const g = giftsToday(), pick = state.giftPick || PRESENTE_AMIGO[0].id;
-        html += `<p class="hint">Mande um presente por dia para até ${PRESENTE_MAX} amigos (hoje: ${g.to.length} de ${PRESENTE_MAX}). Não custa nada! Escolha o presente:</p>
-          <div class="seg small" role="radiogroup" aria-label="Presente">${PRESENTE_AMIGO.map(p => `<button type="button" data-gift-pick="${p.id}" aria-selected="${pick === p.id}">${p.nome}</button>`).join('')}</div>`;
-      }
+      if (state.friends.length) html += `<p class="hint">Mande um presente por dia para até ${PRESENTE_MAX} amigos (hoje: ${giftsToday().to.length} de ${PRESENTE_MAX}). Não custa nada!</p>`;
       if (!state.friends.length) html += `<div class="empty">Mande seu código para um amigo e peça o dele. A amizade começa quando um aceitar o pedido do outro.</div>`;
       for (const uid of state.friends) {
         fetchFriendInfo(uid);
@@ -3624,8 +3620,7 @@ $('#pane').addEventListener('click', e => {
     if (state.coins < POCAO.custo * n) return toast(`Faltam moedas: ${n} ${n > 1 ? 'poções custam' : 'poção custa'} ${POCAO.custo * n}.`, 'bad');
     state.coins -= POCAO.custo * n; state.pocao = (state.pocao || 0) + n; sfx('buy'); toast(`+${n} ${n > 1 ? 'poções' : 'poção'}`, 'good'); return done();
   }
-  if (d.giftPick) { state.giftPick = d.giftPick; save(); return renderPane(); }
-  if (d.sendGift) return sendFriendGift(d.sendGift);
+  if (d.sendGift) return escolherPresente(d.sendGift);
   if (d.sellAnimal) {
     const a = state.animals.find(x => x.id === d.sellAnimal); if (!a) return;
     const key = 'venda' + a.id;
@@ -3981,6 +3976,11 @@ function openSettings() { if ($('#verTxt')) $('#verTxt').textContent = `Versão 
 function closeSettings() { $('#settings').hidden = true; $('#openSettings').focus(); }
 $('#openSettings').addEventListener('click', openSettings);
 $('#giftBtn').addEventListener('click', showGift);
+$('#presente').addEventListener('click', e => {
+  const o = e.target.closest('[data-pres]');
+  if (o) { $('#presente').hidden = true; return sendFriendGift(presenteParaUid, o.dataset.pres); }
+  if (e.target === $('#presente') || e.target.closest('[data-close]')) $('#presente').hidden = true;
+});
 $('#nomeForm').addEventListener('submit', saveName);
 $('#nome').addEventListener('click', e => { if (e.target === $('#nome') || e.target.closest('[data-close]')) { $('#nome').hidden = true; nomeDe = null; } });
 $('#giftOpen').addEventListener('click', openGift);
@@ -4177,9 +4177,23 @@ function giftsToday() {
   if (!state.sentGifts || state.sentGifts.d !== localDay()) state.sentGifts = { d: localDay(), to: [] };
   return state.sentGifts;
 }
-async function sendFriendGift(uid) {
+// Antes de enviar, abre uma janelinha para escolher o presente daquele amigo.
+let presenteParaUid = null;
+function escolherPresente(uid) {
+  const g = giftsToday();
+  if (g.to.includes(uid)) return toast('Você já mandou um presente para essa pessoa hoje.');
+  if (g.to.length >= PRESENTE_MAX) return toast(`Você já mandou ${PRESENTE_MAX} presentes hoje. À meia-noite libera de novo!`);
+  presenteParaUid = uid;
+  const f = friendInfo[uid];
+  $('#presTxt').textContent = `Escolha o presente para ${firstName(f && f.name ? f.name : 'seu amigo')}. Não custa nada!`;
+  const icon = { basico: fertIcon('basico'), racao: bowlIcon(), racaoCao: dogIcon('caramelo') };
+  $('#presOpcoes').innerHTML = PRESENTE_AMIGO.map(p => `<button type="button" class="presopt" data-pres="${p.id}"><img alt="" src="${p.id === 'moedas' ? giftIcon({ moedas: 100 }) : icon[p.id]}"><span>${p.nome}</span></button>`).join('');
+  $('#presente').hidden = false;
+  $('#presOpcoes button').focus();
+}
+async function sendFriendGift(uid, escolha) {
   if (!user) return;
-  const g = giftsToday(), pick = PRESENTE_AMIGO.find(p => p.id === state.giftPick) || PRESENTE_AMIGO[0];
+  const g = giftsToday(), pick = PRESENTE_AMIGO.find(p => p.id === escolha) || PRESENTE_AMIGO[0];
   if (g.to.includes(uid)) return toast('Você já mandou um presente para essa pessoa hoje.');
   if (g.to.length >= PRESENTE_MAX) return toast(`Você já mandou ${PRESENTE_MAX} presentes hoje. À meia-noite libera de novo!`);
   g.to.push(uid); renderPane();
