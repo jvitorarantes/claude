@@ -350,6 +350,8 @@ function migrate(s) {
     s.decor[lugar] = m.id; s.decorTem[m.id] = true;
   }
   s.friends = Array.isArray(s.friends) ? s.friends.filter(f => typeof f === 'string') : [];
+  // cópia de segurança de quem já foi amigo (só sai daqui quando você exclui a pessoa)
+  s.amigosVistos = obj(s.amigosVistos); for (const f of s.friends) s.amigosVistos[f] = 1;
   s.sent = s.sent && typeof s.sent === 'object' && !Array.isArray(s.sent) ? s.sent : {};
   s.fert = s.fert && typeof s.fert === 'object' ? s.fert : {};
   if (!FERT[s.fertSel]) s.fertSel = 'basico';
@@ -1339,7 +1341,7 @@ async function onUser(u) {
     });
     unsubVisits = Cloud.watchVisits(u.uid, applyVisits);
     unsubRequests = Cloud.watchRequests(u.uid, onRequests);
-    checkSent();
+    checkSent(); recuperarAmigos();
     enterGame();
     toast(`Olá, ${firstName(u.name)}! Bom te ver na roça.`, 'good');
   } catch (e) {
@@ -1446,6 +1448,7 @@ async function addFriend(code) {
 async function acceptRequest(uid) {
   if (!user) return;
   if (!state.friends.includes(uid)) state.friends.push(uid);
+  (state.amigosVistos ||= {})[uid] = 1;
   delete state.sent[uid];
   const r = requests.find(x => x.from === uid);
   requests = requests.filter(x => x.from !== uid);
@@ -1472,6 +1475,7 @@ async function cancelRequest(uid) {
 
 async function unfriend(uid) {
   state.friends = state.friends.filter(f => f !== uid);
+  if (state.amigosVistos) delete state.amigosVistos[uid];
   delete friendInfo[uid];
   if (view.kind === 'friend' && view.uid === uid) goHome();
   done(); await cloudSave();
@@ -1493,6 +1497,7 @@ async function checkSent() {
       if (farm && Array.isArray(farm.friends) && farm.friends.includes(user.uid)) {
         delete state.sent[uid];
         if (!state.friends.includes(uid)) state.friends.push(uid);
+        (state.amigosVistos ||= {})[uid] = 1;
         toast(`${firstName(farm.name || 'Seu amigo')} aceitou seu pedido de amizade!`, 'good');
         changed = true;
         continue;
@@ -1505,18 +1510,43 @@ async function checkSent() {
 }
 
 function fetchFriendInfo(uid) {
-  if (friendInfo[uid] !== undefined) return;
+  if (!user || friendInfo[uid] !== undefined) return;
   friendInfo[uid] = 'loading';
   Cloud.loadFarm(uid).then(f => {
     friendInfo[uid] = f ? { name: f.name || 'Amigo', photo: f.photo || '', level: f.level || 1 } : null;
   }).catch(e => {
-    friendInfo[uid] = null;
-    // Sem permissão = a pessoa desfez a amizade. Tira da sua lista também.
-    if (e && e.code === 'permission-denied' && state.friends.includes(uid)) {
-      state.friends = state.friends.filter(f => f !== uid);
-      done(); cloudSave();
-    }
+    // Não conseguiu ler (sem internet, login ainda carregando, ou a pessoa desfez a amizade):
+    // NUNCA apaga o amigo sozinho. Um erro passageiro apagava amigos de verdade.
+    friendInfo[uid] = { erro: true, name: 'Amigo', photo: '', level: 0 };
+    setTimeout(() => { if (friendInfo[uid] && friendInfo[uid].erro) delete friendInfo[uid]; }, 60000); // tenta de novo depois
   }).finally(() => { if (tab === 'amigos') renderPane(); });
+}
+// Recupera amigos que sumiram da lista: procura quem já foi seu amigo (cópia de segurança e rastros
+// como visitas, presentes e ajudas) e devolve para a lista quem ainda tem você na lista dele.
+let recuperando = false;
+async function recuperarAmigos() {
+  if (!user || recuperando) return;
+  recuperando = true;
+  try {
+    const npc = new Set(NEIGHBORS.map(n => n.id)), cand = new Set(Object.keys(state.amigosVistos || {}));
+    const add = k => { const uid = String(k).split(':')[0]; if (uid.length >= 20 && !npc.has(uid)) cand.add(uid); };
+    Object.keys(state.log || {}).forEach(add); Object.keys(state.limits || {}).forEach(add); Object.keys(state.owe || {}).forEach(add);
+    ((state.sentGifts && state.sentGifts.to) || []).forEach(add);
+    const voltaram = [];
+    for (const uid of cand) {
+      if (uid === user.uid || state.friends.includes(uid)) continue;
+      let farm = null;
+      try { farm = await Cloud.loadFarm(uid); } catch (e) { continue; }
+      if (farm && Array.isArray(farm.friends) && farm.friends.includes(user.uid)) {
+        state.friends.push(uid); (state.amigosVistos ||= {})[uid] = 1; delete friendInfo[uid];
+        voltaram.push(firstName(farm.name || 'Amigo'));
+      }
+    }
+    if (voltaram.length) {
+      done(); await cloudSave();
+      toast(`Amigos de volta na sua lista: ${voltaram.join(', ')}.`, 'good');
+    }
+  } finally { recuperando = false; }
 }
 
 // ============================================================
@@ -3770,9 +3800,9 @@ function renderPane() {
         const name = f ? f.name : 'Amigo';
         const armed = unfriendArmed === uid;
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
-          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f ? `Roça nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
-          <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`}
-          ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
+          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f && f.erro ? 'Não deu para ver a roça agora' : f ? `Roça nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
+          <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f && !f.erro ? '' : 'disabled'}>Visitar</button>`}
+          ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && !f.erro && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
           ${armed ? `<span class="meta">Excluir ${esc(firstName(name))}?</span><button class="btn ghost" data-unfriend-cancel>Cancelar</button><button class="btn danger" data-unfriend="${esc(uid)}">Confirmar</button>`
             : `<button class="btn ghost" data-unfriend="${esc(uid)}">Excluir</button>`}</div></div>`;
       }
