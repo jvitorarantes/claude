@@ -4,29 +4,67 @@
 // ============================================================
 // Dados do jogo
 // ============================================================
-const COLS = 8, ROWS = 5, N = COLS * ROWS, START_PLOTS = 6;
+const COLS = 10, ROWS = 10, N = COLS * ROWS;
+const START_LOTS = [0, 1, 2, 10, 11, 12]; // os 6 canteiros iniciais, no canto perto do celeiro
 const PEN_C = 6, PEN_R = 4, ROOM = 5, MAX_ANIMALS = 15;
 const HOUR = 3600, DAY = 86400e3; // HOUR em segundos (tempos de produção), DAY em milissegundos (idades)
-const SAVE_KEY = 'roca-feliz-v2', OLD_SAVE_KEY = 'roca-feliz-v1', SETTINGS_KEY = 'roca-feliz-config';
+const SAVE_KEY = 'roca-feliz-v3', OLD_SAVE_KEYS = ['roca-feliz-v2', 'roca-feliz-v1'], SETTINGS_KEY = 'roca-feliz-config';
 const settings = Object.assign(
   { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.7, track: 0, tema: 'auto' },
   (() => { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (e) { return {}; } })(),
 );
 const Cloud = window.RFCloud || { available: false };
 
+// Plantações. custo = semente de 1 canteiro; venda = quanto vale a colheita inteira do canteiro
+// (sempre 1,6 × a semente), dividida em "rend" unidades.
+const MIN = 60;
+const CROP_LIST = [
+  // id, nome, nível, semente, venda, tempo, XP, unidades, tipo, cores
+  ['nabo',     'Nabo',           1,  10,   16,   2 * MIN,       2,  4,  'raiz',     '#f5eef7', '#a45bbb'],
+  ['cenoura',  'Cenoura',        1,  20,   32,   5 * MIN,       3,  4,  'raiz',     '#f08a24', '#e0761a'],
+  ['trigo',    'Trigo',          2,  30,   48,   10 * MIN,      4,  6,  'grao',     '#e8c35a'],
+  ['milho',    'Milho',          3,  50,   80,   20 * MIN,      5,  5,  'alto',     '#f7d046'],
+  ['batata',   'Batata',         4,  80,   128,  30 * MIN,      6,  8,  'raiz',     '#c9a06a', '#a47a48'],
+  ['tomate',   'Tomate',         5,  120,  192,  HOUR,          8,  8,  'moita',    '#e53b2f'],
+  ['alface',   'Alface',         6,  150,  240,  1.5 * HOUR,    9,  6,  'folha',    '#8fd05a'],
+  ['cebola',   'Cebola',         8,  200,  320,  2.5 * HOUR,    11, 8,  'raiz',     '#b8617e', '#e6c07a'],
+  ['abobora',  'Abóbora',        9,  250,  400,  4 * HOUR,      12, 4,  'chao',     '#f28c1b', '#c9650a'],
+  ['melancia', 'Melancia',       12, 400,  640,  6 * HOUR,      15, 4,  'chao',     '#4d9a3e', '#2a5e27'],
+  ['pepino',   'Pepino',         13, 450,  720,  5 * HOUR,      15, 8,  'pendente', '#4f8f3a', null, 'longo'],
+  ['pimentao', 'Pimentão',       14, 500,  800,  7 * HOUR,      16, 8,  'pendente', '#d8342a'],
+  ['abacaxi',  'Abacaxi',        16, 700,  1120, 10 * HOUR,     20, 4,  'abacaxi',  '#e0a83a'],
+  ['mamao',    'Mamão',          17, 800,  1280, 12 * HOUR,     20, 4,  'pendente', '#f39a3a'],
+  ['pera',     'Pera',           20, 1100, 1760, 16 * HOUR,     25, 8,  'pendente', '#c9d45a'],
+  ['limao',    'Limão',          23, 1400, 2240, 20 * HOUR,     27, 16, 'moita',    '#9ccf3a'],
+  ['cafe',     'Café',           26, 1800, 2880, 24 * HOUR,     30, 16, 'moita',    '#c0302a', null, 'pequeno'],
+  ['conde',    'Fruta-do-conde', 29, 2400, 3840, 32 * HOUR,     38, 6,  'pendente', '#8fbf6a', null, 'redondo'],
+  ['maracuja', 'Maracujá',       30, 2500, 4000, 36 * HOUR,     40, 10, 'pendente', '#f2d03a', null, 'redondo'],
+];
+// Árvores: compra a muda uma vez, a primeira colheita demora mais e depois repete na metade do tempo.
+// Cada colheita vale 0,6 × a muda. Depois de 15 colheitas a árvore pede uma poda.
+const TREE_LIST = [
+  // id, nome, fruta, nome da fruta, nível, muda, 1ª colheita, próximas, XP, unidades, tipo, cores
+  ['morangueiro', 'Morangueiro', 'morango', 'Morango', 7,  180,  2 * HOUR,  HOUR,      10, 12, 'moita',     '#e0224a', null, 'pequeno'],
+  ['videira',     'Videira',     'uva',     'Uva',     15, 600,  8 * HOUR,  4 * HOUR,  18, 8,  'videira',   '#6b3a8a'],
+  ['macieira',    'Macieira',    'maca',    'Maçã',    18, 900,  12 * HOUR, 6 * HOUR,  22, 10, 'arvore',    '#d8342a'],
+  ['laranjeira',  'Laranjeira',  'laranja', 'Laranja', 19, 1000, 14 * HOUR, 7 * HOUR,  23, 10, 'arvore',    '#f28c1b'],
+  ['bananeira',   'Bananeira',   'banana',  'Banana',  22, 1300, 18 * HOUR, 9 * HOUR,  25, 12, 'bananeira', '#f2d03a'],
+  ['coqueiro',    'Coqueiro',    'coco',    'Coco',    24, 1500, 22 * HOUR, 11 * HOUR, 28, 6,  'palmeira',  '#7a5a3a'],
+  ['mangueira',   'Mangueira',   'manga',   'Manga',   27, 2000, 28 * HOUR, 14 * HOUR, 32, 8,  'arvore',    '#f2a03a', '#d8442a'],
+  ['goiabeira',   'Goiabeira',   'goiaba',  'Goiaba',  28, 2200, 30 * HOUR, 15 * HOUR, 35, 10, 'arvore',    '#c9d45a', '#e8788a'],
+];
+const TREE_HARVESTS = 15;
 const CROPS = [
-  { id: 'nabo',      nome: 'Nabo',      custo: 2,  tempo: 40,   rend: 6,  preco: 1,  xp: 2,  nivel: 1, safras: 1, tipo: 'raiz', cor: '#f5eef7', cor2: '#a45bbb' },
-  { id: 'cenoura',   nome: 'Cenoura',   custo: 4,  tempo: 90,   rend: 6,  preco: 2,  xp: 4,  nivel: 1, safras: 1, tipo: 'raiz', cor: '#f08a24', cor2: '#e0761a' },
-  { id: 'milho',     nome: 'Milho',     custo: 8,  tempo: 180,  rend: 5,  preco: 4,  xp: 7,  nivel: 2, safras: 2, tipo: 'alto', cor: '#f7d046' },
-  { id: 'tomate',    nome: 'Tomate',    custo: 12, tempo: 300,  rend: 8,  preco: 3,  xp: 10, nivel: 3, safras: 3, tipo: 'moita', cor: '#e53b2f' },
-  { id: 'berinjela', nome: 'Berinjela', custo: 15, tempo: 420,  rend: 7,  preco: 5,  xp: 13, nivel: 4, safras: 2, tipo: 'pendente', cor: '#6b2e7a' },
-  { id: 'morango',   nome: 'Morango',   custo: 22, tempo: 600,  rend: 10, preco: 5,  xp: 18, nivel: 5, safras: 4, tipo: 'moita', cor: '#e0224a', pequeno: true },
-  { id: 'abobora',   nome: 'Abóbora',   custo: 30, tempo: 900,  rend: 4,  preco: 18, xp: 26, nivel: 6, safras: 1, tipo: 'chao', cor: '#f28c1b', cor2: '#c9650a' },
-  { id: 'melancia',  nome: 'Melancia',  custo: 45, tempo: 1500, rend: 3,  preco: 36, xp: 40, nivel: 8, safras: 2, tipo: 'chao', cor: '#4d9a3e', cor2: '#2a5e27' },
+  ...CROP_LIST.map(([id, nome, nivel, custo, venda, tempo, xp, rend, tipo, cor, cor2, forma]) =>
+    ({ id, nome, nivel, custo, tempo, xp, rend, preco: Math.round(venda / rend), prod: id, prodNome: nome, tipo, cor, cor2: cor2 || cor, forma, pequeno: forma === 'pequeno' })),
+  ...TREE_LIST.map(([id, nome, prod, prodNome, nivel, custo, tempo, tempo2, xp, rend, tipo, cor, cor2, forma]) =>
+    ({ id, nome, nivel, custo, tempo, tempo2, xp, rend, preco: Math.round(custo * 0.6 / rend), prod, prodNome, tipo, cor, cor2: cor2 || cor, forma, pequeno: forma === 'pequeno', arvore: true, poda: Math.round(custo * 0.3) })),
 ];
 const CROP = Object.fromEntries(CROPS.map(c => [c.id, c]));
+// O que vai para o celeiro: a fruta/verdura de cada plantação.
+const PRODUCE = Object.fromEntries(CROPS.map(c => [c.prod, { id: c.prod, nome: c.prodNome, preco: c.preco, planta: c.id }]));
 
-// Produtos dos animais. O esterco do jumento não vai para o celeiro: vira 2 adubos premium.
+// Produtos dos animais. O esterco do jumento não vai para o celeiro: vira 2 fertilizantes básicos.
 const PRODUCTS = [
   { id: 'ovo',       nome: 'Ovo',             preco: 10 },
   { id: 'pelo',      nome: 'Pelo de coelho',  preco: 12 },
@@ -34,7 +72,7 @@ const PRODUCTS = [
   { id: 'ovopata',   nome: 'Ovo de pata',     preco: 22 },
   { id: 'leite',     nome: 'Leite',           preco: 40 },
   { id: 'la',        nome: 'Lã',              preco: 60 },
-  { id: 'esterco',   nome: 'Esterco',         preco: 0, vira: 'premium', qtd: 2 },
+  { id: 'esterco',   nome: 'Esterco',         preco: 0, vira: 'basico', qtd: 2 },
   { id: 'bacon',     nome: 'Bacon',           preco: 80 },
   { id: 'crina',     nome: 'Crina',           preco: 110 },
   { id: 'pena',      nome: 'Pena de pavão',   preco: 200 },
@@ -65,23 +103,23 @@ const seuSua = a => (a.f ? 'Sua ' : 'Seu ') + a.nome.toLowerCase();
 
 // Cães de guarda: um vigia a plantação, outro os animais. Só protegem acordados (com comida).
 const DOGS = [
-  { id: 'caramelo', nome: 'Vira-lata caramelo', custo: 150, nivel: 2, vida: 15, protege: 0.55, morde: 0.4, xpDia: 10, xpPega: 15, cor: '#d99a4e', cor2: '#b8793a' },
-  { id: 'pastor',   nome: 'Pastor-alemão',      custo: 450, nivel: 5, vida: 25, protege: 0.7,  morde: 0.5, xpDia: 20, xpPega: 25, cor: '#8a5a2e', cor2: '#2a221c' },
-  { id: 'fila',     nome: 'Fila brasileiro',    custo: 900, nivel: 8, vida: 35, protege: 0.85, morde: 0.6, xpDia: 30, xpPega: 40, cor: '#b8783e', cor2: '#3a2a20' },
+  { id: 'caramelo', nome: 'Vira-lata caramelo', custo: 1000, nivel: 3, vida: 15, protege: 0.55, morde: 0.4, xpDia: 10, xpPega: 15, cor: '#d99a4e', cor2: '#b8793a' },
+  { id: 'pastor',   nome: 'Pastor-alemão',      custo: 3000, nivel: 8, vida: 25, protege: 0.7,  morde: 0.5, xpDia: 20, xpPega: 25, cor: '#8a5a2e', cor2: '#2a221c' },
+  { id: 'fila',     nome: 'Fila brasileiro',    custo: 6000, nivel: 15, vida: 35, protege: 0.85, morde: 0.6, xpDia: 30, xpPega: 40, cor: '#b8783e', cor2: '#3a2a20' },
 ];
 const DOG = Object.fromEntries(DOGS.map(d => [d.id, d]));
-const DOG_FOOD = { custo: 15, horas: 8 };
+const DOG_FOOD = { custo: 50, horas: 8 };
 const DOG_NAMES = ['Totó', 'Rex', 'Pipoca', 'Thor', 'Mel', 'Bidu', 'Paçoca', 'Nina', 'Bolinha', 'Faísca', 'Pretinha', 'Caramelo'];
 const SLOT_NAME = { roca: 'plantação', animais: 'criação' };
 const STEAL_MAX = { roca: 3, animais: 2 }; // itens por amigo por dia
 
 const DECOR = [
-  { id: 'tapete', nome: 'Tapete de crochê', custo: 60,  nivel: 1, conforto: 3 },
-  { id: 'vaso',   nome: 'Vaso de planta',   custo: 80,  nivel: 1, conforto: 3 },
-  { id: 'quadro', nome: 'Quadro',           custo: 120, nivel: 2, conforto: 4 },
-  { id: 'abajur', nome: 'Abajur',           custo: 150, nivel: 3, conforto: 4 },
-  { id: 'sofa',   nome: 'Sofá',             custo: 200, nivel: 3, conforto: 6 },
-  { id: 'tv',     nome: 'Televisão',        custo: 350, nivel: 5, conforto: 8 },
+  { id: 'tapete', nome: 'Tapete de crochê', custo: 600,  nivel: 1, conforto: 3 },
+  { id: 'vaso',   nome: 'Vaso de planta',   custo: 800,  nivel: 2, conforto: 3 },
+  { id: 'quadro', nome: 'Quadro',           custo: 1200, nivel: 3, conforto: 4 },
+  { id: 'abajur', nome: 'Abajur',           custo: 1500, nivel: 4, conforto: 4 },
+  { id: 'sofa',   nome: 'Sofá',             custo: 2500, nivel: 6, conforto: 6 },
+  { id: 'tv',     nome: 'Televisão',        custo: 4000, nivel: 8, conforto: 8 },
 ];
 const DECO = Object.fromEntries(DECOR.map(d => [d.id, d]));
 // Onde cada decoração fica na sala: [coluna, linha, altura] do centro.
@@ -90,15 +128,15 @@ const DECOR_SPOT = {
   abajur: [0.6, 0.6, 0.6], sofa: [0.55, 1.95, 0.35], tv: [3.65, 0.38, 0.45],
 };
 
-// Adubos: cortam uma parte do tempo que falta para a planta ficar pronta. Um por safra.
+// Fertilizantes: cortam uma parte do tempo total da planta. Um por colheita.
 const FERTS = [
-  { id: 'basico',  nome: 'Adubo básico',  curto: 'Básico',  corta: 0.25, custo: 6,  nivel: 1, cor: '#c98a4b' },
-  { id: 'premium', nome: 'Adubo premium', curto: 'Premium', corta: 0.5,  custo: 18, nivel: 3, cor: '#4a8fd0' },
-  { id: 'pro',     nome: 'Adubo pro',     curto: 'Pro',     corta: 1,    custo: 45, nivel: 5, cor: '#e0a020' },
+  { id: 'basico',  nome: 'Fertilizante básico',  curto: 'Básico',  corta: 0.1,  custo: 50,   nivel: 1,  cor: '#c98a4b' },
+  { id: 'rapido',  nome: 'Fertilizante rápido',  curto: 'Rápido',  corta: 0.25, custo: 200,  nivel: 5,  cor: '#4a8fd0' },
+  { id: 'premium', nome: 'Fertilizante premium', curto: 'Premium', corta: 0.5,  custo: 1000, nivel: 10, cor: '#e0a020' },
 ];
 const FERT = Object.fromEntries(FERTS.map(f => [f.id, f]));
 
-const item = id => CROP[id] || PRODUCT[id];
+const item = id => PRODUCE[id] || PRODUCT[id];
 const STAGE_NAMES = ['Semente', 'Broto', 'Crescendo', 'Quase lá', 'Maduro'];
 
 const NEIGHBORS = [
@@ -114,21 +152,31 @@ function orderFor(cols, rows) {
 }
 const ORDER = orderFor(COLS, ROWS);
 
-const need = l => 30 + (l - 1) * 40 + (l - 1) * (l - 1) * 12;
-const lotCost = owned => Math.round(40 * Math.pow(owned - START_PLOTS + 1, 1.5) / 10) * 10;
-const lotLevel = owned => 2 + Math.floor((owned - START_PLOTS) / 3);
+const need = l => 100 + 50 * (l - 1);
+// Expansões: cada uma libera mais canteiros, que você coloca onde quiser (encostados na sua terra).
+const EXPANSOES = [
+  { nivel: 1,  preco: 0,      total: 6 },
+  { nivel: 5,  preco: 2000,   total: 12 },
+  { nivel: 10, preco: 8000,   total: 20 },
+  { nivel: 15, preco: 20000,  total: 30 },
+  { nivel: 20, preco: 50000,  total: 42 },
+  { nivel: 30, preco: 120000, total: 60 },
+  { nivel: 40, preco: 250000, total: 80 },
+  { nivel: 50, preco: 500000, total: 100 },
+];
+const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganhar XP infinito com o nabo)
 const newId = () => Math.random().toString(36).slice(2, 10);
 
-function emptyPlot(s = 'locked') { return { s, c: null, g: 0, dry: false, w: 0, b: 0, sl: 0, dmg: 0, id: null, th: [], fert: false }; }
+function emptyPlot(s = 'locked') { return { s, c: null, g: 0, dry: false, w: 0, b: 0, dmg: 0, id: null, th: [], fert: false, h: 0, adult: false, poda: false }; }
 function newAnimal(k) { return { id: newId(), k, fed: true, g: 0, ready: false, n: 0, born: Date.now() }; }
 
 function newState() {
   const plots = Array.from({ length: N }, () => emptyPlot());
-  ORDER.slice(0, START_PLOTS).forEach(i => plots[i].s = 'plowed');
+  START_LOTS.forEach(i => plots[i].s = 'plowed');
   return {
-    v: 2, coins: 60, xp: 0, level: 1, plots, barn: {}, owned: START_PLOTS,
-    tool: 'hand', seed: 'nabo', t: Date.now(), nb: {},
-    animals: [newAnimal('galinha'), newAnimal('galinha')], decor: {},
+    v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0,
+    tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
+    animals: [], decor: {},
     friends: [], sent: {}, code: null, owner: null, log: {},
     fert: { basico: 2 }, fertSel: 'basico',
     dogs: { roca: null, animais: null }, dogFood: 0, news: [], newsSeen: 0, limits: {},
@@ -139,13 +187,13 @@ function newState() {
 // Aceita saves antigos (v1, grade 6×4) e dados vindos da nuvem.
 function migrate(s) {
   if (!s || typeof s !== 'object') return null;
-  if (s.v === 1 && Array.isArray(s.plots)) {
-    const oldOrder = orderFor(6, 4);
-    const plots = Array.from({ length: N }, () => emptyPlot());
-    oldOrder.forEach((oi, k) => { if (s.plots[oi]) plots[ORDER[k]] = Object.assign(emptyPlot(), s.plots[oi]); });
-    s.plots = plots; s.v = 2; s.nb = {};
+  if (s.v === 1 || s.v === 2) {
+    // A economia mudou inteira: a roça recomeça, mas amigos, código e avisos ficam.
+    const keep = { friends: s.friends, sent: s.sent, code: s.code, owner: s.owner, news: s.news, newsSeen: s.newsSeen };
+    s = Object.assign(newState(), keep);
+    s.news = [{ at: Date.now(), msg: 'A Roça Feliz foi renovada! Tem 27 plantações novas, árvores frutíferas e expansões. Você recomeça com 2.000 moedas.' }].concat(Array.isArray(s.news) ? s.news : []);
   }
-  if (s.v !== 2 || !Array.isArray(s.plots) || s.plots.length !== N) return null;
+  if (s.v !== 3 || !Array.isArray(s.plots) || s.plots.length !== N) return null;
   s.animals = Array.isArray(s.animals) ? s.animals.filter(a => a && ANIMAL[a.k]) : [];
   for (const a of s.animals) { if (!a.id) a.id = newId(); a.n = a.n || 0; if (!a.born) a.born = Date.now(); }
   const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
@@ -165,9 +213,13 @@ function migrate(s) {
   s.nb = s.nb && typeof s.nb === 'object' ? s.nb : {};
   s.barn = s.barn && typeof s.barn === 'object' ? s.barn : {};
   s.stats = Object.assign({ colheitas: 0, coletas: 0, vendido: 0, roubado: 0, ajudas: 0 }, s.stats);
+  s.tools = Object.assign({ enxada: false }, s.tools);
+  s.xpDay = s.xpDay && s.xpDay.c ? s.xpDay : { d: 0, c: {} };
+  s.exp = clamp(Number(s.exp) || 0, 0, EXPANSOES.length - 1);
   for (const p of s.plots) {
     if (!Array.isArray(p.th)) p.th = [];
-    if (p.s === 'growing' && !CROP[p.c]) Object.assign(p, emptyPlot('plowed'));
+    if ((p.s === 'growing' || p.s === 'withered') && !CROP[p.c]) Object.assign(p, emptyPlot('plowed'));
+    p.h = p.h || 0; p.adult = !!p.adult; p.poda = !!p.poda;
     if (p.s === 'growing' && !p.id) p.id = newId();
   }
   s.owned = s.plots.filter(p => p.s !== 'locked').length;
@@ -177,16 +229,26 @@ function migrate(s) {
 }
 
 // O tempo passou enquanto a roça estava fechada.
+// Tempo da fase atual: árvore adulta usa o tempo das próximas colheitas.
+function phaseTempo(p) { const c = CROP[p.c]; return c.arvore && p.adult ? c.tempo2 : c.tempo; }
+// Faz a planta crescer "sec" segundos. Terra seca cresce mais devagar; mato e pragas
+// vão comendo parte da colheita (no máximo 35%), proporcional ao tempo da planta.
+function growPlot(p, sec, events) {
+  if (p.s !== 'growing' || p.poda) return;
+  const crop = CROP[p.c], T = phaseTempo(p);
+  if (p.g >= T) return;
+  if (events) {
+    if (p.w < 2 && Math.random() < 0.45 / T * sec) p.w++;
+    if (p.b < 1 && Math.random() < 0.12 / T * sec) p.b++; // insetos só de vez em quando
+    if (!p.dry && Math.random() < 0.5 / T * sec) p.dry = true;
+  }
+  p.g = Math.min(T, p.g + sec * (p.dry ? 0.7 : 1));
+  const trouble = p.w + p.b + (p.dry ? 0.5 : 0);
+  if (trouble) p.dmg = Math.min(crop.rend * 0.35, p.dmg + trouble * crop.rend * sec / (T * 4));
+}
 function catchUp(s, sec) {
   sec = Math.max(0, sec || 0);
-  for (const p of s.plots) {
-    if (p.s !== 'growing') continue;
-    const crop = CROP[p.c];
-    if (p.g < crop.tempo) {
-      p.g = Math.min(crop.tempo, p.g + sec * (p.dry ? 0.5 : 1));
-      p.dmg = Math.min(crop.rend * 0.5, p.dmg + sec / 60 * (p.w + p.b + (p.dry ? 0.5 : 0)));
-    }
-  }
+  for (const p of s.plots) growPlot(p, sec, false);
   for (const a of s.animals) {
     const def = ANIMAL[a.k];
     if (a.fed && !a.ready) { a.g += sec; if (a.g >= def.tempo) { a.g = def.tempo; a.ready = true; a.fed = false; } }
@@ -195,7 +257,8 @@ function catchUp(s, sec) {
 
 function load() {
   try {
-    let raw = localStorage.getItem(SAVE_KEY) || localStorage.getItem(OLD_SAVE_KEY);
+    let raw = localStorage.getItem(SAVE_KEY);
+    for (const k of OLD_SAVE_KEYS) raw = raw || localStorage.getItem(k);
     if (!raw) return null;
     const s = migrate(JSON.parse(raw));
     if (!s) return null;
@@ -259,10 +322,11 @@ function fmt(sec) {
   return `${s}s`;
 }
 function stageOf(p) {
-  const k = p.g / CROP[p.c].tempo;
+  const T = phaseTempo(p), k = p.g / T;
+  if (CROP[p.c].arvore && p.adult) return !p.poda && k >= 1 ? 4 : 3; // árvore adulta: com ou sem fruta
   return k >= 1 ? 4 : k < 0.12 ? 0 : k < 0.4 ? 1 : k < 0.7 ? 2 : 3;
 }
-const ripe = p => p.s === 'growing' && p.g >= CROP[p.c].tempo;
+const ripe = p => p.s === 'growing' && !p.poda && p.g >= phaseTempo(p);
 const expectedYield = p => Math.max(1, Math.round(CROP[p.c].rend - p.dmg));
 // Dá para comprar qualquer lote encostado (lado com lado) na terra que você já tem.
 function neighbors(i) {
@@ -271,7 +335,10 @@ function neighbors(i) {
   if (r > 0) out.push(i - COLS); if (r < ROWS - 1) out.push(i + COLS);
   return out;
 }
-const canBuy = i => state.plots[i].s === 'locked' && neighbors(i).some(j => state.plots[j].s !== 'locked');
+const touches = i => state.plots[i].s === 'locked' && neighbors(i).some(j => state.plots[j].s !== 'locked');
+const allowedLots = () => EXPANSOES[state.exp].total;
+const freeLots = () => Math.max(0, allowedLots() - state.owned);
+const canBuy = i => freeLots() > 0 && touches(i); // lote onde dá para colocar um canteiro agora
 let buyPending = null; // lote clicado uma vez, esperando o segundo clique para confirmar
 const sfx = name => { if (window.RFAudio) window.RFAudio.play(name); };
 const comfort = s => DECOR.reduce((t, d) => t + (s.decor[d.id] ? d.conforto : 0), 0);
@@ -296,7 +363,7 @@ function addXP(n, pos) {
   while (state.xp >= need(state.level)) {
     state.xp -= need(state.level); state.level++;
     sfx('level');
-    const bonus = state.level * 5; state.coins += bonus;
+    const bonus = state.level * 50; state.coins += bonus;
     const novas = [...CROPS, ...ANIMALS, ...DECOR].filter(c => c.nivel === state.level).map(c => c.nome);
     toast(`Nível ${state.level}! +${bonus} moedas` + (novas.length ? ` · novidades: ${novas.join(', ')}` : ''), 'good');
   }
@@ -325,10 +392,20 @@ function actPlot(i) {
   if (p.s === 'growing' && p.w > 0 && has('weed')) { p.w--; sfx('weed'); addXP(2, pos); addCoins(1, pos); return done(); }
   if (p.s === 'growing' && p.dry && has('water')) { p.dry = false; sfx('water'); addXP(1, pos); return done(); }
   if (ripe(p) && tool === 'hand') return harvest(p, pos);
+  if (p.s === 'growing' && p.poda && tool === 'hand') return prune(p, pos);
   if (p.s === 'withered' && has('hoe')) { Object.assign(p, emptyPlot('plowed')); sfx('hoe'); addXP(1, pos); return done(); }
+  if (p.s === 'growing' && tool === 'hoe') {
+    // A enxada arranca qualquer plantação (ou árvore). Pede um segundo clique.
+    if (buyPending && buyPending.i === 'hoe' + i && performance.now() < buyPending.until) {
+      buyPending = null; Object.assign(p, emptyPlot('plowed')); sfx('hoe');
+      return done();
+    }
+    buyPending = { i: 'hoe' + i, until: performance.now() + 4000 };
+    return toast(`Arrancar ${CROP[p.c].nome.toLowerCase()}? Clique de novo para confirmar.`);
+  }
   if (p.s === 'plowed' && (tool === 'seed' || tool === 'hand')) return plant(p, pos);
   const hints = {
-    hoe: 'A enxada limpa plantas secas.', water: 'Essa terra não precisa de água.',
+    hoe: 'A enxada limpa plantas secas e arranca plantações.', water: 'Essa terra não precisa de água.',
     pest: 'Não há pragas aqui.', weed: 'Não há mato aqui.', seed: 'Só dá para plantar em terra arada.',
   };
   if (hints[tool]) toast(hints[tool]);
@@ -337,10 +414,28 @@ function actPlot(i) {
 function plant(p, pos) {
   const crop = CROP[state.seed];
   if (crop.nivel > state.level) return toast(`${crop.nome} libera no nível ${crop.nivel}.`);
-  if (state.coins < crop.custo) return toast(`Faltam moedas para ${crop.nome} (${crop.custo}).`, 'bad');
+  if (state.coins < crop.custo) return toast(`Faltam moedas para ${crop.arvore ? 'a muda de ' : ''}${crop.nome} (${crop.custo}).`, 'bad');
   addCoins(-crop.custo, pos);
-  Object.assign(p, emptyPlot('growing'), { c: crop.id, sl: crop.safras, id: newId() });
+  Object.assign(p, emptyPlot('growing'), { c: crop.id, id: newId() });
   sfx('plant');
+  if (xpAllowed(crop.id)) addXP(1, pos);
+  done();
+}
+
+// Quantas colheitas de cada planta já deram XP hoje.
+function xpAllowed(id) {
+  const today = Math.floor(Date.now() / DAY);
+  if (state.xpDay.d !== today) state.xpDay = { d: today, c: {} };
+  return (state.xpDay.c[id] || 0) < XP_CAP;
+}
+function prune(p, pos) {
+  const crop = CROP[p.c];
+  if (state.coins < crop.poda) return toast(`A poda da ${crop.nome.toLowerCase()} custa ${crop.poda} moedas.`, 'bad');
+  addCoins(-crop.poda, pos);
+  Object.assign(p, { poda: false, h: 0, g: 0 });
+  sfx('hoe');
+  toast(`${crop.nome} podada! Mais ${TREE_HARVESTS} colheitas pela frente.`, 'good');
+  addXP(3, pos);
   done();
 }
 
@@ -348,14 +443,15 @@ function fertilize(p, pos) {
   const f = FERT[state.fertSel], have = state.fert[f.id] || 0;
   if (p.s !== 'growing') return toast('O adubo é para planta que está crescendo.');
   if (ripe(p)) return toast('Essa planta já está pronta para colher.');
-  if (p.fert) return toast('Essa safra já foi adubada. Dá para adubar de novo na próxima.');
+  if (p.fert) return toast('Essa colheita já foi adubada. Dá para adubar de novo na próxima.');
+  if (p.poda) return toast('Essa árvore precisa de poda antes.');
   if (have <= 0) { tab = 'loja'; shopSeg = 'adubo'; renderPane(); return toast(`Você não tem ${f.nome}. Compre na Loja.`); }
-  const crop = CROP[p.c], falta = crop.tempo - p.g;
+  const T = phaseTempo(p), corte = Math.min(T - p.g, T * f.corta);
   state.fert[f.id] = have - 1;
-  p.g = Math.min(crop.tempo, p.g + falta * f.corta);
+  p.g += corte;
   p.fert = true;
   sfx('fert');
-  popupAt(pos, f.corta >= 1 ? 'Pronto!' : `−${fmt(falta * f.corta)}`, '#9be36a');
+  popupAt(pos, `−${fmt(corte)}`, '#9be36a');
   addXP(1, pos);
   renderTools();
   done();
@@ -374,39 +470,51 @@ function buyFert(id, n) {
 }
 
 function clickLot(i) {
-  if (!canBuy(i)) return toast('Só dá para comprar terra encostada na sua roça.');
-  const cost = lotCost(state.owned), lvl = lotLevel(state.owned);
-  if (state.level < lvl) return toast(`O próximo lote exige nível ${lvl}.`);
-  if (state.coins < cost) return toast(`O lote custa ${cost} moedas.`, 'bad');
-  if (buyPending && buyPending.i === i && performance.now() < buyPending.until) { buyPending = null; return buyLot(i); }
+  if (!touches(i)) return toast('Os canteiros novos precisam encostar na sua terra.');
+  if (!freeLots()) {
+    const next = EXPANSOES[state.exp + 1];
+    return toast(next ? `Para ter mais canteiros, compre a próxima expansão na aba Terreno (nível ${next.nivel}).` : 'Sua roça já está no tamanho máximo.');
+  }
+  if (buyPending && buyPending.i === i && performance.now() < buyPending.until) {
+    buyPending = null;
+    state.plots[i] = emptyPlot('plowed'); state.owned++;
+    sfx('hoe');
+    toast(freeLots() ? `Canteiro novo! Ainda dá para colocar ${freeLots()}.` : 'Canteiro novo pronto para plantar!', 'good');
+    return done();
+  }
   buyPending = { i, until: performance.now() + 4000 };
   sfx('click');
-  toast(`Este lote custa ${cost} moedas. Clique de novo nele para comprar.`);
+  toast('Clique de novo neste lugar para colocar o canteiro aqui.');
+}
+function buyExpansion() {
+  const next = EXPANSOES[state.exp + 1];
+  if (!next) return;
+  if (state.level < next.nivel) return toast(`Essa expansão libera no nível ${next.nivel}.`);
+  if (state.coins < next.preco) return toast(`A expansão custa ${next.preco.toLocaleString('pt-BR')} moedas.`, 'bad');
+  state.coins -= next.preco; state.exp++;
+  sfx('buy');
+  addXP(10, null);
+  toast(`Expansão comprada! Coloque ${freeLots()} canteiros novos onde quiser: clique nos + da roça.`, 'good');
+  if (!isHome()) goHome();
+  setScene('roca');
+  done();
 }
 
 function harvest(p, pos) {
   const crop = CROP[p.c], qty = expectedYield(p);
   sfx('harvest');
-  gain(crop.id, qty, pos);
+  gain(crop.prod, qty, pos);
   state.stats.colheitas++;
-  addXP(crop.xp, pos);
-  if (p.sl > 1) Object.assign(p, { g: crop.tempo * 0.55, sl: p.sl - 1, dmg: 0, w: 0, b: 0, dry: false, id: newId(), th: [], fert: false });
-  else Object.assign(p, { s: 'withered', g: 0, w: 0, b: 0, dry: false, th: [] });
+  if (xpAllowed(crop.id)) { state.xpDay.c[crop.id] = (state.xpDay.c[crop.id] || 0) + 1; addXP(crop.xp, pos); }
+  else if (state.xpDay.c[crop.id] === XP_CAP) { state.xpDay.c[crop.id]++; toast(`Hoje ${crop.nome.toLowerCase()} já deu todo o XP (${XP_CAP} colheitas). Ainda rende moedas; o XP volta amanhã.`); }
+  if (crop.arvore) {
+    // A árvore fica: volta a produzir. Depois de 15 colheitas, pede poda.
+    Object.assign(p, { g: 0, adult: true, h: p.h + 1, dmg: 0, w: 0, b: 0, dry: false, id: newId(), th: [], fert: false });
+    if (p.h >= TREE_HARVESTS) { p.poda = true; toast(`${crop.nome} deu ${TREE_HARVESTS} colheitas e precisa de poda (${crop.poda} moedas).`); }
+  } else Object.assign(p, { s: 'withered', g: 0, w: 0, b: 0, dry: false, th: [] });
   done();
 }
 
-function buyLot(i) {
-  const cost = lotCost(state.owned), lvl = lotLevel(state.owned);
-  if (state.level < lvl) return toast(`Este lote exige nível ${lvl}.`);
-  if (state.coins < cost) return toast(`O lote custa ${cost} moedas.`, 'bad');
-  const pos = scene === 'roca' ? cellCenter(i) : null;
-  sfx('buy');
-  addCoins(-cost, pos);
-  state.plots[i] = emptyPlot('plowed'); state.owned++;
-  addXP(5, pos);
-  toast('Lote novo comprado!', 'good');
-  done();
-}
 
 function actAnimal(id) {
   const s = S(), a = s.animals.find(x => x.id === id);
@@ -590,11 +698,12 @@ function genNeighbor() {
   const plots = Array.from({ length: N }, () => emptyPlot());
   const count = 12 + Math.floor(Math.random() * 16);
   for (const i of ORDER.slice(0, count)) {
-    const crop = CROPS[Math.floor(Math.random() * CROPS.length)];
+    const pool = CROPS.filter(c => !c.arvore && c.nivel <= Math.max(5, state.level + 3));
+    const crop = pool[Math.floor(Math.random() * pool.length)];
     if (Math.random() < 0.12) { plots[i] = emptyPlot('plowed'); continue; }
     const mature = Math.random() < 0.5;
     plots[i] = Object.assign(emptyPlot('growing'), {
-      c: crop.id, sl: 1, id: newId(),
+      c: crop.id, id: newId(),
       g: mature ? crop.tempo : crop.tempo * rand(0.15, 0.95),
       w: Math.random() < 0.25 ? 1 + Math.floor(Math.random() * 2) : 0,
       b: Math.random() < 0.08 ? 1 : 0,
@@ -703,7 +812,7 @@ function awayPlot(i, p) {
     if (guarded('roca', pos, { t: 'steal', plot: i, pid: p.id, qty: 0 })) return done();
     const crop = CROP[p.c];
     sfx('harvest');
-    gain(crop.id, 1, pos); state.stats.roubado++; addXP(1, pos);
+    gain(crop.prod, 1, pos); state.stats.roubado++; addXP(1, pos);
     sendVisit({ t: 'steal', plot: i, pid: p.id, qty: 1 });
     return done();
   }
@@ -758,7 +867,7 @@ function applyVisits(list) {
       const qty = 1;
       p.dmg = Math.min(CROP[p.c].rend - 1, p.dmg + qty);
       if (!p.th.includes(v.from)) p.th.push(v.from);
-      note(`pegou ${qty} ${CROP[p.c].nome} da sua plantação`, true);
+      note(`pegou ${qty} ${CROP[p.c].prodNome} da sua plantação`, true);
     } else if (v.t === 'feed' && a && !a.fed && !a.ready) {
       a.fed = true; note('alimentou seus animais');
     } else if (v.t === 'stealA' && a && a.ready) {
@@ -880,7 +989,7 @@ function drawGateArt() {
     drawBarn(72, 172, 96);
     drawTree(430, 150, 80, 0);
     drawFence(3, 2, 'back');
-    const crops = ['tomate', 'milho', 'abobora', 'cenoura', 'morango', 'melancia'];
+    const crops = ['tomate', 'milho', 'abobora', 'cenoura', 'alface', 'melancia'];
     for (let sum = 0; sum <= 3; sum++) for (let c = 0; c < 3; c++) {
       const r = sum - c; if (r < 0 || r > 1) continue;
       const crop = CROP[crops[r * 3 + c]];
@@ -1012,16 +1121,7 @@ function fetchFriendInfo(uid) {
 // Simulação
 // ============================================================
 function tick(dt) {
-  for (const p of state.plots) {
-    if (p.s !== 'growing') continue;
-    const crop = CROP[p.c];
-    if (p.g >= crop.tempo) continue;
-    p.g = Math.min(crop.tempo, p.g + dt * (p.dry ? 0.5 : 1));
-    if (p.w < 2 && Math.random() < 0.45 / crop.tempo * dt) p.w++;
-    if (p.b < 1 && Math.random() < 0.12 / crop.tempo * dt) p.b++; // insetos só de vez em quando
-    if (!p.dry && Math.random() < 0.7 / crop.tempo * dt) p.dry = true;
-    p.dmg = Math.min(crop.rend * 0.5, p.dmg + dt / 60 * (p.w + p.b + (p.dry ? 0.5 : 0)));
-  }
+  for (const p of state.plots) growPlot(p, dt, true);
   for (const a of state.animals) {
     const def = ANIMAL[a.k];
     if (a.fed && !a.ready) { a.g += dt; if (a.g >= def.tempo) { a.g = def.tempo; a.ready = true; a.fed = false; } }
@@ -1383,11 +1483,63 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
     const ripeNow = stage === 4;
     switch (crop.tipo) {
       case 'raiz': {
+        if (crop.id === 'cebola') {
+          if (ripeNow) {
+            ctx.fillStyle = crop.cor; ctx.beginPath(); ctx.ellipse(x, y - 3 * s, 6 * s, 5 * s, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.beginPath(); ctx.ellipse(x - 2 * s, y - 4 * s, 1.5 * s, 3 * s, 0, 0, 7); ctx.fill();
+          }
+          ctx.strokeStyle = '#5aa83a'; ctx.lineWidth = 1.6 * s; ctx.lineCap = 'round';
+          for (const a of [-0.35, -0.12, 0.1, 0.3]) { ctx.beginPath(); ctx.moveTo(x, y - 6 * s); ctx.lineTo(x + Math.sin(a + sway) * 22 * s, y - 6 * s - Math.cos(a) * 22 * s); ctx.stroke(); }
+          ctx.lineCap = 'butt';
+          break;
+        }
+        if (crop.id === 'batata') {
+          if (ripeNow) for (const [dx, dy] of [[-7, 1], [6, 2], [0, 3]]) { ctx.fillStyle = crop.cor; ctx.beginPath(); ctx.ellipse(x + dx * s, y + dy * s, 3.6 * s, 2.6 * s, 0.3, 0, 7); ctx.fill(); }
+          ctx.fillStyle = GD; ctx.beginPath(); ctx.arc(x - 5 * s, y - 7 * s, 6 * s, 0, 7); ctx.arc(x + 5 * s, y - 7 * s, 6 * s, 0, 7); ctx.fill();
+          ctx.fillStyle = G; ctx.beginPath(); ctx.arc(x + sway * 5 * s, y - 11 * s, 7 * s, 0, 7); ctx.fill();
+          if (ripeNow) { ctx.fillStyle = '#f2f0f5'; for (const [dx, dy] of [[-4, -13], [3, -15], [5, -9]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 1.3 * s, 0, 7); ctx.fill(); } }
+          break;
+        }
         if (ripeNow) {
           ctx.fillStyle = crop.cor; ctx.beginPath(); ctx.ellipse(x, y - 1 * s, 6.5 * s, 4.5 * s, 0, 0, 7); ctx.fill();
           ctx.fillStyle = crop.cor2; ctx.beginPath(); ctx.ellipse(x, y - 3 * s, 6 * s, 2.4 * s, 0, 0, 7); ctx.fill();
         }
         for (const a of [-1.1, -0.55, 0, 0.55, 1.1]) leaf(x, y - 3 * s, (ripeNow ? 22 : 18) * s, 4.2 * s, a + sway, a === 0 ? GL : G);
+        break;
+      }
+      case 'grao': {
+        ctx.lineCap = 'round';
+        for (const dx of [-5, -2, 1, 4, 6.5]) {
+          const tx = x + dx * s + sway * 14 * s, ty = y - 26 * s;
+          ctx.strokeStyle = ripeNow ? '#c9a24a' : '#6aa83a'; ctx.lineWidth = 1.2 * s;
+          ctx.beginPath(); ctx.moveTo(x + dx * s * 0.5, y); ctx.lineTo(tx, ty); ctx.stroke();
+          ctx.fillStyle = ripeNow ? crop.cor : '#9cc85a';
+          ctx.beginPath(); ctx.ellipse(tx, ty - 3 * s, 1.8 * s, 4.5 * s, dx * 0.03, 0, 7); ctx.fill();
+          ctx.strokeStyle = ripeNow ? '#d9b25a' : '#8ab84a'; ctx.lineWidth = 0.6 * s;
+          ctx.beginPath(); ctx.moveTo(tx, ty - 7 * s); ctx.lineTo(tx - 1 * s, ty - 11 * s); ctx.moveTo(tx, ty - 7 * s); ctx.lineTo(tx + 1 * s, ty - 11 * s); ctx.stroke();
+        }
+        ctx.lineCap = 'butt';
+        break;
+      }
+      case 'folha': {
+        const r = (ripeNow ? 11 : 8) * s;
+        ctx.fillStyle = '#5a9e3a'; ctx.beginPath(); ctx.ellipse(x, y - r * 0.5, r * 1.1, r * 0.6, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = crop.cor; ctx.beginPath(); ctx.arc(x, y - r * 0.8, r * 0.8, 0, 7); ctx.fill();
+        ctx.fillStyle = '#b8e87a'; ctx.beginPath(); ctx.arc(x - r * 0.15, y - r * 0.95, r * 0.45, 0, 7); ctx.fill();
+        ctx.strokeStyle = 'rgba(60,110,30,.45)'; ctx.lineWidth = 1;
+        for (const a of [-0.9, -0.3, 0.3, 0.9]) { ctx.beginPath(); ctx.arc(x, y - r * 0.8, r * 0.8, a - 0.2 - Math.PI / 2, a + 0.2 - Math.PI / 2); ctx.stroke(); }
+        break;
+      }
+      case 'abacaxi': {
+        ctx.fillStyle = '#4f8a3a';
+        for (const a of [-1.2, -0.8, -0.4, 0.4, 0.8, 1.2]) { ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(-1.5 * s, 0); ctx.lineTo(0, -16 * s); ctx.lineTo(1.5 * s, 0); ctx.fill(); ctx.restore(); }
+        if (ripeNow) {
+          ctx.fillStyle = crop.cor; ctx.beginPath(); ctx.ellipse(x, y - 11 * s, 4.5 * s, 6.5 * s, 0, 0, 7); ctx.fill();
+          ctx.strokeStyle = 'rgba(120,70,20,.5)'; ctx.lineWidth = 0.7 * s;
+          for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(x - 4 * s, y - 11 * s + k * 2.5 * s); ctx.lineTo(x + 4 * s, y - 13 * s + k * 2.5 * s); ctx.stroke(); }
+          ctx.fillStyle = '#5aa83a';
+          for (const a of [-0.5, 0, 0.5]) { ctx.save(); ctx.translate(x, y - 17 * s); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(-1 * s, 0); ctx.lineTo(0, -6 * s); ctx.lineTo(1 * s, 0); ctx.fill(); ctx.restore(); }
+        }
         break;
       }
       case 'alto': {
@@ -1418,9 +1570,10 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
           for (const [dx, dy] of [[-6, -1], [5, -4], [1, 3], [-2, -9], [7, 3]]) ball(x + dx * s * k, cy + dy * s * k, fr, col);
         } else {
           const col = ripeNow ? crop.cor : '#9bc36a';
+          const [rx, ry] = crop.forma === 'longo' ? [1.8, 7] : crop.forma === 'redondo' ? [3.6, 3.8] : [2.8, 6];
           for (const dx of [-6, 1, 7]) {
             const fx = x + dx * s, fy = cy + r * 0.55;
-            ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(fx, fy + 4 * s, 2.8 * s, (ripeNow ? 6 : 4) * s, 0.1, 0, 7); ctx.fill();
+            ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(fx, fy + 4 * s, rx * s, (ripeNow ? ry : ry * 0.66) * s, 0.1, 0, 7); ctx.fill();
             ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(fx - 1 * s, fy + 2 * s, 0.8 * s, 2 * s, 0.1, 0, 7); ctx.fill();
             ctx.fillStyle = '#3f7a2a'; ctx.beginPath(); ctx.ellipse(fx, fy - 1 * s, 2.4 * s, 1.4 * s, 0, 0, 7); ctx.fill();
           }
@@ -1445,6 +1598,78 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
         break;
       }
     }
+  }
+}
+
+// Árvores frutíferas (uma por canteiro). stage: 0 muda, 1-2 crescendo, 3 adulta, 4 com frutas.
+function drawFruitTree(x, y, s, crop, stage, t) {
+  const sway = Math.sin(t / 900 + x * 0.03) * 0.04;
+  ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(x, y, 16 * s, 5 * s, 0, 0, 7); ctx.fill();
+  if (stage === 0) {
+    line({ x, y }, { x, y: y - 10 * s }, '#7a5a3a', 1.6 * s);
+    leaf(x, y - 9 * s, 8 * s, 3 * s, -0.8 + sway, '#6cc24a'); leaf(x, y - 9 * s, 8 * s, 3 * s, 0.8 + sway, '#4fa83a');
+    return;
+  }
+  const grow = stage === 1 ? 0.45 : stage === 2 ? 0.7 : 1, ripeNow = stage === 4;
+  const tipo = crop.tipo;
+  if (tipo === 'palmeira') {
+    const h = 44 * s * grow, top = { x: x + 5 * s * grow, y: y - h };
+    ctx.strokeStyle = '#9a7a52'; ctx.lineWidth = 4.5 * s * grow; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - 3 * s, y - h * 0.5, top.x, top.y); ctx.stroke();
+    ctx.strokeStyle = 'rgba(90,60,30,.35)'; ctx.lineWidth = 1;
+    for (let k = 1; k < 7; k++) { const q = y - h * k / 7; ctx.beginPath(); ctx.moveTo(x - 2.5 * s * grow + (top.x - x) * k / 7, q); ctx.lineTo(x + 2.5 * s * grow + (top.x - x) * k / 7, q); ctx.stroke(); }
+    for (const a of [-2.7, -2.1, -1.5, -0.9, -0.35, 0.3]) {
+      ctx.save(); ctx.translate(top.x, top.y); ctx.rotate(a + Math.PI / 2 + sway);
+      ctx.fillStyle = a < -1.2 ? '#4fa83a' : '#3a8a2c';
+      ctx.beginPath(); ctx.ellipse(0, -13 * s * grow, 3.2 * s * grow, 13 * s * grow, 0, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+    if (ripeNow) { ctx.fillStyle = crop.cor; for (const [dx, dy] of [[-3, 3], [2, 4], [-0.5, 6]]) { ctx.beginPath(); ctx.arc(top.x + dx * s, top.y + dy * s, 2.8 * s, 0, 7); ctx.fill(); } }
+    ctx.lineCap = 'butt';
+    return;
+  }
+  if (tipo === 'bananeira') {
+    const h = 26 * s * grow;
+    ctx.fillStyle = '#7f9a4a'; ctx.fillRect(x - 3 * s * grow, y - h, 6 * s * grow, h);
+    for (const [a, len] of [[-1.3, 1], [-0.6, 1.1], [0.1, 1], [0.8, 1.1], [1.4, 0.9]]) {
+      ctx.save(); ctx.translate(x, y - h); ctx.rotate(a + sway);
+      ctx.fillStyle = a > 0 ? '#5cb04a' : '#4a9a3a';
+      ctx.beginPath(); ctx.ellipse(0, -11 * s * grow * len, 5.5 * s * grow, 12 * s * grow * len, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(30,80,20,.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -22 * s * grow * len); ctx.stroke();
+      ctx.restore();
+    }
+    if (ripeNow) {
+      ctx.strokeStyle = crop.cor; ctx.lineWidth = 2.6 * s; ctx.lineCap = 'round';
+      for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(x + 4 * s, y - h + 5 * s + k * 2.2 * s, 4 * s, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
+      ctx.lineCap = 'butt';
+    }
+    return;
+  }
+  if (tipo === 'videira') {
+    const h = 30 * s;
+    ctx.fillStyle = '#8a5a33';
+    ctx.fillRect(x - 13 * s, y - h, 2.4 * s, h); ctx.fillRect(x + 11 * s, y - h, 2.4 * s, h);
+    ctx.fillRect(x - 14 * s, y - h, 28 * s, 2.2 * s);
+    ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 1.6 * s;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - 4 * s, y - h * 0.5, x, y - h * grow); ctx.stroke();
+    const n = Math.round(6 * grow);
+    for (let k = 0; k < n; k++) { const lx = x - 12 * s + k * 24 * s / Math.max(1, n - 1); leaf(lx, y - h + 2 * s, 7 * s, 3.5 * s, (k % 2 ? 0.6 : -0.6) + Math.PI + sway, k % 2 ? '#4fa83a' : '#3a8a2c'); }
+    if (ripeNow) for (const bx of [-7, 1, 8]) {
+      ctx.fillStyle = crop.cor;
+      for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, 2.2], [-1.6, 4.2], [1.6, 4.2], [0, 6.2]]) { ctx.beginPath(); ctx.arc(x + bx * s + dx * s * 0.9, y - h + 6 * s + dy * s, 1.7 * s, 0, 7); ctx.fill(); }
+    }
+    return;
+  }
+  // árvore frutífera comum (maçã, laranja, manga, goiaba)
+  const th = 18 * s * grow, R = 15 * s * grow;
+  ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - 2.5 * s * grow, y - th, 5 * s * grow, th);
+  const cx = x + sway * 20 * s, cy = y - th - R * 0.7;
+  ctx.fillStyle = '#3a8a2c'; ctx.beginPath(); ctx.arc(cx - R * 0.6, cy + R * 0.25, R * 0.75, 0, 7); ctx.arc(cx + R * 0.6, cy + R * 0.25, R * 0.75, 0, 7); ctx.fill();
+  ctx.fillStyle = '#4fa83a'; ctx.beginPath(); ctx.arc(cx, cy - R * 0.2, R, 0, 7); ctx.fill();
+  ctx.fillStyle = '#6cc24a'; ctx.beginPath(); ctx.arc(cx - R * 0.35, cy - R * 0.55, R * 0.4, 0, 7); ctx.fill();
+  if (ripeNow || stage === 3) {
+    const spots = [[-0.55, 0.1], [0.4, -0.35], [0.6, 0.35], [-0.2, -0.65], [0.05, 0.4], [-0.75, -0.3]];
+    spots.forEach(([dx, dy], k) => ball(cx + dx * R, cy + dy * R, (ripeNow ? 2.8 : 1.8) * s, ripeNow ? (k % 2 ? crop.cor2 : crop.cor) : '#9bc36a'));
   }
 }
 
@@ -1706,6 +1931,13 @@ function drawBubbleAt(x, y, kind, obj, t, seed) {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.2 * s; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(x - 3.6 * s, y + 0.2 * s); ctx.lineTo(x - 1 * s, y + 3 * s); ctx.lineTo(x + 4 * s, y - 2.8 * s); ctx.stroke();
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+  } else if (kind === 'poda') {
+    // tesoura de poda
+    ctx.strokeStyle = '#6b7780'; ctx.lineWidth = 1.8 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - 5 * s, y - 5 * s); ctx.lineTo(x + 4 * s, y + 3 * s); ctx.moveTo(x + 5 * s, y - 5 * s); ctx.lineTo(x - 4 * s, y + 3 * s); ctx.stroke();
+    ctx.strokeStyle = '#c8402f'; ctx.lineWidth = 1.6 * s;
+    ctx.beginPath(); ctx.arc(x - 5 * s, y + 5 * s, 2.2 * s, 0, 7); ctx.moveTo(x + 7.2 * s, y + 5 * s); ctx.arc(x + 5 * s, y + 5 * s, 2.2 * s, 0, 7); ctx.stroke();
+    ctx.lineCap = 'butt';
   } else if (kind === 'bone') {
     ctx.fillStyle = '#f3ead6'; ctx.strokeStyle = '#b8a47a'; ctx.lineWidth = 0.8 * s;
     ctx.save(); ctx.translate(x, y); ctx.rotate(-0.5);
@@ -1759,8 +1991,8 @@ function drawPlot(i, p, t, home) {
       ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 2;
       ctx.fillRect(m.x - bw / 2, m.y - W * 0.47, bw, bh); ctx.strokeRect(m.x - bw / 2, m.y - W * 0.47, bw, bh);
       ctx.fillStyle = '#4a2a10'; ctx.font = `800 ${Math.round(clamp(W * 0.11, 9, 15))}px 'Baloo 2', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('Comprar?', m.x, m.y - W * 0.405);
-      ctx.fillText(`${lotCost(state.owned)}`, m.x, m.y - W * 0.29);
+      ctx.fillText('Colocar', m.x, m.y - W * 0.405);
+      ctx.fillText('aqui?', m.x, m.y - W * 0.29);
     }
     if (hov) quad(p1, p2, p3, p4, null, 'rgba(255,255,255,.9)', 2);
     return;
@@ -1785,6 +2017,12 @@ function drawPlot(i, p, t, home) {
     const crop = CROP[p.c];
     for (let k = 0; k < p.w; k++) { const [u, v] = WEED_SPOTS[k]; const q = iso(c + u, r + v); drawWeed(q.x, q.y, W / 100); }
     const st = p.s === 'growing' ? stageOf(p) : 4;
+    if (crop && crop.arvore && crop.tipo !== 'moita' && p.s === 'growing') {
+      const q = iso(c + 0.5, r + 0.58);
+      drawFruitTree(q.x, q.y, W / 100 * 1.05, crop, st, t);
+      for (let k = 0; k < p.b; k++) { const qb = iso(c + 0.3 + k * 0.15, r + 0.75); drawBug(qb.x, qb.y, W / 100, t, k + i); }
+      return;
+    }
     const big = crop && crop.tipo === 'chao' && st >= 3;
     const s = W / 100 * (big ? 1.25 : 0.72) * (st === 0 ? 1.2 : 1);
     for (const [u, v] of (big ? BIG_SPOTS : PLANT_SPOTS)) { const q = iso(c + u, r + v); drawPlant(q.x, q.y, s, crop, st, t, p.s === 'withered'); }
@@ -1795,6 +2033,7 @@ function drawPlot(i, p, t, home) {
 function plotBubble(p, home) {
   if (p.s === 'withered') return home ? 'hoe' : null;
   if (p.s !== 'growing') return null;
+  if (p.poda) return home ? 'poda' : null;
   if (p.b) return 'pest';
   if (p.w) return 'weed';
   if (p.dry) return 'water';
@@ -2030,10 +2269,12 @@ function makeIcon(key, fn) {
   return (ICONS[key] = g.toDataURL());
 }
 const cropIcon = id => makeIcon('c:' + id, () => {
+  const crop = CROP[id];
+  if (crop.arvore && crop.tipo !== 'moita') { drawFruitTree(48, 90, crop.tipo === 'palmeira' ? 1.35 : crop.tipo === 'arvore' ? 1.45 : 1.6, crop, 4, 0); return; }
   ctx.fillStyle = '#8b5a33'; ctx.beginPath(); ctx.ellipse(48, 76, 34, 13, 0, 0, 7); ctx.fill();
   ctx.fillStyle = 'rgba(60,34,14,.35)'; ctx.beginPath(); ctx.ellipse(48, 78, 26, 8, 0, 0, 7); ctx.fill();
-  const crop = CROP[id];
-  drawPlant(48, 78, crop.tipo === 'chao' ? 2.3 : crop.tipo === 'alto' ? 1.6 : 2.4, crop, 4, 0, false);
+  const sc = { chao: 2.3, alto: 1.6, grao: 2.2, abacaxi: 2.6, folha: 2.8 }[crop.tipo] || 2.4;
+  drawPlant(48, 78, sc, crop, 4, 0, false);
 });
 const animalIcon = k => makeIcon('a:' + k, () => {
   const sc = { galinha: 2.6, vaca: 1.6, ovelha: 2.2, porco: 2.1, coelho: 2.7, angola: 2.5, pato: 2.5, jumento: 1.45, cavalo: 1.35, pavao: 2.0 }[k];
@@ -2048,7 +2289,7 @@ const decorIcon = id => makeIcon('d:' + id, () => {
   if (id === 'quadro') { ctx.fillStyle = '#f1dcae'; ctx.fillRect(8, 8, 80, 80); }
   DRAW_DECOR[id](0);
 });
-const itemIcon = id => CROP[id] ? cropIcon(id) : productIcon(id);
+const itemIcon = id => PRODUCE[id] ? cropIcon(PRODUCE[id].planta) : productIcon(id);
 const dogIcon = raca => makeIcon('dog:' + raca, () => drawDog(50, 88, 118, 0, raca, false));
 const bowlIcon = () => makeIcon('bowl', () => {
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(48, 74, 32, 7, 0, 0, 7); ctx.fill();
@@ -2067,7 +2308,7 @@ const fertIcon = id => makeIcon('f:' + id, () => {
   ctx.fillStyle = f.cor; ctx.fillRect(22, 46, 52, 22);
   leaf(48, 64, 18, 5, -0.5, '#4fa83a'); leaf(48, 64, 18, 5, 0.5, '#6cc24a');
   ctx.fillStyle = '#fff'; ctx.font = "800 13px 'Baloo 2', sans-serif"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(f.id === 'basico' ? '25%' : f.id === 'premium' ? '50%' : '100%', 48, 50);
+  ctx.fillText(`${f.corta * 100}%`, 48, 50);
 });
 
 // ============================================================
@@ -2087,7 +2328,7 @@ const TOOLS = [
   { id: 'fert', nome: 'Adubo' },
 ];
 const HOME_ONLY = ['seed', 'hoe', 'fert'];
-const availTools = () => TOOLS.filter(t => isHome() || !HOME_ONLY.includes(t.id));
+const availTools = () => TOOLS.filter(t => (isHome() || !HOME_ONLY.includes(t.id)) && (t.id !== 'hoe' || state.tools.enxada));
 
 function renderTools() {
   const box = $('#tools'), hint = $('#sceneHint');
@@ -2132,7 +2373,7 @@ function renderHUD() {
 function renderSceneInfo() {
   const s = S(), el = $('#sceneInfo');
   const owner = isHome() ? '' : `${view.nome} · `;
-  if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length} de ${N} lotes`;
+  if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length}${isHome() ? ` de ${allowedLots()}` : ''} canteiros`;
   else if (scene === 'animais') el.textContent = owner + `${s.animals.length} de ${MAX_ANIMALS} animais`;
   else el.textContent = owner + `Conforto ${comfort(s)} · +${comfort(s)}% de XP`;
 }
@@ -2186,29 +2427,41 @@ function renderPane() {
   const pane = $('#pane');
   let html = '';
   if (tab === 'loja') {
-    const segs = [['sementes', 'Sementes'], ['adubo', 'Adubo'], ['animais', 'Animais'], ['caes', 'Cães'], ['decor', 'Casa']];
+    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['caes', 'Cães'], ['decor', 'Casa']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
-    if (shopSeg === 'sementes') {
-      html += `<p class="hint">Escolha uma semente e clique na terra arada para plantar. O preço é cobrado no plantio.</p>`;
-      for (const c of CROPS) {
+    if (shopSeg === 'sementes' || shopSeg === 'mudas') {
+      const trees = shopSeg === 'mudas';
+      html += trees
+        ? `<p class="hint">Árvores ocupam um canteiro e ficam lá: a primeira colheita demora mais, depois repete na metade do tempo. Depois de ${TREE_HARVESTS} colheitas pedem uma poda.</p>`
+        : `<p class="hint">Escolha uma semente e clique na terra arada para plantar. Cada semente vale para um canteiro e é cobrada no plantio.</p>`;
+      const list = CROPS.filter(c => !!c.arvore === trees);
+      const shown = list.filter(c => c.nivel <= state.level);
+      const upcoming = list.filter(c => c.nivel > state.level);
+      for (const c of [...shown, ...upcoming.slice(0, 2)]) {
         const locked = c.nivel > state.level, sel = state.seed === c.id && state.tool === 'seed';
-        const lucro = c.rend * c.preco * c.safras - c.custo;
+        const total = c.rend * c.preco;
+        const meta = trees
+          ? `Muda ${c.custo.toLocaleString('pt-BR')} · 1ª colheita em ${fmt(c.tempo)}, depois a cada ${fmt(c.tempo2)}<br>${c.rend} ${c.prodNome.toLowerCase()} × ${c.preco} = ${total} por colheita · ${c.xp} XP`
+          : `Semente ${c.custo.toLocaleString('pt-BR')} · ${fmt(c.tempo)}<br>${c.rend} × ${c.preco} = ${total.toLocaleString('pt-BR')} · lucro ${(total - c.custo).toLocaleString('pt-BR')} · ${c.xp} XP`;
         html += `<div class="row ${locked ? 'locked' : ''} ${sel ? 'sel' : ''}">
           <img alt="" src="${cropIcon(c.id)}">
-          <div><div class="name">${c.nome}</div>
-          <div class="meta">${c.custo} moedas · ${fmt(c.tempo)} · rende ${c.rend} × ${c.preco}<br><b>${c.safras} ${c.safras > 1 ? 'colheitas' : 'colheita'}</b> antes de secar · lucro ${lucro} · ${c.xp} XP</div></div>
+          <div><div class="name">${c.nome}</div><div class="meta">${meta}</div></div>
           ${locked ? `<button class="btn" disabled>Nível ${c.nivel}</button>` : `<button class="btn ${sel ? 'gold' : ''}" data-seed="${c.id}">${sel ? 'Na mão' : 'Escolher'}</button>`}
         </div>`;
       }
+      if (upcoming.length > 2) html += `<p class="hint">Mais ${upcoming.length - 2} ${trees ? 'árvores' : 'plantações'} liberam nos próximos níveis, até o nível ${upcoming[upcoming.length - 1].nivel}.</p>`;
     } else if (shopSeg === 'adubo') {
-      html += `<p class="hint">Adubo faz a planta crescer mais rápido. Escolha o tipo e clique numa planta com a ferramenta Adubo. Vale um por safra.</p>`;
+      html += `<div class="row ${state.tools.enxada ? 'sel' : ''}"><div class="avatar" style="background:#8a5a33">${TOOL_ICONS.hoe}</div>
+        <div><div class="name">Enxada</div><div class="meta">100 moedas · arranca qualquer plantação ou árvore</div></div>
+        ${state.tools.enxada ? '<button class="btn ghost" disabled>Sua</button>' : `<button class="btn" data-buy-hoe ${state.coins < 100 ? 'disabled' : ''}>Comprar</button>`}</div>`;
+      html += `<p class="hint">O regador é grátis. Fertilizante corta uma parte do tempo total da planta; escolha o tipo e clique numa planta com a ferramenta Adubo. Vale um por colheita.</p>`;
       for (const f of FERTS) {
         const locked = f.nivel > state.level, have = state.fert[f.id] || 0;
         const sel = state.tool === 'fert' && state.fertSel === f.id;
         html += `<div class="row ${locked ? 'locked' : ''} ${sel ? 'sel' : ''}">
           <img alt="" src="${fertIcon(f.id)}">
           <div><div class="name">${f.nome}</div>
-          <div class="meta">${f.corta >= 1 ? 'Deixa a planta pronta na hora' : `Corta ${f.corta * 100}% do tempo que falta`}<br>${f.custo} moedas · você tem <b>${have}</b></div></div>
+          <div class="meta">Corta ${f.corta * 100}% do tempo da planta<br>${f.custo.toLocaleString('pt-BR')} moedas · você tem <b>${have}</b></div></div>
           ${locked ? `<button class="btn" disabled>Nível ${f.nivel}</button>` : `<div class="stack">
             <button class="btn" data-buy-fert="${f.id}" data-n="1" ${state.coins < f.custo ? 'disabled' : ''}>Comprar 1</button>
             <button class="btn ghost" data-buy-fert="${f.id}" data-n="5" ${state.coins < f.custo * 5 ? 'disabled' : ''}>Comprar 5</button>
@@ -2264,7 +2517,7 @@ function renderPane() {
       }
     }
   } else if (tab === 'celeiro') {
-    const items = [...CROPS, ...PRODUCTS].filter(it => state.barn[it.id] > 0);
+    const items = [...Object.values(PRODUCE), ...PRODUCTS].filter(it => state.barn[it.id] > 0);
     let total = 0; for (const it of items) total += state.barn[it.id] * it.preco;
     html += `<h3>Celeiro</h3>`;
     if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha na roça e recolha ovos, leite, lã e trufas dos animais.</div>`;
@@ -2279,7 +2532,7 @@ function renderPane() {
     }
   } else if (tab === 'terreno') {
     html += `<h3>Terreno</h3><div class="kv">
-      <span>Lotes</span><span>${state.owned} de ${N}</span>
+      <span>Canteiros</span><span>${state.owned} de ${allowedLots()}</span>
       <span>Animais</span><span>${state.animals.length} de ${MAX_ANIMALS}</span>
       <span>Decorações</span><span>${Object.keys(state.decor).length} de ${DECOR.length}</span>
       <span>Colheitas</span><span>${state.stats.colheitas}</span>
@@ -2287,13 +2540,18 @@ function renderPane() {
       <span>Moedas vendidas</span><span>${state.stats.vendido}</span>
       <span>Pegos nas visitas</span><span>${state.stats.roubado}</span>
       <span>Ajudas aos amigos</span><span>${state.stats.ajudas}</span></div>`;
-    if (state.owned < N) {
-      const cost = lotCost(state.owned), lvl = lotLevel(state.owned);
-      html += `<div class="row"><div></div><div><div class="name">Próximo lote</div><div class="meta">${cost} moedas · exige nível ${lvl}</div></div>
-        <button class="btn gold" data-see-land>Ver na roça</button></div>
-        <p class="hint">Você escolhe onde crescer: qualquer lote com <b>+</b> encostado na sua terra está à venda. Clique nele e depois clique de novo para confirmar.</p>`;
-    } else html += `<div class="empty">Você comprou todo o terreno!</div>`;
-    html += `<p class="hint">Mato e pragas diminuem a colheita enquanto ficam lá. Terra seca faz a planta crescer na metade da velocidade.</p>
+    if (freeLots()) html += `<div class="row sel"><div></div><div><div class="name">${freeLots()} ${freeLots() > 1 ? 'canteiros' : 'canteiro'} para colocar</div><div class="meta">Clique num + encostado na sua terra (duas vezes) para escolher o lugar.</div></div>
+        <button class="btn gold" data-see-land>Ver na roça</button></div>`;
+    html += `<h3>Expansões</h3>`;
+    EXPANSOES.forEach((e, k) => {
+      if (k === 0) return;
+      const have = k <= state.exp, next = k === state.exp + 1, extra = e.total - EXPANSOES[k - 1].total;
+      if (!have && !next && k > state.exp + 3) return;
+      html += `<div class="row ${have ? '' : next ? '' : 'locked'}"><div class="avatar" style="background:${have ? '#4f9a2f' : '#b7b39c'}">${k + 1}</div>
+        <div><div class="name">+${extra} canteiros (total ${e.total})</div><div class="meta">${e.preco.toLocaleString('pt-BR')} moedas · nível ${e.nivel}</div></div>
+        ${have ? '<button class="btn ghost" disabled>Comprada</button>' : next ? `<button class="btn gold" data-expand ${state.level >= e.nivel && state.coins >= e.preco ? '' : 'disabled'}>Comprar</button>` : `<button class="btn" disabled>Nível ${e.nivel}</button>`}</div>`;
+    });
+    html += `<p class="hint">Mato e pragas comem parte da colheita enquanto ficam lá. Terra seca faz a planta crescer mais devagar. Cada planta dá XP em até ${XP_CAP} colheitas por dia.</p>
       <button class="btn danger" data-reset>${resetArmed ? 'Clique de novo para apagar tudo' : 'Recomeçar do zero'}</button>`;
   } else if (tab === 'amigos') {
     if (state.news.length) {
@@ -2368,8 +2626,13 @@ $('#pane').addEventListener('click', e => {
   else if (d.sell) sell(d.sell, false);
   else if (d.sellallOf) sell(d.sellallOf, true);
   else if ('sellall' in d) sellAll();
-  else if ('seeLand' in d) { if (!isHome()) goHome(); setScene('roca'); toast('Clique num lote com + para comprar.'); }
+  else if ('seeLand' in d) { if (!isHome()) goHome(); setScene('roca'); toast('Clique num + encostado na sua terra para colocar um canteiro.'); }
+  else if ('expand' in d) buyExpansion();
   else if (d.buyFert) buyFert(d.buyFert, Number(d.n) || 1);
+  else if ('buyHoe' in d) {
+    if (state.coins < 100) toast('A enxada custa 100 moedas.', 'bad');
+    else { state.coins -= 100; state.tools.enxada = true; sfx('buy'); toast('Enxada comprada! Agora ela aparece nas ferramentas.', 'good'); renderTools(); done(); }
+  }
   else if (d.buyDog) buyDog(d.buyDog, d.slot);
   else if (d.dogFood) buyDogFood(Number(d.dogFood) || 1);
   else if (d.feedDog) feedDog(d.feedDog);
@@ -2406,7 +2669,7 @@ $('#pane').addEventListener('submit', e => {
   e.preventDefault();
   addFriend($('#friendCode').value);
 });
-document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; renderPane(); if (tab === 'amigos') checkSent(); }));
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; renderPane(); $('#pane').scrollTop = 0; if (tab === 'amigos') checkSent(); }));
 document.querySelectorAll('#scenes button').forEach(b => b.addEventListener('click', () => setScene(b.dataset.scene)));
 $('#goHome').addEventListener('click', () => goHome());
 
@@ -2416,21 +2679,24 @@ $('#goHome').addEventListener('click', () => goHome());
 function tipPlot(i) {
   const p = S().plots[i], home = isHome();
   if (p.s === 'locked') {
-    if (home && canBuy(i)) return `<b>Lote à venda</b><br>${lotCost(state.owned)} moedas · nível ${lotLevel(state.owned)}<br>Clique duas vezes para comprar.`;
-    return home ? 'Pasto. Dá para comprar os lotes com + encostados na sua terra.' : null;
+    if (home && canBuy(i)) return `<b>Espaço livre</b><br>Clique duas vezes para colocar um canteiro aqui.<br>Você tem ${freeLots()} para colocar.`;
+    if (home && touches(i)) return '<b>Pasto</b><br>Compre uma expansão na aba Terreno para ter mais canteiros.';
+    return home ? 'Pasto.' : null;
   }
   if (p.s === 'plowed') return home ? `<b>Terra arada</b><br>Clique para plantar ${CROP[state.seed].nome}.` : '<b>Terra arada</b>';
-  if (p.s === 'withered') return '<b>Planta seca</b><br>Use a enxada (ou a Mão) para limpar.';
-  const crop = CROP[p.c], st = stageOf(p), k = Math.min(1, p.g / crop.tempo);
-  let h = `<b>${crop.nome}</b> · ${STAGE_NAMES[st]}`;
-  if (st < 4) h += `<br>Fica pronto em ${fmt((crop.tempo - p.g) / (p.dry ? 0.5 : 1))}`;
+  if (p.s === 'withered') return '<b>Planta seca</b><br>Use a Mão ou a enxada para limpar.';
+  const crop = CROP[p.c], st = stageOf(p), T = phaseTempo(p), k = Math.min(1, p.g / T);
+  if (p.poda) return `<b>${crop.nome}</b><br>Precisa de poda para voltar a produzir.<br>${home ? `Clique com a Mão para podar (${crop.poda} moedas).` : ''}`;
+  let h = `<b>${crop.nome}</b> · ${crop.arvore && p.adult ? (st === 4 ? 'Com frutas' : 'Dando frutas') : STAGE_NAMES[st]}`;
+  if (st < 4 || k < 1) h += `<br>Fica pronto em ${fmt((T - p.g) / (p.dry ? 0.7 : 1))}`;
   else h += !home && (p.stolen || state.log[visitKey(p.id)]) ? '<br>Você já pegou daqui.' : '<br>Pronto para colher!';
   h += `<div class="bar"><i style="width:${k * 100}%"></i></div>`;
   const probs = [];
   if (p.w) probs.push(`${p.w} mato`); if (p.b) probs.push(`${p.b} praga${p.b > 1 ? 's' : ''}`); if (p.dry) probs.push('terra seca');
   if (probs.length) h += `<div class="warn">${probs.join(' · ')}</div>`;
-  h += `Colheita ${crop.safras - p.sl + 1} de ${crop.safras}${p.fert ? ' · adubada' : ''}`;
-  if (home) h += `<br>Vai render ${expectedYield(p)} de ${crop.rend}`;
+  if (crop.arvore) h += `Colheita ${p.h + 1} de ${TREE_HARVESTS} até a poda`;
+  if (p.fert) h += `${crop.arvore ? ' · ' : ''}adubada`;
+  if (home) h += `<br>Vai render ${expectedYield(p)} ${crop.prodNome.toLowerCase()} (de ${crop.rend})`;
   return h;
 }
 function tipAnimal(id) {
