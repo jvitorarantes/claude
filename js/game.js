@@ -245,7 +245,7 @@ function newState() {
   return {
     v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0,
     tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
-    animals: [], decor: {}, abrigos: { galinheiro: 1 },
+    animals: [], decor: {}, abrigos: { galinheiro: 1 }, racaoEsp: 0,
     friends: [], sent: {}, code: null, owner: null, log: {},
     fert: { basico: 2 }, fertSel: 'basico',
     dogs: { roca: null, animais: null }, dogFood: 0, news: [], newsSeen: 0, limits: {},
@@ -3001,6 +3001,8 @@ function renderTabs() {
   const old = b.querySelector('.badge'); if (old) old.remove();
   if (n) b.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${n} novidades">${n}</span>`);
 }
+// Preço nos botões da loja: ícone de moeda + valor (e a quantidade, quando tem).
+const moeda = (n, q) => `${q ? `<span class="qtd">×${q}</span>` : ''}<span class="coin" aria-hidden="true"></span>${n.toLocaleString('pt-BR')}`;
 const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos' };
 // A janela abre por cima do jogo. Clicar de novo no mesmo botão fecha.
 function openPanel(t, seg, focus) {
@@ -3042,17 +3044,17 @@ function renderPane() {
         html += `<div class="row ${locked ? 'locked' : ''} ${sel ? 'sel' : ''}">
           <img alt="" src="${cropIcon(c.id)}">
           <div><div class="name">${c.nome}</div><div class="meta">${meta}</div></div>
-          ${locked ? `<button class="btn" disabled>Nível ${c.nivel}</button>` : `<button class="btn ${sel ? 'gold' : ''}" data-seed="${c.id}">${sel ? 'Na mão' : 'Escolher'}</button>`}
+          ${locked ? `<button class="btn" disabled>Nível ${c.nivel}</button>` : `<button class="btn ${sel ? 'gold' : ''}" data-seed="${c.id}" aria-label="${sel ? 'Na mão' : `Escolher ${c.nome} por ${c.custo} moedas`}">${sel ? 'Na mão' : moeda(c.custo)}</button>`}
         </div>`;
       }
       if (upcoming.length > 2) html += `<p class="hint">Mais ${upcoming.length - 2} ${trees ? 'árvores' : 'plantações'} liberam nos próximos níveis, até o nível ${upcoming[upcoming.length - 1].nivel}.</p>`;
     } else if (shopSeg === 'adubo') {
       html += `<div class="row ${state.tools.enxada ? 'sel' : ''}"><div class="avatar" style="background:#8a5a33">${TOOL_ICONS.hoe}</div>
         <div><div class="name">Enxada</div><div class="meta">100 moedas · arranca qualquer plantação ou árvore</div></div>
-        ${state.tools.enxada ? '<button class="btn ghost" disabled>Sua</button>' : `<button class="btn" data-buy-hoe ${state.coins < 100 ? 'disabled' : ''}>Comprar</button>`}</div>`;
+        ${state.tools.enxada ? '<button class="btn ghost" disabled>Sua</button>' : `<button class="btn" data-buy-hoe ${state.coins < 100 ? 'disabled' : ''}>${moeda(100)}</button>`}</div>`;
       html += `<div class="row"><img alt="" src="${bowlIcon()}">
         <div><div class="name">Ração especial</div><div class="meta">${RACAO_ESP} moedas · a próxima produção do animal rende em dobro. É usada quando você alimenta um animal clicando nele. Você tem <b>${state.racaoEsp}</b></div></div>
-        <div class="stack"><button class="btn" data-racao-esp="1" ${state.coins < RACAO_ESP ? 'disabled' : ''}>Comprar 1</button><button class="btn ghost" data-racao-esp="5" ${state.coins < RACAO_ESP * 5 ? 'disabled' : ''}>Comprar 5</button></div></div>`;
+        <div class="stack"><button class="btn" data-racao-esp="1" ${state.coins < RACAO_ESP ? 'disabled' : ''}>${moeda(RACAO_ESP, 1)}</button><button class="btn ghost" data-racao-esp="5" ${state.coins < RACAO_ESP * 5 ? 'disabled' : ''}>${moeda(RACAO_ESP * 5, 5)}</button></div></div>`;
       html += `<p class="hint">O regador é grátis. Fertilizante corta uma parte do tempo total da planta; escolha o tipo e clique numa planta com a ferramenta Adubo. Vale um por colheita.</p>`;
       for (const f of FERTS) {
         const locked = f.nivel > state.level, have = state.fert[f.id] || 0;
@@ -3062,8 +3064,8 @@ function renderPane() {
           <div><div class="name">${f.nome}</div>
           <div class="meta">Corta ${f.corta * 100}% do tempo da planta<br>${f.custo.toLocaleString('pt-BR')} moedas · você tem <b>${have}</b></div></div>
           ${locked ? `<button class="btn" disabled>Nível ${f.nivel}</button>` : `<div class="stack">
-            <button class="btn" data-buy-fert="${f.id}" data-n="1" ${state.coins < f.custo ? 'disabled' : ''}>Comprar 1</button>
-            <button class="btn ghost" data-buy-fert="${f.id}" data-n="5" ${state.coins < f.custo * 5 ? 'disabled' : ''}>Comprar 5</button>
+            <button class="btn" data-buy-fert="${f.id}" data-n="1" ${state.coins < f.custo ? 'disabled' : ''}>${moeda(f.custo, 1)}</button>
+            <button class="btn ghost" data-buy-fert="${f.id}" data-n="5" ${state.coins < f.custo * 5 ? 'disabled' : ''}>${moeda(f.custo * 5, 5)}</button>
             ${have ? `<button class="btn ${sel ? 'gold' : 'ghost'}" data-use-fert="${f.id}">${sel ? 'Na mão' : 'Usar'}</button>` : ''}</div>`}
         </div>`;
       }
@@ -3076,7 +3078,7 @@ function renderPane() {
         const ab = d.lugar !== 'casa' && abrigoOf(d.id);
         if (ab && !abrigoLv(state, ab.id)) return `<button class="btn ghost" data-seg="abrigos" data-focus="${ab.id}">Precisa ${ab.o === 'a' ? 'da' : 'do'} ${ab.nome.toLowerCase()}</button>`;
         if (ab && vagas(state, ab.id) <= 0) return `<button class="btn ghost" data-seg="abrigos" data-focus="${ab.id}">${ab.nome} ${ab.o === 'a' ? 'cheia' : 'cheio'}</button>`;
-        return `<button class="btn" data-buy-animal="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>Comprar</button>`;
+        return `<button class="btn" data-buy-animal="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>${moeda(d.custo)}</button>`;
       };
       const visible = tipo => { const l = ANIMALS.filter(d => d.tipo === tipo); const up = l.filter(d => d.nivel > state.level); return [...l.filter(d => d.nivel <= state.level), ...up.slice(0, 2)]; };
       html += `<h3>Produção</h3>`;
@@ -3102,7 +3104,7 @@ function renderPane() {
         const quem = b.bichos.map(k => ANIMAL[k].nome).join(', ');
         const btn = max ? '<button class="btn ghost" disabled>Nível máximo</button>'
           : state.level < nivel ? `<button class="btn" disabled>Nível ${nivel}</button>`
-          : `<button class="btn ${lv ? '' : 'gold'}" data-abrigo="${b.id}" ${state.coins < preco ? 'disabled' : ''}>${lv ? 'Aumentar' : 'Construir'}<br><small>${preco ? preco.toLocaleString('pt-BR') : 'grátis'}</small></button>`;
+          : `<button class="btn ${lv ? '' : 'gold'}" data-abrigo="${b.id}" ${state.coins < preco ? 'disabled' : ''}>${preco ? moeda(preco) : 'Grátis'}</button>`;
         html += `<div class="row ${state.level < b.nivel ? 'locked' : ''} ${lv ? 'sel' : ''}" id="abrigo-${b.id}"><img alt="" src="${abrigoIcon(b.id)}">
           <div><div class="name">${b.nome}${lv ? ` · nível ${lv}` : ''}</div>
           <div class="meta">${quem}<br>${lv ? `${livesIn(state, b.id).length} de ${ABRIGO_CAP[lv]} animais${max ? '' : ` · nível ${lv + 1} cabe ${ABRIGO_CAP[lv + 1]}`}` : `cabe ${ABRIGO_CAP[1]} animais`}</div></div>${btn}</div>`;
@@ -3120,8 +3122,8 @@ function renderPane() {
       }
       html += `<div class="row"><img alt="" src="${bowlIcon()}">
         <div><div class="name">Ração de cachorro</div><div class="meta">${DOG_FOOD.custo} moedas · dura ${DOG_FOOD.horas}h · você tem <b>${state.dogFood}</b></div></div>
-        <div class="stack"><button class="btn" data-dog-food="1" ${state.coins < DOG_FOOD.custo ? 'disabled' : ''}>Comprar 1</button>
-        <button class="btn ghost" data-dog-food="3" ${state.coins < DOG_FOOD.custo * 3 ? 'disabled' : ''}>Comprar 3</button></div></div>`;
+        <div class="stack"><button class="btn" data-dog-food="1" ${state.coins < DOG_FOOD.custo ? 'disabled' : ''}>${moeda(DOG_FOOD.custo, 1)}</button>
+        <button class="btn ghost" data-dog-food="3" ${state.coins < DOG_FOOD.custo * 3 ? 'disabled' : ''}>${moeda(DOG_FOOD.custo * 3, 3)}</button></div></div>`;
       html += `<h3>Raças</h3>`;
       for (const b of DOGS) {
         const locked = b.nivel > state.level;
@@ -3138,7 +3140,7 @@ function renderPane() {
         html += `<div class="row ${locked ? 'locked' : ''} ${owned ? 'sel' : ''}">
           <img alt="" src="${decorIcon(d.id)}">
           <div><div class="name">${d.nome}</div><div class="meta">${d.custo} moedas · +${d.conforto} de conforto</div></div>
-          ${owned ? `<button class="btn ghost" data-see-house>Na casa</button>` : locked ? `<button class="btn" disabled>Nível ${d.nivel}</button>` : `<button class="btn" data-buy-decor="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>Comprar</button>`}
+          ${owned ? `<button class="btn ghost" data-see-house>Na casa</button>` : locked ? `<button class="btn" disabled>Nível ${d.nivel}</button>` : `<button class="btn" data-buy-decor="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>${moeda(d.custo)}</button>`}
         </div>`;
       }
     }
@@ -3176,7 +3178,7 @@ function renderPane() {
       if (!have && !next && k > state.exp + 3) return;
       html += `<div class="row ${have ? '' : next ? '' : 'locked'}"><div class="avatar" style="background:${have ? '#4f9a2f' : '#b7b39c'}">${k + 1}</div>
         <div><div class="name">+${extra} canteiros (total ${e.total})</div><div class="meta">${e.preco.toLocaleString('pt-BR')} moedas · nível ${e.nivel}</div></div>
-        ${have ? '<button class="btn ghost" disabled>Comprada</button>' : next ? `<button class="btn gold" data-expand ${state.level >= e.nivel && state.coins >= e.preco ? '' : 'disabled'}>Comprar</button>` : `<button class="btn" disabled>Nível ${e.nivel}</button>`}</div>`;
+        ${have ? '<button class="btn ghost" disabled>Comprada</button>' : next ? `<button class="btn gold" data-expand ${state.level >= e.nivel && state.coins >= e.preco ? '' : 'disabled'}>${moeda(e.preco)}</button>` : `<button class="btn" disabled>Nível ${e.nivel}</button>`}</div>`;
     });
     html += `<p class="hint">Pragas comem parte da colheita enquanto ficam lá. Terra seca faz a planta crescer mais devagar. Nunca acontecem os dois juntos. Cada planta dá XP em até ${XP_CAP} colheitas por dia.</p>
       <button class="btn danger" data-reset>${resetArmed ? 'Clique de novo para apagar tudo' : 'Recomeçar do zero'}</button>`;

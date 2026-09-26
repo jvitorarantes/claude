@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roça Feliz</title>
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="15">
-<script src="firebase-config.js?v=15"></script>
+<meta name="rf-version" content="16">
+<script src="firebase-config.js?v=16"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -238,6 +238,9 @@
     background: var(--leaf); color: #fff; box-shadow: 0 3px 0 var(--leaf-d);
   }
   .btn small { font-weight: 700; opacity: .9; }
+  .btn .coin { display: inline-block; width: 15px; height: 15px; vertical-align: -2px; margin-right: 4px; }
+  .btn .qtd { margin-right: 6px; opacity: .85; }
+  .row .btn { white-space: nowrap; font-variant-numeric: tabular-nums; }
   .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--leaf-d); }
   .btn:disabled { background: #b7b39c; box-shadow: 0 3px 0 #8f8a73; cursor: not-allowed; }
   .btn.gold { background: #e9a800; box-shadow: 0 3px 0 #a87400; }
@@ -468,8 +471,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=15"></script>
-<script src="js/cloud.js?v=15"></script>
-<script src="js/game.js?v=15"></script>
+<script src="js/audio.js?v=16"></script>
+<script src="js/cloud.js?v=16"></script>
+<script src="js/game.js?v=16"></script>
 </body>
 </html>
