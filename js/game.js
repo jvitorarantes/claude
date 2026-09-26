@@ -189,6 +189,31 @@ const DECOR = [
   { id: 'tv',     nome: 'Televisão',        custo: 4000, nivel: 8, conforto: 8 },
 ];
 const DECO = Object.fromEntries(DECOR.map(d => [d.id, d]));
+// Cada lugar da casa tem vários modelos. Você compra os que quiser e escolhe qual fica em uso.
+const MODELOS = [
+  { id: 'tapete',          lugar: 'tapete', nome: 'Tapete de crochê',     custo: 600,  nivel: 1,  conforto: 3, padrao: 'croche', cor: '#b8433a', cor2: '#f2c14e' },
+  { id: 'tapete_listras',  lugar: 'tapete', nome: 'Tapete azul listrado', custo: 900,  nivel: 3,  conforto: 4, padrao: 'listras', cor: '#3f6fa8', cor2: '#f4f1ea' },
+  { id: 'tapete_xadrez',   lugar: 'tapete', nome: 'Tapete xadrez',        custo: 1400, nivel: 6,  conforto: 5, padrao: 'xadrez', cor: '#4f9a2f', cor2: '#f2c14e' },
+  { id: 'vaso',            lugar: 'vaso',   nome: 'Vaso de flores',       custo: 800,  nivel: 2,  conforto: 3, tipo: 'flores', cor: '#d0703f' },
+  { id: 'vaso_cacto',      lugar: 'vaso',   nome: 'Cacto',                custo: 700,  nivel: 3,  conforto: 3, tipo: 'cacto', cor: '#3f6fa8' },
+  { id: 'vaso_girassol',   lugar: 'vaso',   nome: 'Girassóis',            custo: 1300, nivel: 6,  conforto: 5, tipo: 'girassol', cor: '#f4f1ea' },
+  { id: 'quadro',          lugar: 'quadro', nome: 'Quadro de paisagem',   custo: 1200, nivel: 3,  conforto: 4, tipo: 'paisagem', cor: '#c9962e' },
+  { id: 'quadro_vaca',     lugar: 'quadro', nome: 'Retrato da vaca',      custo: 1600, nivel: 5,  conforto: 5, tipo: 'vaca', cor: '#7a4a22' },
+  { id: 'quadro_sol',      lugar: 'quadro', nome: 'Pôr do sol',           custo: 2200, nivel: 9,  conforto: 6, tipo: 'sol', cor: '#2c5282' },
+  { id: 'abajur',          lugar: 'abajur', nome: 'Abajur amarelo',       custo: 1500, nivel: 4,  conforto: 4, tipo: 'abajur', cor: '#f6d27a' },
+  { id: 'abajur_franja',   lugar: 'abajur', nome: 'Abajur de franjas',    custo: 1900, nivel: 6,  conforto: 5, tipo: 'franja', cor: '#f48fb1' },
+  { id: 'abajur_lampiao',  lugar: 'abajur', nome: 'Lampião',              custo: 2600, nivel: 9,  conforto: 6, tipo: 'lampiao', cor: '#c98c00' },
+  { id: 'sofa',            lugar: 'sofa',   nome: 'Sofá verde',           custo: 2500, nivel: 6,  conforto: 6, cores: ['#5c9a78', '#4a8466', '#3f7358', '#6fb08c', '#66a482'] },
+  { id: 'sofa_vermelho',   lugar: 'sofa',   nome: 'Sofá vermelho',        custo: 3200, nivel: 8,  conforto: 7, cores: ['#c8402f', '#a53325', '#8f2a1e', '#e0584a', '#d24a3b'] },
+  { id: 'sofa_couro',      lugar: 'sofa',   nome: 'Sofá de couro',        custo: 4500, nivel: 12, conforto: 9, cores: ['#8a5a33', '#6e4424', '#5a3614', '#a86b38', '#96602f'] },
+  { id: 'tv_radio',        lugar: 'tv',     nome: 'Rádio antigo',         custo: 3000, nivel: 7,  conforto: 7, tipo: 'radio' },
+  { id: 'tv',              lugar: 'tv',     nome: 'TV de tubo',           custo: 4000, nivel: 8,  conforto: 8, tipo: 'tubo' },
+  { id: 'tv_plana',        lugar: 'tv',     nome: 'TV de tela plana',     custo: 7000, nivel: 14, conforto: 11, tipo: 'plana' },
+];
+const MODELO = Object.fromEntries(MODELOS.map(m => [m.id, m]));
+// O modelo em uso num lugar (saves antigos guardavam só "true", que é o primeiro modelo).
+const emUso = (s, lugar) => { const v = s.decor && s.decor[lugar]; return v === true ? MODELO[lugar] : MODELO[v] || null; };
+const LUGAR_NOME = { tapete: 'Tapetes', vaso: 'Vasos', quadro: 'Quadros', abajur: 'Luz', sofa: 'Sofás', tv: 'TV e rádio' };
 // Onde cada decoração fica na sala: [coluna, linha, altura] do centro.
 const DECOR_SPOT = {
   tapete: [2.6, 2.65, 0], vaso: [4.4, 4.3, 0.35], quadro: [3.7, 0, 0.92],
@@ -243,10 +268,10 @@ function newAnimal(k) {
   return a;
 }
 // Faz o animal produzir ou crescer por "sec" segundos.
-function growAnimal(a, sec) {
+function growAnimal(a, sec, s = state) {
   const d = ANIMAL[a.k];
   if (d.tipo === 'prod') {
-    if (a.fed && !a.ready) { a.g += sec; if (a.g >= d.tempo) { a.g = d.tempo; a.ready = true; a.fed = false; } }
+    if (a.fed && !a.ready) { a.g += sec * acelera(s, d.prod); if (a.g >= d.tempo) { a.g = d.tempo; a.ready = true; a.fed = false; } }
   } else if (d.tipo === 'cria' && a.g < d.tempo) {
     const use = Math.min(sec, a.food || 0);
     a.g = Math.min(d.tempo, a.g + use); a.food = (a.food || 0) - use;
@@ -318,6 +343,12 @@ function migrate(s) {
   s.limits = s.limits && typeof s.limits === 'object' ? s.limits : {};
   if (s.barn && s.barn.trufa) { s.barn.bacon = (s.barn.bacon || 0) + s.barn.trufa; delete s.barn.trufa; } // a trufa virou bacon
   s.decor = s.decor && typeof s.decor === 'object' ? s.decor : {};
+  s.decorTem = s.decorTem && typeof s.decorTem === 'object' ? s.decorTem : {};
+  for (const [lugar, v] of Object.entries(s.decor)) {
+    const m = v === true ? MODELO[lugar] : MODELO[v];
+    if (!m || m.lugar !== lugar) { delete s.decor[lugar]; continue; }
+    s.decor[lugar] = m.id; s.decorTem[m.id] = true;
+  }
   s.friends = Array.isArray(s.friends) ? s.friends.filter(f => typeof f === 'string') : [];
   s.sent = s.sent && typeof s.sent === 'object' && !Array.isArray(s.sent) ? s.sent : {};
   s.fert = s.fert && typeof s.fert === 'object' ? s.fert : {};
@@ -351,7 +382,7 @@ function phaseTempo(p) { const c = CROP[p.c]; return c.arvore && p.adult ? c.tem
 // vão comendo parte da colheita (no máximo 35%), proporcional ao tempo da planta.
 // Planta pronta que fica mais de 24h sem colher apodrece. Volta com uma poção ou com a ajuda de amigos.
 const PODRE_APOS = 24 * HOUR, POCAO = { custo: 150 }, CURA_MAX = 3;
-function growPlot(p, sec, events) {
+function growPlot(p, sec, events, s = state) {
   if (p.s !== 'growing' || p.poda) return;
   const crop = CROP[p.c], T = phaseTempo(p);
   if (p.g >= T) {
@@ -363,14 +394,14 @@ function growPlot(p, sec, events) {
     if (!p.dry && !p.b && Math.random() < 0.12 / T * sec) p.b = 1;
     else if (!p.dry && !p.b && Math.random() < 0.5 / T * sec) p.dry = true;
   }
-  p.g = Math.min(T, p.g + sec * (p.dry ? 0.7 : 1));
+  p.g = Math.min(T, p.g + sec * (p.dry ? 0.7 : 1) * acelera(s, crop.prod));
   const trouble = p.w + p.b + (p.dry ? 0.5 : 0);
   if (trouble) p.dmg = Math.min(crop.rend * 0.35, p.dmg + trouble * crop.rend * sec / (T * 4));
 }
 function catchUp(s, sec) {
   sec = Math.max(0, sec || 0);
-  for (const p of s.plots) growPlot(p, sec, false);
-  for (const a of s.animals) growAnimal(a, sec);
+  for (const p of s.plots) growPlot(p, sec, false, s);
+  for (const a of s.animals) growAnimal(a, sec, s);
 }
 
 function load() {
@@ -472,7 +503,7 @@ const freeLots = () => Math.max(0, allowedLots() - state.owned);
 const canBuy = i => freeLots() > 0 && touches(i); // lote onde dá para colocar um canteiro agora
 let buyPending = null; // lote clicado uma vez, esperando o segundo clique para confirmar
 const sfx = name => { if (window.RFAudio) window.RFAudio.play(name); };
-const comfort = s => DECOR.reduce((t, d) => t + (s.decor[d.id] ? d.conforto : 0), 0) + confortoEnfeites(s);
+const comfort = s => DECOR.reduce((t, d) => t + (emUso(s, d.id) ? emUso(s, d.id).conforto : 0), 0) + confortoEnfeites(s);
 const firstName = n => (n || '').split(' ')[0] || 'Você';
 
 function toast(msg, kind = '') {
@@ -537,7 +568,9 @@ function actPlot(i) {
     buyPending = { i: 'hoe' + i, until: performance.now() + 4000 };
     return toast(`Arrancar ${CROP[p.c].nome.toLowerCase()}? Clique de novo para confirmar.`);
   }
-  if (p.s === 'plowed' && (tool === 'seed' || tool === 'hand')) return plant(p, pos);
+  if (p.s === 'plowed' && tool === 'seed') return plant(p, pos);
+  // Terra vazia sem semente na mão: abre a Loja para escolher o que plantar (nada é plantado sozinho).
+  if (p.s === 'plowed' && tool === 'hand') { openPanel('loja', CROP[state.seed] && CROP[state.seed].arvore ? 'mudas' : 'sementes'); return toast('Escolha uma semente na Loja e clique na terra para plantar.'); }
   const hints = {
     hoe: 'A enxada limpa plantas secas e arranca plantações.', water: 'Essa terra não precisa de água.',
     pest: 'Não há pragas aqui.', weed: 'Não há mato aqui.', seed: 'Só dá para plantar em terra arada.',
@@ -681,7 +714,7 @@ function actAnimal(id) {
   }
   if (a.ready) { collectAnimal(a, pos); return done(); }
   if (!a.fed) return feedAnimal(a, pos, true) && done();
-  toast(`${d.nome} está produzindo ${PRODUCT[d.prod].nome.toLowerCase()}: falta ${fmt(d.tempo - a.g)}.`);
+  toast(`${d.nome} está produzindo ${PRODUCT[d.prod].nome.toLowerCase()}: falta ${fmt((d.tempo - a.g) / acelera(S(), d.prod))}.`);
 }
 // Ações que pedem um segundo clique para confirmar.
 function confirmTwice(key, msg, fn) {
@@ -884,11 +917,10 @@ function abrigoHTML() {
   return html;
 }
 function actDecor(id) {
-  const d = DECO[id];
-  if (!isHome()) return toast(`${d.nome} de ${view.nome}.`);
-  if (state.decor[id]) return toast(`${d.nome}: +${d.conforto}% de XP.`);
+  const m = emUso(S(), id);
+  if (!isHome()) return toast(`${m ? m.nome : DECO[id].nome} de ${view.nome}.`);
   openPanel('loja', 'decor');
-  toast(`Compre ${d.nome} na Loja para colocar aqui.`);
+  toast(m ? `${m.nome}: +${m.conforto}% de XP. Na Loja você pode trocar o modelo.` : `Escolha ${LUGAR_NOME[id].toLowerCase()} na Loja para este lugar.`);
 }
 
 function buyAnimal(k) {
@@ -941,14 +973,21 @@ function buyAbrigo(id) {
   done();
 }
 function buyDecor(id) {
-  const d = DECO[id];
-  if (state.decor[id]) return;
+  const d = MODELO[id];
+  if (!d || state.decorTem[id]) return;
   if (state.level < d.nivel) return toast(`${d.nome} libera no nível ${d.nivel}.`);
   if (state.coins < d.custo) return toast(`${d.nome} custa ${d.custo} moedas.`, 'bad');
-  state.coins -= d.custo; state.decor[id] = true;
+  state.coins -= d.custo; state.decorTem[id] = true; state.decor[d.lugar] = id;
   sfx('buy');
   addXP(3, null);
   toast(`${d.nome} na sua casa! Agora você ganha +${comfort(state)}% de XP.`, 'good');
+  if (isHome()) setScene('casa');
+  done();
+}
+function usarDecor(id) {
+  const d = MODELO[id]; if (!d || !state.decorTem[id]) return;
+  state.decor[d.lugar] = id; sfx('buy');
+  toast(`${d.nome} em uso. Conforto: +${comfort(state)}% de XP.`, 'good');
   if (isHome()) setScene('casa');
   done();
 }
@@ -1005,8 +1044,22 @@ function genNeighbor() {
   return ensureAbrigos({ plots, animals, decor, banca: npcBanca(), refreshAt: Date.now() + 4 * 60 * 1000 });
 }
 
+// Tela de carregamento de uns 3 segundos ao ir ou voltar da roça de alguém.
+const CARREGA_MS = 3000;
+let carregaTimer = 0;
+const espera = ms => new Promise(r => setTimeout(r, ms));
+function telaCarregando(txt, ms = CARREGA_MS) {
+  const el = $('#loading'); if (!el) return;
+  $('#loadingTxt').textContent = txt;
+  const bar = el.querySelector('.loadbar i'); bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
+  el.hidden = false; clearTimeout(carregaTimer);
+  if (ms) carregaTimer = setTimeout(fecharCarregando, ms);
+}
+function fecharCarregando() { clearTimeout(carregaTimer); const el = $('#loading'); if (el) el.hidden = true; }
+
 function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
+  telaCarregando(`Indo até a roça de ${nb.nome}…`);
   const cur = state.nb[id];
   if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry)) || !cur.plots.some(p => 'podre' in p) || !cur.banca) state.nb[id] = genNeighbor();
   view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima };
@@ -1016,9 +1069,10 @@ function visitNpc(id) {
 
 async function visitFriend(uid) {
   if (!user) return;
-  toast('Indo até a roça do amigo…');
+  const amigo = friendInfo[uid];
+  telaCarregando(`Indo até a roça de ${amigo && amigo.name ? firstName(amigo.name) : 'um amigo'}…`, 0);
   try {
-    const f = await Cloud.loadFarm(uid);
+    const [f] = await Promise.all([Cloud.loadFarm(uid), espera(CARREGA_MS)]);
     const data = f && f.stateJson ? migrate(JSON.parse(f.stateJson)) : null;
     if (!data) return toast('Essa roça ainda não existe na nuvem.', 'bad');
     catchUp(data, (Date.now() - (f.updatedAt || Date.now())) / 1000);
@@ -1027,19 +1081,30 @@ async function visitFriend(uid) {
   } catch (e) {
     console.warn(e);
     toast('Não consegui abrir a roça do amigo agora.', 'bad');
-  }
+  } finally { fecharCarregando(); }
 }
 
 function afterVisit() {
   hover = null; setScene('roca');
   if (['seed', 'hoe', 'fert'].includes(state.tool)) state.tool = 'hand';
-  $('#bannerTxt').textContent = `Você está na roça de ${view.nome} (nível ${view.nivel}). Veja a banca em Fábrica. Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
+  $('#bannerTxt').textContent = `Você está na roça de ${view.nome} (nível ${view.nivel}). Veja a banca em Negócios. Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
   $('#banner').hidden = false;
   cv.setAttribute('aria-label', `Roça de ${view.nome}`);
+  renderVisita();
   renderTools(); renderPane(); renderSceneInfo();
 }
+// Na roça de outra pessoa somem os botões que só servem na sua (Loja, Celeiro, Presente, Mover…).
+// Ficam Amigos (para ir a outra roça) e Negócios (para comprar na banca).
+const TABS_VISITA = ['amigos', 'fabrica'];
+function renderVisita() {
+  const fora = !isHome();
+  document.body.classList.toggle('visitando', fora);
+  if (fora && !$('#panel').hidden && !TABS_VISITA.includes(tab)) closePanel();
+  renderMoveBtn();
+}
 function goHome() {
-  view = { kind: 'home' }; hover = null;
+  if (!isHome()) telaCarregando('Voltando para a sua roça…');
+  view = { kind: 'home' }; hover = null; renderVisita();
   setScene('roca'); // voltar para a sua fazenda sempre começa na roça
   $('#banner').hidden = true; cv.setAttribute('aria-label', 'Sua roça');
   renderTools(); renderPane(); renderSceneInfo();
@@ -2890,34 +2955,81 @@ function drawPen(s, t, home, dt) {
 // Cena: casa
 // ============================================================
 const DRAW_DECOR = {
-  quadro() {
-    quad(P(3.1, 0, 0.72), P(4.3, 0, 0.72), P(4.3, 0, 1.12), P(3.1, 0, 1.12), '#c9962e', '#8a6420', 1.5);
-    quad(P(3.18, 0, 0.77), P(4.22, 0, 0.77), P(4.22, 0, 1.07), P(3.18, 0, 1.07), '#9fd6f2');
+  quadro(t, m) {
+    quad(P(3.1, 0, 0.72), P(4.3, 0, 0.72), P(4.3, 0, 1.12), P(3.1, 0, 1.12), m.cor, 'rgba(0,0,0,.35)', 1.5);
+    if (m.tipo === 'vaca') {
+      quad(P(3.18, 0, 0.77), P(4.22, 0, 0.77), P(4.22, 0, 1.07), P(3.18, 0, 1.07), '#e8f4d8');
+      const c = P(3.7, 0, 0.92), W = L.W;
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(c.x, c.y, W * 0.16, W * 0.12, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.beginPath(); ctx.ellipse(c.x - W * 0.07, c.y - W * 0.04, W * 0.05, W * 0.04, 0.3, 0, 7); ctx.fill();
+      ctx.fillStyle = '#f4a6b0'; ctx.beginPath(); ctx.ellipse(c.x, c.y + W * 0.07, W * 0.09, W * 0.045, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#111'; for (const dx of [-0.05, 0.05]) { ctx.beginPath(); ctx.arc(c.x + dx * W, c.y - W * 0.01, W * 0.015, 0, 7); ctx.fill(); }
+      ctx.fillStyle = '#e8c35a'; for (const dx of [-0.17, 0.17]) { ctx.beginPath(); ctx.ellipse(c.x + dx * W, c.y - W * 0.08, W * 0.04, W * 0.02, dx > 0 ? -0.5 : 0.5, 0, 7); ctx.fill(); }
+      return;
+    }
+    const sol = m.tipo === 'sol';
+    quad(P(3.18, 0, 0.77), P(4.22, 0, 0.77), P(4.22, 0, 1.07), P(3.18, 0, 1.07), sol ? '#f28b5b' : '#9fd6f2');
+    if (sol) { const q = P(3.7, 0, 0.86); ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(q.x, q.y, L.W * 0.08, Math.PI, 0); ctx.fill(); quad(P(3.18, 0, 0.77), P(4.22, 0, 0.77), P(4.22, 0, 0.84), P(3.18, 0, 0.84), '#2c5282'); return; }
     poly([P(3.18, 0, 0.77), P(4.22, 0, 0.77), P(4.22, 0, 0.86), P(3.7, 0, 0.93), P(3.18, 0, 0.87)]); ctx.fillStyle = '#5ea83a'; ctx.fill();
     const sun = P(3.98, 0, 1.0); ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(sun.x, sun.y, L.W * 0.04, 0, 7); ctx.fill();
     const h = P(3.45, 0, 0.9); ctx.fillStyle = '#c8402f'; ctx.fillRect(h.x - L.W * 0.035, h.y - L.W * 0.03, L.W * 0.07, L.W * 0.05);
   },
-  tapete() {
-    quad(P(1.3, 1.4), P(3.9, 1.4), P(3.9, 3.9), P(1.3, 3.9), '#b8433a');
-    quad(P(1.5, 1.6), P(3.7, 1.6), P(3.7, 3.7), P(1.5, 3.7), null, '#f2c14e', 2);
-    quad(P(2.6, 2.05), P(3.2, 2.65), P(2.6, 3.25), P(2.0, 2.65), '#f2c14e');
-    quad(P(2.6, 2.35), P(2.9, 2.65), P(2.6, 2.95), P(2.3, 2.65), '#b8433a');
-    for (let k = 0; k <= 12; k++) { const a = P(1.3 + k * 2.6 / 12, 3.9), b = P(1.3 + k * 2.6 / 12, 4.0); line(a, b, '#f2c14e', 1.2); }
+  tapete(t, m) {
+    quad(P(1.3, 1.4), P(3.9, 1.4), P(3.9, 3.9), P(1.3, 3.9), m.cor);
+    if (m.padrao === 'listras') {
+      for (let k = 0; k < 5; k++) { const v0 = 1.55 + k * 0.5; quad(P(1.3, v0), P(3.9, v0), P(3.9, v0 + 0.2), P(1.3, v0 + 0.2), m.cor2); }
+    } else if (m.padrao === 'xadrez') {
+      for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if ((i + j) % 2) quad(P(1.3 + i * 0.52, 1.4 + j * 0.5), P(1.82 + i * 0.52, 1.4 + j * 0.5), P(1.82 + i * 0.52, 1.9 + j * 0.5), P(1.3 + i * 0.52, 1.9 + j * 0.5), m.cor2);
+    } else {
+      quad(P(1.5, 1.6), P(3.7, 1.6), P(3.7, 3.7), P(1.5, 3.7), null, m.cor2, 2);
+      quad(P(2.6, 2.05), P(3.2, 2.65), P(2.6, 3.25), P(2.0, 2.65), m.cor2);
+      quad(P(2.6, 2.35), P(2.9, 2.65), P(2.6, 2.95), P(2.3, 2.65), m.cor);
+    }
+    for (let k = 0; k <= 12; k++) { const a = P(1.3 + k * 2.6 / 12, 3.9), b = P(1.3 + k * 2.6 / 12, 4.0); line(a, b, m.cor2, 1.2); }
   },
-  abajur(t) {
+  abajur(t, m) {
     const b = P(0.6, 0.6, 0), top = P(0.6, 0.6, 1.05), bot = P(0.6, 0.6, 0.8), W = L.W;
     const night = timeOfDay() !== 'dia';
     const g = ctx.createRadialGradient(bot.x, bot.y, 0, bot.x, bot.y, W * 1.3);
     g.addColorStop(0, `rgba(255,233,160,${night ? 0.5 : 0.22})`); g.addColorStop(1, 'rgba(255,233,160,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bot.x, bot.y, W * 1.3, 0, 7); ctx.fill();
+    if (m.tipo === 'lampiao') {
+      // lampião de pendurar, numa mesinha
+      isoBox(0.35, 0.35, 0.85, 0.85, 0, 0.45, '#a86b38', '#8a5a33', '#6e4424');
+      const c = P(0.6, 0.6, 0.62);
+      ctx.fillStyle = m.cor; ctx.fillRect(c.x - W * 0.08, c.y - W * 0.02, W * 0.16, W * 0.04); ctx.fillRect(c.x - W * 0.06, c.y - W * 0.28, W * 0.12, W * 0.04);
+      ctx.fillStyle = 'rgba(255,230,150,.85)'; ctx.fillRect(c.x - W * 0.06, c.y - W * 0.24, W * 0.12, W * 0.22);
+      ctx.strokeStyle = m.cor; ctx.lineWidth = 2; ctx.strokeRect(c.x - W * 0.06, c.y - W * 0.24, W * 0.12, W * 0.22);
+      ctx.fillStyle = '#ffb300'; ctx.beginPath(); ctx.ellipse(c.x, c.y - W * 0.1, W * 0.025, W * 0.05 + Math.sin(t / 150) * W * 0.005, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(c.x, c.y - W * 0.33, W * 0.04, Math.PI, 0); ctx.strokeStyle = m.cor; ctx.stroke();
+      return;
+    }
     ctx.fillStyle = '#5a3a22'; ctx.beginPath(); ctx.ellipse(b.x, b.y, W * 0.12, W * 0.05, 0, 0, 7); ctx.fill();
     line(b, bot, '#5a3a22', W * 0.025);
     poly([{ x: top.x - W * 0.09, y: top.y }, { x: top.x + W * 0.09, y: top.y }, { x: bot.x + W * 0.16, y: bot.y }, { x: bot.x - W * 0.16, y: bot.y }]);
-    ctx.fillStyle = '#f6d27a'; ctx.fill(); ctx.strokeStyle = '#c99a3c'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = m.cor; ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1.5; ctx.stroke();
+    if (m.tipo === 'franja') { ctx.strokeStyle = '#fff4e0'; ctx.lineWidth = 1.2; for (let k = 0; k <= 8; k++) { const x = bot.x - W * 0.16 + k * W * 0.04; ctx.beginPath(); ctx.moveTo(x, bot.y); ctx.lineTo(x, bot.y + W * 0.05); ctx.stroke(); } }
   },
-  tv(t) {
+  tv(t, m) {
     isoBox(2.9, 0.1, 4.4, 0.65, 0, 0.28, '#9a6a3e', '#7a4a22', '#653c1b');
     line(P(3.65, 0.65, 0.05), P(3.65, 0.65, 0.23), '#4a2c14', 1.5);
+    if (m.tipo === 'radio') {
+      isoBox(3.2, 0.2, 4.1, 0.5, 0.28, 0.62, '#b07a44', '#8a5a33', '#6e4424');
+      quad(P(3.3, 0.5, 0.34), P(3.75, 0.5, 0.34), P(3.75, 0.5, 0.56), P(3.3, 0.5, 0.56), '#e8d2a8');
+      ctx.strokeStyle = 'rgba(90,60,30,.5)'; ctx.lineWidth = 1; for (let k = 1; k < 4; k++) line(P(3.3 + k * 0.11, 0.5, 0.34), P(3.3 + k * 0.11, 0.5, 0.56), 'rgba(90,60,30,.5)', 1);
+      for (const u of [3.85, 4.0]) { const q = P(u, 0.5, 0.45); ctx.fillStyle = '#3a2412'; ctx.beginPath(); ctx.arc(q.x, q.y, L.W * 0.03, 0, 7); ctx.fill(); }
+      const k = Math.sin(t / 200); ctx.fillStyle = '#3a2412'; const n = P(4.05, 0.3, 0.75 + k * 0.02); ctx.font = `${Math.round(L.W * 0.12)}px serif`; ctx.fillText('♪', n.x, n.y);
+      return;
+    }
+    if (m.tipo === 'plana') {
+      line(P(3.65, 0.35, 0.28), P(3.65, 0.35, 0.42), '#333', 3);
+      quad(P(2.95, 0.36, 0.4), P(4.35, 0.36, 0.4), P(4.35, 0.36, 1.0), P(2.95, 0.36, 1.0), '#1a1a1a');
+      const hue = (t / 60) % 360;
+      quad(P(3.0, 0.36, 0.44), P(4.3, 0.36, 0.44), P(4.3, 0.36, 0.96), P(3.0, 0.36, 0.96), `hsl(${hue}, 55%, 60%)`);
+      const k = (Math.sin(t / 600) + 1) / 2, q = P(3.2 + k * 0.9, 0.36, 0.62);
+      ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(q.x, q.y, L.W * 0.05, 0, 7); ctx.fill();
+      return;
+    }
     isoBox(3.1, 0.18, 4.2, 0.4, 0.28, 0.74, '#3a3a3a', '#2a2a2a', '#1e1e1e');
     const hue = (t / 60) % 360;
     quad(P(3.18, 0.4, 0.34), P(4.12, 0.4, 0.34), P(4.12, 0.4, 0.68), P(3.18, 0.4, 0.68), `hsl(${hue}, 45%, 58%)`);
@@ -2925,19 +3037,36 @@ const DRAW_DECOR = {
     ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.beginPath(); ctx.arc(q.x, q.y, L.W * 0.035, 0, 7); ctx.fill();
     line(P(3.65, 0.29, 0.74), P(3.3, 0.29, 0.98), '#555', 1.5); line(P(3.65, 0.29, 0.74), P(4.0, 0.29, 0.98), '#555', 1.5);
   },
-  sofa() {
-    isoBox(0.1, 1.0, 1.0, 2.9, 0, 0.3, '#5c9a78', '#4a8466', '#3f7358');
-    quad(P(0.42, 1.25, 0.3), P(0.95, 1.25, 0.3), P(0.95, 1.9, 0.3), P(0.42, 1.9, 0.3), '#6fb08c');
-    quad(P(0.42, 2.0, 0.3), P(0.95, 2.0, 0.3), P(0.95, 2.65, 0.3), P(0.42, 2.65, 0.3), '#6fb08c');
-    isoBox(0.1, 1.0, 0.38, 2.9, 0.3, 0.7, '#5c9a78', '#4a8466', '#3f7358');
-    isoBox(0.1, 1.0, 1.0, 1.22, 0.3, 0.46, '#66a482', '#4a8466', '#3f7358');
-    isoBox(0.1, 2.68, 1.0, 2.9, 0.3, 0.46, '#66a482', '#4a8466', '#3f7358');
+  sofa(t, m) {
+    const [a, b, c, d, e] = m.cores;
+    isoBox(0.1, 1.0, 1.0, 2.9, 0, 0.3, a, b, c);
+    quad(P(0.42, 1.25, 0.3), P(0.95, 1.25, 0.3), P(0.95, 1.9, 0.3), P(0.42, 1.9, 0.3), d);
+    quad(P(0.42, 2.0, 0.3), P(0.95, 2.0, 0.3), P(0.95, 2.65, 0.3), P(0.42, 2.65, 0.3), d);
+    isoBox(0.1, 1.0, 0.38, 2.9, 0.3, 0.7, a, b, c);
+    isoBox(0.1, 1.0, 1.0, 1.22, 0.3, 0.46, e, b, c);
+    isoBox(0.1, 2.68, 1.0, 2.9, 0.3, 0.46, e, b, c);
   },
-  vaso(t) {
-    isoBox(4.15, 4.05, 4.65, 4.55, 0, 0.28, '#d0703f', '#b85e33', '#9c4e2a');
+  vaso(t, m) {
+    isoBox(4.15, 4.05, 4.65, 4.55, 0, 0.28, m.cor, 'rgba(0,0,0,.12)', 'rgba(0,0,0,.25)');
+    isoBox(4.15, 4.05, 4.65, 4.55, 0, 0.28, m.cor, m.cor, m.cor);
     quad(P(4.18, 4.08, 0.28), P(4.62, 4.08, 0.28), P(4.62, 4.52, 0.28), P(4.18, 4.52, 0.28), '#5a3a20');
     const b = P(4.4, 4.3, 0.28), W = L.W, sw = Math.sin(t / 900) * 0.05;
+    if (m.tipo === 'cacto') {
+      ctx.fillStyle = '#4f9a2f'; ctx.strokeStyle = '#2f6e1e'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(b.x, b.y - W * 0.2, W * 0.07, W * 0.2, 0, 0, 7); ctx.fill(); ctx.stroke();
+      for (const d of [-1, 1]) { ctx.beginPath(); ctx.ellipse(b.x + d * W * 0.11, b.y - W * 0.22 - (d > 0 ? W * 0.05 : 0), W * 0.04, W * 0.09, 0, 0, 7); ctx.fill(); ctx.stroke(); }
+      ctx.fillStyle = '#f06292'; ctx.beginPath(); ctx.arc(b.x, b.y - W * 0.4, W * 0.035, 0, 7); ctx.fill();
+      return;
+    }
     [-1.1, -0.6, -0.15, 0.3, 0.75, 1.15].forEach((a, i) => leaf(b.x, b.y, W * (0.32 + (i % 2) * 0.08), W * 0.055, a + sw, i % 2 ? '#4fa83a' : '#3a8a2c'));
+    if (m.tipo === 'girassol') {
+      for (const [dx, dy] of [[-0.1, -0.4], [0.1, -0.46], [0.02, -0.52]]) {
+        const x = b.x + dx * W, y = b.y + dy * W;
+        ctx.fillStyle = '#ffd54a'; for (let k = 0; k < 8; k++) { const a2 = k * Math.PI / 4; ctx.beginPath(); ctx.ellipse(x + Math.cos(a2) * W * 0.04, y + Math.sin(a2) * W * 0.04, W * 0.025, W * 0.015, a2, 0, 7); ctx.fill(); }
+        ctx.fillStyle = '#6b3a1a'; ctx.beginPath(); ctx.arc(x, y, W * 0.028, 0, 7); ctx.fill();
+      }
+      return;
+    }
     ctx.fillStyle = '#ef7aa0';
     for (const [dx, dy] of [[-0.08, -0.38], [0.1, -0.42], [0.02, -0.46]]) { ctx.beginPath(); ctx.arc(b.x + dx * W, b.y + dy * W, W * 0.035, 0, 7); ctx.fill(); }
   },
@@ -2997,14 +3126,14 @@ function drawRoom(s, t, home) {
   quad(P(0, 3.55, 0.1), P(0, 4.35, 0.1), P(0, 4.35, 0.42), P(0, 3.55, 0.42), null, 'rgba(0,0,0,.25)', 1.5);
   const kn = P(0, 3.6, 0.45); ctx.fillStyle = '#e8c35a'; ctx.beginPath(); ctx.arc(kn.x, kn.y, W * 0.025, 0, 7); ctx.fill();
   // decorações
-  for (const id of DECOR_ORDER) if (s.decor[id]) DRAW_DECOR[id](t);
+  for (const id of DECOR_ORDER) { const m = emUso(s, id); if (m) DRAW_DECOR[id](t, m); }
   // bichos de companhia que moram dentro de casa
   const pets = s.animals.filter(a => ANIMAL[a.k].lugar === 'casa');
   updateWander(pets, Math.min(0.05, 1 / 60), ROOM_AREA);
   pets.map(a => ({ a, m: amb[a.id] })).sort((x, y) => (x.m.u + x.m.v) - (y.m.u + y.m.v)).forEach(({ a, m }) => drawAnimalAt(a, m, W / 100 * (a.k === 'arara' ? 1.35 : 2.1), t));
   for (const id of DECOR_ORDER) {
-    if (home && !s.decor[id]) drawSlotHint(id);
-    if (home || s.decor[id]) { const m = decorCenter(id); hits.push({ kind: 'decor', id, x: m.x, y: m.y, r: W * 0.4 }); }
+    if (home && !emUso(s, id)) drawSlotHint(id);
+    if (home || emUso(s, id)) { const m = decorCenter(id); hits.push({ kind: 'decor', id, x: m.x, y: m.y, r: W * 0.4 }); }
   }
   const hv = hover && hover.kind === 'decor' && decorCenter(hover.id);
   if (hv) { ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(hv.x, hv.y, W * 0.42, 0, 7); ctx.stroke(); }
@@ -3110,13 +3239,14 @@ const animalIcon = id => makeIcon('a:' + id, () => {
   drawAnimal(k, x, 88, sc, 0, 1, false);
 });
 const productIcon = id => makeIcon('p:' + id, () => drawProduct(id, 48, 48, 5.5));
-const decorIcon = id => makeIcon('d:' + id, () => {
+const decorIcon = mid => makeIcon('d:' + mid, () => {
+  const mod = MODELO[mid], id = mod.lugar;
   L.W = { tapete: 34, sofa: 48, tv: 64, quadro: 100, abajur: 70, vaso: 105 }[id];
   L.ox = 0; L.oy = 0;
   const m = decorCenter(id);
   L.ox = 48 - m.x; L.oy = (id === 'abajur' ? 52 : 56) - m.y;
   if (id === 'quadro') { ctx.fillStyle = '#f1dcae'; ctx.fillRect(8, 8, 80, 80); }
-  DRAW_DECOR[id](0);
+  DRAW_DECOR[id](0, mod);
 });
 const abrigoIcon = id => makeIcon('ab:' + id, () => {
   L.W = 58; L.ox = 0; L.oy = 0;
@@ -3320,7 +3450,7 @@ function renderTabs() {
 }
 // Preço nos botões da loja: ícone de moeda + valor (e a quantidade, quando tem).
 const moeda = (n, q) => `${q ? `<span class="qtd">×${q}</span>` : ''}<span class="coin" aria-hidden="true"></span>${n.toLocaleString('pt-BR')}`;
-const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões', correio: 'Correio', fabrica: 'Fábrica', inventario: 'Inventário' };
+const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões', correio: 'Correio', fabrica: 'Negócios', inventario: 'Inventário' };
 // A janela abre por cima do jogo. Clicar de novo no mesmo botão fecha.
 function openPanel(t, seg, focus) {
   tab = t; if (seg) shopSeg = seg;
@@ -3487,14 +3617,18 @@ function renderPane() {
           ${using ? '<button class="btn ghost" disabled>Em uso</button>' : owned ? `<button class="btn" data-tema-roca="${t.id}">Usar</button>` : locked ? `<button class="btn" disabled>Nível ${t.nivel}</button>` : `<button class="btn" data-tema-roca="${t.id}" ${state.coins < t.custo ? 'disabled' : ''}>${moeda(t.custo)}</button>`}</div>`;
       }
     } else {
-      html += `<p class="hint">Decore a sua casa. Cada peça dá conforto, e cada ponto de conforto vale +1% de XP. Agora: +${comfort(state)}%.</p>`;
+      html += `<p class="hint">Decore a sua casa. Cada lugar tem vários modelos: compre os que quiser e escolha qual fica em uso. O conforto do modelo em uso vale +1% de XP por ponto. Agora: +${comfort(state)}%.</p>`;
       for (const d of DECOR) {
-        const locked = d.nivel > state.level, owned = !!state.decor[d.id];
-        html += `<div class="row ${locked ? 'locked' : ''} ${owned ? 'sel' : ''}">
-          <img alt="" src="${decorIcon(d.id)}">
-          <div><div class="name">${d.nome}</div><div class="meta">${d.custo} moedas · +${d.conforto} de conforto</div></div>
-          ${owned ? `<div class="stack"><button class="btn ghost" data-see-house>Na casa</button>${venderBtn('dec:' + d.id, Math.floor(d.custo / 2))}</div>` : locked ? `<button class="btn" disabled>Nível ${d.nivel}</button>` : `<button class="btn" data-buy-decor="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>${moeda(d.custo)}</button>`}
-        </div>`;
+        html += `<h3>${LUGAR_NOME[d.id]}</h3>`;
+        for (const m of MODELOS.filter(x => x.lugar === d.id)) {
+          const locked = m.nivel > state.level, tem = !!state.decorTem[m.id], uso = state.decor[d.id] === m.id;
+          html += `<div class="row ${locked ? 'locked' : ''} ${uso ? 'sel' : ''}">
+            <img alt="" src="${decorIcon(m.id)}">
+            <div><div class="name">${m.nome}</div><div class="meta">${m.custo.toLocaleString('pt-BR')} moedas · +${m.conforto} de conforto${uso ? ' · <b>em uso</b>' : tem ? ' · guardado' : ''}</div></div>
+            ${tem ? `<div class="stack">${uso ? '<button class="btn ghost" data-see-house>Na casa</button>' : `<button class="btn" data-usar-decor="${m.id}">Usar</button>`}${venderBtn('dec:' + m.id, Math.floor(m.custo / 2))}</div>`
+              : locked ? `<button class="btn" disabled>Nível ${m.nivel}</button>` : `<button class="btn" data-buy-decor="${m.id}" ${state.coins < m.custo ? 'disabled' : ''}>${moeda(m.custo)}</button>`}
+          </div>`;
+        }
       }
     }
   } else if (tab === 'celeiro') {
@@ -3516,7 +3650,7 @@ function renderPane() {
       <span>Canteiros</span><span>${state.owned} de ${allowedLots()}</span>
       <span>Animais</span><span>${state.animals.length}</span>
       <span>Abrigos</span><span>${Object.keys(state.abrigos).length} de ${ABRIGOS.length}</span>
-      <span>Decorações</span><span>${Object.keys(state.decor).length} de ${DECOR.length}</span>
+      <span>Decorações</span><span>${Object.keys(state.decorTem).length} de ${MODELOS.length} modelos</span>
       <span>Colheitas</span><span>${state.stats.colheitas}</span>
       <span>Produtos dos animais</span><span>${state.stats.coletas}</span>
       <span>Moedas vendidas</span><span>${state.stats.vendido}</span>
@@ -3649,6 +3783,7 @@ $('#pane').addEventListener('click', e => {
   else if (d.seed) { state.seed = d.seed; state.tool = 'seed'; if (!isHome()) goHome(); setScene('roca'); closePanel(); save(); toast(`${CROP[d.seed].nome} na mão: clique na terra arada para plantar.`); }
   else if (d.buyAnimal) buyAnimal(d.buyAnimal);
   else if (d.buyDecor) buyDecor(d.buyDecor);
+  else if (d.usarDecor) usarDecor(d.usarDecor);
   else if ('seeHouse' in d) { if (!isHome()) goHome(); setScene('casa'); closePanel(); }
   else if (d.sell) sell(d.sell, false);
   else if (d.sellallOf) sell(d.sellallOf, true);
@@ -3724,7 +3859,8 @@ const MENU_ICONS = {
   missoes: '<svg viewBox="0 0 32 32"><path d="M8 4h16a2 2 0 0 1 2 2v22l-4-2-3 2-3-2-3 2-3-2-4 2V6a2 2 0 0 1 2-2z" fill="#fff4e0" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 11l2 2 3-4M10 18l2 2 3-4" fill="none" stroke="#4f9a2f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 11h5M18 18h5" stroke="#a86b38" stroke-width="2" stroke-linecap="round"/></svg>',
   inventario: '<svg viewBox="0 0 32 32"><path d="M4 12h24v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="#a86b38" stroke="#5a3614" stroke-width="1.6"/><path d="M3 8h26v5H3z" fill="#c98a4b" stroke="#5a3614" stroke-width="1.6"/><path d="M13 16h6v4h-6z" fill="#ffd54a" stroke="#a87400" stroke-width="1.2"/><path d="M4 12h24" stroke="#5a3614" stroke-width="1.6"/></svg>',
   mover: '<svg viewBox="0 0 32 32" fill="none" stroke="#7a4a22" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4v24M4 16h24M16 4l-4 4M16 4l4 4M16 28l-4-4M16 28l4-4M4 16l4-4M4 16l4 4M28 16l-4-4M28 16l-4 4"/></svg>',
-  fabrica: '<svg viewBox="0 0 32 32"><path d="M3 28V14l7 4v-4l7 4v-4l7 4V6h5v22z" fill="#c8402f" stroke="#6b1f14" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 22h4v4H6zM13 22h4v4h-4zM20 22h4v4h-4z" fill="#ffe08a"/><path d="M25 4c0-2 2-3 3-2" fill="none" stroke="#b7b39c" stroke-width="2" stroke-linecap="round"/></svg>',
+  // Negócios: barraquinha com toldo listrado (fábrica, banca e caminhão ficam aqui dentro)
+  fabrica: '<svg viewBox="0 0 32 32"><path d="M6 14h20v14H6z" fill="#c98a4b" stroke="#6b3f1f" stroke-width="1.5"/><path d="M10 19h12v9H10z" fill="#7a4a24"/><path d="M11 20h4v3h-4zM17 20h4v3h-4z" fill="#ffe08a"/><path d="M3 14l3-9h20l3 9z" fill="#fff" stroke="#6b1f14" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 5l-2 9h4l1-9zM17 5v9h4l-1-9z" fill="#d8402f"/><path d="M3 14q2.5 3 5 0q2.5 3 5 0q2.5 3 5 0q2.5 3 5 0q2.5 3 6 0" fill="#d8402f" stroke="#6b1f14" stroke-width="1.2"/><circle cx="24" cy="25" r="2.4" fill="#e8b04a" stroke="#8a5a1f"/></svg>',
   correio: '<svg viewBox="0 0 32 32"><path d="M15 28V17" stroke="#7a4a22" stroke-width="3"/><path d="M5 10a6 6 0 0 1 12 0v8H5z" fill="#4a86c7" stroke="#2c5a8f" stroke-width="1.5" stroke-linejoin="round"/><path d="M11 4h12a6 6 0 0 1 6 6v8H17v-8a6 6 0 0 0-6-6z" fill="#5a9ae0" stroke="#2c5a8f" stroke-width="1.5" stroke-linejoin="round"/><path d="M23 18v-6h4v3h-4" fill="#e0463a" stroke="#8f2a1e" stroke-width="1.2"/><path d="M8 11h6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>',
   presente: '<svg viewBox="0 0 32 32"><rect x="5" y="13" width="22" height="15" rx="2" fill="#e0463a" stroke="#8f2a1e" stroke-width="1.6"/><rect x="3" y="9" width="26" height="6" rx="1.5" fill="#f25a4a" stroke="#8f2a1e" stroke-width="1.6"/><path d="M14 9h4v19h-4z" fill="#ffd54a"/><path d="M16 9c-2-5-8-6-8-2s6 2 8 2zM16 9c2-5 8-6 8-2s-6 2-8 2z" fill="#ffd54a" stroke="#a87400" stroke-width="1.4"/></svg>',
   casa: '<svg viewBox="0 0 32 32"><path d="M5 15 16 6l11 9v13H5z" fill="#f1dcae" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M2 16 16 4l14 12" fill="none" stroke="#b5532f" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 28v-8h6v8" fill="#8a5a33"/><path d="M20 15h5v4h-5z" fill="#9fd4f5" stroke="#7a4a22" stroke-width="1.2"/></svg>',
@@ -3753,13 +3889,13 @@ function tipPlot(i) {
     if (home && touches(i)) return '<b>Pasto</b><br>Compre uma expansão na aba Terreno para ter mais canteiros.';
     return home ? 'Pasto.' : null;
   }
-  if (p.s === 'plowed') return home ? `<b>Terra arada</b><br>Clique para plantar ${CROP[state.seed].nome}.` : '<b>Terra arada</b>';
+  if (p.s === 'plowed') return home ? `<b>Terra arada</b><br>${state.tool === 'seed' ? `Clique para plantar ${CROP[state.seed].nome}.` : 'Clique para escolher uma semente na Loja.'}` : '<b>Terra arada</b>';
   if (p.s === 'withered') return '<b>Planta seca</b><br>Use a Mão ou a enxada para limpar.';
   const crop = CROP[p.c], st = stageOf(p), T = phaseTempo(p), k = Math.min(1, p.g / T);
   if (p.podre) return `<b>${crop.nome} podre</b><br>Ficou mais de 24h sem colher.<br>${home ? `Clique para usar uma poção (você tem ${state.pocao || 0}) ou peça ajuda a um amigo.` : 'Clique para salvar a planta do seu amigo!'}`;
   if (p.poda) return `<b>${crop.nome}</b><br>Precisa de poda para voltar a produzir.<br>${home ? `Clique com a Mão para podar (${crop.poda} moedas).` : ''}`;
   let h = `<b>${crop.nome}</b> · ${crop.arvore && p.adult ? (st === 4 ? 'Com frutas' : 'Dando frutas') : STAGE_NAMES[st]}`;
-  if (st < 4 || k < 1) h += `<br>Fica pronto em ${fmt((T - p.g) / (p.dry ? 0.7 : 1))}`;
+  if (st < 4 || k < 1) h += `<br>Fica pronto em ${fmt((T - p.g) / (p.dry ? 0.7 : 1) / acelera(S(), crop.prod))}`;
   else h += !home && (p.stolen || state.log[visitKey(p.id)]) ? '<br>Você já pegou daqui.' : `<br>Pronto para colher! Apodrece em ${fmt(Math.max(60, PODRE_APOS - (p.pronto || 0)))}`;
   h += `<div class="bar"><i style="width:${k * 100}%"></i></div>`;
   const probs = [];
@@ -3786,7 +3922,7 @@ function tipAnimal(id) {
   const prod = PRODUCT[d.prod];
   if (a.ready) h += `${prod.nome} pronto${a.dobro ? ' (em dobro!)' : ''}! Clique para recolher.`;
   else if (!a.fed) h += `Com fome. ${home ? `Clique para dar ração (${d.racao} moedas${state.racaoEsp ? ', usa 1 ração especial' : ''}).` : 'Clique para dar comida e ajudar.'}`;
-  else h += `Produzindo ${prod.nome.toLowerCase()}${a.dobro ? ' em dobro' : ''}: falta ${fmt(d.tempo - a.g)}<div class="bar"><i style="width:${a.g / d.tempo * 100}%"></i></div>`;
+  else h += `Produzindo ${prod.nome.toLowerCase()}${a.dobro ? ' em dobro' : ''}: falta ${fmt((d.tempo - a.g) / acelera(S(), d.prod))}<div class="bar"><i style="width:${a.g / d.tempo * 100}%"></i></div>`;
   h += `<br>Vive mais ${vida(lifeLeft(a))}`;
   if (home) h += ` · vende por ${sellPrice(a).toLocaleString('pt-BR')} (na Loja › Animais)`;
   return h;
@@ -3824,9 +3960,9 @@ function tipLand() {
   return `<b>Próxima expansão</b><br>+${next.total - EXPANSOES[state.exp].total} canteiros · ${next.preco.toLocaleString('pt-BR')} moedas · nível ${next.nivel}<br>Clique para ver todas.`;
 }
 function tipDecor(id) {
-  const d = DECO[id];
-  if (S().decor[id]) return `<b>${d.nome}</b><br>+${d.conforto} de conforto`;
-  return `<b>Espaço para ${d.nome}</b><br>${d.custo} moedas na Loja · nível ${d.nivel}`;
+  const m = emUso(S(), id);
+  if (m) return `<b>${m.nome}</b><br>+${m.conforto} de conforto${isHome() ? '<br>Clique para trocar o modelo.' : ''}`;
+  return `<b>Lugar para ${LUGAR_NOME[id].toLowerCase()}</b><br>Veja os modelos na Loja › Casa.`;
 }
 let lastTip = '';
 function updateTip() {
@@ -4307,10 +4443,15 @@ const owes = key => state.owe[key] && Date.now() - state.owe[key].at < AJUDA_PRA
 
 // ---------- Livro de coleção ----------
 // Cada planta e produto dos animais ganha carimbos com o número de colheitas.
+// Cada carimbo também deixa aquele item mais rápido de produzir (acumula até o diamante).
+const RAPIDEZ = [0, 0.05, 0.10, 0.15, 0.20];
+const menosTempo = (s, prod) => RAPIDEZ[Math.min(RAPIDEZ.length - 1, (s && s.stamps && s.stamps[prod]) || 0)];
+const acelera = (s, prod) => 1 / (1 - menosTempo(s, prod));
 const CARIMBOS = [
   { n: 10, nome: 'bronze', cor: '#cd7f32', moedas: 100, xp: 10 },
   { n: 50, nome: 'prata', cor: '#b8c2cc', moedas: 500, xp: 50 },
   { n: 200, nome: 'ouro', cor: '#f2b705', moedas: 2000, xp: 150 },
+  { n: 500, nome: 'diamante', cor: '#6fd3f2', moedas: 5000, xp: 400 },
 ];
 const COLECAO = () => [...CROPS.map(c => ({ id: c.prod, nome: c.prodNome, icon: () => cropIcon(c.id), nivel: c.nivel })),
   ...PRODUCTS.filter(p => p.id !== 'leitao').map(p => ({ id: p.id, nome: p.nome, icon: () => productIcon(p.id), nivel: 0 }))];
@@ -4320,7 +4461,7 @@ function collect(id, pos) {
   state.stamps[id] = lv + 1; state.newStamps = (state.newStamps || 0) + 1; renderTabs();
   state.coins += c.moedas; addXP(c.xp, pos);
   sfx('level');
-  toast(`Carimbo de ${c.nome} no livro de coleção: ${item(id).nome}! +${c.moedas.toLocaleString('pt-BR')} moedas`, 'good');
+  toast(`Carimbo de ${c.nome} no livro de coleção: ${item(id).nome}! +${c.moedas.toLocaleString('pt-BR')} moedas · agora fica pronto ${Math.round(RAPIDEZ[lv + 1] * 100)}% mais rápido`, 'good');
 }
 
 // ---------- Temas da roça ----------
@@ -4559,10 +4700,10 @@ function missoesHTML() {
     <div class="meta">Esta semana rendem ${Math.round(ESTACAO_BONUS * 100)}% a mais: ${est.plantas.map(id => CROP[id].nome.toLowerCase()).join(', ')}.</div></div><div></div></div>`;
   if (missSeg === 'colecao') {
     const lista = COLECAO(), temCarimbo = lista.filter(c => state.stamps[c.id]).length;
-    html += `<p class="hint">Cada colheita ou produto recolhido conta. ${CARIMBOS.map(c => `${c.n} dão o carimbo de ${c.nome} (+${c.moedas.toLocaleString('pt-BR')} moedas)`).join(', ')}. Você já tem ${temCarimbo} de ${lista.length} com carimbo.</p><div class="colgrid">`;
+    html += `<p class="hint">Cada colheita ou produto recolhido conta. ${CARIMBOS.map((c, k) => `${c.n} dão o carimbo de ${c.nome} (+${c.moedas.toLocaleString('pt-BR')} moedas, ${Math.round(RAPIDEZ[k + 1] * 100)}% mais rápido)`).join(', ')}. Você já tem ${temCarimbo} de ${lista.length} com carimbo.</p><div class="colgrid">`;
     for (const c of lista) {
       const n = state.col[c.id] || 0, lv = state.stamps[c.id] || 0, next = CARIMBOS[lv];
-      html += `<div class="colcard ${n ? '' : 'unknown'}" title="${esc(c.nome)}"><img alt="" src="${c.icon()}"><b>${n ? esc(c.nome) : '???'}</b><small>${n}${next ? ` / ${next.n}` : ''}</small>
+      html += `<div class="colcard ${n ? '' : 'unknown'}" title="${esc(c.nome)}"><img alt="" src="${c.icon()}"><b>${n ? esc(c.nome) : '???'}</b><small>${n}${next ? ` / ${next.n}` : ''}${lv ? ` · −${Math.round(RAPIDEZ[lv] * 100)}% tempo` : ''}</small>
         <span class="stamps">${CARIMBOS.map((s, k) => `<i style="background:${k < lv ? s.cor : 'transparent'}" title="${s.nome}"></i>`).join('')}</span></div>`;
     }
     return html + '</div>';
@@ -5049,9 +5190,10 @@ function venderDecoracao(key) {
     if (!e || e.especial || !(state.enfeites[id] > 0)) return;
     state.enfeites[id]--; nome = e.nome; preco = Math.floor(e.custo / 2);
   } else {
-    const d = DECO[id];
-    if (!d || !state.decor[id]) return;
-    delete state.decor[id]; nome = d.nome; preco = Math.floor(d.custo / 2);
+    const d = MODELO[id];
+    if (!d || !state.decorTem[id]) return;
+    delete state.decorTem[id]; if (state.decor[d.lugar] === id) delete state.decor[d.lugar];
+    nome = d.nome; preco = Math.floor(d.custo / 2);
   }
   state.coins += preco; sfx('coin');
   toast(`Vendeu ${nome.toLowerCase()} por ${preco.toLocaleString('pt-BR')} moedas.`, 'good');

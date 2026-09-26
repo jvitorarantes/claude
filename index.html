@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roça Feliz</title>
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="39">
-<script src="firebase-config.js?v=39"></script>
+<meta name="rf-version" content="40">
+<script src="firebase-config.js?v=40"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -244,6 +244,18 @@
   .tip .bar { height: 6px; background: rgba(255,255,255,.2); border-radius: 4px; margin-top: 4px; overflow: hidden; }
   .tip .bar i { display: block; height: 100%; background: #8fdc5a; }
   .tip .warn { color: #ffb4a4; }
+  .loading { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #a8d86a, #5e9a34 70%, #3f7424); }
+  .loading[hidden] { display: none; }
+  .loadbox { display: grid; justify-items: center; gap: 14px; padding: 24px; text-align: center; }
+  .loadsun { width: 96px; height: 96px; animation: girar 2.4s linear infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
+  .loading p { margin: 0; color: #fff; font-size: 20px; font-weight: 800; text-shadow: 0 2px 3px rgba(0,0,0,.35); }
+  .loadbar { width: min(260px, 70vw); height: 12px; border-radius: 8px; background: rgba(0,0,0,.25); overflow: hidden; border: 2px solid #fff6; }
+  .loadbar i { display: block; height: 100%; width: 100%; background: #f2c14e; transform-origin: left; animation: encher 3s ease-in-out forwards; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  @keyframes encher { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @media (prefers-reduced-motion: reduce) { .loadsun { animation: none; } }
+  /* Na roça de outra pessoa só ficam os botões que servem lá */
+  .visitando .menu .tab:not([data-tab=amigos]):not([data-tab=fabrica]), .visitando #giftBtn, .visitando #moveBtn { display: none !important; }
   .toasts { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; z-index: 8; pointer-events: none; width: max-content; max-width: 90%; }
   .toast {
     background: #fffbe8; color: #2f2a1f; border: 3px solid var(--wood-2);
@@ -552,6 +564,17 @@
       <button class="btn" id="goHome" type="button">Voltar para minha roça</button>
     </div>
     <div class="toasts" id="toasts"></div>
+    <div class="loading" id="loading" role="status" aria-live="polite" hidden>
+      <div class="loadbox">
+        <svg class="loadsun" viewBox="0 0 64 64" aria-hidden="true"><g fill="#f2c14e">
+          <ellipse cx="32" cy="10" rx="6" ry="10"/><ellipse cx="32" cy="54" rx="6" ry="10"/><ellipse cx="10" cy="32" rx="10" ry="6"/><ellipse cx="54" cy="32" rx="10" ry="6"/>
+          <ellipse cx="16.5" cy="16.5" rx="6" ry="10" transform="rotate(-45 16.5 16.5)"/><ellipse cx="47.5" cy="47.5" rx="6" ry="10" transform="rotate(-45 47.5 47.5)"/>
+          <ellipse cx="47.5" cy="16.5" rx="6" ry="10" transform="rotate(45 47.5 16.5)"/><ellipse cx="16.5" cy="47.5" rx="6" ry="10" transform="rotate(45 16.5 47.5)"/></g>
+          <circle cx="32" cy="32" r="13" fill="#7a4a24"/><circle cx="32" cy="32" r="9" fill="#5a3614"/></svg>
+        <p id="loadingTxt">Carregando…</p>
+        <div class="loadbar"><i></i></div>
+      </div>
+    </div>
 
     <nav class="scenes over outline" id="scenes" role="tablist" aria-label="Lugar">
       <button class="roundbtn" type="button" role="tab" data-scene="roca" aria-selected="true"><span class="ic"></span><span class="lb">Roça</span></button>
@@ -568,7 +591,7 @@
       <button class="roundbtn tab" type="button" data-tab="amigos" aria-selected="false"><span class="ic"></span><span class="lb">Amigos</span></button>
       <button class="roundbtn tab" type="button" data-tab="missoes" aria-selected="false"><span class="ic"></span><span class="lb">Missões</span></button>
       <button class="roundbtn tab" type="button" data-tab="correio" aria-selected="false"><span class="ic"></span><span class="lb">Correio</span></button>
-      <button class="roundbtn tab" type="button" data-tab="fabrica" aria-selected="false"><span class="ic"></span><span class="lb">Fábrica</span></button>
+      <button class="roundbtn tab" type="button" data-tab="fabrica" aria-selected="false"><span class="ic"></span><span class="lb">Negócios</span></button>
     </nav>
 
     <div class="zoom over" role="group" aria-label="Zoom">
@@ -673,8 +696,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=39"></script>
-<script src="js/cloud.js?v=39"></script>
-<script src="js/game.js?v=39"></script>
+<script src="js/audio.js?v=40"></script>
+<script src="js/cloud.js?v=40"></script>
+<script src="js/game.js?v=40"></script>
 </body>
 </html>
