@@ -164,7 +164,7 @@ function isHungry(a) {
 const seuSua = a => (a.f ? 'Sua ' : 'Seu ') + a.nome.toLowerCase();
 const nomeBicho = a => a.nome && a.nome !== ANIMAL[a.k].nome ? `${a.nome} (${ANIMAL[a.k].nome.toLowerCase()})` : ANIMAL[a.k].nome;
 
-// Cães de guarda: um vigia a plantação, outro os animais. Só protegem acordados (com comida).
+// Cães de guarda: um vigia a roça, outro o rancho. Só protegem acordados (com comida).
 const DOGS = [
   { id: 'caramelo', nome: 'Vira-lata caramelo', custo: 1000, nivel: 3, vida: 15, protege: 0.55, morde: 0.4, xpDia: 10, xpPega: 15, cor: '#d99a4e', cor2: '#b8793a' },
   { id: 'pastor',   nome: 'Pastor-alemão',      custo: 3000, nivel: 8, vida: 25, protege: 0.7,  morde: 0.5, xpDia: 20, xpPega: 25, cor: '#8a5a2e', cor2: '#2a221c' },
@@ -173,7 +173,8 @@ const DOGS = [
 const DOG = Object.fromEntries(DOGS.map(d => [d.id, d]));
 const DOG_FOOD = { custo: 50, horas: 8 };
 const DOG_NAMES = ['Totó', 'Rex', 'Pipoca', 'Thor', 'Mel', 'Bidu', 'Paçoca', 'Nina', 'Bolinha', 'Faísca', 'Pretinha', 'Caramelo'];
-const SLOT_NAME = { roca: 'plantação', animais: 'criação' };
+// Nome de cada lugar com o artigo certo ("a roça", "o rancho"…)
+const SLOT = { roca: { a: 'a roça', aSua: 'a sua roça', daSua: 'da sua roça', A: 'A roça' }, animais: { a: 'o rancho', aSua: 'o seu rancho', daSua: 'do seu rancho', A: 'O rancho' } };
 const STEAL_MAX = { roca: 3, animais: 3 }; // itens por amigo por dia
 const STEAL_FARMS = 5;                       // roças diferentes onde dá para pegar por dia
 // Dia pelo relógio do aparelho: os limites voltam à meia-noite.
@@ -760,11 +761,11 @@ function actDog(slot) {
   const d = S().dogs && S().dogs[slot];
   if (!isHome()) {
     if (!d) return;
-    return toast(dogAwake(d) ? `${d.nome} está acordado vigiando a ${SLOT_NAME[slot]}. Cuidado!` : `${d.nome} está dormindo… é a sua chance.`);
+    return toast(dogAwake(d) ? `${d.nome} está acordado vigiando ${SLOT[slot].a}. Cuidado!` : `${d.nome} está dormindo… é a sua chance.`);
   }
   if (!d) {
     openPanel('loja', 'caes');
-    return toast(`Compre um cachorro na Loja para vigiar a ${SLOT_NAME[slot]}.`);
+    return toast(`Compre um cachorro na Loja para vigiar ${SLOT[slot].a}.`);
   }
   if (!dogAwake(d)) return feedDog(slot);
   const dias = Math.ceil((d.born + DOG[d.raca].vida * DAY - Date.now()) / DAY);
@@ -787,7 +788,7 @@ function feedDog(slot) {
 }
 function buyDog(raca, slot) {
   const b = DOG[raca];
-  if (state.dogs[slot]) return toast(`Já tem um cachorro vigiando a ${SLOT_NAME[slot]}.`);
+  if (state.dogs[slot]) return toast(`Já tem um cachorro vigiando ${SLOT[slot].a}.`);
   if (state.level < b.nivel) return toast(`${b.nome} libera no nível ${b.nivel}.`);
   if (state.coins < b.custo) return toast(`${b.nome} custa ${b.custo} moedas.`, 'bad');
   const used = Object.values(state.dogs).filter(Boolean).map(d => d.nome);
@@ -797,7 +798,7 @@ function buyDog(raca, slot) {
   state.dogs[slot] = { raca, nome, born: Date.now(), fedUntil: Date.now() + DOG_FOOD.horas * 3600e3, lastXp: Date.now() };
   sfx('buy'); sfx('bark');
   addXP(5, null);
-  toast(`${nome}, ${b.nome.toLowerCase()}, agora vigia a sua ${SLOT_NAME[slot]}!`, 'good');
+  toast(`${nome}, ${b.nome.toLowerCase()}, agora vigia ${SLOT[slot].aSua}!`, 'good');
   if (isHome()) setScene(slot === 'roca' ? 'roca' : 'animais');
   done();
 }
@@ -833,7 +834,7 @@ function tickLife() {
     const b = DOG[d.raca];
     if (!dogAlive(d)) {
       state.dogs[slot] = null;
-      const msg = `${d.nome} ficou velhinho e foi descansar. A ${SLOT_NAME[slot]} está sem cachorro.`;
+      const msg = `${d.nome} ficou velhinho e foi descansar. ${SLOT[slot].A} está sem cachorro.`;
       addNews(msg); toast(msg); changed = true;
       continue;
     }
@@ -842,7 +843,7 @@ function tickLife() {
       const n = Math.min(days, 3) * b.xpDia;
       d.lastXp += days * DAY;
       addXP(n, null);
-      addNews(`${d.nome} vigiou a sua ${SLOT_NAME[slot]} e rendeu +${n} XP.`);
+      addNews(`${d.nome} vigiou ${SLOT[slot].aSua} e rendeu +${n} XP.`);
       changed = true;
     }
   }
@@ -1152,8 +1153,8 @@ function applyVisits(list) {
       const coins = clamp(Math.round(Number(v.coins) || 0), 0, 10), nome = d ? d.nome : 'Seu cachorro';
       if (coins) state.coins += coins;
       addXP(d ? DOG[d.raca].xpPega : 5, null);
-      const msg = coins ? `${nome} mordeu ${who}, que tentou pegar da sua ${SLOT_NAME[slot]}, e ganhou ${coins} moedas!`
-        : `${nome} espantou ${who}, que tentou pegar da sua ${SLOT_NAME[slot]}.`;
+      const msg = coins ? `${nome} mordeu ${who}, que tentou pegar ${SLOT[slot].daSua}, e ganhou ${coins} moedas!`
+        : `${nome} espantou ${who}, que tentou pegar ${SLOT[slot].daSua}.`;
       addNews(msg); toast(msg, 'good');
       continue;
     }
@@ -3443,13 +3444,13 @@ function renderPane() {
           <div class="meta">${quem}<br>${lv ? `${livesIn(state, b.id).length} de ${ABRIGO_CAP[lv]} animais${max ? '' : ` · nível ${lv + 1} cabe ${ABRIGO_CAP[lv + 1]}`}` : `cabe ${ABRIGO_CAP[1]} animais`}</div></div>${btn}</div>`;
       }
     } else if (shopSeg === 'caes') {
-      html += `<p class="hint">A casinha fica do lado do celeiro. Um cachorro vigia a plantação e outro os animais. Acordado (com ração), ele espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. A ração dura ${DOG_FOOD.horas}h.</p>`;
+      html += `<p class="hint">Um cachorro vigia a roça e outro o rancho. Acordado (com ração), ele espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. A ração dura ${DOG_FOOD.horas}h.</p>`;
       for (const slot of ['roca', 'animais']) {
         const d = state.dogs[slot];
-        if (!d) { html += `<div class="row"><div class="avatar" style="background:#b7b39c">?</div><div><div class="name">${slot === 'roca' ? 'Plantação' : 'Animais'} sem cachorro</div><div class="meta">Escolha uma raça aqui embaixo.</div></div><div></div></div>`; continue; }
+        if (!d) { html += `<div class="row"><div class="avatar" style="background:#b7b39c">?</div><div><div class="name">${slot === 'roca' ? 'Roça' : 'Rancho'} sem cachorro</div><div class="meta">Escolha uma raça aqui embaixo.</div></div><div></div></div>`; continue; }
         const b = DOG[d.raca], awake = dogAwake(d), dias = Math.max(1, Math.ceil((d.born + b.vida * DAY - Date.now()) / DAY));
         html += `<div class="row ${awake ? '' : 'sel'}"><img alt="" src="${dogIcon(d.raca)}">
-          <div><div class="name">${esc(d.nome)} · ${slot === 'roca' ? 'plantação' : 'animais'}</div>
+          <div><div class="name">${esc(d.nome)} · ${slot === 'roca' ? 'roça' : 'rancho'}</div>
           <div class="meta">${awake ? `Acordado · ração por mais ${fmt((d.fedUntil - Date.now()) / 1000)}` : '<b>Dormindo de fome!</b> Não está vigiando.'}<br>${b.nome} · vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}</div></div>
           ${awake ? '<div></div>' : `<button class="btn" data-feed-dog="${slot}">Dar ração</button>`}</div>`;
       }
@@ -3460,7 +3461,7 @@ function renderPane() {
       html += `<h3>Raças</h3>`;
       for (const b of DOGS) {
         const locked = b.nivel > state.level;
-        const btn = slot => `<button class="btn ${slot === 'animais' ? 'ghost' : ''}" data-buy-dog="${b.id}" data-slot="${slot}" ${state.dogs[slot] || state.coins < b.custo ? 'disabled' : ''}>${slot === 'roca' ? 'Para a plantação' : 'Para os animais'}</button>`;
+        const btn = slot => `<button class="btn ${slot === 'animais' ? 'ghost' : ''}" data-buy-dog="${b.id}" data-slot="${slot}" ${state.dogs[slot] || state.coins < b.custo ? 'disabled' : ''}>${slot === 'roca' ? 'Para a roça' : 'Para o rancho'}</button>`;
         html += `<div class="row wide ${locked ? 'locked' : ''}"><img alt="" src="${dogIcon(b.id)}">
           <div><div class="name">${b.nome}</div>
           <div class="meta">${b.custo} moedas · vive ${b.vida} dias<br>espanta ${Math.round(b.protege * 100)}% dos ladrões · morde ${Math.round(b.morde * 100)}% deles<br>+${b.xpDia} XP por dia · +${b.xpPega} XP por ladrão</div></div>
@@ -3791,7 +3792,7 @@ function tipAnimal(id) {
 }
 function tipDog(slot) {
   const d = S().dogs && S().dogs[slot];
-  if (!dogAlive(d)) return isHome() ? `<b>Casinha vazia</b><br>Compre um cachorro para vigiar a ${SLOT_NAME[slot]}.` : null;
+  if (!dogAlive(d)) return isHome() ? `<b>Casinha vazia</b><br>Compre um cachorro para vigiar ${SLOT[slot].a}.` : null;
   const b = DOG[d.raca], awake = dogAwake(d);
   let h = `<b>${esc(d.nome)}</b> · ${b.nome}<br>`;
   if (!isHome()) return h + (awake ? 'Acordado e de olho em você!' : 'Dormindo… pode ser a sua chance.');

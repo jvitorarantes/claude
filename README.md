@@ -20,7 +20,7 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **Animais de produção**: galinha, pato, coelho, cabra, ovelha, vaca, colmeia, porca e búfala. Cada produção custa uma ração em moedas. Sem comida o animal só para de produzir. Cada um vive de 30 a 60 dias e depois vai embora, e é preciso comprar outro. Dá para vender antes, por bem menos que a compra e cada dia mais barato. A porca tem leitões, que viram porquinhos no chiqueiro. A ração especial faz a próxima produção render em dobro. Botões para alimentar e recolher tudo de uma vez.
 - **Animais para criar e vender**: porquinho, bezerro, burro, potro e avestruz. Comem uma vez por dia e são vendidos adultos.
 - **Companhia**: gato, tartaruga e arara moram dentro de casa; o cavalo mora na cocheira e o pavão no viveiro. Dá para trocar o nome e fazer carinho.
-- **Cães de guarda**: a casinha fica do lado do celeiro. Dá para ter 2 cachorros, um para a plantação e outro para os animais, de 3 raças com preço, vida e força diferentes. Com ração (dura 8h) o cachorro fica acordado, espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. Ele também dá XP por dia e por ladrão pego.
+- **Cães de guarda**: Dá para ter 2 cachorros, um para a roça e outro para o rancho, de 3 raças com preço, vida e força diferentes. Com ração (dura 8h) o cachorro fica acordado, espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. Ele também dá XP por dia e por ladrão pego.
 - **Plantação pronta** aparece com um check verde.
 - **Casa com 6 decorações**: tapete, vaso de planta, quadro, abajur, sofá e televisão. Cada uma dá conforto, e cada ponto de conforto vale +1% de XP.
 - **Celeiro** para vender colheitas e produtos.
