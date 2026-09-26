@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roça Feliz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --wood: #7a4a22;
+    --wood-2: #a86b38;
+    --wood-3: #d39a5c;
+    --panel: #f1f7e7;
+    --panel-2: #e2eecf;
+    --ink: #2f2a1f;
+    --muted: #6a6a52;
+    --leaf: #4f9a2f;
+    --leaf-d: #2f6e1e;
+    --gold: #f2b705;
+    --red: #c8402f;
+    --xp: #4aa3df;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    background: linear-gradient(#bfe6f7, #d7efc0 260px, #cfe6b0);
+    color: var(--ink);
+    font-family: 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.35;
+    padding: 12px 16px 28px;
+    min-height: 100%;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--xp); outline-offset: 2px; }
+  .app { max-width: 1180px; margin: 0 auto; display: grid; gap: 12px; }
+
+  /* HUD */
+  .hud {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+    background: var(--wood); color: #fff1d6;
+    border-radius: 14px; padding: 8px 16px;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.22), 0 2px 0 rgba(0,0,0,.08);
+  }
+  .brand {
+    font-family: 'Chewy', 'Comic Sans MS', cursive; font-size: 30px; line-height: 1;
+    color: #ffe08a; text-shadow: 0 3px 0 #4a2a10; letter-spacing: .5px;
+  }
+  .hud .spacer { flex: 1; }
+  .stat { display: flex; align-items: center; gap: 8px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .lvl {
+    width: 38px; height: 38px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: #ffd54a; color: #5a3a0c; font-size: 18px;
+    box-shadow: inset 0 -3px 0 #d69c00;
+  }
+  .xpwrap { display: grid; gap: 2px; min-width: 150px; }
+  .xpwrap small { font-weight: 600; opacity: .85; font-size: 12px; }
+  .xpbar { height: 10px; border-radius: 6px; background: rgba(0,0,0,.3); overflow: hidden; }
+  .xpbar i { display: block; height: 100%; width: 0; background: linear-gradient(#7cc8f5, var(--xp)); transition: width .3s; }
+  .coin {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff2a8, var(--gold) 55%, #c98c00);
+    box-shadow: inset 0 0 0 2px #b77f00;
+  }
+  .coins { font-size: 20px; }
+
+  /* Main */
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
+  @media (max-width: 880px) { .main { grid-template-columns: minmax(0, 1fr); } }
+  .left { display: grid; gap: 10px; min-width: 0; }
+
+  .banner {
+    display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between;
+    background: #fff3c4; border: 3px solid var(--wood-3); border-radius: 12px; padding: 6px 12px;
+    font-weight: 600;
+  }
+  .stage {
+    position: relative; border: 5px solid var(--wood); border-radius: 16px; overflow: hidden;
+    background: #8cc84b; aspect-ratio: 16 / 11; max-width: 100%;
+    box-shadow: 0 4px 0 rgba(0,0,0,.12);
+    touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  }
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .tip {
+    position: absolute; pointer-events: none; z-index: 3;
+    background: rgba(40, 26, 12, .92); color: #fff4df;
+    border-radius: 10px; padding: 6px 10px; font-size: 13px; line-height: 1.3;
+    max-width: 220px; box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  }
+  .tip b { color: #ffe08a; font-size: 14px; }
+  .tip .bar { height: 6px; background: rgba(255,255,255,.2); border-radius: 4px; margin-top: 4px; overflow: hidden; }
+  .tip .bar i { display: block; height: 100%; background: #8fdc5a; }
+  .tip .warn { color: #ffb4a4; }
+  .toasts { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; z-index: 4; pointer-events: none; width: max-content; max-width: 90%; }
+  .toast {
+    background: #fffbe8; color: var(--ink); border: 3px solid var(--wood-2);
+    border-radius: 12px; padding: 4px 12px; font-weight: 700; text-align: center;
+    box-shadow: 0 3px 0 rgba(0,0,0,.15); animation: pop .25s ease-out;
+  }
+  .toast.bad { border-color: var(--red); color: #7a1d10; }
+  .toast.good { border-color: var(--leaf); }
+  @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* Tools */
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tool {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--panel); border: 3px solid var(--wood-2); border-radius: 12px;
+    padding: 4px 10px 4px 6px; font-weight: 700;
+    box-shadow: 0 3px 0 var(--wood);
+    transition: transform .08s;
+  }
+  .tool:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--wood); }
+  .tool svg { width: 28px; height: 28px; flex: none; }
+  .tool kbd { font: 600 11px/1 'Baloo 2', monospace; color: var(--muted); border: 1px solid #c9c3a8; border-radius: 4px; padding: 2px 4px; }
+  .tool[aria-pressed="true"] { background: #ffe08a; border-color: var(--wood); }
+  .tool .seedimg { width: 28px; height: 28px; }
+
+  /* Panel */
+  .panel { background: var(--panel); border: 4px solid var(--wood-2); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 0 rgba(0,0,0,.1); }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--wood-2); gap: 3px; padding: 4px 4px 0; }
+  .tab {
+    border: 0; border-radius: 10px 10px 0 0; padding: 6px 2px;
+    background: var(--wood-3); color: #4a2a10; font-weight: 800; font-size: 14px;
+  }
+  .tab[aria-selected="true"] { background: var(--panel); }
+  .pane { padding: 12px; display: grid; gap: 8px; max-height: 560px; overflow-y: auto; }
+  .pane h3 { margin: 0; font-family: 'Chewy', cursive; font-weight: 400; font-size: 22px; color: var(--wood); letter-spacing: .3px; }
+  .pane p.hint { margin: 0; color: var(--muted); font-size: 13px; }
+  .row {
+    display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    background: #fff; border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px 8px;
+  }
+  .row.sel { border-color: var(--gold); background: #fff9df; }
+  .row.locked { opacity: .55; }
+  .row img { width: 48px; height: 48px; }
+  .row .name { font-weight: 800; }
+  .row .meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .btn {
+    border: 0; border-radius: 10px; padding: 4px 12px; font-weight: 800;
+    background: var(--leaf); color: #fff; box-shadow: 0 3px 0 var(--leaf-d);
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--leaf-d); }
+  .btn:disabled { background: #b7b39c; box-shadow: 0 3px 0 #8f8a73; cursor: not-allowed; }
+  .btn.gold { background: #e9a800; box-shadow: 0 3px 0 #a87400; }
+  .btn.ghost { background: transparent; color: var(--wood); box-shadow: none; border: 2px solid var(--wood-3); }
+  .btn.danger { background: var(--red); box-shadow: 0 3px 0 #862516; }
+  .total { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 800; }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-variant-numeric: tabular-nums; }
+  .kv span:nth-child(odd) { color: var(--muted); }
+  .empty { text-align: center; color: var(--muted); padding: 18px 8px; }
+  .foot { text-align: center; color: var(--muted); font-size: 12px; }
+  @media (max-width: 560px) {
+    .stage { aspect-ratio: 4 / 3; }
+    .toast { font-size: 12px; padding: 2px 8px; }
+    .brand { font-size: 26px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .toast { animation: none; } .xpbar i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hud">
+    <div class="brand">Roça Feliz</div>
+    <div class="stat">
+      <div class="lvl" id="lvl" title="Nível">1</div>
+      <div class="xpwrap">
+        <small id="xptxt">0 / 30 XP</small>
+        <div class="xpbar"><i id="xpbar"></i></div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="stat coins"><div class="coin" aria-hidden="true"></div><span id="coins">0</span></div>
+  </header>
+
+  <div class="main">
+    <div class="left">
+      <div class="banner" id="banner" hidden>
+        <span id="bannerTxt"></span>
+        <button class="btn" id="goHome">Voltar para minha roça</button>
+      </div>
+      <div class="stage" id="stage">
+        <canvas id="cv" aria-label="Sua roça"></canvas>
+        <div class="tip" id="tip" hidden></div>
+        <div class="toasts" id="toasts"></div>
+      </div>
+      <div class="tools" id="tools" role="toolbar" aria-label="Ferramentas"></div>
+    </div>
+
+    <aside class="panel">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="loja" aria-selected="true">Loja</button>
+        <button class="tab" role="tab" data-tab="celeiro" aria-selected="false">Celeiro</button>
+        <button class="tab" role="tab" data-tab="terreno" aria-selected="false">Terreno</button>
+        <button class="tab" role="tab" data-tab="vizinhos" aria-selected="false">Vizinhos</button>
+      </div>
+      <div class="pane" id="pane"></div>
+    </aside>
+  </div>
+  <div class="foot">O jogo salva sozinho neste navegador. Atalhos: 1–6 trocam de ferramenta.</div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+// ---------- Dados ----------
+const COLS = 6, ROWS = 4, N = COLS * ROWS, START_PLOTS = 6;
+const SAVE_KEY = 'roca-feliz-v1';
+
+const CROPS = [
+  { id: 'nabo',      nome: 'Nabo',      custo: 2,  tempo: 40,   rend: 6,  preco: 1,  xp: 2,  nivel: 1, safras: 1, tipo: 'raiz', cor: '#f5eef7', cor2: '#a45bbb' },
+  { id: 'cenoura',   nome: 'Cenoura',   custo: 4,  tempo: 90,   rend: 6,  preco: 2,  xp: 4,  nivel: 1, safras: 1, tipo: 'raiz', cor: '#f08a24', cor2: '#e0761a' },
+  { id: 'milho',     nome: 'Milho',     custo: 8,  tempo: 180,  rend: 5,  preco: 4,  xp: 7,  nivel: 2, safras: 1, tipo: 'alto', cor: '#f7d046' },
+  { id: 'tomate',    nome: 'Tomate',    custo: 12, tempo: 300,  rend: 8,  preco: 3,  xp: 10, nivel: 3, safras: 2, tipo: 'moita', cor: '#e53b2f' },
+  { id: 'berinjela', nome: 'Berinjela', custo: 15, tempo: 420,  rend: 7,  preco: 5,  xp: 13, nivel: 4, safras: 1, tipo: 'pendente', cor: '#6b2e7a' },
+  { id: 'morango',   nome: 'Morango',   custo: 22, tempo: 600,  rend: 10, preco: 5,  xp: 18, nivel: 5, safras: 2, tipo: 'moita', cor: '#e0224a', pequeno: true },
+  { id: 'abobora',   nome: 'Abóbora',   custo: 30, tempo: 900,  rend: 4,  preco: 18, xp: 26, nivel: 6, safras: 1, tipo: 'chao', cor: '#f28c1b', cor2: '#c9650a' },
+  { id: 'melancia',  nome: 'Melancia',  custo: 45, tempo: 1500, rend: 3,  preco: 36, xp: 40, nivel: 8, safras: 1, tipo: 'chao', cor: '#4d9a3e', cor2: '#2a5e27' },
+];
+const CROP = Object.fromEntries(CROPS.map(c => [c.id, c]));
+const STAGE_NAMES = ['Semente', 'Broto', 'Crescendo', 'Quase lá', 'Maduro'];
+
+const NEIGHBORS = [
+  { id: 'cida',  nome: 'Tia Cida',   cao: 'Totó',    casa: '#5a8fc7', pega: 0.10 },
+  { id: 'juca',  nome: 'Seu Juca',   cao: 'Rex',     casa: '#d9a441', pega: 0.18 },
+  { id: 'neide', nome: 'Dona Neide', cao: 'Pipoca',  casa: '#c7658f', pega: 0.06 },
+];
+
+// Ordem em que os lotes são liberados: do centro para as bordas.
+const ORDER = [...Array(N).keys()].sort((a, b) => {
+  const d = i => { const c = i % COLS, r = Math.floor(i / COLS); return (c + .5 - COLS / 2) ** 2 + ((r + .5 - ROWS / 2) * 1.4) ** 2; };
+  return d(a) - d(b) || a - b;
+});
+
+const need = l => 30 + (l - 1) * 40 + (l - 1) * (l - 1) * 12;
+const lotCost = owned => Math.round(40 * Math.pow(owned - START_PLOTS + 1, 1.5) / 10) * 10;
+const lotLevel = owned => 2 + Math.floor((owned - START_PLOTS) / 2);
+
+function emptyPlot(s = 'locked') { return { s, c: null, g: 0, dry: false, w: 0, b: 0, sl: 0, dmg: 0 }; }
+
+function newState() {
+  const plots = Array.from({ length: N }, () => emptyPlot());
+  ORDER.slice(0, START_PLOTS).forEach(i => plots[i].s = 'plowed');
+  return { v: 1, coins: 60, xp: 0, level: 1, plots, barn: {}, owned: START_PLOTS, tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, stats: { colheitas: 0, vendido: 0, roubado: 0, ajudas: 0 } };
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || s.v !== 1 || !Array.isArray(s.plots) || s.plots.length !== N) return null;
+    // O tempo passou enquanto você estava fora.
+    const away = Math.max(0, (Date.now() - (s.t || Date.now())) / 1000);
+    for (const p of s.plots) {
+      if (p.s !== 'growing') continue;
+      const crop = CROP[p.c]; if (!crop) { Object.assign(p, emptyPlot('plowed')); continue; }
+      if (p.g < crop.tempo) {
+        p.g = Math.min(crop.tempo, p.g + away * (p.dry ? 0.5 : 1));
+        p.dmg = Math.min(crop.rend * 0.5, p.dmg + away / 60 * (p.w + p.b + (p.dry ? 0.5 : 0)));
+      }
+    }
+    return s;
+  } catch (e) { return null; }
+}
+function save() {
+  try { state.t = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* sem armazenamento */ }
+}
+
+// ---------- Estado de tela ----------
+let state;
+let view = 'home';
+let tab = 'loja';
+let hover = -1;
+let pointer = { x: 0, y: 0, inside: false, touch: false, tipUntil: 0 };
+const popups = [];
+const L = { W: 60, ox: 0, oy: 0, cw: 0, ch: 0, horizon: 0, dpr: 1 };
+
+const $ = s => document.querySelector(s);
+const cv = $('#cv'), mainCtx = cv.getContext('2d');
+let ctx = mainCtx; // as funções de desenho usam este contexto; os ícones trocam por outro
+const stage = $('#stage'), tip = $('#tip');
+
+// ---------- Utilidades ----------
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function fmt(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  if (h) return `${h}h ${m}min`;
+  if (m) return s ? `${m}min ${s}s` : `${m}min`;
+  return `${s}s`;
+}
+function stageOf(p) {
+  const crop = CROP[p.c]; const k = p.g / crop.tempo;
+  return k >= 1 ? 4 : k < 0.12 ? 0 : k < 0.4 ? 1 : k < 0.7 ? 2 : 3;
+}
+const ripe = p => p.s === 'growing' && p.g >= CROP[p.c].tempo;
+const expectedYield = p => Math.max(1, Math.round(CROP[p.c].rend - p.dmg));
+function curPlots() { return view === 'home' ? state.plots : state.nb[view].plots; }
+function nextLot() { return ORDER.find(i => state.plots[i].s === 'locked'); }
+
+function toast(msg, kind = '') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + kind; el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+  const all = $('#toasts').children; if (all.length > (L.cw < 500 ? 2 : 3)) all[0].remove();
+}
+function cellCenter(i) { const c = i % COLS, r = Math.floor(i / COLS); return iso(c + .5, r + .5); }
+function popup(i, text, color, delay = 0) {
+  const p = cellCenter(i);
+  popups.push({ x: p.x, y: p.y - L.W * 0.2, text, color, t0: performance.now() + delay });
+}
+
+function addXP(n, i) {
+  state.xp += n;
+  if (i != null) popup(i, `+${n} XP`, '#4aa3df', 180);
+  while (state.xp >= need(state.level)) {
+    state.xp -= need(state.level); state.level++;
+    const bonus = state.level * 5; state.coins += bonus;
+    const novas = CROPS.filter(c => c.nivel === state.level).map(c => c.nome);
+    toast(`Nível ${state.level}! +${bonus} moedas` + (novas.length ? ` · nova semente: ${novas.join(', ')}` : ''), 'good');
+  }
+}
+function addCoins(n, i) {
+  state.coins += n;
+  if (i != null && n) popup(i, `${n > 0 ? '+' : ''}${n} moedas`, n > 0 ? '#f2b705' : '#e05a3a', 360);
+}
+
+// ---------- Ações ----------
+function act(i) {
+  const plots = curPlots(); const p = plots[i];
+  const tool = state.tool;
+  if (view !== 'home') return actNeighbor(i, p, tool);
+
+  if (p.s === 'locked') {
+    if (i === nextLot()) buyLot(i); else toast('Compre primeiro o lote com a placa.');
+    return done();
+  }
+  const has = t => tool === 'hand' || tool === t;
+  if (p.s === 'growing' && p.b > 0 && has('pest')) { p.b--; addXP(2, i); addCoins(1, i); return done(); }
+  if (p.s === 'growing' && p.w > 0 && has('weed')) { p.w--; addXP(2, i); addCoins(1, i); return done(); }
+  if (p.s === 'growing' && p.dry && has('water')) { p.dry = false; addXP(1, i); return done(); }
+  if (ripe(p) && tool === 'hand') return harvest(i, p);
+  if (p.s === 'withered' && has('hoe')) { Object.assign(p, emptyPlot('plowed')); addXP(1, i); return done(); }
+  if (p.s === 'plowed' && (tool === 'seed' || tool === 'hand')) return plant(i, p);
+
+  // Nada a fazer com essa ferramenta aqui
+  const hints = {
+    hoe: 'A enxada limpa plantas secas.', water: 'Essa terra não precisa de água.',
+    pest: 'Não há pragas aqui.', weed: 'Não há mato aqui.', seed: 'Só dá para plantar em terra arada.',
+  };
+  if (hints[tool]) toast(hints[tool]);
+}
+
+function plant(i, p) {
+  const crop = CROP[state.seed];
+  if (!crop) return toast('Escolha uma semente na Loja.');
+  if (crop.nivel > state.level) return toast(`${crop.nome} libera no nível ${crop.nivel}.`);
+  if (state.coins < crop.custo) return toast(`Faltam moedas para ${crop.nome} (${crop.custo}).`, 'bad');
+  addCoins(-crop.custo, i);
+  Object.assign(p, emptyPlot('growing'), { c: crop.id, sl: crop.safras });
+  done();
+}
+
+function harvest(i, p) {
+  const crop = CROP[p.c]; const qty = expectedYield(p);
+  state.barn[crop.id] = (state.barn[crop.id] || 0) + qty;
+  state.stats.colheitas++;
+  popup(i, `+${qty} ${crop.nome}`, '#ffffff');
+  addXP(crop.xp, i);
+  if (p.sl > 1) Object.assign(p, { g: crop.tempo * 0.55, sl: p.sl - 1, dmg: 0, w: 0, b: 0, dry: false });
+  else Object.assign(p, { s: 'withered', g: 0, w: 0, b: 0, dry: false });
+  done();
+}
+
+function buyLot(i) {
+  const cost = lotCost(state.owned), lvl = lotLevel(state.owned);
+  if (state.level < lvl) return toast(`Este lote exige nível ${lvl}.`);
+  if (state.coins < cost) return toast(`O lote custa ${cost} moedas.`, 'bad');
+  addCoins(-cost, i);
+  state.plots[i] = emptyPlot('plowed'); state.owned++;
+  addXP(5, i);
+  toast('Lote novo comprado!', 'good');
+}
+
+function actNeighbor(i, p, tool) {
+  const nb = NEIGHBORS.find(n => n.id === view);
+  if (p.s !== 'growing') return;
+  const has = t => tool === 'hand' || tool === t;
+  if (p.b > 0 && has('pest')) { p.b--; help(i); return done(); }
+  if (p.w > 0 && has('weed')) { p.w--; help(i); return done(); }
+  if (p.dry && has('water')) { p.dry = false; help(i); return done(); }
+  if (ripe(p) && tool === 'hand') {
+    if (p.stolen) return toast('Você já pegou daqui. Não exagere!');
+    p.stolen = true;
+    if (Math.random() < nb.pega) {
+      const loss = Math.min(state.coins, Math.round(rand(5, 15)));
+      addCoins(-loss, i);
+      toast(`${nb.cao}, o cachorro de ${nb.nome}, te pegou! −${loss} moedas`, 'bad');
+      return done();
+    }
+    const crop = CROP[p.c]; const qty = 1 + (Math.random() < 0.4 ? 1 : 0);
+    state.barn[crop.id] = (state.barn[crop.id] || 0) + qty;
+    state.stats.roubado += qty;
+    popup(i, `+${qty} ${crop.nome}`, '#ffffff');
+    addXP(1, i);
+    return done();
+  }
+}
+function help(i) { state.stats.ajudas++; addXP(2, i); addCoins(2, i); }
+
+function sell(id, all) {
+  const crop = CROP[id]; const q = state.barn[id] || 0; if (!q) return;
+  const n = all ? q : 1;
+  state.barn[id] = q - n; if (!state.barn[id]) delete state.barn[id];
+  state.coins += n * crop.preco; state.stats.vendido += n * crop.preco;
+  done();
+}
+function sellAll() {
+  let total = 0;
+  for (const [id, q] of Object.entries(state.barn)) total += q * CROP[id].preco;
+  if (!total) return;
+  state.barn = {}; state.coins += total; state.stats.vendido += total;
+  toast(`Vendeu tudo por ${total} moedas`, 'good');
+  done();
+}
+
+function done() { save(); renderHUD(); renderPane(); }
+
+// ---------- Vizinhos ----------
+function genNeighbor() {
+  const plots = Array.from({ length: N }, () => emptyPlot());
+  const count = 10 + Math.floor(Math.random() * 9);
+  for (const i of ORDER.slice(0, count)) {
+    const crop = CROPS[Math.floor(Math.random() * CROPS.length)];
+    if (Math.random() < 0.12) { plots[i] = emptyPlot('plowed'); continue; }
+    const mature = Math.random() < 0.55;
+    plots[i] = Object.assign(emptyPlot('growing'), {
+      c: crop.id, sl: 1,
+      g: mature ? crop.tempo : crop.tempo * rand(0.15, 0.95),
+      w: Math.random() < 0.25 ? 1 + Math.floor(Math.random() * 2) : 0,
+      b: Math.random() < 0.2 ? 1 : 0,
+      dry: !mature && Math.random() < 0.25,
+      stolen: false,
+    });
+  }
+  return { plots, refreshAt: Date.now() + 4 * 60 * 1000 };
+}
+function visit(id) {
+  if (!state.nb[id] || Date.now() > state.nb[id].refreshAt) state.nb[id] = genNeighbor();
+  view = id; hover = -1;
+  if (state.tool === 'seed' || state.tool === 'hoe') state.tool = 'hand';
+  const nb = NEIGHBORS.find(n => n.id === id);
+  $('#bannerTxt').textContent = `Você está na roça de ${nb.nome}. Ajude com mato e pragas ou pegue um pouquinho da colheita… cuidado com ${nb.cao}!`;
+  $('#banner').hidden = false;
+  cv.setAttribute('aria-label', `Roça de ${nb.nome}`);
+  renderTools(); save();
+}
+function goHome() {
+  view = 'home'; hover = -1;
+  $('#banner').hidden = true; cv.setAttribute('aria-label', 'Sua roça');
+  renderTools(); renderPane();
+}
+
+// ---------- Simulação ----------
+function tick(dt) {
+  for (const p of state.plots) {
+    if (p.s !== 'growing') continue;
+    const crop = CROP[p.c];
+    if (p.g >= crop.tempo) continue;
+    p.g = Math.min(crop.tempo, p.g + dt * (p.dry ? 0.5 : 1));
+    if (p.w < 2 && Math.random() < 0.6 / crop.tempo * dt) p.w++;
+    if (p.b < 2 && Math.random() < 0.45 / crop.tempo * dt) p.b++;
+    if (!p.dry && Math.random() < 0.7 / crop.tempo * dt) p.dry = true;
+    p.dmg = Math.min(crop.rend * 0.5, p.dmg + dt / 60 * (p.w + p.b + (p.dry ? 0.5 : 0)));
+  }
+}
+
+// ---------- Desenho ----------
+function resize() {
+  const r = stage.getBoundingClientRect();
+  const cw = r.width - 10, ch = r.height - 10; // borda de 5px
+  L.dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(cw * L.dpr); cv.height = Math.round(ch * L.dpr);
+  L.cw = cw; L.ch = ch;
+  L.W = Math.min(cw / 6.1, ch / 4.4);
+  L.ox = cw / 2 - (COLS - ROWS) * L.W / 4;
+  L.oy = ch - 2.75 * L.W;
+  L.horizon = Math.max(ch * 0.1, L.oy - L.W * 0.95);
+}
+function iso(c, r) { return { x: L.ox + (c - r) * L.W / 2, y: L.oy + (c + r) * L.W / 4 }; }
+function cellAt(x, y) {
+  const a = (x - L.ox) / (L.W / 2), b = (y - L.oy) / (L.W / 4);
+  const c = Math.floor((a + b) / 2), r = Math.floor((b - a) / 2);
+  if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return -1;
+  return r * COLS + c;
+}
+
+// Pontos fixos de grama para textura
+const TUFTS = Array.from({ length: 140 }, () => [Math.random(), Math.random(), Math.random()]);
+const STARS = Array.from({ length: 40 }, () => [Math.random(), Math.random() * 0.9, Math.random()]);
+
+function timeOfDay() {
+  const h = new Date().getHours() + new Date().getMinutes() / 60;
+  if (h >= 6.5 && h < 17) return 'dia';
+  if (h >= 17 && h < 19) return 'tarde';
+  if (h >= 5 && h < 6.5) return 'aurora';
+  return 'noite';
+}
+
+function drawSky(t, tod) {
+  const { cw, horizon } = L;
+  const skies = {
+    dia: ['#7cc4ef', '#c5ebfa'], tarde: ['#f28b5b', '#ffd49a'],
+    aurora: ['#8a8fcf', '#ffc9a8'], noite: ['#101b3f', '#2f4a7c'],
+  };
+  const [a, b] = skies[tod];
+  const g = ctx.createLinearGradient(0, 0, 0, horizon);
+  g.addColorStop(0, a); g.addColorStop(1, b);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, cw, horizon + 2);
+  if (tod === 'noite') {
+    ctx.fillStyle = '#fff';
+    for (const [x, y, k] of STARS) { ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t / 900 + k * 9)); ctx.fillRect(x * cw, y * horizon, 1.5, 1.5); }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#f4f1d0'; ctx.beginPath(); ctx.arc(cw * 0.82, horizon * 0.42, L.W * 0.2, 0, 7); ctx.fill();
+    ctx.fillStyle = b; ctx.beginPath(); ctx.arc(cw * 0.82 + L.W * 0.08, horizon * 0.38, L.W * 0.17, 0, 7); ctx.fill();
+  } else {
+    const sy = tod === 'dia' ? horizon * 0.4 : horizon * 0.8;
+    ctx.fillStyle = tod === 'dia' ? '#fff3a6' : '#ffb35c';
+    ctx.beginPath(); ctx.arc(cw * 0.84, sy, L.W * 0.22, 0, 7); ctx.fill();
+  }
+  // Nuvens
+  ctx.fillStyle = tod === 'noite' ? 'rgba(200,210,240,.18)' : 'rgba(255,255,255,.85)';
+  for (let k = 0; k < 3; k++) {
+    const sp = 8 + k * 5, span = cw + L.W * 3;
+    const x = ((t / 1000) * sp + k * span / 3) % span - L.W * 1.5;
+    const y = horizon * (0.25 + k * 0.2), s = L.W * (0.28 + k * 0.05);
+    ctx.beginPath();
+    ctx.ellipse(x, y, s * 1.3, s * 0.5, 0, 0, 7);
+    ctx.ellipse(x - s * 0.6, y + s * 0.1, s * 0.7, s * 0.4, 0, 0, 7);
+    ctx.ellipse(x + s * 0.6, y + s * 0.05, s * 0.8, s * 0.45, 0, 0, 7);
+    ctx.fill();
+  }
+}
+
+function drawGround() {
+  const { cw, ch, horizon, W } = L;
+  // Morros ao fundo
+  ctx.fillStyle = '#6fae43';
+  ctx.beginPath(); ctx.moveTo(0, horizon + 4);
+  for (let x = 0; x <= cw + 20; x += 20) ctx.lineTo(x, horizon - Math.sin(x / cw * 7 + 1) * W * 0.12 - W * 0.08);
+  ctx.lineTo(cw, horizon + 10); ctx.closePath(); ctx.fill();
+  const g = ctx.createLinearGradient(0, horizon, 0, ch);
+  g.addColorStop(0, '#86c450'); g.addColorStop(1, '#9ad35e');
+  ctx.fillStyle = g; ctx.fillRect(0, horizon, cw, ch - horizon);
+  ctx.strokeStyle = 'rgba(46,110,30,.45)'; ctx.lineWidth = 1.2;
+  for (const [x, y, k] of TUFTS) {
+    const px = x * cw, py = horizon + 6 + y * (ch - horizon - 6), s = W * (0.04 + k * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(px - s, py - s); ctx.lineTo(px - s * 0.3, py);
+    ctx.moveTo(px, py - s * 1.3); ctx.lineTo(px, py);
+    ctx.moveTo(px + s, py - s); ctx.lineTo(px + s * 0.3, py);
+    ctx.stroke();
+  }
+}
+
+function drawBarn(x, y, s) {
+  // Celeiro vermelho
+  const w = s * 1.0, h = s * 0.62;
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, w * 0.62, s * 0.08, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#c8402f'; ctx.fillRect(x - w / 2, y - h, w, h);
+  ctx.fillStyle = '#8f2a1e';
+  ctx.beginPath(); ctx.moveTo(x - w * 0.58, y - h); ctx.lineTo(x, y - h - s * 0.42); ctx.lineTo(x + w * 0.58, y - h); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#fff4e0'; ctx.lineWidth = Math.max(1.5, s * 0.03);
+  ctx.strokeRect(x - w / 2, y - h, w, h);
+  const dw = w * 0.42, dh = h * 0.7;
+  ctx.strokeRect(x - dw / 2, y - dh, dw, dh);
+  ctx.beginPath(); ctx.moveTo(x - dw / 2, y - dh); ctx.lineTo(x + dw / 2, y); ctx.moveTo(x + dw / 2, y - dh); ctx.lineTo(x - dw / 2, y); ctx.stroke();
+  ctx.fillStyle = '#fff4e0'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.08, 0, 7); ctx.fill();
+  ctx.fillStyle = '#6b3a1a'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.05, 0, 7); ctx.fill();
+}
+function drawHouse(x, y, s, cor) {
+  const w = s * 0.95, h = s * 0.55;
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, w * 0.62, s * 0.08, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = cor; ctx.fillRect(x - w / 2, y - h, w, h);
+  ctx.fillStyle = '#b5532f';
+  ctx.beginPath(); ctx.moveTo(x - w * 0.62, y - h); ctx.lineTo(x - w * 0.3, y - h - s * 0.35); ctx.lineTo(x + w * 0.3, y - h - s * 0.35); ctx.lineTo(x + w * 0.62, y - h); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#6b3a1a'; ctx.fillRect(x - w * 0.1, y - h * 0.62, w * 0.2, h * 0.62);
+  ctx.fillStyle = '#ffe9a8';
+  ctx.fillRect(x - w * 0.38, y - h * 0.7, w * 0.18, h * 0.3); ctx.fillRect(x + w * 0.2, y - h * 0.7, w * 0.18, h * 0.3);
+}
+function drawTree(x, y, s, t) {
+  const sw = Math.sin(t / 1400 + x) * s * 0.02;
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.35, s * 0.08, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - s * 0.06, y - s * 0.5, s * 0.12, s * 0.5);
+  ctx.fillStyle = '#3f8a2a';
+  ctx.beginPath(); ctx.arc(x + sw, y - s * 0.72, s * 0.32, 0, 7); ctx.arc(x - s * 0.22 + sw, y - s * 0.55, s * 0.24, 0, 7); ctx.arc(x + s * 0.22 + sw, y - s * 0.56, s * 0.25, 0, 7); ctx.fill();
+  ctx.fillStyle = '#e53b2f';
+  for (const [dx, dy] of [[-.15, -.7], [.12, -.8], [.2, -.55], [-.25, -.5]]) { ctx.beginPath(); ctx.arc(x + dx * s + sw, y + dy * s, s * 0.035, 0, 7); ctx.fill(); }
+}
+function drawDog(x, y, s, t) {
+  const wag = Math.sin(t / 120) * 0.5;
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.3, s * 0.06, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = s * 0.06; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x + s * 0.22, y - s * 0.22); ctx.lineTo(x + s * 0.36, y - s * 0.34 + wag * s * 0.1); ctx.stroke();
+  ctx.fillStyle = '#b0773d';
+  ctx.beginPath(); ctx.ellipse(x + s * 0.05, y - s * 0.18, s * 0.22, s * 0.12, 0, 0, 7); ctx.fill();
+  ctx.fillRect(x - s * 0.12, y - s * 0.12, s * 0.06, s * 0.12); ctx.fillRect(x + s * 0.16, y - s * 0.12, s * 0.06, s * 0.12);
+  ctx.beginPath(); ctx.arc(x - s * 0.17, y - s * 0.3, s * 0.13, 0, 7); ctx.fill();
+  ctx.fillStyle = '#6e4420'; ctx.beginPath(); ctx.ellipse(x - s * 0.26, y - s * 0.28, s * 0.05, s * 0.1, 0.4, 0, 7); ctx.fill();
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - s * 0.21, y - s * 0.32, s * 0.02, 0, 7); ctx.arc(x - s * 0.29, y - s * 0.27, s * 0.025, 0, 7); ctx.fill();
+  ctx.lineCap = 'butt';
+}
+
+function drawFence() {
+  const W = L.W, e = -0.14;
+  const post = (p) => {
+    ctx.fillStyle = '#a4703f'; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.2);
+    ctx.fillStyle = '#c99260'; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.03);
+  };
+  const rail = (a, b) => {
+    ctx.strokeStyle = '#b98050'; ctx.lineWidth = W * 0.03;
+    for (const h of [0.08, 0.16]) { ctx.beginPath(); ctx.moveTo(a.x, a.y - W * h); ctx.lineTo(b.x, b.y - W * h); ctx.stroke(); }
+  };
+  rail(iso(e, e), iso(COLS - e, e)); rail(iso(e, e), iso(e, ROWS - e));
+  for (let k = 0; k <= COLS * 2; k++) post(iso(e + k * (COLS - 2 * e) / (COLS * 2), e));
+  for (let k = 1; k <= ROWS * 2; k++) post(iso(e, e + k * (ROWS - 2 * e) / (ROWS * 2)));
+}
+
+function leaf(x, y, len, wid, ang, col) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+  ctx.beginPath(); ctx.ellipse(0, -len / 2, wid, len / 2, 0, 0, 7);
+  ctx.fillStyle = col; ctx.fill();
+  ctx.strokeStyle = 'rgba(20,50,10,.35)'; ctx.lineWidth = Math.max(0.8, wid * 0.18); ctx.stroke();
+  ctx.restore();
+}
+function ball(x, y, r, col) {
+  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.3, 0, 7); ctx.fill();
+}
+
+// Desenha uma planta com a base em (x, y); s = escala (1 ≈ 1px por unidade)
+function drawPlant(x, y, s, crop, stage, t, withered) {
+  const sway = Math.sin(t / 700 + x * 0.05) * 0.08;
+  const G = '#4fa83a', GD = '#3a8a2c', GL = '#6cc24a';
+  if (withered) {
+    ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 2 * s; ctx.lineCap = 'round';
+    for (const d of [-1, 0, 1]) { ctx.beginPath(); ctx.moveTo(x + d * 3 * s, y); ctx.quadraticCurveTo(x + d * 5 * s, y - 14 * s, x + d * 11 * s, y - 6 * s); ctx.stroke(); }
+    leaf(x - 8 * s, y - 2 * s, 7 * s, 2.5 * s, -1.6, '#a88b55');
+    ctx.lineCap = 'butt';
+    return;
+  }
+  if (stage === 0) {
+    ctx.fillStyle = '#4a2c14';
+    for (const [dx, dy] of [[-4, 0], [3, -1], [0, 2]]) { ctx.beginPath(); ctx.ellipse(x + dx * s, y + dy * s, 1.6 * s, 1.1 * s, 0, 0, 7); ctx.fill(); }
+  } else if (stage === 1) {
+    ctx.strokeStyle = GD; ctx.lineWidth = 1.4 * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 5 * s); ctx.stroke();
+    leaf(x, y - 4 * s, 8 * s, 3 * s, -0.8 + sway, GL); leaf(x, y - 4 * s, 8 * s, 3 * s, 0.8 + sway, GL);
+  } else if (stage === 2) {
+    for (const a of [-1.0, -0.35, 0.35, 1.0]) leaf(x, y, 14 * s, 4 * s, a + sway, G);
+  } else {
+    const ripeNow = stage === 4;
+    switch (crop.tipo) {
+      case 'raiz': {
+        if (ripeNow) {
+          ctx.fillStyle = crop.cor; ctx.beginPath(); ctx.ellipse(x, y - 1 * s, 6.5 * s, 4.5 * s, 0, 0, 7); ctx.fill();
+          ctx.fillStyle = crop.cor2; ctx.beginPath(); ctx.ellipse(x, y - 3 * s, 6 * s, 2.4 * s, 0, 0, 7); ctx.fill();
+        }
+        for (const a of [-1.1, -0.55, 0, 0.55, 1.1]) leaf(x, y - 3 * s, (ripeNow ? 22 : 18) * s, 4.2 * s, a + sway, a === 0 ? GL : G);
+        break;
+      }
+      case 'alto': {
+        const h = (ripeNow ? 40 : 32) * s;
+        ctx.strokeStyle = '#5a9e33'; ctx.lineWidth = 3.2 * s;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + sway * 20 * s, y - h); ctx.stroke();
+        for (const [k, a] of [[0.2, -1.2], [0.35, 1.2], [0.55, -1.1], [0.72, 1.1]]) leaf(x + sway * 20 * s * k, y - h * k, 17 * s, 3.2 * s, a + sway, k > 0.5 ? GL : G);
+        if (ripeNow) {
+          ctx.save(); ctx.translate(x + sway * 10 * s + 4 * s, y - h * 0.5); ctx.rotate(0.35);
+          ctx.fillStyle = crop.cor; ctx.beginPath(); ctx.ellipse(0, 0, 3.6 * s, 8.5 * s, 0, 0, 7); ctx.fill();
+          ctx.fillStyle = 'rgba(160,110,0,.4)'; for (let k = -2; k <= 2; k++) ctx.fillRect(-2.6 * s, k * 3 * s, 5.2 * s, 0.8 * s);
+          ctx.restore();
+          leaf(x + 2 * s, y - h * 0.38, 12 * s, 2.6 * s, 0.7, '#7fbf4a');
+        }
+        ctx.strokeStyle = '#d9b25a'; ctx.lineWidth = 1.3 * s;
+        const tx = x + sway * 20 * s, ty = y - h;
+        for (const a of [-0.6, 0, 0.6]) { ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + Math.sin(a) * 6 * s, ty - Math.cos(a) * 6 * s); ctx.stroke(); }
+        break;
+      }
+      case 'moita':
+      case 'pendente': {
+        const small = crop.pequeno, r = (small ? 7.5 : 9.5) * s, cy = y - (small ? 7 : 11) * s;
+        ctx.fillStyle = GD; ctx.beginPath(); ctx.arc(x - r * 0.6, cy + r * 0.2, r * 0.8, 0, 7); ctx.arc(x + r * 0.6, cy + r * 0.2, r * 0.8, 0, 7); ctx.fill();
+        ctx.fillStyle = G; ctx.beginPath(); ctx.arc(x + sway * 6 * s, cy - r * 0.2, r, 0, 7); ctx.fill();
+        ctx.fillStyle = GL; ctx.beginPath(); ctx.arc(x - r * 0.3 + sway * 6 * s, cy - r * 0.5, r * 0.45, 0, 7); ctx.fill();
+        if (crop.tipo === 'moita') {
+          const col = ripeNow ? crop.cor : '#a4cf45', fr = (small ? 2.6 : 3.3) * s;
+          for (const [dx, dy] of [[-6, -1], [5, -4], [1, 3], [-2, -9], [7, 3]]) ball(x + dx * s * (r / (9.5 * s)), cy + dy * s * (r / (9.5 * s)), fr, col);
+        } else {
+          const col = ripeNow ? crop.cor : '#9bc36a';
+          for (const dx of [-6, 1, 7]) {
+            const fx = x + dx * s, fy = cy + r * 0.55;
+            ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(fx, fy + 4 * s, 2.8 * s, (ripeNow ? 6 : 4) * s, 0.1, 0, 7); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(fx - 1 * s, fy + 2 * s, 0.8 * s, 2 * s, 0.1, 0, 7); ctx.fill();
+            ctx.fillStyle = '#3f7a2a'; ctx.beginPath(); ctx.ellipse(fx, fy - 1 * s, 2.4 * s, 1.4 * s, 0, 0, 7); ctx.fill();
+          }
+        }
+        break;
+      }
+      case 'chao': {
+        for (const [dx, dy, a] of [[-10, 0, -1.4], [10, -1, 1.4], [-5, -4, -0.6], [6, -5, 0.7], [0, 2, 0]]) {
+          ctx.save(); ctx.translate(x + dx * s, y + dy * s); ctx.scale(1, 0.55);
+          leaf(0, 0, 13 * s, 6 * s, a, a === 0 ? GL : G); ctx.restore();
+        }
+        if (ripeNow) {
+          const rx = 11 * s, ry = 8 * s, fy = y - 5 * s;
+          ctx.fillStyle = crop.cor; ctx.beginPath(); ctx.ellipse(x, fy, rx, ry, 0, 0, 7); ctx.fill();
+          ctx.strokeStyle = crop.cor2; ctx.lineWidth = (crop.id === 'melancia' ? 2 : 1.2) * s;
+          for (const k of [-0.6, -0.2, 0.2, 0.6]) { ctx.beginPath(); ctx.ellipse(x + k * rx * 0.9, fy, rx * 0.22, ry * 0.95, 0, -1.4, 1.4); ctx.stroke(); }
+          ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.beginPath(); ctx.ellipse(x - rx * 0.4, fy - ry * 0.4, rx * 0.25, ry * 0.18, -0.4, 0, 7); ctx.fill();
+          ctx.strokeStyle = '#6b4a1a'; ctx.lineWidth = 2 * s; ctx.beginPath(); ctx.moveTo(x, fy - ry); ctx.lineTo(x + 2 * s, fy - ry - 3 * s); ctx.stroke();
+        } else {
+          ctx.fillStyle = '#9cc85a'; ctx.beginPath(); ctx.ellipse(x + 2 * s, y - 3 * s, 5 * s, 4 * s, 0, 0, 7); ctx.fill();
+        }
+        break;
+      }
+    }
+  }
+}
+
+function drawWeed(x, y, s) {
+  ctx.strokeStyle = '#2d5e1a'; ctx.lineWidth = 1.4 * s; ctx.lineCap = 'round';
+  for (const a of [-0.9, -0.45, 0, 0.45, 0.9]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(a) * 9 * s, y - Math.cos(a) * 9 * s); ctx.stroke(); }
+  ctx.fillStyle = '#f5d33a'; ctx.beginPath(); ctx.arc(x + 1 * s, y - 9 * s, 1.8 * s, 0, 7); ctx.fill();
+  ctx.lineCap = 'butt';
+}
+function drawBug(x, y, s, t, k) {
+  const a = t / 500 + k * 2.3;
+  const bx = x + Math.cos(a) * 5 * s, by = y + Math.sin(a) * 2.5 * s;
+  ctx.save(); ctx.translate(bx, by); ctx.rotate(a + Math.PI / 2);
+  ctx.strokeStyle = '#2a1a0a'; ctx.lineWidth = 0.8 * s;
+  for (const d of [-1, 1]) for (const e of [-1.5, 0, 1.5]) { ctx.beginPath(); ctx.moveTo(0, e * s); ctx.lineTo(d * 3.5 * s, e * s + Math.sin(t / 60 + e) * s); ctx.stroke(); }
+  ctx.fillStyle = '#3b2a18'; ctx.beginPath(); ctx.ellipse(0, 0, 2.4 * s, 3.4 * s, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#7d9a2a'; ctx.beginPath(); ctx.ellipse(0, 0.6 * s, 1.8 * s, 2.3 * s, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function diamond(c, r, inset) {
+  return [iso(c + inset, r + inset), iso(c + 1 - inset, r + inset), iso(c + 1 - inset, r + 1 - inset), iso(c + inset, r + 1 - inset)];
+}
+function poly(pts) { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y); ctx.closePath(); }
+const lerp = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k });
+
+const PLANT_SPOTS = [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]];
+const BIG_SPOTS = [[0.62, 0.34], [0.36, 0.64]];
+const WEED_SPOTS = [[0.5, 0.16], [0.86, 0.55], [0.16, 0.86]];
+
+function drawPlot(i, p, t, isHome) {
+  const c = i % COLS, r = Math.floor(i / COLS), W = L.W;
+  const [p1, p2, p3, p4] = diamond(c, r, 0.05);
+  if (p.s === 'locked') {
+    ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.strokeStyle = 'rgba(40,90,20,.22)'; ctx.lineWidth = 1;
+    poly([p1, p2, p3, p4]); ctx.fill(); ctx.stroke();
+    if (isHome && i === nextLot()) {
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2; poly([p1, p2, p3, p4]); ctx.stroke(); ctx.setLineDash([]);
+      const m = cellCenter(i);
+      ctx.fillStyle = '#7a4a22'; ctx.fillRect(m.x - W * 0.03, m.y - W * 0.3, W * 0.06, W * 0.3);
+      ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 2;
+      const bw = W * 0.5, bh = W * 0.24; ctx.fillRect(m.x - bw / 2, m.y - W * 0.45, bw, bh); ctx.strokeRect(m.x - bw / 2, m.y - W * 0.45, bw, bh);
+      ctx.fillStyle = '#4a2a10'; ctx.font = `800 ${Math.round(W * 0.1)}px 'Baloo 2', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('À venda', m.x, m.y - W * 0.39);
+      ctx.fillText(`${lotCost(state.owned)}`, m.x, m.y - W * 0.285);
+    }
+    if (hover === i) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; poly([p1, p2, p3, p4]); ctx.stroke(); }
+    return;
+  }
+  const d = W * 0.07;
+  const dry = p.s === 'growing' && p.dry;
+  const top = dry ? '#b88a58' : p.s === 'withered' ? '#94704a' : '#8b5a33';
+  const dn = pt => ({ x: pt.x, y: pt.y + d });
+  ctx.fillStyle = '#5e3a1c'; poly([p4, p3, dn(p3), dn(p4)]); ctx.fill();
+  ctx.fillStyle = '#4a2c14'; poly([p3, p2, dn(p2), dn(p3)]); ctx.fill();
+  ctx.fillStyle = top; poly([p1, p2, p3, p4]); ctx.fill();
+  ctx.strokeStyle = dry ? 'rgba(120,80,40,.5)' : 'rgba(60,34,14,.5)'; ctx.lineWidth = Math.max(1, W * 0.018);
+  for (let k = 1; k <= 3; k++) { const a = lerp(p1, p4, k / 4), b = lerp(p2, p3, k / 4); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+  if (dry) { // rachaduras
+    ctx.strokeStyle = 'rgba(90,60,30,.6)'; ctx.lineWidth = 1;
+    const m = cellCenter(i); ctx.beginPath(); ctx.moveTo(m.x - W * .15, m.y); ctx.lineTo(m.x - W * .05, m.y + W * .03); ctx.lineTo(m.x + W * .02, m.y - W * .02); ctx.lineTo(m.x + W * .14, m.y + W * .02); ctx.stroke();
+  }
+  if (hover === i) { ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5; poly([p1, p2, p3, p4]); ctx.stroke(); }
+
+  if (p.s === 'growing' || p.s === 'withered') {
+    const crop = CROP[p.c];
+    for (let k = 0; k < p.w; k++) { const [u, v] = WEED_SPOTS[k]; const q = iso(c + u, r + v); drawWeed(q.x, q.y, W / 100); }
+    const st = p.s === 'growing' ? stageOf(p) : 4;
+    const big = crop && crop.tipo === 'chao' && st >= 3;
+    const spots = big ? BIG_SPOTS : PLANT_SPOTS;
+    const s = W / 100 * (big ? 1.25 : 0.72) * (st === 0 ? 1.2 : 1);
+    for (const [u, v] of spots) { const q = iso(c + u, r + v); drawPlant(q.x, q.y, s, crop, st, t, p.s === 'withered'); }
+    for (let k = 0; k < p.b; k++) { const q = iso(c + 0.45 + k * 0.15, r + 0.5); drawBug(q.x, q.y, W / 100, t, k + i); }
+  }
+}
+
+function bubbleFor(p, isHome) {
+  if (p.s === 'withered') return isHome ? 'hoe' : null;
+  if (p.s !== 'growing') return null;
+  if (p.b) return 'pest';
+  if (p.w) return 'weed';
+  if (p.dry) return 'water';
+  if (ripe(p) && !(p.stolen && !isHome)) return 'ripe';
+  return null;
+}
+function drawBubble(i, kind, p, t) {
+  const W = L.W, m = cellCenter(i);
+  const bob = Math.sin(t / 300 + i) * W * 0.02;
+  const x = m.x, y = m.y - W * 0.55 + bob, R = W * 0.13;
+  ctx.fillStyle = '#fffdf2'; ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - R * 0.3, y + R * 0.9); ctx.lineTo(x, y + R * 1.45); ctx.lineTo(x + R * 0.3, y + R * 0.9); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x - R * 0.3, y + R * 0.95); ctx.lineTo(x, y + R * 1.45); ctx.lineTo(x + R * 0.3, y + R * 0.95); ctx.stroke();
+  const s = R / 11;
+  if (kind === 'water') {
+    ctx.fillStyle = '#3aa0e8'; ctx.beginPath(); ctx.moveTo(x, y - 7 * s);
+    ctx.bezierCurveTo(x + 6 * s, y, x + 5 * s, y + 6 * s, x, y + 6 * s); ctx.bezierCurveTo(x - 5 * s, y + 6 * s, x - 6 * s, y, x, y - 7 * s); ctx.fill();
+  } else if (kind === 'pest') { drawBug(x, y, s * 1.3, 0, 0);
+  } else if (kind === 'weed') { drawWeed(x, y + 5 * s, s * 1.1);
+  } else if (kind === 'hoe') {
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 2 * s; ctx.beginPath(); ctx.moveTo(x - 6 * s, y + 6 * s); ctx.lineTo(x + 4 * s, y - 5 * s); ctx.stroke();
+    ctx.fillStyle = '#8f9aa3'; ctx.beginPath(); ctx.moveTo(x + 1 * s, y - 7 * s); ctx.lineTo(x + 8 * s, y - 2 * s); ctx.lineTo(x + 6 * s, y); ctx.lineTo(x + 2 * s, y - 4 * s); ctx.fill();
+  } else if (kind === 'ripe') {
+    const crop = CROP[p.c]; ball(x, y + 1 * s, 5.5 * s, crop.id === 'melancia' ? '#4d9a3e' : crop.cor);
+    leaf(x, y - 4 * s, 5 * s, 1.8 * s, 0.6, '#4fa83a');
+    ctx.fillStyle = '#ffd54a'; const sp = 1 + Math.sin(t / 200 + i) * 0.3;
+    ctx.beginPath(); ctx.arc(x + 7 * s, y - 6 * s, 1.5 * s * sp, 0, 7); ctx.fill();
+  }
+}
+
+function draw(t) {
+  ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+  const tod = timeOfDay(), W = L.W, isHome = view === 'home';
+  const plots = curPlots();
+  drawSky(t, tod);
+  drawGround();
+  const nb = !isHome && NEIGHBORS.find(n => n.id === view);
+  if (isHome) drawBarn(L.ox - W * 2.0, L.oy + W * 0.35, W * 1.15);
+  else drawHouse(L.ox - W * 2.0, L.oy + W * 0.35, W * 1.15, nb.casa);
+  drawTree(L.ox + W * 2.6, L.oy + W * 0.45, W * 1.0, t);
+  drawTree(L.ox + W * 3.5, L.oy + W * 1.0, W * 0.8, t);
+  if (!isHome) { const q = iso(-0.55, 1.3); drawDog(q.x, q.y, W * 0.7, t); }
+  drawFence();
+  for (let sum = 0; sum <= COLS + ROWS - 2; sum++)
+    for (let c = 0; c < COLS; c++) { const r = sum - c; if (r >= 0 && r < ROWS) drawPlot(r * COLS + c, plots[r * COLS + c], t, isHome); }
+  if (tod !== 'dia') {
+    ctx.fillStyle = tod === 'noite' ? 'rgba(15,25,70,.32)' : tod === 'tarde' ? 'rgba(255,120,40,.1)' : 'rgba(120,100,200,.12)';
+    ctx.fillRect(0, 0, L.cw, L.ch);
+  }
+  for (let i = 0; i < N; i++) { const k = bubbleFor(plots[i], isHome); if (k) drawBubble(i, k, plots[i], t); }
+  // Textos flutuantes
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `800 ${Math.round(clamp(W * 0.16, 12, 20))}px 'Baloo 2', sans-serif`;
+  for (let k = popups.length - 1; k >= 0; k--) {
+    const pp = popups[k], age = (t - pp.t0) / 1300;
+    if (age < 0) continue;
+    if (age > 1) { popups.splice(k, 1); continue; }
+    ctx.globalAlpha = 1 - age * age;
+    const y = pp.y - age * W * 0.5;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(40,24,8,.85)'; ctx.strokeText(pp.text, pp.x, y);
+    ctx.fillStyle = pp.color; ctx.fillText(pp.text, pp.x, y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---------- Ícones das sementes ----------
+const ICONS = {};
+function cropIcon(id) {
+  if (ICONS[id]) return ICONS[id];
+  const size = 96, g = document.createElement('canvas'); g.width = g.height = size;
+  const gc = g.getContext('2d');
+  ctx = gc;
+  gc.fillStyle = '#8b5a33'; gc.beginPath(); gc.ellipse(48, 76, 34, 13, 0, 0, 7); gc.fill();
+  gc.fillStyle = 'rgba(60,34,14,.35)'; gc.beginPath(); gc.ellipse(48, 78, 26, 8, 0, 0, 7); gc.fill();
+  const crop = CROP[id];
+  drawPlant(48, 78, crop.tipo === 'chao' ? 2.3 : crop.tipo === 'alto' ? 1.6 : 2.4, crop, 4, 0, false);
+  ctx = mainCtx;
+  return (ICONS[id] = g.toDataURL());
+}
+
+// ---------- Interface ----------
+const TOOL_ICONS = {
+  hand: '<svg viewBox="0 0 24 24" fill="#ffd9b0" stroke="#6b4220" stroke-width="1.6" stroke-linejoin="round"><path d="M8 13V6a1.5 1.5 0 0 1 3 0v5V4.5a1.5 1.5 0 0 1 3 0V11V5.5a1.5 1.5 0 0 1 3 0V12V8.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-5-2.7L4.3 14a1.6 1.6 0 0 1 2.6-1.8L8 13.5z"/></svg>',
+  hoe: '<svg viewBox="0 0 24 24"><path d="M4 21 17 6" stroke="#8a5a2b" stroke-width="2.4" stroke-linecap="round"/><path d="M14.5 3.5 21 8l-2.5 1.5-5-4z" fill="#8f9aa3" stroke="#4d565c" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+  water: '<svg viewBox="0 0 24 24" stroke="#1d5f8f" stroke-width="1.4" stroke-linejoin="round"><path d="M6 10h9v9a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z" fill="#5cb4ee"/><path d="M15 12l5-5 1.5 1.5-5.5 6" fill="#5cb4ee"/><path d="M8 10a2.5 2.5 0 0 1 5 0" fill="none"/><path d="M21 11.5v1.5M19 13v1.5" stroke="#3aa0e8" stroke-linecap="round"/></svg>',
+  pest: '<svg viewBox="0 0 24 24" stroke="#3b2a18" stroke-width="1.4" stroke-linejoin="round"><rect x="7" y="8" width="9" height="13" rx="2" fill="#e05a3a"/><path d="M9 8V5h5v3" fill="#bbb"/><path d="M14 5h3l2-1" fill="none"/><path d="M19 7l2-1M19 9l2 0" stroke="#7aa" stroke-linecap="round"/><circle cx="11.5" cy="14.5" r="2.2" fill="#fff"/></svg>',
+  weed: '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 21v-7M12 14c-3 0-5-2-5-5 3 0 5 2 5 5zM12 14c3 0 5-2 5-5-3 0-5 2-5 5z" stroke="#2f6e1e" stroke-width="1.8" fill="#6cc24a"/><path d="M12 7V2M9.5 4.5 12 2l2.5 2.5" stroke="#6b4220" stroke-width="1.8"/></svg>',
+};
+const TOOLS = [
+  { id: 'hand', nome: 'Mão' }, { id: 'hoe', nome: 'Enxada' }, { id: 'water', nome: 'Regar' },
+  { id: 'pest', nome: 'Inseticida' }, { id: 'weed', nome: 'Arrancar' }, { id: 'seed', nome: 'Semente' },
+];
+function renderTools() {
+  const box = $('#tools'); box.innerHTML = '';
+  TOOLS.filter(t => view === 'home' || (t.id !== 'seed' && t.id !== 'hoe')).forEach((t, k) => {
+    const b = document.createElement('button');
+    b.className = 'tool'; b.type = 'button';
+    b.setAttribute('aria-pressed', String(state.tool === t.id));
+    const icon = t.id === 'seed' ? `<img class="seedimg" alt="" src="${cropIcon(state.seed)}">` : TOOL_ICONS[t.id];
+    const label = t.id === 'seed' ? CROP[state.seed].nome : t.nome;
+    b.innerHTML = `${icon}<span>${label}</span><kbd>${k + 1}</kbd>`;
+    b.title = t.id === 'hand' ? 'Faz a ação certa: colhe, rega, tira mato e pragas, planta' : t.nome;
+    b.addEventListener('click', () => setTool(t.id));
+    box.appendChild(b);
+  });
+}
+function setTool(id) {
+  if (view !== 'home' && (id === 'seed' || id === 'hoe')) return;
+  state.tool = id; renderTools(); renderPane();
+}
+
+function renderHUD() {
+  $('#lvl').textContent = state.level;
+  const n = need(state.level);
+  $('#xptxt').textContent = `${state.xp} / ${n} XP`;
+  $('#xpbar').style.width = `${Math.min(100, state.xp / n * 100)}%`;
+  $('#coins').textContent = state.coins.toLocaleString('pt-BR');
+}
+
+function renderPane() {
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  const pane = $('#pane');
+  let html = '';
+  if (tab === 'loja') {
+    html += `<h3>Sementes</h3><p class="hint">Escolha uma semente e clique na terra arada para plantar. O preço é cobrado no plantio.</p>`;
+    for (const c of CROPS) {
+      const locked = c.nivel > state.level, sel = state.seed === c.id && state.tool === 'seed';
+      const lucro = c.rend * c.preco * c.safras - c.custo;
+      html += `<div class="row ${locked ? 'locked' : ''} ${sel ? 'sel' : ''}">
+        <img alt="" src="${cropIcon(c.id)}">
+        <div><div class="name">${c.nome}</div>
+        <div class="meta">${c.custo} moedas · ${fmt(c.tempo)}${c.safras > 1 ? ` · ${c.safras} safras` : ''}<br>rende ${c.rend} × ${c.preco} · lucro ${lucro} · ${c.xp} XP</div></div>
+        ${locked ? `<button class="btn" disabled>Nível ${c.nivel}</button>` : `<button class="btn ${sel ? 'gold' : ''}" data-seed="${c.id}">${sel ? 'Na mão' : 'Escolher'}</button>`}
+      </div>`;
+    }
+  } else if (tab === 'celeiro') {
+    const items = Object.entries(state.barn).filter(([, q]) => q > 0);
+    let total = 0; for (const [id, q] of items) total += q * CROP[id].preco;
+    html += `<h3>Celeiro</h3>`;
+    if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha algo com a Mão quando aparecer o balão da fruta.</div>`;
+    else {
+      html += `<div class="total"><span>Total: ${total} moedas</span><button class="btn gold" data-sellall>Vender tudo</button></div>`;
+      for (const [id, q] of items) {
+        const c = CROP[id];
+        html += `<div class="row"><img alt="" src="${cropIcon(id)}">
+          <div><div class="name">${c.nome} × ${q}</div><div class="meta">${c.preco} moedas cada · ${q * c.preco} no total</div></div>
+          <div style="display:grid;gap:4px"><button class="btn" data-sell="${id}">Vender 1</button><button class="btn ghost" data-sellall-of="${id}">Todos</button></div></div>`;
+      }
+    }
+  } else if (tab === 'terreno') {
+    const i = nextLot();
+    html += `<h3>Terreno</h3><div class="kv">
+      <span>Lotes</span><span>${state.owned} de ${N}</span>
+      <span>Colheitas</span><span>${state.stats.colheitas}</span>
+      <span>Moedas vendidas</span><span>${state.stats.vendido}</span>
+      <span>Pegos dos vizinhos</span><span>${state.stats.roubado}</span>
+      <span>Ajudas aos vizinhos</span><span>${state.stats.ajudas}</span></div>`;
+    if (i != null) {
+      const cost = lotCost(state.owned), lvl = lotLevel(state.owned);
+      const ok = state.level >= lvl && state.coins >= cost;
+      html += `<div class="row"><div></div><div><div class="name">Próximo lote</div><div class="meta">${cost} moedas · exige nível ${lvl}</div></div>
+        <button class="btn gold" data-buylot ${ok ? '' : 'disabled'}>Comprar</button></div>
+        <p class="hint">O lote à venda aparece com uma placa na roça.</p>`;
+    } else html += `<div class="empty">Você comprou todo o terreno!</div>`;
+    html += `<p class="hint">Mato e pragas diminuem a colheita enquanto ficam lá. Terra seca faz a planta crescer na metade da velocidade.</p>
+      <button class="btn danger" data-reset>${resetArmed ? 'Clique de novo para apagar tudo' : 'Recomeçar do zero'}</button>`;
+  } else if (tab === 'vizinhos') {
+    html += `<h3>Vizinhos</h3><p class="hint">Visite a roça dos vizinhos: tire mato e pragas para ganhar moedas, ou pegue um pouco da colheita madura. Cada vizinho tem um cachorro de guarda.</p>`;
+    for (const n of NEIGHBORS) {
+      const here = view === n.id;
+      html += `<div class="row ${here ? 'sel' : ''}"><div style="width:48px;height:48px;border-radius:12px;background:${n.casa};display:grid;place-items:center;color:#fff;font:400 24px Chewy, cursive">${n.nome.split(' ').pop()[0]}</div>
+        <div><div class="name">${n.nome}</div><div class="meta">Cachorro: ${n.cao} · ${n.pega >= .15 ? 'bravo' : n.pega >= .09 ? 'atento' : 'dorminhoco'}</div></div>
+        ${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit="${n.id}">Visitar</button>`}</div>`;
+    }
+  }
+  pane.innerHTML = html;
+}
+let resetArmed = false;
+
+$('#pane').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.seed) { state.seed = b.dataset.seed; state.tool = 'seed'; if (view !== 'home') goHome(); renderTools(); renderPane(); save(); }
+  else if (b.dataset.sell) sell(b.dataset.sell, false);
+  else if (b.dataset.sellallOf) sell(b.dataset.sellallOf, true);
+  else if ('sellall' in b.dataset) sellAll();
+  else if ('buylot' in b.dataset) { const i = nextLot(); if (i != null) { if (view !== 'home') goHome(); buyLot(i); done(); } }
+  else if (b.dataset.visit) { visit(b.dataset.visit); renderPane(); }
+  else if ('home' in b.dataset) goHome();
+  else if ('reset' in b.dataset) {
+    if (!resetArmed) { resetArmed = true; renderPane(); setTimeout(() => { resetArmed = false; if (tab === 'terreno') renderPane(); }, 4000); return; }
+    resetArmed = false; state = newState(); view = 'home'; $('#banner').hidden = true; save(); renderTools(); done();
+    toast('Roça nova em folha!', 'good');
+  }
+});
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; renderPane(); }));
+$('#goHome').addEventListener('click', () => goHome());
+
+// ---------- Tooltip ----------
+function tipHTML(i) {
+  const p = curPlots()[i], isHome = view === 'home';
+  if (p.s === 'locked') {
+    if (isHome && i === nextLot()) return `<b>Lote à venda</b><br>${lotCost(state.owned)} moedas · nível ${lotLevel(state.owned)}`;
+    return isHome ? 'Pasto. Compre os lotes com placa para crescer.' : null;
+  }
+  if (p.s === 'plowed') return isHome ? `<b>Terra arada</b><br>Clique para plantar ${CROP[state.seed].nome}.` : '<b>Terra arada</b>';
+  if (p.s === 'withered') return '<b>Planta seca</b><br>Use a enxada (ou a Mão) para limpar.';
+  const crop = CROP[p.c], st = stageOf(p), k = Math.min(1, p.g / crop.tempo);
+  let h = `<b>${crop.nome}</b> · ${STAGE_NAMES[st]}`;
+  if (st < 4) h += `<br>Fica pronto em ${fmt((crop.tempo - p.g) / (p.dry ? 0.5 : 1))}`;
+  else h += p.stolen && !isHome ? '<br>Você já pegou daqui.' : '<br>Pronto para colher!';
+  h += `<div class="bar"><i style="width:${k * 100}%"></i></div>`;
+  const probs = [];
+  if (p.w) probs.push(`${p.w} mato`); if (p.b) probs.push(`${p.b} praga${p.b > 1 ? 's' : ''}`); if (p.dry) probs.push('terra seca');
+  if (probs.length) h += `<div class="warn">${probs.join(' · ')}</div>`;
+  if (isHome) {
+    h += `Colheita prevista: ${expectedYield(p)} de ${crop.rend}`;
+    if (p.sl > 1) h += ` · +${p.sl - 1} safra`;
+  }
+  return h;
+}
+let lastTip = '';
+function updateTip() {
+  const show = hover >= 0 && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
+  const html = show ? tipHTML(hover) : null;
+  if (!html) { tip.hidden = true; lastTip = ''; return; }
+  if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
+  tip.hidden = false;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = pointer.x + 16, y = pointer.y + 16;
+  if (x + w > L.cw) x = pointer.x - w - 12;
+  if (y + h > L.ch) y = pointer.y - h - 12;
+  tip.style.left = `${Math.max(4, x)}px`; tip.style.top = `${Math.max(4, y)}px`;
+}
+
+function localPos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+cv.addEventListener('pointermove', e => {
+  const q = localPos(e); pointer.x = q.x; pointer.y = q.y; pointer.inside = true; pointer.touch = e.pointerType === 'touch';
+  hover = cellAt(q.x, q.y);
+});
+cv.addEventListener('pointerleave', () => { pointer.inside = false; if (!pointer.touch) hover = -1; });
+cv.addEventListener('click', e => {
+  const q = localPos(e); pointer.x = q.x; pointer.y = q.y;
+  const i = cellAt(q.x, q.y); hover = i;
+  if (pointer.touch) pointer.tipUntil = performance.now() + 2200;
+  if (i >= 0) act(i);
+});
+cv.addEventListener('pointerdown', e => { pointer.touch = e.pointerType === 'touch'; });
+window.addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea')) return;
+  const k = parseInt(e.key, 10);
+  const avail = TOOLS.filter(t => view === 'home' || (t.id !== 'seed' && t.id !== 'hoe'));
+  if (k >= 1 && k <= avail.length) setTool(avail[k - 1].id);
+});
+new ResizeObserver(resize).observe(stage);
+
+// ---------- Laço principal ----------
+let last = performance.now(), lastSave = 0, lastUI = 0;
+function frame(now) {
+  const dt = Math.min(1, (now - last) / 1000); last = now;
+  tick(dt);
+  draw(now);
+  if (now - lastUI > 250) { updateTip(); lastUI = now; }
+  if (now - lastSave > 5000) { save(); lastSave = now; }
+  requestAnimationFrame(frame);
+}
+
+function start(data) {
+  state = (data && data.state) || load() || newState();
+  if (!CROP[state.seed]) state.seed = 'nabo';
+  resize(); renderTools(); renderHUD(); renderPane();
+  requestAnimationFrame(t => { last = t; frame(t); });
+}
+window.addEventListener('pagehide', save);
+window.claude?.hot?.snapshot?.(() => ({ state }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
