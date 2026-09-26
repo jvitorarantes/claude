@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roça Feliz</title>
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="33">
-<script src="firebase-config.js?v=33"></script>
+<meta name="rf-version" content="34">
+<script src="firebase-config.js?v=34"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -168,6 +168,19 @@
   .colcard small { color: var(--muted); font-variant-numeric: tabular-nums; }
   .colcard.unknown img { filter: brightness(0) opacity(.25); }
   .stamps { display: flex; gap: 3px; }
+  .bm-card { width: min(100%, 480px); }
+  .bmitens { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; max-height: 38vh; overflow-y: auto; }
+  .bmitem { display: grid; justify-items: center; gap: 1px; background: var(--card); border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px 4px; font-size: 12px; font-weight: 700; line-height: 1.15; }
+  .bmitem img { width: 40px; height: 40px; }
+  .bmitem small { color: var(--muted); font-weight: 600; }
+  .bmitem.sel { border-color: var(--gold); background: var(--sel); box-shadow: 0 0 0 2px rgba(242,183,5,.35); }
+  .bmrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .bmrow small { color: var(--muted); }
+  .stepper { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+  .stepper b { min-width: 2ch; text-align: center; font-size: 20px; }
+  .stepper input { width: 84px; text-align: center; font-weight: 800; font-size: 16px; border: 2px solid var(--wood-3); border-radius: 10px; padding: 3px 4px; background: var(--card); }
+  .bslot.vazio { cursor: pointer; font: inherit; font-size: 13px; line-height: 1.2; }
+  .bslot.vazio:hover { border-color: var(--gold); background: var(--sel); color: var(--heading); }
   .presopts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .presopt { display: grid; justify-items: center; gap: 4px; background: var(--card); border: 2px solid var(--panel-2); border-radius: 14px; padding: 10px 6px; font-weight: 800; }
   .presopt:hover, .presopt:focus-visible { border-color: var(--gold); background: var(--sel); }
@@ -602,6 +615,23 @@
   </div>
 </div>
 
+<div class="modal" id="bancaModal" hidden role="dialog" aria-modal="true" aria-labelledby="bmTitle">
+  <div class="modal-card bm-card">
+    <div class="modal-head"><h2 id="bmTitle">Colocar à venda</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <section>
+      <h3>Escolha o item</h3>
+      <div class="bmitens" id="bmItens"></div>
+    </section>
+    <section>
+      <div class="bmrow"><span><b id="bmNome"></b><br><small id="bmTem"></small></span>
+        <span class="stepper"><button type="button" class="zbtn" id="bmQmenos" aria-label="Menos">−</button><b id="bmQtd">1</b><button type="button" class="zbtn" id="bmQmais" aria-label="Mais">+</button></span></div>
+      <div class="bmrow"><span><b>Preço</b><br><small id="bmFaixa"></small></span>
+        <span class="stepper"><button type="button" class="zbtn" id="bmPmenos" aria-label="Mais barato">−</button><input id="bmPreco" type="number" min="1" aria-label="Preço"><button type="button" class="zbtn" id="bmPmais" aria-label="Mais caro">+</button></span></div>
+      <button class="btn gold big" type="button" id="bmOk">Colocar na banca</button>
+    </section>
+  </div>
+</div>
+
 <div class="modal" id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="setTitle">
   <div class="modal-card">
     <div class="modal-head"><h2 id="setTitle">Configurações</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
@@ -638,8 +668,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=33"></script>
-<script src="js/cloud.js?v=33"></script>
-<script src="js/game.js?v=33"></script>
+<script src="js/audio.js?v=34"></script>
+<script src="js/cloud.js?v=34"></script>
+<script src="js/game.js?v=34"></script>
 </body>
 </html>

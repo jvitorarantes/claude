@@ -3610,6 +3610,7 @@ $('#pane').addEventListener('click', e => {
   if (d.fabricar) return fabricar(d.fabricar);
   if ('fabRecolher' in d) return recolherFab();
   if (d.bancaRem) return bancaRemove(d.bancaRem);
+  if ('bancaNovo' in d) return abrirBancaModal();
   if (d.bancaComprar) return bancaComprar(d.bancaComprar);
   if (d.entregar) return entregar(Number(d.entregar));
   if (d.mseg) { missSeg = d.mseg; renderPane(); $('#pane').scrollTop = 0; return; }
@@ -3694,11 +3695,8 @@ $('#pane').addEventListener('click', e => {
   }
 });
 $('#pane').addEventListener('change', e => {
-  if (e.target.id === 'bItem') { bancaSel = e.target.value; renderPane(); }
-  if (e.target.id === 'bQtd') bancaQtd = Number(e.target.value) || 1;
 });
 $('#pane').addEventListener('submit', e => {
-  if (e.target.id === 'bancaForm') { e.preventDefault(); bancaQtd = Number($('#bQtd').value) || 1; return bancaAdd($('#bItem').value, bancaQtd, Number($('#bPreco').value)); }
   const rn = e.target.dataset && e.target.dataset.rename;
   if (rn) {
     e.preventDefault();
@@ -3985,6 +3983,8 @@ function openSettings() { if ($('#verTxt')) $('#verTxt').textContent = `Versão 
 function closeSettings() { $('#settings').hidden = true; $('#openSettings').focus(); }
 $('#openSettings').addEventListener('click', openSettings);
 $('#giftBtn').addEventListener('click', showGift);
+$('#bancaModal').addEventListener('click', bancaModalClick);
+$('#bmPreco').addEventListener('change', e => { bm.preco = Math.round(Number(e.target.value) || 0); renderBancaModal(); });
 $('#moveBtn').addEventListener('click', () => setMoveMode(!moveMode));
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && moveMode) { if (moving) { moving = null; toast('Cancelado.'); } else setMoveMode(false); } });
 $('#presente').addEventListener('click', e => {
@@ -4582,12 +4582,56 @@ function bancaAdd(id, qtd, preco) {
   if (state.banca.length >= BANCA_MAX) return toast(`A banca tem ${BANCA_MAX} lugares.`);
   qtd = clamp(Math.floor(qtd) || 1, 1, 10);
   if ((state.barn[id] || 0) < qtd) return toast('Você não tem tudo isso no celeiro.', 'bad');
-  const min = Math.max(1, Math.round(valorDe(id) * qtd * 0.5)), max = Math.round(valorDe(id) * qtd * 2);
+  const [min, max] = faixaPreco(id, qtd);
   preco = clamp(Math.round(preco) || 0, min, max);
   state.barn[id] -= qtd; if (!state.barn[id]) delete state.barn[id];
   state.banca.push({ id: newId(), item: id, qtd, preco, at: Date.now() });
   sfx('buy'); toast(`${qtd} ${item(id).nome.toLowerCase()} na banca por ${preco.toLocaleString('pt-BR')} moedas.`, 'good');
   done();
+}
+// Preço na banca: de metade até o dobro do valor no celeiro (o máximo evita preços abusivos).
+const BANCA_QTD_MAX = 10;
+const faixaPreco = (id, qtd) => [Math.max(1, Math.round(valorDe(id) * qtd * 0.5)), Math.max(1, Math.round(valorDe(id) * qtd * 2))];
+// Janelinha que abre ao clicar num lugar livre da banca.
+const bm = { item: null, qtd: 1, preco: 0 };
+function abrirBancaModal() {
+  const tenho = Object.keys(state.barn).filter(id => state.barn[id] > 0 && item(id));
+  if (!tenho.length) return toast('O celeiro está vazio. Colha ou fabrique algo para vender.');
+  if ((state.banca || []).length >= BANCA_MAX) return toast(`A banca tem ${BANCA_MAX} lugares.`);
+  if (!tenho.includes(bm.item)) bm.item = tenho[0];
+  escolherBancaItem(bm.item);
+  $('#bancaModal').hidden = false;
+}
+function escolherBancaItem(id) {
+  bm.item = id; bm.qtd = Math.min(bm.qtd || 1, state.barn[id] || 1, BANCA_QTD_MAX);
+  bm.preco = Math.round(valorDe(id) * bm.qtd * 1.2);
+  renderBancaModal();
+}
+function renderBancaModal() {
+  const tenho = Object.keys(state.barn).filter(id => state.barn[id] > 0 && item(id));
+  $('#bmItens').innerHTML = tenho.map(id => `<button type="button" class="bmitem ${id === bm.item ? 'sel' : ''}" data-bm-item="${id}" aria-pressed="${id === bm.item}">
+    <img alt="" src="${itemIcon(id)}"><span>${esc(item(id).nome)}</span><small>tem ${state.barn[id]}</small></button>`).join('');
+  const tem = state.barn[bm.item] || 0, maxQ = Math.min(tem, BANCA_QTD_MAX), [min, max] = faixaPreco(bm.item, bm.qtd);
+  bm.qtd = clamp(bm.qtd, 1, maxQ); bm.preco = clamp(bm.preco, min, max);
+  $('#bmNome').textContent = item(bm.item).nome;
+  $('#bmQtd').textContent = bm.qtd;
+  $('#bmTem').textContent = `você tem ${tem}${tem > BANCA_QTD_MAX ? ` (até ${BANCA_QTD_MAX} por lugar)` : ''}`;
+  $('#bmPreco').value = bm.preco;
+  $('#bmFaixa').textContent = `mín. ${min.toLocaleString('pt-BR')} · máx. ${max.toLocaleString('pt-BR')} · vale ${valorDe(bm.item).toLocaleString('pt-BR')} cada no celeiro`;
+  $('#bmQmenos').disabled = bm.qtd <= 1; $('#bmQmais').disabled = bm.qtd >= maxQ;
+  $('#bmPmenos').disabled = bm.preco <= min; $('#bmPmais').disabled = bm.preco >= max;
+}
+function bancaModalClick(e) {
+  const t = e.target;
+  if (t === $('#bancaModal') || t.closest('[data-close]')) { $('#bancaModal').hidden = true; return; }
+  const it = t.closest('[data-bm-item]'); if (it) return escolherBancaItem(it.dataset.bmItem);
+  const passo = Math.max(1, Math.round(valorDe(bm.item) * bm.qtd * 0.1));
+  const un = valorDe(bm.item) * 1.2;
+  if (t.closest('#bmQmenos')) { bm.qtd--; bm.preco = Math.round(un * bm.qtd); return renderBancaModal(); }
+  if (t.closest('#bmQmais')) { bm.qtd++; bm.preco = Math.round(un * bm.qtd); return renderBancaModal(); }
+  if (t.closest('#bmPmenos')) { bm.preco -= passo; return renderBancaModal(); }
+  if (t.closest('#bmPmais')) { bm.preco += passo; return renderBancaModal(); }
+  if (t.closest('#bmOk')) { $('#bancaModal').hidden = true; return bancaAdd(bm.item, bm.qtd, bm.preco); }
 }
 let bancaRemArmed = null;
 function bancaRemove(sid) {
@@ -4709,21 +4753,13 @@ function fabricaHTML() {
     html += `<p class="hint">Coloque coisas do celeiro à venda. Os amigos compram quando visitam a sua roça, e os vizinhos da vila passam de vez em quando (se o preço for justo). O dinheiro chega sozinho.</p>`;
     html += `<div class="banca">${Array.from({ length: BANCA_MAX }, (_, k) => {
       const s = banca[k];
-      if (!s) return '<div class="bslot vazio">lugar livre</div>';
+      if (!s) return '<button type="button" class="bslot vazio" data-banca-novo>+<br>lugar livre</button>';
       const armed = bancaRemArmed === s.id;
       return `<div class="bslot"><img alt="" src="${itemIcon(s.item)}"><b>${s.qtd} ${esc(item(s.item).nome)}</b><span>${moeda(s.preco)}</span>
         <button class="btn ${armed ? 'danger' : 'ghost'} tiny" data-banca-rem="${s.id}">${armed ? 'Confirmar' : 'Tirar'}</button></div>`;
     }).join('')}</div>`;
-    const tenho = Object.keys(state.barn).filter(id => state.barn[id] > 0 && item(id));
-    if (banca.length < BANCA_MAX && tenho.length) {
-      const sel = tenho.includes(bancaSel) ? bancaSel : tenho[0], v = valorDe(sel);
-      html += `<h3>Colocar à venda</h3><form class="bform" id="bancaForm">
-        <label>Item <select id="bItem">${tenho.map(id => `<option value="${id}" ${id === sel ? 'selected' : ''}>${esc(item(id).nome)} (${state.barn[id]})</option>`).join('')}</select></label>
-        <label>Quantidade <input id="bQtd" type="number" min="1" max="${Math.min(10, state.barn[sel])}" value="${Math.min(bancaQtd, state.barn[sel], 10)}"></label>
-        <label>Preço <input id="bPreco" type="number" min="1" value="${Math.round(v * Math.min(bancaQtd, state.barn[sel], 10) * 1.2)}"></label>
-        <p class="hint">Vale ${v.toLocaleString('pt-BR')} cada no celeiro. Preço entre metade e o dobro disso.</p>
-        <button class="btn gold" type="submit">Colocar na banca</button></form>`;
-    } else if (!tenho.length) html += `<div class="empty">O celeiro está vazio. Colha ou fabrique algo para vender.</div>`;
+    if (!Object.keys(state.barn).some(id => state.barn[id] > 0 && item(id))) html += `<div class="empty">O celeiro está vazio. Colha ou fabrique algo para vender.</div>`;
+    else if (banca.length < BANCA_MAX) html += `<p class="hint">Clique num lugar livre para escolher o que vender.</p>`;
   } else {
     const t = state.truck, falta = (t.b + 1) * CAMINHAO_BLOCO - Date.now();
     html += `<p class="hint">O caminhão leva pedidos da cidade e paga bem mais que o celeiro. Pedidos novos em <b>${fmt(falta / 1000)}</b>.</p>`;
@@ -4737,7 +4773,6 @@ function fabricaHTML() {
   }
   return html;
 }
-let bancaSel = null, bancaQtd = 1;
 function bancaVisitaHTML() {
   const banca = (view.data.banca || []);
   let html = `<h3>Banca de ${esc(view.nome)}</h3>`;
