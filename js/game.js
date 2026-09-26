@@ -289,6 +289,9 @@ function migrate(s) {
   if (typeof s.helpDay !== 'number') s.helpDay = -1;
   s.changed = Number(s.changed) || 0;
   s.pocao = Math.max(0, Number(s.pocao) || 0);
+  s.banca = Array.isArray(s.banca) ? s.banca.filter(x => x && item(x.item) && x.qtd > 0) : [];
+  s.fab = s.fab && Array.isArray(s.fab.fila) ? { fila: s.fab.fila.filter(x => x && RECEITA[x.r]).slice(0, FILA_MAX) } : { fila: [] };
+  if (s.truck && !Array.isArray(s.truck.pedidos)) s.truck = null;
   const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
   s.dogs = {};
   for (const slot of ['roca', 'animais']) { const d = dogs[slot]; s.dogs[slot] = d && DOG[d.raca] ? d : null; }
@@ -933,13 +936,13 @@ function genNeighbor() {
   }
   const decor = {};
   for (const d of DECOR) if (Math.random() < 0.55) decor[d.id] = true;
-  return ensureAbrigos({ plots, animals, decor, refreshAt: Date.now() + 4 * 60 * 1000 });
+  return ensureAbrigos({ plots, animals, decor, banca: npcBanca(), refreshAt: Date.now() + 4 * 60 * 1000 });
 }
 
 function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
   const cur = state.nb[id];
-  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry)) || !cur.plots.some(p => 'podre' in p)) state.nb[id] = genNeighbor();
+  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry)) || !cur.plots.some(p => 'podre' in p) || !cur.banca) state.nb[id] = genNeighbor();
   view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima };
   afterVisit();
   save();
@@ -964,7 +967,7 @@ async function visitFriend(uid) {
 function afterVisit() {
   hover = null; setScene('roca');
   if (['seed', 'hoe', 'fert'].includes(state.tool)) state.tool = 'hand';
-  $('#bannerTxt').textContent = `Você está na roça de ${view.nome} (nível ${view.nivel}). Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
+  $('#bannerTxt').textContent = `Você está na roça de ${view.nome} (nível ${view.nivel}). Veja a banca em Fábrica. Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
   $('#banner').hidden = false;
   cv.setAttribute('aria-label', `Roça de ${view.nome}`);
   renderTools(); renderPane(); renderSceneInfo();
@@ -1099,6 +1102,9 @@ function applyVisits(list) {
       p.dmg = Math.min(CROP[p.c].rend - 1, p.dmg + qty);
       if (!p.th.includes(v.from)) p.th.push(v.from);
       note(`pegou ${qty} ${CROP[p.c].prodNome} da sua plantação`, true);
+    } else if (v.t === 'buy') {
+      const sl = (state.banca || []).find(x => x.id === v.slot && x.item === v.item && x.qtd === v.qtd && x.preco === v.preco);
+      if (sl) bancaVendeu(sl, who);
     } else if (v.t === 'gift' && PRESENTE_AMIGO.some(g => g.id === v.gift)) {
       const g = PRESENTE_AMIGO.find(x => x.id === v.gift);
       g.dar(state); note(`mandou um presente para você: ${g.nome}`);
@@ -2068,6 +2074,7 @@ function drawBug(x, y, s, t, k) {
 
 // Produtos dos animais, centrados em (x, y); s ≈ 1/10 do tamanho.
 function drawProduct(id, x, y, s) {
+  if (RECEITA[id]) return drawGood(id, x, y, s);
   ctx.lineWidth = Math.max(1, 0.6 * s);
   if (id === 'ovo') {
     ctx.fillStyle = '#fff6df'; ctx.strokeStyle = '#cdb88c';
@@ -3193,6 +3200,10 @@ function renderTabs() {
   const unread = state ? state.news.filter(n => n.at > state.newsSeen).length : 0;
   setBadge(document.querySelector('.tab[data-tab="amigos"]'), requests.length, 'pedidos de amizade');
   setBadge(document.querySelector('.tab[data-tab="correio"]'), unread, 'cartas novas');
+  if (state) {
+    setBadge(document.querySelector('.tab[data-tab="celeiro"]'), Object.values(state.barn).reduce((t, q) => t + (q > 0 ? q : 0), 0), 'itens no celeiro');
+    setBadge(document.querySelector('.tab[data-tab="fabrica"]'), prontosFab() + entregaveis(), 'coisas prontas na fábrica ou pedidos para entregar');
+  }
   const mb = document.querySelector('.tab[data-tab="missoes"]'), mn = missoesProntas();
   setBadge(mb, mn, 'prêmios');
   renderGiftBtn();
@@ -3211,7 +3222,7 @@ function renderTabs() {
 }
 // Preço nos botões da loja: ícone de moeda + valor (e a quantidade, quando tem).
 const moeda = (n, q) => `${q ? `<span class="qtd">×${q}</span>` : ''}<span class="coin" aria-hidden="true"></span>${n.toLocaleString('pt-BR')}`;
-const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões', correio: 'Correio' };
+const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões', correio: 'Correio', fabrica: 'Fábrica' };
 // A janela abre por cima do jogo. Clicar de novo no mesmo botão fecha.
 function openPanel(t, seg, focus) {
   tab = t; if (seg) shopSeg = seg;
@@ -3233,6 +3244,7 @@ function renderPane() {
   const pane = $('#pane');
   let html = '';
   if (tab === 'missoes') html = missoesHTML();
+  else if (tab === 'fabrica') html = fabricaHTML();
   else if (tab === 'loja') {
     const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['temas', 'Temas']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
@@ -3375,7 +3387,7 @@ function renderPane() {
       }
     }
   } else if (tab === 'celeiro') {
-    const items = [...Object.values(PRODUCE), ...PRODUCTS].filter(it => state.barn[it.id] > 0);
+    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...RECEITAS].filter(it => state.barn[it.id] > 0);
     let total = 0; for (const it of items) total += state.barn[it.id] * it.preco;
     html += `<h3>Celeiro</h3>`;
     if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha na roça e recolha ovos, leite, lã e trufas dos animais.</div>`;
@@ -3488,6 +3500,12 @@ function renderPane() {
 $('#pane').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   const d = b.dataset;
+  if (d.fseg) { fabSeg = d.fseg; renderPane(); $('#pane').scrollTop = 0; return; }
+  if (d.fabricar) return fabricar(d.fabricar);
+  if ('fabRecolher' in d) return recolherFab();
+  if (d.bancaRem) return bancaRemove(d.bancaRem);
+  if (d.bancaComprar) return bancaComprar(d.bancaComprar);
+  if (d.entregar) return entregar(Number(d.entregar));
   if (d.mseg) { missSeg = d.mseg; renderPane(); $('#pane').scrollTop = 0; return; }
   if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
   if (d.temaRoca) return buyTema(d.temaRoca);
@@ -3565,7 +3583,12 @@ $('#pane').addEventListener('click', e => {
     toast('Roça nova em folha!', 'good');
   }
 });
+$('#pane').addEventListener('change', e => {
+  if (e.target.id === 'bItem') { bancaSel = e.target.value; renderPane(); }
+  if (e.target.id === 'bQtd') bancaQtd = Number(e.target.value) || 1;
+});
 $('#pane').addEventListener('submit', e => {
+  if (e.target.id === 'bancaForm') { e.preventDefault(); bancaQtd = Number($('#bQtd').value) || 1; return bancaAdd($('#bItem').value, bancaQtd, Number($('#bPreco').value)); }
   const rn = e.target.dataset && e.target.dataset.rename;
   if (rn) {
     e.preventDefault();
@@ -3589,6 +3612,7 @@ const MENU_ICONS = {
   terreno: '<svg viewBox="0 0 32 32"><path d="M16 9 29 17 16 25 3 17z" fill="#8b5a33" stroke="#4a2c14" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 17l7-4.3M12 19l7-4.3M15 21l7-4.3" stroke="#5e3a1c" stroke-width="1.2"/><circle cx="24" cy="8" r="6" fill="#4f9a2f" stroke="#2f6e1e" stroke-width="1.4"/><path d="M24 5v6M21 8h6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>',
   amigos: '<svg viewBox="0 0 32 32"><circle cx="11" cy="12" r="5" fill="#ffd9b0" stroke="#6b4220" stroke-width="1.5"/><path d="M3 27c0-5 3.5-8 8-8s8 3 8 8z" fill="#4aa3df" stroke="#1d5f8f" stroke-width="1.5"/><circle cx="22" cy="13" r="4.5" fill="#f3c08e" stroke="#6b4220" stroke-width="1.5"/><path d="M15 27c0-4.5 3-7.5 7-7.5s7 3 7 7.5z" fill="#e9a800" stroke="#a87400" stroke-width="1.5"/></svg>',
   missoes: '<svg viewBox="0 0 32 32"><path d="M8 4h16a2 2 0 0 1 2 2v22l-4-2-3 2-3-2-3 2-3-2-4 2V6a2 2 0 0 1 2-2z" fill="#fff4e0" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 11l2 2 3-4M10 18l2 2 3-4" fill="none" stroke="#4f9a2f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 11h5M18 18h5" stroke="#a86b38" stroke-width="2" stroke-linecap="round"/></svg>',
+  fabrica: '<svg viewBox="0 0 32 32"><path d="M3 28V14l7 4v-4l7 4v-4l7 4V6h5v22z" fill="#c8402f" stroke="#6b1f14" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 22h4v4H6zM13 22h4v4h-4zM20 22h4v4h-4z" fill="#ffe08a"/><path d="M25 4c0-2 2-3 3-2" fill="none" stroke="#b7b39c" stroke-width="2" stroke-linecap="round"/></svg>',
   correio: '<svg viewBox="0 0 32 32"><path d="M15 28V17" stroke="#7a4a22" stroke-width="3"/><path d="M5 10a6 6 0 0 1 12 0v8H5z" fill="#4a86c7" stroke="#2c5a8f" stroke-width="1.5" stroke-linejoin="round"/><path d="M11 4h12a6 6 0 0 1 6 6v8H17v-8a6 6 0 0 0-6-6z" fill="#5a9ae0" stroke="#2c5a8f" stroke-width="1.5" stroke-linejoin="round"/><path d="M23 18v-6h4v3h-4" fill="#e0463a" stroke="#8f2a1e" stroke-width="1.2"/><path d="M8 11h6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>',
   presente: '<svg viewBox="0 0 32 32"><rect x="5" y="13" width="22" height="15" rx="2" fill="#e0463a" stroke="#8f2a1e" stroke-width="1.6"/><rect x="3" y="9" width="26" height="6" rx="1.5" fill="#f25a4a" stroke="#8f2a1e" stroke-width="1.6"/><path d="M14 9h4v19h-4z" fill="#ffd54a"/><path d="M16 9c-2-5-8-6-8-2s6 2 8 2zM16 9c2-5 8-6 8-2s-6 2-8 2z" fill="#ffd54a" stroke="#a87400" stroke-width="1.4"/></svg>',
   casa: '<svg viewBox="0 0 32 32"><path d="M5 15 16 6l11 9v13H5z" fill="#f1dcae" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M2 16 16 4l14 12" fill="none" stroke="#b5532f" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 28v-8h6v8" fill="#8a5a33"/><path d="M20 15h5v4h-5z" fill="#9fd4f5" stroke="#7a4a22" stroke-width="1.2"/></svg>',
@@ -3900,6 +3924,8 @@ const MISSOES_DIA = [
   { ev: 'pegar', txt: 'Pegue {n} itens nas roças dos vizinhos', alvo: [2, 4, 6] },
   { ev: 'adubar', txt: 'Use {n} fertilizantes', alvo: [2, 3, 5] },
   { ev: 'presentear', txt: 'Mande presente para {n} amigos', alvo: [1, 2, 3], need: () => state.friends.length > 0 },
+  { ev: 'fabricar', txt: 'Faça {n} coisas na fábrica', alvo: [2, 4, 6], need: () => state.level >= 2 },
+  { ev: 'entregar', txt: 'Entregue {n} pedidos do caminhão', alvo: [1, 2, 3] },
 ];
 const MISSOES_SEMANA = [
   { ev: 'colher', txt: 'Colha {n} vezes', alvo: [100, 200, 350] },
@@ -3910,6 +3936,8 @@ const MISSOES_SEMANA = [
   { ev: 'estacao', txt: 'Colha {n} vezes plantas da estação', alvo: [15, 30, 60] },
   { ev: 'dourada', txt: 'Faça {n} colheita dourada', alvo: [1, 1, 2] },
   { ev: 'adubar', txt: 'Use {n} fertilizantes', alvo: [10, 20, 30] },
+  { ev: 'fabricar', txt: 'Faça {n} coisas na fábrica', alvo: [15, 30, 50], need: () => state.level >= 2 },
+  { ev: 'entregar', txt: 'Entregue {n} pedidos do caminhão', alvo: [8, 15, 25] },
 ];
 const faixaNivel = () => state.level < 5 ? 0 : state.level < 15 ? 1 : 2;
 function sortear(pool, n) {
@@ -4045,7 +4073,9 @@ async function sendFriendGift(uid) {
   } catch (e) {
     console.warn(e);
     g.to = g.to.filter(x => x !== uid); renderPane();
-    toast('Não consegui mandar o presente agora. Tente de novo.', 'bad');
+    toast(e && e.code === 'permission-denied'
+      ? 'O Firebase recusou o presente: publique as regras novas do arquivo firestore.rules (Firestore › Regras › Publicar).'
+      : 'Não consegui mandar o presente agora. Tente de novo.', 'bad');
   }
 }
 
@@ -4338,6 +4368,275 @@ function missoesHTML() {
 }
 
 // ============================================================
+// Fábrica, banca e caminhão
+// ============================================================
+// ---------- Fábrica: transforma colheitas e produtos dos animais em coisas que valem mais ----------
+// in: ingredientes (ids do celeiro). tempo em segundos. forma/cor: como o produto é desenhado.
+const RECEITAS = [
+  { id: 'farinha',  nome: 'Farinha de trigo',    nivel: 2,  in: { trigo: 3 },                           tempo: 10 * MIN, forma: 'saco',     cor: '#f4efe2' },
+  { id: 'farofa',   nome: 'Farinha de mandioca', nivel: 3,  in: { mandioca: 2 },                        tempo: 40 * MIN, forma: 'saco',     cor: '#f0dca8' },
+  { id: 'pipoca',   nome: 'Pipoca',              nivel: 3,  in: { milho: 2 },                           tempo: 15 * MIN, forma: 'balde',    cor: '#fff3c4' },
+  { id: 'pao',      nome: 'Pão',                 nivel: 4,  in: { farinha: 2, ovo: 1 },                 tempo: 30 * MIN, forma: 'pao',      cor: '#d99a4e' },
+  { id: 'molho',    nome: 'Molho de tomate',     nivel: 5,  in: { tomate: 4 },                          tempo: 30 * MIN, forma: 'pote',     cor: '#d8342a' },
+  { id: 'bolo',     nome: 'Bolo de cenoura',     nivel: 6,  in: { cenoura: 3, ovo: 2, farinha: 1 },     tempo: HOUR,     forma: 'bolo',     cor: '#f08a24' },
+  { id: 'geleia',   nome: 'Geleia de morango',   nivel: 7,  in: { morango: 5 },                         tempo: HOUR,     forma: 'pote',     cor: '#e0224a' },
+  { id: 'novelo',   nome: 'Novelo de lã',        nivel: 8,  in: { la: 2 },                              tempo: HOUR,     forma: 'novelo',   cor: '#f4f1ea' },
+  { id: 'manteiga', nome: 'Manteiga',            nivel: 10, in: { leite: 1 },                           tempo: 40 * MIN, forma: 'manteiga', cor: '#ffe27a' },
+  { id: 'queijo',   nome: 'Queijo',              nivel: 10, in: { leite: 2 },                           tempo: HOUR,     forma: 'queijo',   cor: '#f7d046' },
+  { id: 'sucouva',  nome: 'Suco de uva',         nivel: 15, in: { uva: 4 },                             tempo: 30 * MIN, forma: 'garrafa',  cor: '#6b3a8a' },
+  { id: 'sucolar',  nome: 'Suco de laranja',     nivel: 19, in: { laranja: 4 },                         tempo: 30 * MIN, forma: 'garrafa',  cor: '#f28c1b' },
+];
+const RECEITA = Object.fromEntries(RECEITAS.map(r => [r.id, r]));
+// O produto vale 50% a mais que os ingredientes, e um pouco pelo tempo de fábrica.
+for (const r of RECEITAS) {
+  const base = Object.entries(r.in).reduce((t, [id, q]) => t + ((PRODUCE[id] || PRODUCT[id] || RECEITA[id] || {}).preco || 0) * q, 0);
+  r.preco = Math.round(base * 1.5 + r.tempo / 60);
+  PRODUCT[r.id] = { id: r.id, nome: r.nome, preco: r.preco, fabrica: true };
+}
+const FILA_MAX = 3;
+const fab = () => state.fab || (state.fab = { fila: [] });
+const temIngredientes = (r, n = 1) => Object.entries(r.in).every(([id, q]) => (state.barn[id] || 0) >= q * n);
+function fabricar(id) {
+  const r = RECEITA[id], f = fab();
+  if (state.level < r.nivel) return toast(`${r.nome} libera no nível ${r.nivel}.`);
+  if (f.fila.length >= FILA_MAX) return toast(`A fábrica faz ${FILA_MAX} coisas de cada vez. Recolha o que ficou pronto.`);
+  if (!temIngredientes(r)) return toast(`Faltam ingredientes para ${r.nome.toLowerCase()}.`, 'bad');
+  for (const [iid, q] of Object.entries(r.in)) { state.barn[iid] -= q; if (!state.barn[iid]) delete state.barn[iid]; }
+  // um de cada vez: começa quando o anterior termina
+  const ini = Math.max(Date.now(), ...f.fila.map(x => x.fim));
+  f.fila.push({ r: id, fim: ini + r.tempo * 1000 });
+  sfx('buy'); toast(`${r.nome} na fábrica! Fica pronto em ${fmt((ini + r.tempo * 1000 - Date.now()) / 1000)}.`, 'good');
+  done();
+}
+const prontosFab = () => (state && state.fab ? state.fab.fila.filter(x => x.fim <= Date.now()).length : 0);
+function recolherFab() {
+  const f = fab(), agora = Date.now(), prontos = f.fila.filter(x => x.fim <= agora);
+  if (!prontos.length) return;
+  f.fila = f.fila.filter(x => x.fim > agora);
+  for (const x of prontos) { const r = RECEITA[x.r]; state.barn[r.id] = (state.barn[r.id] || 0) + 1; addXP(Math.max(2, Math.round(r.tempo / 600)), null); track('fabricar'); }
+  sfx('collect');
+  toast(`Recolheu da fábrica: ${prontos.map(x => RECEITA[x.r].nome.toLowerCase()).join(', ')}.`, 'good');
+  done();
+}
+
+// ---------- Banca: coloque coisas à venda para os amigos ----------
+const BANCA_MAX = 6;
+const valorDe = id => (item(id) || {}).preco || 0;
+function bancaAdd(id, qtd, preco) {
+  state.banca = state.banca || [];
+  if (state.banca.length >= BANCA_MAX) return toast(`A banca tem ${BANCA_MAX} lugares.`);
+  qtd = clamp(Math.floor(qtd) || 1, 1, 10);
+  if ((state.barn[id] || 0) < qtd) return toast('Você não tem tudo isso no celeiro.', 'bad');
+  const min = Math.max(1, Math.round(valorDe(id) * qtd * 0.5)), max = Math.round(valorDe(id) * qtd * 2);
+  preco = clamp(Math.round(preco) || 0, min, max);
+  state.barn[id] -= qtd; if (!state.barn[id]) delete state.barn[id];
+  state.banca.push({ id: newId(), item: id, qtd, preco, at: Date.now() });
+  sfx('buy'); toast(`${qtd} ${item(id).nome.toLowerCase()} na banca por ${preco.toLocaleString('pt-BR')} moedas.`, 'good');
+  done();
+}
+let bancaRemArmed = null;
+function bancaRemove(sid) {
+  const s = (state.banca || []).find(x => x.id === sid); if (!s) return;
+  if (bancaRemArmed !== sid) {
+    bancaRemArmed = sid; renderPane();
+    toast('Atenção: ao tirar da banca, você NÃO recebe o item de volta nem dinheiro. Clique em "Confirmar" para tirar mesmo assim.', 'bad');
+    setTimeout(() => { if (bancaRemArmed === sid) { bancaRemArmed = null; renderPane(); } }, 5000);
+    return;
+  }
+  bancaRemArmed = null;
+  state.banca = state.banca.filter(x => x !== s);
+  toast('Item tirado da banca.'); done();
+}
+// Alguém comprou da sua banca (amigo pela nuvem ou vizinho da vila).
+function bancaVendeu(s, quem) {
+  state.banca = state.banca.filter(x => x !== s);
+  state.coins += s.preco; state.stats.vendido += s.preco; track('vender', s.preco);
+  const msg = `${quem} comprou ${s.qtd} ${item(s.item).nome.toLowerCase()} da sua banca por ${s.preco.toLocaleString('pt-BR')} moedas!`;
+  addNews(msg); toast(msg, 'good'); sfx('coin');
+}
+// Os vizinhos da vila passam na banca de vez em quando e compram o que está com preço justo.
+function bancaTick() {
+  const agora = Date.now(), ult = state.bancaT || agora, horas = (agora - ult) / 3600e3;
+  state.bancaT = agora;
+  if (!state.banca || !state.banca.length || horas <= 0) return;
+  for (const s of state.banca.slice()) {
+    if (agora - s.at < 10 * 60e3) continue;
+    if (s.preco > valorDe(s.item) * s.qtd * 1.3) continue; // caro demais: só amigo compra
+    const chance = 1 - Math.pow(0.6, Math.min(horas, 48));
+    if (Math.random() < chance) bancaVendeu(s, NEIGHBORS[Math.floor(Math.random() * NEIGHBORS.length)].nome);
+  }
+}
+// Comprar da banca de um amigo (ou de um vizinho da vila).
+function bancaComprar(sid) {
+  const dono = view.data, s = (dono.banca || []).find(x => x.id === sid);
+  if (!s || s.vendido) return toast('Esse já foi vendido.');
+  if (state.coins < s.preco) return toast(`Faltam moedas: custa ${s.preco.toLocaleString('pt-BR')}.`, 'bad');
+  state.coins -= s.preco; s.vendido = true;
+  state.barn[s.item] = (state.barn[s.item] || 0) + s.qtd;
+  state.log['banca:' + s.id] = Date.now();
+  sfx('coin');
+  toast(`Comprou ${s.qtd} ${item(s.item).nome.toLowerCase()} de ${view.nome}!`, 'good');
+  if (view.kind === 'friend') sendVisit({ t: 'buy', slot: s.id, item: s.item, qtd: s.qtd, preco: s.preco });
+  done();
+}
+function npcBanca() {
+  const pool = [...CROPS.filter(c => c.nivel <= state.level + 2).map(c => c.prod), 'ovo', 'leite', ...RECEITAS.filter(r => r.nivel <= state.level + 2).map(r => r.id)];
+  return Array.from({ length: 3 }, () => {
+    const it = pool[Math.floor(Math.random() * pool.length)], qtd = 1 + Math.floor(Math.random() * 5);
+    return { id: newId(), item: it, qtd, preco: Math.round(valorDe(it) * qtd * (1 + Math.random() * 0.3)), at: Date.now() };
+  });
+}
+
+// ---------- Caminhão: 5 pedidos novos a cada 4 horas ----------
+const CAMINHAO_BLOCO = 4 * 3600e3, CAMINHAO_N = 5;
+const blocoCaminhao = () => Math.floor(Date.now() / CAMINHAO_BLOCO);
+function itensPossiveis() {
+  const l = CROPS.filter(c => c.nivel <= state.level).map(c => c.prod);
+  const bichos = new Set(state.animals.filter(a => ANIMAL[a.k].tipo === 'prod' && ANIMAL[a.k].prod !== 'leitao').map(a => ANIMAL[a.k].prod));
+  return [...l, ...bichos, ...RECEITAS.filter(r => r.nivel <= state.level).map(r => r.id)];
+}
+function novoPedido() {
+  const pool = itensPossiveis(), n = 1 + Math.floor(Math.random() * Math.min(3, 1 + state.level / 6)), itens = {};
+  while (Object.keys(itens).length < n && Object.keys(itens).length < pool.length) {
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    const barato = valorDe(id) < 60;
+    itens[id] = barato ? 4 + Math.floor(Math.random() * (4 + state.level)) : 1 + Math.floor(Math.random() * 4);
+  }
+  const valor = Object.entries(itens).reduce((t, [id, q]) => t + valorDe(id) * q, 0);
+  return { itens, moedas: Math.round(valor * 1.6 / 5) * 5, xp: Math.max(3, Math.round(valor / 25)), feito: false };
+}
+function rollCaminhao() {
+  const b = blocoCaminhao();
+  if (state.truck && state.truck.b === b) return;
+  state.truck = { b, pedidos: Array.from({ length: CAMINHAO_N }, novoPedido) };
+}
+const podeEntregar = p => !p.feito && Object.entries(p.itens).every(([id, q]) => (state.barn[id] || 0) >= q);
+const entregaveis = () => (state && state.truck ? state.truck.pedidos.filter(podeEntregar).length : 0);
+function entregar(k) {
+  const p = state.truck.pedidos[k];
+  if (!p || !podeEntregar(p)) return toast('Faltam itens no celeiro para esse pedido.', 'bad');
+  for (const [id, q] of Object.entries(p.itens)) { state.barn[id] -= q; if (!state.barn[id]) delete state.barn[id]; }
+  p.feito = true;
+  state.coins += p.moedas; addXP(p.xp, null); track('entregar');
+  sfx('coin');
+  toast(`O caminhão levou o pedido! +${p.moedas.toLocaleString('pt-BR')} moedas e +${p.xp} XP.`, 'good');
+  done();
+}
+
+// ---------- Tela da fábrica (com a banca e o caminhão) ----------
+let fabSeg = 'fabrica';
+function fabricaHTML() {
+  const segs = [['fabrica', 'Fábrica', prontosFab()], ['banca', 'Banca', 0], ['caminhao', 'Caminhão', entregaveis()]];
+  if (!isHome()) return bancaVisitaHTML();
+  rollCaminhao();
+  let html = `<div class="seg small" role="tablist">${segs.map(([id, n, c]) => `<button type="button" role="tab" data-fseg="${id}" aria-selected="${fabSeg === id}">${n}${c ? `<span class="badge ready">${c}</span>` : ''}</button>`).join('')}</div>`;
+  if (fabSeg === 'fabrica') {
+    const f = fab(), agora = Date.now();
+    html += `<p class="hint">Transforme colheitas e produtos dos animais em coisas que valem mais. A fábrica faz ${FILA_MAX} de cada vez, uma depois da outra.</p>`;
+    html += `<div class="fila">${Array.from({ length: FILA_MAX }, (_, k) => {
+      const x = f.fila[k];
+      if (!x) return '<div class="fslot vazio">vazio</div>';
+      const r = RECEITA[x.r], pronto = x.fim <= agora;
+      return `<div class="fslot ${pronto ? 'pronto' : ''}"><img alt="" src="${productIcon(r.id)}"><small>${pronto ? 'Pronto!' : fmt((x.fim - agora) / 1000)}</small></div>`;
+    }).join('')}</div>`;
+    if (prontosFab()) html += `<button class="btn gold" data-fab-recolher>Recolher ${prontosFab() > 1 ? `tudo (${prontosFab()})` : 'o que ficou pronto'}</button>`;
+    html += `<h3>Receitas</h3>`;
+    const vis = RECEITAS.filter(r => r.nivel <= state.level), prox = RECEITAS.filter(r => r.nivel > state.level).slice(0, 2);
+    for (const r of [...vis, ...prox]) {
+      const locked = r.nivel > state.level, ok = !locked && temIngredientes(r) && f.fila.length < FILA_MAX;
+      const ing = Object.entries(r.in).map(([id, q]) => `<span class="${(state.barn[id] || 0) >= q ? '' : 'falta'}">${q} ${item(id) ? item(id).nome.toLowerCase() : id} (${state.barn[id] || 0})</span>`).join(' + ');
+      html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${productIcon(r.id)}"><div><div class="name">${r.nome}${state.barn[r.id] ? ` <span class="meta">(${state.barn[r.id]} no celeiro)</span>` : ''}</div>
+        <div class="meta">${ing}<br>${fmt(r.tempo)} · vende por ${r.preco.toLocaleString('pt-BR')}</div></div>
+        ${locked ? `<button class="btn" disabled>Nível ${r.nivel}</button>` : `<button class="btn" data-fabricar="${r.id}" ${ok ? '' : 'disabled'}>Fazer</button>`}</div>`;
+    }
+  } else if (fabSeg === 'banca') {
+    const banca = state.banca || [];
+    html += `<p class="hint">Coloque coisas do celeiro à venda. Os amigos compram quando visitam a sua roça, e os vizinhos da vila passam de vez em quando (se o preço for justo). O dinheiro chega sozinho.</p>`;
+    html += `<div class="banca">${Array.from({ length: BANCA_MAX }, (_, k) => {
+      const s = banca[k];
+      if (!s) return '<div class="bslot vazio">lugar livre</div>';
+      const armed = bancaRemArmed === s.id;
+      return `<div class="bslot"><img alt="" src="${itemIcon(s.item)}"><b>${s.qtd} ${esc(item(s.item).nome)}</b><span>${moeda(s.preco)}</span>
+        <button class="btn ${armed ? 'danger' : 'ghost'} tiny" data-banca-rem="${s.id}">${armed ? 'Confirmar' : 'Tirar'}</button></div>`;
+    }).join('')}</div>`;
+    const tenho = Object.keys(state.barn).filter(id => state.barn[id] > 0 && item(id));
+    if (banca.length < BANCA_MAX && tenho.length) {
+      const sel = tenho.includes(bancaSel) ? bancaSel : tenho[0], v = valorDe(sel);
+      html += `<h3>Colocar à venda</h3><form class="bform" id="bancaForm">
+        <label>Item <select id="bItem">${tenho.map(id => `<option value="${id}" ${id === sel ? 'selected' : ''}>${esc(item(id).nome)} (${state.barn[id]})</option>`).join('')}</select></label>
+        <label>Quantidade <input id="bQtd" type="number" min="1" max="${Math.min(10, state.barn[sel])}" value="${Math.min(bancaQtd, state.barn[sel], 10)}"></label>
+        <label>Preço <input id="bPreco" type="number" min="1" value="${Math.round(v * Math.min(bancaQtd, state.barn[sel], 10) * 1.2)}"></label>
+        <p class="hint">Vale ${v.toLocaleString('pt-BR')} cada no celeiro. Preço entre metade e o dobro disso.</p>
+        <button class="btn gold" type="submit">Colocar na banca</button></form>`;
+    } else if (!tenho.length) html += `<div class="empty">O celeiro está vazio. Colha ou fabrique algo para vender.</div>`;
+  } else {
+    const t = state.truck, falta = (t.b + 1) * CAMINHAO_BLOCO - Date.now();
+    html += `<p class="hint">O caminhão leva pedidos da cidade e paga bem mais que o celeiro. Pedidos novos em <b>${fmt(falta / 1000)}</b>.</p>`;
+    t.pedidos.forEach((p, k) => {
+      const ok = podeEntregar(p);
+      const lista = Object.entries(p.itens).map(([id, q]) => `<span class="${(state.barn[id] || 0) >= q ? '' : 'falta'}"><img alt="" src="${itemIcon(id)}">${q} ${esc(item(id).nome.toLowerCase())} (${state.barn[id] || 0})</span>`).join('');
+      html += `<div class="row ${p.feito ? 'locked' : ok ? 'sel' : ''}"><div class="avatar" style="background:${p.feito ? '#4f9a2f' : '#3f6fa8'}">${p.feito ? '✓' : k + 1}</div>
+        <div><div class="pedido">${lista}</div><div class="meta">${p.moedas.toLocaleString('pt-BR')} moedas · ${p.xp} XP</div></div>
+        ${p.feito ? '<button class="btn ghost" disabled>Entregue</button>' : `<button class="btn gold" data-entregar="${k}" ${ok ? '' : 'disabled'}>Entregar</button>`}</div>`;
+    });
+  }
+  return html;
+}
+let bancaSel = null, bancaQtd = 1;
+function bancaVisitaHTML() {
+  const banca = (view.data.banca || []);
+  let html = `<h3>Banca de ${esc(view.nome)}</h3>`;
+  if (!banca.length) return html + '<div class="empty">A banca está vazia hoje.</div>';
+  html += `<p class="hint">Compre o que quiser: vai direto para o seu celeiro.</p><div class="banca">`;
+  for (const s of banca) {
+    const vendido = s.vendido || state.log['banca:' + s.id];
+    html += `<div class="bslot ${vendido ? 'vendido' : ''}"><img alt="" src="${itemIcon(s.item)}"><b>${s.qtd} ${esc(item(s.item) ? item(s.item).nome : s.item)}</b><span>${moeda(s.preco)}</span>
+      ${vendido ? '<button class="btn ghost tiny" disabled>Vendido</button>' : `<button class="btn tiny" data-banca-comprar="${esc(s.id)}" ${state.coins < s.preco ? 'disabled' : ''}>Comprar</button>`}</div>`;
+  }
+  return html + '</div>';
+}
+
+// ---------- Desenho dos produtos da fábrica ----------
+function drawGood(id, x, y, s) {
+  const r = RECEITA[id], c = r.cor;
+  ctx.lineWidth = Math.max(1, 0.5 * s); ctx.strokeStyle = 'rgba(60,30,10,.55)';
+  const f = r.forma;
+  if (f === 'saco') {
+    ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - 5 * s, y - 4 * s); ctx.quadraticCurveTo(x - 7 * s, y + 6 * s, x - 5 * s, y + 7 * s); ctx.lineTo(x + 5 * s, y + 7 * s); ctx.quadraticCurveTo(x + 7 * s, y + 6 * s, x + 5 * s, y - 4 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c9a06a'; ctx.fillRect(x - 3 * s, y - 6 * s, 6 * s, 2.5 * s);
+    ctx.fillStyle = id === 'farinha' ? '#e8c35a' : '#a86b38'; ctx.beginPath(); ctx.arc(x, y + 2 * s, 2.2 * s, 0, 7); ctx.fill();
+  } else if (f === 'balde') {
+    ctx.fillStyle = '#e0463a'; ctx.beginPath(); ctx.moveTo(x - 5 * s, y - 2 * s); ctx.lineTo(x + 5 * s, y - 2 * s); ctx.lineTo(x + 4 * s, y + 7 * s); ctx.lineTo(x - 4 * s, y + 7 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; for (let k = 0; k < 3; k++) ctx.fillRect(x - 4 * s + k * 3 * s, y - 2 * s, 1.5 * s, 9 * s);
+    ctx.fillStyle = c; for (const [dx, dy] of [[-3, -3], [0, -4.5], [3, -3], [-1.5, -5.5], [1.5, -5.8]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 1.8 * s, 0, 7); ctx.fill(); }
+  } else if (f === 'pao') {
+    ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y + 1 * s, 7 * s, 4.5 * s, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#a86b38'; for (const dx of [-3, 0, 3]) { ctx.beginPath(); ctx.moveTo(x + dx * s - s, y - 1 * s); ctx.lineTo(x + dx * s + s, y + 2 * s); ctx.stroke(); }
+  } else if (f === 'bolo') {
+    ctx.fillStyle = c; ctx.fillRect(x - 6 * s, y - 2 * s, 12 * s, 7 * s); ctx.strokeRect(x - 6 * s, y - 2 * s, 12 * s, 7 * s);
+    ctx.fillStyle = '#6b3a1a'; ctx.beginPath(); ctx.ellipse(x, y - 2 * s, 6 * s, 2 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e53b2f'; ctx.beginPath(); ctx.arc(x, y - 4 * s, 1.4 * s, 0, 7); ctx.fill();
+  } else if (f === 'pote') {
+    ctx.fillStyle = c; ctx.fillRect(x - 4.5 * s, y - 3 * s, 9 * s, 9 * s); ctx.strokeRect(x - 4.5 * s, y - 3 * s, 9 * s, 9 * s);
+    ctx.fillStyle = '#fff4e0'; ctx.fillRect(x - 5 * s, y - 6 * s, 10 * s, 3 * s); ctx.fillStyle = '#e53b2f'; for (let k = 0; k < 3; k++) ctx.fillRect(x - 5 * s + k * 3.5 * s, y - 6 * s, 1.6 * s, 3 * s);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x - 3 * s, y - 2 * s, 1.5 * s, 6 * s);
+  } else if (f === 'novelo') {
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y + 1 * s, 6 * s, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(150,130,110,.6)'; for (const a of [-0.6, 0, 0.6]) { ctx.beginPath(); ctx.ellipse(x, y + s, 5.5 * s, 2.5 * s, a, 0, 7); ctx.stroke(); }
+  } else if (f === 'manteiga') {
+    ctx.fillStyle = c; ctx.fillRect(x - 6 * s, y - 1 * s, 12 * s, 5 * s); ctx.strokeRect(x - 6 * s, y - 1 * s, 12 * s, 5 * s);
+    ctx.fillStyle = '#fff4c0'; ctx.fillRect(x - 6 * s, y - 3 * s, 12 * s, 2 * s);
+  } else if (f === 'queijo') {
+    ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - 7 * s, y + 5 * s); ctx.lineTo(x + 7 * s, y + 5 * s); ctx.lineTo(x + 7 * s, y - 1 * s); ctx.lineTo(x - 7 * s, y - 4 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d9a82a'; for (const [dx, dy, rr] of [[-3, 1, 1.4], [2, 2.5, 1.1], [4, -0.2, 0.9]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, rr * s, 0, 7); ctx.fill(); }
+  } else if (f === 'garrafa') {
+    ctx.fillStyle = 'rgba(230,245,255,.9)'; ctx.fillRect(x - 3.5 * s, y - 3 * s, 7 * s, 10 * s); ctx.strokeRect(x - 3.5 * s, y - 3 * s, 7 * s, 10 * s);
+    ctx.fillStyle = c; ctx.fillRect(x - 3 * s, y, 6 * s, 6.5 * s);
+    ctx.fillStyle = 'rgba(230,245,255,.9)'; ctx.fillRect(x - 1.5 * s, y - 7 * s, 3 * s, 4 * s); ctx.fillStyle = '#4f9a2f'; ctx.fillRect(x - 1.8 * s, y - 8 * s, 3.6 * s, 1.6 * s);
+  }
+}
+
+// ============================================================
 // Laço principal
 // ============================================================
 let last = performance.now(), lastSave = 0, lastUI = 0, lastInfo = 0, lastSentCheck = 0;
@@ -4346,7 +4645,10 @@ function frame(now) {
   tick(dt);
   if (!isGated() && L.cw > 20) draw(now, dt);
   if (now - lastUI > 250) { updateTip(); lastUI = now; }
-  if (now - lastInfo > 2000) { tickLife(); rollPeriods(); weatherTick(); renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
+  if (now - lastInfo > 2000) {
+    tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao();
+    // a fábrica e o caminhão têm relógio: atualiza a janela (menos a banca, que tem formulário)
+    if (!$('#panel').hidden && tab === 'fabrica' && fabSeg !== 'banca' && isHome()) { const y = $('#pane').scrollTop; renderPane(); $('#pane').scrollTop = y; } renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
   if (now - lastSave > 5000) { save(); lastSave = now; }
   if (user && dirty && now - lastCloud > 3000) cloudSave(); // salva na nuvem poucos segundos depois de cada mudança
   if (user && now - lastSentCheck > 60000) { lastSentCheck = now; checkSent(); }

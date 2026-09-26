@@ -39,6 +39,10 @@ Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no nav
 - **Presente diário**: 7 dias de presentes (o 7º é um baú). Depois vem uma leva nova.
 - **Presente para os amigos**: na aba Amigos, mande um presente por dia para até 5 amigos (100 moedas, fertilizante, ração especial ou ração de cachorro). Não custa nada para quem manda. *Precisa das regras novas do `firestore.rules` publicadas no Firebase.*
 - **Avisos nos botões**: Roça e Rancho mostram um número verde quando tem coisa pronta para colher, recolher ou vender.
+- **Fábrica** (no menu): 12 receitas (farinha de trigo, farinha de mandioca, pipoca, pão, molho de tomate, bolo de cenoura, geleia de morango, novelo de lã, manteiga, queijo, suco de uva e suco de laranja). Faz 3 coisas de cada vez, uma depois da outra, e o produto vale mais que os ingredientes.
+- **Banca**: coloque até 6 coisas do celeiro à venda, com preço entre metade e o dobro do valor. Os amigos compram quando visitam a sua roça (a banca deles aparece na Fábrica durante a visita), e os vizinhos da vila compram de vez em quando se o preço for justo. Tirar da banca avisa que o item e o dinheiro não voltam. *Comprar da banca de um amigo precisa das regras novas do `firestore.rules`.*
+- **Caminhão**: 5 pedidos novos a cada 4 horas, com colheitas, produtos dos animais e da fábrica. Paga bem mais que o celeiro.
+- **Celeiro** mostra no botão quantos itens estão guardados.
 - **Ajuda de volta**: quem ajudou a sua roça (um amigo ou um vizinho da vila) fica marcado por 2 dias. Ajudar de volta dá 50 moedas.
 - **Livro de coleção**: cada planta e produto dos animais ganha carimbos de bronze (10 colheitas), prata (50) e ouro (200), com prêmios.
 - **Temas da roça**: clássico, cerca branca com roseiras, muro de pedra, tropical com coqueiros e lago dos patos.
