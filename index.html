@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roça Feliz</title>
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="17">
-<script src="firebase-config.js?v=17"></script>
+<meta name="rf-version" content="18">
+<script src="firebase-config.js?v=18"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -137,7 +137,7 @@
   .roundbtn .badge { position: absolute; top: -2px; right: 6px; margin: 0; }
   .scenes { left: 10px; top: 92px; display: grid; gap: 6px; }
   .zoom {
-    right: 18px; top: 382px; display: grid; gap: 4px; justify-items: center;
+    right: 18px; top: 456px; display: grid; gap: 4px; justify-items: center;
     background: rgba(74,42,16,.55); border: 2px solid rgba(255,235,190,.45); border-radius: 24px; padding: 5px;
   }
   .zbtn {
@@ -148,6 +148,26 @@
   .zbtn.small { width: 44px; height: 24px; border-radius: 12px; font-size: 11px; background: #fff3c4; }
   .zbtn:disabled { opacity: .45; cursor: default; }
   .menu { right: 10px; top: 70px; display: grid; gap: 6px; }
+  .giftwrap { left: 10px; top: 330px; }
+  .gdays { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .gday { display: grid; justify-items: center; gap: 2px; text-align: center; background: var(--card); border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px 4px; font-size: 12px; }
+  .gday img { width: 44px; height: 44px; }
+  .gday small { color: var(--muted); line-height: 1.15; font-size: 11px; }
+  .gday.today { border-color: var(--gold); background: var(--sel); box-shadow: 0 0 0 3px rgba(242,183,5,.35); }
+  .gday.got { opacity: .5; }
+  .gday.got b::after { content: " ✓"; color: var(--leaf); }
+  .gday:last-child { grid-column: span 2; }
+  .btn.big { font-size: 18px; padding: 8px 16px; }
+  .mbar { height: 8px; border-radius: 5px; background: var(--panel-2); overflow: hidden; margin-top: 3px; }
+  .mbar i { display: block; height: 100%; background: linear-gradient(#9fe06a, #4caf2a); }
+  .tag { display: inline-block; background: #fff3c4; color: #7a4a22; border: 1px solid var(--gold); border-radius: 8px; padding: 0 6px; font-size: 11px; font-weight: 800; margin-left: 4px; }
+  .colgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; }
+  .colcard { display: grid; justify-items: center; text-align: center; gap: 1px; background: var(--card); border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px 4px; font-size: 12px; }
+  .colcard img { width: 44px; height: 44px; }
+  .colcard small { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .colcard.unknown img { filter: brightness(0) opacity(.25); }
+  .stamps { display: flex; gap: 3px; }
+  .stamps i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid #b7a78a; }
 
   .bottombar {
     bottom: 10px; left: 8px; right: 8px; pointer-events: none;
@@ -344,7 +364,8 @@
     .roundbtn .ic svg, .roundbtn .ic img { width: 26px; height: 26px; }
     .roundbtn .lb { font-size: 10px; max-width: 50px; }
     .scenes { left: 2px; top: 80px; gap: 4px; }
-    .zoom { right: 4px; top: 300px; padding: 3px; }
+    .zoom { right: 4px; top: 360px; padding: 3px; }
+    .giftwrap { left: 2px; top: 262px; }
     .zbtn { width: 34px; height: 34px; font-size: 20px; }
     .zbtn.small { width: 38px; height: 20px; font-size: 10px; }
     .menu { right: 2px; top: 60px; gap: 4px; }
@@ -410,11 +431,13 @@
       <button class="roundbtn" type="button" role="tab" data-scene="animais" aria-selected="false"><span class="ic"></span><span class="lb">Rancho</span></button>
       <button class="roundbtn" type="button" role="tab" data-scene="casa" aria-selected="false"><span class="ic"></span><span class="lb">Casa</span></button>
     </nav>
+    <div class="giftwrap over outline"><button class="roundbtn" type="button" id="giftBtn"><span class="ic"></span><span class="lb">Presente</span></button></div>
     <nav class="menu over outline" aria-label="Menu">
       <button class="roundbtn tab" type="button" data-tab="loja" aria-selected="false"><span class="ic"></span><span class="lb">Loja</span></button>
       <button class="roundbtn tab" type="button" data-tab="celeiro" aria-selected="false"><span class="ic"></span><span class="lb">Celeiro</span></button>
       <button class="roundbtn tab" type="button" data-tab="terreno" aria-selected="false"><span class="ic"></span><span class="lb">Terreno</span></button>
       <button class="roundbtn tab" type="button" data-tab="amigos" aria-selected="false"><span class="ic"></span><span class="lb">Amigos</span></button>
+      <button class="roundbtn tab" type="button" data-tab="missoes" aria-selected="false"><span class="ic"></span><span class="lb">Missões</span></button>
     </nav>
 
     <div class="zoom over" role="group" aria-label="Zoom">
@@ -432,6 +455,17 @@
       <div class="panel-head"><h2 id="panelTitle">Loja</h2><button class="iconbtn" type="button" id="closePanel" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="pane" id="pane"></div>
     </aside>
+  </div>
+</div>
+
+<div class="modal" id="gift" hidden role="dialog" aria-modal="true" aria-labelledby="giftTitle">
+  <div class="modal-card gift-card">
+    <div class="modal-head"><h2 id="giftTitle">Presente do dia</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <section>
+      <div class="gdays" id="giftDays"></div>
+      <p class="hint" id="giftNote" style="margin:0;color:var(--muted);font-size:13px"></p>
+      <button class="btn gold big" type="button" id="giftOpen">Abrir presente</button>
+    </section>
   </div>
 </div>
 
@@ -471,8 +505,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=17"></script>
-<script src="js/cloud.js?v=17"></script>
-<script src="js/game.js?v=17"></script>
+<script src="js/audio.js?v=18"></script>
+<script src="js/cloud.js?v=18"></script>
+<script src="js/game.js?v=18"></script>
 </body>
 </html>

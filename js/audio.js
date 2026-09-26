@@ -239,7 +239,7 @@
     bark: t => { for (const d of [0, 0.22]) { const o = ac.createOscillator(), b = ac.createBiquadFilter(), g = ac.createGain(); o.type = 'sawtooth'; b.type = 'bandpass'; b.frequency.value = 900; b.Q.value = 2; o.frequency.setValueAtTime(380, t + d); o.frequency.exponentialRampToValueAtTime(170, t + d + 0.14); o.connect(b); b.connect(g); g.connect(sfxBus); g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.35, t + d + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.16); o.start(t + d); o.stop(t + d + 0.2); } },
   };
 
-  let unlocked = false;
+  let unlocked = false, rainSrc = null, rainGain = null;
   const RFAudio = {
     tracks: TRACKS.map(t => t.nome),
     // Navegadores só liberam som depois de um toque/clique do jogador.
@@ -257,6 +257,20 @@
       if (!cfg.music) stopMusic();
       else if (trackChanged) { stopMusic(); startMusic(); }
       else startMusic();
+    },
+    // Chuva: um chiado baixinho em loop (segue o botão de sons).
+    rain(on) {
+      if (!ac || !unlocked) return;
+      if (on && !rainSrc) {
+        rainSrc = ac.createBufferSource(); rainSrc.buffer = noiseBuf; rainSrc.loop = true;
+        const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400;
+        rainGain = ac.createGain(); rainGain.gain.setValueAtTime(0.0001, ac.currentTime); rainGain.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + 2);
+        rainSrc.connect(f); f.connect(rainGain); rainGain.connect(sfxBus); rainSrc.start();
+      } else if (!on && rainSrc) {
+        const src = rainSrc; rainGain.gain.setTargetAtTime(0.0001, ac.currentTime, 0.6);
+        setTimeout(() => { try { src.stop(); } catch (e) { /* já parou */ } }, 3000);
+        rainSrc = null;
+      }
     },
     play(name) {
       if (!ac || !unlocked || !cfg.sfx || !SFX[name]) return;

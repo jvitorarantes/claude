@@ -249,6 +249,7 @@ function newState() {
     v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0,
     tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
     animals: [], decor: {}, abrigos: { galinheiro: 1 }, racaoEsp: 0,
+    missions: null, gift: { i: 0, ciclo: 0, last: -1 }, owe: {}, col: {}, stamps: {}, temas: { classico: true }, tema: 'classico', helpDay: -1,
     friends: [], sent: {}, code: null, owner: null, log: {},
     fert: { basico: 2 }, fertSel: 'basico',
     dogs: { roca: null, animais: null }, dogFood: 0, news: [], newsSeen: 0, limits: {},
@@ -270,6 +271,13 @@ function migrate(s) {
   s.animals = s.animals.map(a => Object.assign(newAnimal(a.k), a));
   s.racaoEsp = Math.max(0, Number(s.racaoEsp) || 0);
   ensureAbrigos(s);
+  const obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  s.gift = Object.assign({ i: 0, ciclo: 0, last: -1 }, obj(s.gift));
+  s.owe = obj(s.owe); s.col = obj(s.col); s.stamps = obj(s.stamps);
+  s.temas = Object.assign({ classico: true }, obj(s.temas));
+  if (!s.temas[s.tema]) s.tema = 'classico';
+  if (!s.missions || !Array.isArray(s.missions.dia) || !Array.isArray(s.missions.semana)) s.missions = null;
+  if (typeof s.helpDay !== 'number') s.helpDay = -1;
   const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
   s.dogs = {};
   for (const slot of ['roca', 'animais']) { const d = dogs[slot]; s.dogs[slot] = d && DOG[d.raca] ? d : null; }
@@ -402,7 +410,8 @@ function stageOf(p) {
 }
 const ripe = p => p.s === 'growing' && !p.poda && p.g >= phaseTempo(p);
 // Cada colheita rende um número sorteado numa faixa em volta da média (nabo: 3 a 5).
-const yieldRange = c => [Math.max(1, Math.round(c.rend * 0.75)), Math.max(1, Math.round(c.rend * 1.25))];
+const yieldRange = c => { const k = daEstacao(c.id) ? 1 + ESTACAO_BONUS : 1; return [Math.max(1, Math.round(c.rend * 0.75 * k)), Math.max(1, Math.round(c.rend * 1.25 * k))]; };
+const OURO_CHANCE = 0.03, OURO_VEZES = 5; // colheita dourada: rara, rende 5 vezes mais
 const expectedYield = p => Math.max(1, Math.round(CROP[p.c].rend - p.dmg));
 function rollYield(p) {
   const [lo, hi] = yieldRange(CROP[p.c]);
@@ -469,9 +478,9 @@ function actPlot(i) {
   if (p.s === 'locked') return clickLot(i);
   if (tool === 'fert') return fertilize(p, pos);
   const has = t => tool === 'hand' || tool === t;
-  if (p.s === 'growing' && p.b > 0 && has('pest')) { p.b--; sfx('pest'); useFx('pest', pos); addXP(2, pos); addCoins(1, pos); return done(); }
+  if (p.s === 'growing' && p.b > 0 && has('pest')) { p.b--; sfx('pest'); useFx('pest', pos); track('praga'); addXP(2, pos); addCoins(1, pos); return done(); }
   if (p.s === 'growing' && p.w > 0 && has('weed')) { p.w--; sfx('weed'); addXP(2, pos); addCoins(1, pos); return done(); }
-  if (p.s === 'growing' && p.dry && has('water')) { p.dry = false; sfx('water'); useFx('water', pos); addXP(1, pos); return done(); }
+  if (p.s === 'growing' && p.dry && has('water')) { p.dry = false; sfx('water'); useFx('water', pos); track('regar'); addXP(1, pos); return done(); }
   if (ripe(p) && tool === 'hand') return harvest(p, pos);
   if (p.s === 'growing' && p.poda && tool === 'hand') return prune(p, pos);
   if (p.s === 'withered' && has('hoe')) { Object.assign(p, emptyPlot('plowed')); sfx('hoe'); useFx('hoe', pos); addXP(1, pos); return done(); }
@@ -497,8 +506,8 @@ function plant(p, pos) {
   if (crop.nivel > state.level) return toast(`${crop.nome} libera no nível ${crop.nivel}.`);
   if (state.coins < crop.custo) return toast(`Faltam moedas para ${crop.arvore ? 'a muda de ' : ''}${crop.nome} (${crop.custo}).`, 'bad');
   addCoins(-crop.custo, pos);
-  Object.assign(p, emptyPlot('growing'), { c: crop.id, id: newId() });
-  sfx('plant'); useFx('seed', pos);
+  Object.assign(p, emptyPlot('growing'), { c: crop.id, id: newId(), ouro: Math.random() < OURO_CHANCE });
+  sfx('plant'); useFx('seed', pos); track('plantar');
   if (xpAllowed(crop.id)) addXP(1, pos);
   done();
 }
@@ -530,7 +539,7 @@ function fertilize(p, pos) {
   state.fert[f.id] = have - 1;
   p.g += corte;
   p.fert = true;
-  sfx('fert'); useFx('fert', pos);
+  sfx('fert'); useFx('fert', pos); track('adubar');
   popupAt(pos, `−${fmt(corte)}`, '#9be36a');
   addXP(1, pos);
   renderTools();
@@ -581,15 +590,23 @@ function buyExpansion() {
 }
 
 function harvest(p, pos) {
-  const crop = CROP[p.c], qty = rollYield(p);
+  const crop = CROP[p.c], ouro = !!p.ouro, qty = rollYield(p) * (ouro ? OURO_VEZES : 1);
   sfx('harvest');
   gain(crop.prod, qty, pos);
   state.stats.colheitas++;
+  track('colher'); if (daEstacao(crop.id)) track('estacao');
+  collect(crop.prod, pos);
+  if (ouro) {
+    track('dourada'); sfx('level');
+    popupAt(pos, `Dourada! ×${OURO_VEZES}`, '#ffd54a', 250);
+    toast(`Colheita dourada de ${crop.nome.toLowerCase()}: ${qty} ${crop.prodNome.toLowerCase()}!`, 'good');
+    addNews(`Você fez uma colheita dourada de ${crop.nome.toLowerCase()} (${qty} ${crop.prodNome.toLowerCase()}).`);
+  }
   if (xpAllowed(crop.id)) { state.xpDay.c[crop.id] = (state.xpDay.c[crop.id] || 0) + 1; addXP(crop.xp, pos); }
   else if (state.xpDay.c[crop.id] === XP_CAP) { state.xpDay.c[crop.id]++; toast(`Hoje ${crop.nome.toLowerCase()} já deu todo o XP (${XP_CAP} colheitas). Ainda rende moedas; o XP volta amanhã.`); }
   if (crop.arvore) {
     // A árvore fica: volta a produzir. Depois de 15 colheitas, pede poda.
-    Object.assign(p, { g: 0, adult: true, h: p.h + 1, dmg: 0, w: 0, b: 0, dry: false, id: newId(), th: [], fert: false });
+    Object.assign(p, { g: 0, adult: true, h: p.h + 1, dmg: 0, w: 0, b: 0, dry: false, id: newId(), th: [], fert: false, ouro: Math.random() < OURO_CHANCE });
     if (p.h >= TREE_HARVESTS) { p.poda = true; toast(`${crop.nome} deu ${TREE_HARVESTS} colheitas e precisa de poda (${crop.poda} moedas).`); }
   } else Object.assign(p, { s: 'withered', g: 0, w: 0, b: 0, dry: false, th: [] });
   done();
@@ -628,8 +645,8 @@ function collectAnimal(a, pos) {
     while (born < qty && vagas(state, 'chiqueiro') > 0) { state.animals.push(newAnimal('porco')); born++; }
     if (born) popupAt(pos, born > 1 ? '+2 porquinhos!' : '+1 porquinho!', '#ffffff');
     if (born < qty) { const n = qty - born; addCoins(PRODUCT.leitao.preco * n, pos); toast(`O chiqueiro está cheio: ${n > 1 ? 'os leitões foram vendidos' : 'o leitão foi vendido'} por ${PRODUCT.leitao.preco * n} moedas.`); }
-  } else gain(d.prod, qty, pos);
-  addXP(d.xp, pos); state.stats.coletas++;
+  } else { gain(d.prod, qty, pos); collect(d.prod, pos); }
+  addXP(d.xp, pos); state.stats.coletas++; track('coletar', qty);
 }
 // Alimenta um animal pagando a ração. Clicando nele, usa a ração especial se você tiver.
 function feedAnimal(a, pos, allowSpecial) {
@@ -640,7 +657,7 @@ function feedAnimal(a, pos, allowSpecial) {
     a.fed = true;
     if (allowSpecial && state.racaoEsp > 0) { state.racaoEsp--; a.dobro = true; popupAt(pos, 'Ração especial: produção em dobro!', '#ffe08a', 500); }
   } else a.food = Math.min(24 * HOUR, d.tempo - a.g);
-  sfx('feed'); addXP(1, pos);
+  sfx('feed'); addXP(1, pos); track('alimentar');
   return true;
 }
 function callVet(a, pos) {
@@ -666,6 +683,7 @@ function petAnimal(a, pos) {
   const d = ANIMAL[a.k];
   popupAt(pos, '♥', '#ff6b8a'); popupAt(pos, '♥', '#ff8aa3', 200);
   sfx('collect');
+  track('carinho');
   if (Date.now() - (a.lastPet || 0) > DAY) { a.lastPet = Date.now(); addXP(2, pos); done(); }
   else toast(`${a.nome || d.nome} adorou o carinho!`);
 }
@@ -844,7 +862,7 @@ function sell(id, all) {
   const it = item(id), q = state.barn[id] || 0; if (!q || !it) return;
   const n = all ? q : 1;
   state.barn[id] = q - n; if (!state.barn[id]) delete state.barn[id];
-  state.coins += n * it.preco; state.stats.vendido += n * it.preco;
+  state.coins += n * it.preco; state.stats.vendido += n * it.preco; track('vender', n * it.preco);
   sfx('coin');
   done();
 }
@@ -852,7 +870,7 @@ function sellAll() {
   let total = 0;
   for (const [id, q] of Object.entries(state.barn)) total += q * (item(id)?.preco || 0);
   if (!total) return;
-  state.barn = {}; state.coins += total; state.stats.vendido += total;
+  state.barn = {}; state.coins += total; state.stats.vendido += total; track('vender', total);
   sfx('coin');
   toast(`Vendeu tudo por ${total} moedas`, 'good');
   done();
@@ -931,7 +949,7 @@ function goHome() {
 }
 
 const visitKey = id => (view.kind === 'friend' ? view.uid : view.id) + ':' + id;
-function help(pos) { state.stats.ajudas++; addXP(2, pos); addCoins(2, pos); }
+function help(pos) { state.stats.ajudas++; addXP(2, pos); addCoins(2, pos); track('ajudar'); helpBack(pos); }
 // Limite de itens por amigo por dia: 3 da plantação e 3 dos animais, em até 5 roças.
 function stealLimit() {
   const today = localDay(), key = (view.kind === 'friend' ? view.uid : view.id) + ':' + today;
@@ -974,9 +992,9 @@ function awayPlot(i, p) {
   if (p.s !== 'growing') return;
   const tool = state.tool, has = t => tool === 'hand' || tool === t, pos = cellCenter(i);
   let what = null;
-  if (p.b > 0 && has('pest')) { p.b--; what = 'b'; sfx('pest'); }
+  if (p.b > 0 && has('pest')) { p.b--; what = 'b'; sfx('pest'); useFx('pest', pos); }
   else if (p.w > 0 && has('weed')) { p.w--; what = 'w'; sfx('weed'); }
-  else if (p.dry && has('water')) { p.dry = false; what = 'dry'; sfx('water'); }
+  else if (p.dry && has('water')) { p.dry = false; what = 'dry'; sfx('water'); useFx('water', pos); track('regar'); }
   if (what) { help(pos); sendVisit({ t: 'help', what, plot: i, pid: p.id }); return done(); }
   if (ripe(p) && tool === 'hand') {
     const key = visitKey(p.id), lim = stealLimit();
@@ -987,7 +1005,7 @@ function awayPlot(i, p) {
     if (guarded('roca', pos, { t: 'steal', plot: i, pid: p.id, qty: 0 })) return done();
     const crop = CROP[p.c];
     sfx('harvest');
-    gain(crop.prod, 1, pos); state.stats.roubado++; addXP(1, pos);
+    gain(crop.prod, 1, pos); state.stats.roubado++; addXP(1, pos); track('pegar');
     sendVisit({ t: 'steal', plot: i, pid: p.id, qty: 1 });
     return done();
   }
@@ -1007,7 +1025,7 @@ function awayAnimal(a, def, prod, pos) {
     if (guarded('animais', pos, { t: 'stealA', animal: a.id })) return done();
     sfx('collect');
     gain(prod.id, 1, pos);
-    addXP(1, pos); state.stats.roubado++;
+    addXP(1, pos); state.stats.roubado++; track('pegar');
     sendVisit({ t: 'stealA', animal: a.id });
     return done();
   }
@@ -1040,14 +1058,14 @@ function applyVisits(list) {
       if (v.what === 'w') p.w = Math.max(0, p.w - 1);
       if (v.what === 'b') p.b = Math.max(0, p.b - 1);
       if (v.what === 'dry') p.dry = false;
-      note('ajudou na sua roça');
+      note('ajudou na sua roça'); helpedBy(v.from, who);
     } else if (v.t === 'steal' && p && p.id === v.pid && p.s === 'growing') {
       const qty = 1;
       p.dmg = Math.min(CROP[p.c].rend - 1, p.dmg + qty);
       if (!p.th.includes(v.from)) p.th.push(v.from);
       note(`pegou ${qty} ${CROP[p.c].prodNome} da sua plantação`, true);
     } else if (v.t === 'feed' && a && ANIMAL[a.k].tipo === 'prod' && isHungry(a)) {
-      a.fed = true; note('alimentou seus animais');
+      a.fed = true; note('alimentou seus animais'); helpedBy(v.from, who);
     } else if (v.t === 'stealA' && a && ANIMAL[a.k].tipo === 'prod' && a.ready) {
       a.ready = false; a.g = 0; a.n++;
       note(`pegou 1 ${PRODUCT[ANIMAL[a.k].prod].nome} dos seus animais`, true);
@@ -1145,6 +1163,7 @@ function showGate(mode, msg) {
 function enterGame() {
   root.classList.remove('gated');
   resize(); setScene(scene);
+  setTimeout(() => { if (giftReady() && !isGated()) showGift(); }, 1500);
 }
 // Recado para o jogador: na tela de entrada, vai no status; no jogo, vira aviso.
 function notify(msg, kind) {
@@ -1513,22 +1532,29 @@ function drawSky(t, tod) {
 }
 
 function drawGround() {
-  const { cw, ch, horizon, W } = L;
-  ctx.fillStyle = '#6fae43';
+  const { cw, ch, horizon, W } = L, est = estacao();
+  ctx.fillStyle = est.morro;
   ctx.beginPath(); ctx.moveTo(0, horizon + 4);
   for (let x = 0; x <= cw + 20; x += 20) ctx.lineTo(x, horizon - Math.sin(x / cw * 7 + 1) * W * 0.12 - W * 0.08);
   ctx.lineTo(cw, horizon + 10); ctx.closePath(); ctx.fill();
   const g = ctx.createLinearGradient(0, horizon, 0, ch);
-  g.addColorStop(0, '#86c450'); g.addColorStop(1, '#9ad35e');
+  g.addColorStop(0, est.grama[0]); g.addColorStop(1, est.grama[1]);
   ctx.fillStyle = g; ctx.fillRect(0, horizon, cw, ch - horizon);
+  // outono: folhas caídas; inverno: montinhos de neve
+  if (est.folhas || est.neve) TUFTS.forEach(([x, y, k], n) => {
+    if (n % (est.neve ? 5 : 3)) return;
+    const px = x * cw, py = horizon + 10 + y * (ch - horizon - 10);
+    ctx.fillStyle = est.neve ? 'rgba(255,255,255,.8)' : ['#d9822b', '#c8502a', '#e8b04a'][n % 3];
+    ctx.beginPath(); ctx.ellipse(px, py, est.neve ? W * (0.08 + k * 0.1) : W * 0.035, est.neve ? W * (0.025 + k * 0.03) : W * 0.018, est.neve ? 0 : k * 3, 0, 7); ctx.fill();
+  });
   const FL = ['#ffffff', '#ffd54a', '#f06292', '#ffffff', '#ba68c8'];
   TUFTS.forEach(([x, y, k], n) => {
-    if (n % 9) return;
+    if (!est.flores || n % Math.round(27 / est.flores)) return;
     const px = x * cw, py = horizon + 10 + y * (ch - horizon - 10), r = Math.max(1.8, W * 0.025);
     for (let f = 0; f < 3; f++) { ctx.fillStyle = FL[(n + f) % FL.length]; ctx.beginPath(); ctx.arc(px + f * r * 2.4 - r * 2.4, py + (f % 2) * r * 1.5, r, 0, 7); ctx.fill(); }
     ctx.fillStyle = '#f2b705'; ctx.beginPath(); ctx.arc(px, py, r * 0.45, 0, 7); ctx.fill();
   });
-  ctx.strokeStyle = 'rgba(46,110,30,.45)'; ctx.lineWidth = 1.2;
+  ctx.strokeStyle = est.neve ? 'rgba(80,120,70,.35)' : est.folhas ? 'rgba(110,100,30,.45)' : 'rgba(46,110,30,.45)'; ctx.lineWidth = 1.2;
   for (const [x, y, k] of TUFTS) {
     const px = x * cw, py = horizon + 6 + y * (ch - horizon - 6), s = W * (0.04 + k * 0.04);
     ctx.beginPath();
@@ -1582,13 +1608,23 @@ function drawCoop(x, y, s) {
   ctx.strokeStyle = '#a0703f'; ctx.lineWidth = s * 0.04;
   ctx.beginPath(); ctx.moveTo(x - s * 0.08, y - s * 0.12 - h * 0.1); ctx.lineTo(x + s * 0.25, y); ctx.stroke();
 }
-function drawTree(x, y, s, t) {
-  const sw = Math.sin(t / 1400 + x) * s * 0.02;
+function drawTree(x, y, s, t, coqueiro) {
+  const sw = Math.sin(t / 1400 + x) * s * 0.02, est = estacao();
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.35, s * 0.08, 0, 0, 7); ctx.fill();
+  if (coqueiro) {
+    // tronco curvo e folhas compridas
+    ctx.strokeStyle = '#9a6a3a'; ctx.lineWidth = s * 0.09; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - s * 0.15, y - s * 0.5, x + sw * 3, y - s * 0.95); ctx.stroke(); ctx.lineCap = 'butt';
+    const tx = x + sw * 3, ty = y - s * 0.95;
+    for (const a of [-2.6, -2.0, -1.2, -0.5, 0.1, -1.6]) leaf(tx, ty, s * 0.55, s * 0.09, a + Math.PI / 2 + sw * 0.05, '#3f9a2f');
+    ctx.fillStyle = '#7a4a22'; for (const dx of [-0.05, 0.05, 0]) { ctx.beginPath(); ctx.arc(tx + dx * s, ty + s * 0.06, s * 0.05, 0, 7); ctx.fill(); }
+    return;
+  }
   ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - s * 0.06, y - s * 0.5, s * 0.12, s * 0.5);
-  ctx.fillStyle = '#3f8a2a';
+  ctx.fillStyle = est.folha;
   ctx.beginPath(); ctx.arc(x + sw, y - s * 0.72, s * 0.32, 0, 7); ctx.arc(x - s * 0.22 + sw, y - s * 0.55, s * 0.24, 0, 7); ctx.arc(x + s * 0.22 + sw, y - s * 0.56, s * 0.25, 0, 7); ctx.fill();
-  ctx.fillStyle = '#e53b2f';
+  if (est.neve) { ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.ellipse(x + sw, y - s * 0.98, s * 0.2, s * 0.07, 0, 0, 7); ctx.ellipse(x - s * 0.25 + sw, y - s * 0.74, s * 0.13, s * 0.05, 0, 0, 7); ctx.fill(); return; }
+  ctx.fillStyle = est.folhas ? '#f2b705' : '#e53b2f';
   for (const [dx, dy] of [[-.15, -.7], [.12, -.8], [.2, -.55], [-.25, -.5]]) { ctx.beginPath(); ctx.arc(x + dx * s + sw, y + dy * s, s * 0.035, 0, 7); ctx.fill(); }
 }
 // Cachorro virado para a esquerda. raca muda as cores; sleeping = deitado dormindo.
@@ -1690,17 +1726,30 @@ function dogBubble(slot, s, t, home) {
 
 // Cerca do lado de trás ('back') ou da frente ('front') de uma área cols×rows.
 function drawFence(cols, rows, side) { const e = -0.14; drawFenceRect(e, e, cols - e, rows - e, side); }
-function drawFenceRect(u0, v0, u1, v1, side) {
+// Um trecho de cerca de a até b, no estilo do tema da roça.
+function fenceRun(a, b, steps, skipFirst, tm) {
   const W = L.W;
+  if (tm.pedra) {
+    // muro baixo de pedra
+    const h = W * 0.16;
+    ctx.fillStyle = tm.trilho; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(b.x, b.y - h); ctx.lineTo(a.x, a.y - h); ctx.closePath(); ctx.fill();
+    line({ x: a.x, y: a.y - h }, { x: b.x, y: b.y - h }, tm.topo, W * 0.04);
+    ctx.strokeStyle = 'rgba(70,64,52,.35)'; ctx.lineWidth = 1;
+    for (let k = 0; k < steps * 2; k++) { const q = lerp(a, b, (k + (k % 2) * 0.5) / (steps * 2)); ctx.strokeRect(q.x - W * 0.06, q.y - h * (k % 2 ? 0.95 : 0.5), W * 0.12, h * 0.45); }
+    return;
+  }
   const post = p => {
-    ctx.fillStyle = '#a4703f'; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.2);
-    ctx.fillStyle = '#c99260'; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.03);
+    ctx.fillStyle = tm.poste; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.2);
+    ctx.fillStyle = tm.topo; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.03);
+    if (tm.bambu) for (const h of [0.07, 0.14]) { ctx.fillStyle = 'rgba(60,80,20,.5)'; ctx.fillRect(p.x - W * 0.025, p.y - W * h, W * 0.05, 1.5); }
+    if (tm.rosas) { ctx.fillStyle = '#3f8a2a'; ctx.beginPath(); ctx.arc(p.x, p.y - W * 0.03, W * 0.05, 0, 7); ctx.fill(); ctx.fillStyle = '#e53b2f'; ctx.beginPath(); ctx.arc(p.x + W * 0.02, p.y - W * 0.06, W * 0.022, 0, 7); ctx.fill(); }
   };
-  const run = (c0, r0, c1, r1, steps, skipFirst) => {
-    const a = iso(c0, r0), b = iso(c1, r1);
-    for (const h of [0.08, 0.16]) line({ x: a.x, y: a.y - W * h }, { x: b.x, y: b.y - W * h }, '#b98050', W * 0.03);
-    for (let k = skipFirst ? 1 : 0; k <= steps; k++) post(lerp(a, b, k / steps));
-  };
+  for (const h of [0.08, 0.16]) line({ x: a.x, y: a.y - W * h }, { x: b.x, y: b.y - W * h }, tm.trilho, W * 0.03);
+  for (let k = skipFirst ? 1 : 0; k <= steps; k++) post(lerp(a, b, k / steps));
+}
+function drawFenceRect(u0, v0, u1, v1, side) {
+  const tm = temaDe(S());
+  const run = (c0, r0, c1, r1, steps, skipFirst) => fenceRun(iso(c0, r0), iso(c1, r1), steps, skipFirst, tm);
   const nu = Math.round((u1 - u0) * 2), nv = Math.round((v1 - v0) * 2);
   if (side === 'back') { run(u0, v0, u1, v0, nu); run(u0, v0, u0, v1, nv, true); }
   else { run(u0, v1, u1, v1, nu, true); run(u1, v0, u1, v1, nv, true); }
@@ -2395,13 +2444,17 @@ function drawPlot(i, p, t, home) {
     const st = p.s === 'growing' ? stageOf(p) : 4;
     if (crop && crop.arvore && crop.tipo !== 'moita' && p.s === 'growing') {
       const q = iso(c + 0.5, r + 0.58);
+      if (p.ouro) goldGlow(c, r, t, st);
       drawFruitTree(q.x, q.y, W / 100 * 1.05, crop, st, t);
+      if (p.ouro) goldSparkle(c, r, t, st);
       for (let k = 0; k < p.b; k++) { const qb = iso(c + 0.3 + k * 0.15, r + 0.75); drawBug(qb.x, qb.y, W / 100, t, k + i); }
       return;
     }
     const big = crop && crop.tipo === 'chao' && st >= 3;
     const s = W / 100 * (big ? 1.25 : 0.72) * (st === 0 ? 1.2 : 1);
+    if (p.ouro && p.s === 'growing') goldGlow(c, r, t, st);
     for (const [u, v] of (big ? BIG_SPOTS : PLANT_SPOTS)) { const q = iso(c + u, r + v); drawPlant(q.x, q.y, s, crop, st, t, p.s === 'withered'); }
+    if (p.ouro && p.s === 'growing') goldSparkle(c, r, t, st);
     for (let k = 0; k < p.b; k++) { const q = iso(c + 0.45 + k * 0.15, r + 0.5); drawBug(q.x, q.y, W / 100, t, k + i); }
   }
 }
@@ -2433,6 +2486,20 @@ function drawLandSign() {
   ctx.fillStyle = txt[2]; ctx.fillText(txt[1], bx, top + bh * 0.72);
   hits.push({ kind: 'land', x: bx, y: top + bh / 2, r: Math.max(bw / 2, 30) });
 }
+// Planta dourada: brilho no chão e estrelinhas piscando (mais fortes quando está pronta).
+function goldGlow(c, r, t, st) {
+  const m = iso(c + 0.5, r + 0.5), W = L.W, k = st >= 4 ? 1 : 0.5;
+  const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, W * 0.5);
+  g.addColorStop(0, `rgba(255,215,64,${0.55 * k})`); g.addColorStop(1, 'rgba(255,215,64,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(m.x, m.y, W * 0.5, W * 0.26, 0, 0, 7); ctx.fill();
+}
+function goldSparkle(c, r, t, st) {
+  const m = iso(c + 0.5, r + 0.5), W = L.W, n = st >= 4 ? 5 : 2;
+  for (let k = 0; k < n; k++) {
+    const a = t / 700 + k * 1.3, tw = Math.abs(Math.sin(t / 300 + k * 2));
+    star(m.x + Math.cos(a) * W * 0.3, m.y - W * 0.25 + Math.sin(a * 1.3) * W * 0.18, W * 0.05 * tw + 1);
+  }
+}
 function plotBubble(p, home) {
   if (p.s === 'withered') return home ? 'hoe' : null;
   if (p.s !== 'growing') return null;
@@ -2444,13 +2511,27 @@ function plotBubble(p, home) {
   return null;
 }
 
+// Lago do tema "Lago dos patos", com patinhos nadando.
+function drawLake(x, y, W, t) {
+  ctx.fillStyle = '#6b8f4a'; ctx.beginPath(); ctx.ellipse(x, y, W * 1.05, W * 0.45, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = estacao().neve ? '#cfe6f5' : '#5aa9e6'; ctx.beginPath(); ctx.ellipse(x, y, W * 0.95, W * 0.38, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1.5;
+  for (let k = 0; k < 3; k++) { const r = ((t / 1500 + k / 3) % 1); ctx.globalAlpha = 1 - r; ctx.beginPath(); ctx.ellipse(x - W * 0.3, y, W * 0.1 + r * W * 0.3, W * 0.04 + r * W * 0.12, 0, 0, 7); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#4f9a2f'; for (const [dx, dy] of [[0.5, 0.1], [0.62, -0.05], [-0.6, 0.12]]) { ctx.beginPath(); ctx.ellipse(x + dx * W, y + dy * W, W * 0.08, W * 0.035, 0, 0.3, 6.1); ctx.lineTo(x + dx * W, y + dy * W); ctx.fill(); }
+  for (let k = 0; k < 2; k++) {
+    const a = t / 6000 + k * 3, px = x + Math.cos(a) * W * 0.5, py = y + Math.sin(a) * W * 0.16;
+    drawAnimal('pato', px, py + W * 0.05, W / 100 * 0.9, t, Math.sin(a) > 0 ? -1 : 1, false);
+  }
+}
 function drawRoca(s, t, home) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
   if (home) drawBarn(L.ox - W * 1.55, L.oy + W * 0.3, W * 1.15);
   else drawHouse(L.ox - W * 1.55, L.oy + W * 0.3, W * 1.15, view.casa);
-  drawTree(L.ox + W * 2.6, L.oy + W * 0.5, W * 1.0, t);
-  drawTree(L.ox + W * 3.6, L.oy + W * 1.1, W * 0.8, t);
+  const tm = temaDe(s);
+  if (tm.lago) { drawLake(L.ox + W * 2.75, L.oy + W * 0.4, W * 0.72, t); drawTree(L.ox + W * 4.0, L.oy + W * 1.4, W * 0.9, t); }
+  else { drawTree(L.ox + W * 2.6, L.oy + W * 0.5, W * 1.0, t, tm.coqueiro); drawTree(L.ox + W * 3.6, L.oy + W * 1.1, W * 0.8, t, tm.coqueiro); }
   if (view.kind === 'npc') { const q = DOG_AT(); drawDog(q.x, q.y, W * 0.7, t); }
   else drawKennelSpot('roca', s, home);
   drawFence(COLS, ROWS, 'back');
@@ -2458,7 +2539,9 @@ function drawRoca(s, t, home) {
   if (home) drawLandSign();
   for (let sum = 0; sum <= COLS + ROWS - 2; sum++)
     for (let c = 0; c < COLS; c++) { const r = sum - c; if (r >= 0 && r < ROWS) drawPlot(r * COLS + c, s.plots[r * COLS + c], t, home); }
+  drawCritters(t, tod);
   nightOverlay(tod);
+  drawWeather(t);
   for (let i = 0; i < N; i++) {
     const k = plotBubble(s.plots[i], home);
     if (k) { const m = cellCenter(i); drawBubbleAt(m.x, m.y - W * 0.55, k, s.plots[i], t, i); }
@@ -2611,7 +2694,9 @@ function drawPen(s, t, home, dt) {
   const bubbles = [];
   const order = ABRIGOS.slice().sort((a, b) => { const p = yardOf(a.id), q = yardOf(b.id); return (p.u0 + p.v0) - (q.u0 + q.v0); });
   for (const b of order) drawYard(b, s, t, home, dt, bubbles);
+  drawCritters(t, tod);
   nightOverlay(tod);
+  drawWeather(t);
   for (const [a, m, k, sc] of bubbles) { const p = iso(m.u, m.v); drawBubbleAt(p.x, p.y - ANIMAL_H[drawKind(a)] * sc - W * 0.2, k, a, t, m.u * 7); }
   dogBubble('animais', s, t, home);
 }
@@ -2957,7 +3042,7 @@ function renderPenActions() {
 function renderSceneInfo() {
   renderPenActions();
   const s = S(), el = $('#sceneInfo');
-  const owner = isHome() ? '' : `${view.nome} · `;
+  const est = estacao(), owner = `${est.icone} ${est.nome}${raining() ? (est.neve ? ' · nevando' : ' · chovendo') : ''} · ` + (isHome() ? '' : `${view.nome} · `);
   if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length}${isHome() ? ` de ${allowedLots()}` : ''} canteiros`;
   else if (scene === 'animais') {
     const cap = ABRIGOS.reduce((t, b) => t + ABRIGO_CAP[abrigoLv(s, b.id)], 0);
@@ -3011,10 +3096,13 @@ function renderTabs() {
   const unread = state ? state.news.filter(n => n.at > state.newsSeen).length : 0, n = requests.length + unread;
   const old = b.querySelector('.badge'); if (old) old.remove();
   if (n) b.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${n} novidades">${n}</span>`);
+  const mb = document.querySelector('.tab[data-tab="missoes"]'), mn = missoesProntas();
+  if (mb) { const o = mb.querySelector('.badge'); if (o) o.remove(); if (mn) mb.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${mn} prêmios">${mn}</span>`); }
+  renderGiftBtn();
 }
 // Preço nos botões da loja: ícone de moeda + valor (e a quantidade, quando tem).
 const moeda = (n, q) => `${q ? `<span class="qtd">×${q}</span>` : ''}<span class="coin" aria-hidden="true"></span>${n.toLocaleString('pt-BR')}`;
-const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos' };
+const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões' };
 // A janela abre por cima do jogo. Clicar de novo no mesmo botão fecha.
 function openPanel(t, seg, focus) {
   tab = t; if (seg) shopSeg = seg;
@@ -3035,8 +3123,9 @@ function renderPane() {
   if (!open) return;
   const pane = $('#pane');
   let html = '';
-  if (tab === 'loja') {
-    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa']];
+  if (tab === 'missoes') html = missoesHTML();
+  else if (tab === 'loja') {
+    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['temas', 'Temas']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
     if (shopSeg === 'sementes' || shopSeg === 'mudas') {
       const trees = shopSeg === 'mudas';
@@ -3054,7 +3143,7 @@ function renderPane() {
           : `Semente ${c.custo.toLocaleString('pt-BR')} · ${fmt(c.tempo)}<br>rende ${faixa(c)} × ${c.preco} · lucro médio ${(total - c.custo).toLocaleString('pt-BR')} · ${c.xp} XP`;
         html += `<div class="row ${locked ? 'locked' : ''} ${sel ? 'sel' : ''}">
           <img alt="" src="${cropIcon(c.id)}">
-          <div><div class="name">${c.nome}</div><div class="meta">${meta}</div></div>
+          <div><div class="name">${c.nome}${daEstacao(c.id) ? ` <span class="tag">${estacao().icone} da estação +${Math.round(ESTACAO_BONUS * 100)}%</span>` : ''}</div><div class="meta">${meta}</div></div>
           ${locked ? `<button class="btn" disabled>Nível ${c.nivel}</button>` : `<button class="btn ${sel ? 'gold' : ''}" data-seed="${c.id}" aria-label="${sel ? 'Na mão' : `Escolher ${c.nome} por ${c.custo} moedas`}">${sel ? 'Na mão' : moeda(c.custo)}</button>`}
         </div>`;
       }
@@ -3144,6 +3233,14 @@ function renderPane() {
           <div class="meta">${b.custo} moedas · vive ${b.vida} dias<br>espanta ${Math.round(b.protege * 100)}% dos ladrões · morde ${Math.round(b.morde * 100)}% deles<br>+${b.xpDia} XP por dia · +${b.xpPega} XP por ladrão</div></div>
           <div class="actions">${locked ? `<button class="btn" disabled>Nível ${b.nivel}</button>` : btn('roca') + btn('animais')}</div></div>`;
       }
+    } else if (shopSeg === 'temas') {
+      html += `<p class="hint">Os temas mudam a cerca e o jeito da sua roça. Os amigos veem o seu tema quando visitam.</p>`;
+      for (const t of TEMAS) {
+        const locked = t.nivel > state.level, owned = !!state.temas[t.id], using = state.tema === t.id;
+        html += `<div class="row ${locked ? 'locked' : ''} ${using ? 'sel' : ''}"><img alt="" src="${temaIcon(t.id)}">
+          <div><div class="name">${t.nome}</div><div class="meta">${t.desc}</div></div>
+          ${using ? '<button class="btn ghost" disabled>Em uso</button>' : owned ? `<button class="btn" data-tema-roca="${t.id}">Usar</button>` : locked ? `<button class="btn" disabled>Nível ${t.nivel}</button>` : `<button class="btn" data-tema-roca="${t.id}" ${state.coins < t.custo ? 'disabled' : ''}>${moeda(t.custo)}</button>`}</div>`;
+      }
     } else {
       html += `<p class="hint">Decore a sua casa. Cada peça dá conforto, e cada ponto de conforto vale +1% de XP. Agora: +${comfort(state)}%.</p>`;
       for (const d of DECOR) {
@@ -3230,7 +3327,7 @@ function renderPane() {
         const name = f ? f.name : 'Amigo';
         const armed = unfriendArmed === uid;
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
-          <div><div class="name">${esc(name)}</div><div class="meta">${f ? `Nível ${f.level}` : 'Ainda não entrou no jogo'}</div></div>
+          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f ? `Nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`}
           <button class="btn ${armed ? 'danger' : 'ghost'}" data-unfriend="${esc(uid)}">${armed ? 'Confirmar' : 'Desfazer'}</button></div></div>`;
       }
@@ -3249,7 +3346,7 @@ function renderPane() {
     for (const n of NEIGHBORS) {
       const here = view.kind === 'npc' && view.id === n.id;
       html += `<div class="row ${here ? 'sel' : ''}"><div class="avatar" style="background:${n.casa}">${n.nome.split(' ').pop()[0]}</div>
-        <div><div class="name">${n.nome}</div><div class="meta">Cachorro: ${n.cao} · ${n.pega >= .15 ? 'bravo' : n.pega >= .09 ? 'atento' : 'dorminhoco'}</div></div>
+        <div><div class="name">${n.nome}${owes(n.id) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${owes(n.id) ? `Ajude de volta: +${AJUDA_BONUS.moedas} moedas · ` : ''}Cachorro: ${n.cao} · ${n.pega >= .15 ? 'bravo' : n.pega >= .09 ? 'atento' : 'dorminhoco'}</div></div>
         ${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit="${n.id}">Visitar</button>`}</div>`;
     }
   }
@@ -3259,6 +3356,9 @@ function renderPane() {
 $('#pane').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   const d = b.dataset;
+  if (d.mseg) { missSeg = d.mseg; renderPane(); $('#pane').scrollTop = 0; return; }
+  if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
+  if (d.temaRoca) return buyTema(d.temaRoca);
   if (d.seg) { shopSeg = d.seg; renderPane(); $('#pane').scrollTop = 0; if (d.focus) focusRow('abrigo-' + d.focus); }
   else if (d.abrigo) buyAbrigo(d.abrigo);
   else if (d.seed) { state.seed = d.seed; state.tool = 'seed'; if (!isHome()) goHome(); setScene('roca'); closePanel(); save(); toast(`${CROP[d.seed].nome} na mão: clique na terra arada para plantar.`); }
@@ -3334,12 +3434,15 @@ const MENU_ICONS = {
   celeiro: '<svg viewBox="0 0 32 32"><path d="M4 14 16 5l12 9v14H4z" fill="#c8402f" stroke="#6b1f14" stroke-width="1.6" stroke-linejoin="round"/><path d="M11 28V18h10v10" fill="#fff4e0"/><path d="M11 18l10 10M21 18 11 28" stroke="#c8402f" stroke-width="1.6"/><circle cx="16" cy="12" r="2.2" fill="#fff4e0"/></svg>',
   terreno: '<svg viewBox="0 0 32 32"><path d="M16 9 29 17 16 25 3 17z" fill="#8b5a33" stroke="#4a2c14" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 17l7-4.3M12 19l7-4.3M15 21l7-4.3" stroke="#5e3a1c" stroke-width="1.2"/><circle cx="24" cy="8" r="6" fill="#4f9a2f" stroke="#2f6e1e" stroke-width="1.4"/><path d="M24 5v6M21 8h6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>',
   amigos: '<svg viewBox="0 0 32 32"><circle cx="11" cy="12" r="5" fill="#ffd9b0" stroke="#6b4220" stroke-width="1.5"/><path d="M3 27c0-5 3.5-8 8-8s8 3 8 8z" fill="#4aa3df" stroke="#1d5f8f" stroke-width="1.5"/><circle cx="22" cy="13" r="4.5" fill="#f3c08e" stroke="#6b4220" stroke-width="1.5"/><path d="M15 27c0-4.5 3-7.5 7-7.5s7 3 7 7.5z" fill="#e9a800" stroke="#a87400" stroke-width="1.5"/></svg>',
+  missoes: '<svg viewBox="0 0 32 32"><path d="M8 4h16a2 2 0 0 1 2 2v22l-4-2-3 2-3-2-3 2-3-2-4 2V6a2 2 0 0 1 2-2z" fill="#fff4e0" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 11l2 2 3-4M10 18l2 2 3-4" fill="none" stroke="#4f9a2f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 11h5M18 18h5" stroke="#a86b38" stroke-width="2" stroke-linecap="round"/></svg>',
+  presente: '<svg viewBox="0 0 32 32"><rect x="5" y="13" width="22" height="15" rx="2" fill="#e0463a" stroke="#8f2a1e" stroke-width="1.6"/><rect x="3" y="9" width="26" height="6" rx="1.5" fill="#f25a4a" stroke="#8f2a1e" stroke-width="1.6"/><path d="M14 9h4v19h-4z" fill="#ffd54a"/><path d="M16 9c-2-5-8-6-8-2s6 2 8 2zM16 9c2-5 8-6 8-2s-6 2-8 2z" fill="#ffd54a" stroke="#a87400" stroke-width="1.4"/></svg>',
   casa: '<svg viewBox="0 0 32 32"><path d="M5 15 16 6l11 9v13H5z" fill="#f1dcae" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M2 16 16 4l14 12" fill="none" stroke="#b5532f" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 28v-8h6v8" fill="#8a5a33"/><path d="M20 15h5v4h-5z" fill="#9fd4f5" stroke="#7a4a22" stroke-width="1.2"/></svg>',
 };
 function paintMenuIcons() {
   document.querySelectorAll('.tab .ic').forEach(el => { el.innerHTML = MENU_ICONS[el.parentNode.dataset.tab]; });
   const sc = { roca: `<img alt="" src="${cropIcon('milho')}">`, animais: `<img alt="" src="${animalIcon('vaca')}">`, casa: MENU_ICONS.casa };
   document.querySelectorAll('#scenes .ic').forEach(el => { el.innerHTML = sc[el.parentNode.dataset.scene]; });
+  const g = document.querySelector('#giftBtn .ic'); if (g) g.innerHTML = MENU_ICONS.presente;
 }
 document.querySelectorAll('#scenes button').forEach(b => b.addEventListener('click', () => setScene(b.dataset.scene)));
 $('#goHome').addEventListener('click', () => goHome());
@@ -3575,6 +3678,10 @@ $('#checkUpdate')?.addEventListener('click', checkUpdate);
 function openSettings() { if ($('#verTxt')) $('#verTxt').textContent = `Versão ${VERSION}`; if ($('#updStatus')) $('#updStatus').textContent = ''; if ($('#checkUpdate')) $('#checkUpdate').disabled = false; renderSettings(); $('#settings').hidden = false; $('#settings [data-close]').focus(); }
 function closeSettings() { $('#settings').hidden = true; $('#openSettings').focus(); }
 $('#openSettings').addEventListener('click', openSettings);
+$('#giftBtn').addEventListener('click', showGift);
+$('#giftOpen').addEventListener('click', openGift);
+$('#gift').addEventListener('click', e => { if (e.target === $('#gift') || e.target.closest('[data-close]')) closeGift(); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gift').hidden) closeGift(); });
 $('#settings').addEventListener('click', e => {
   if (e.target === $('#settings') || e.target.closest('[data-close]')) return closeSettings();
   // Só os botões de dentro da janela (a página inteira também tem data-tema).
@@ -3597,6 +3704,353 @@ window.addEventListener('keydown', unlockAudio);
 document.addEventListener('click', e => { if (e.target.closest('button')) sfx('click'); }, true);
 
 // ============================================================
+// Missões, presente diário, ajuda de volta, coleção, temas, estações, chuva e bichinhos
+// ============================================================
+// A semana começa na segunda-feira à meia-noite (o dia 0 do calendário foi uma quinta).
+const weekOf = d => Math.floor((d + 3) / 7);
+const thisWeek = () => weekOf(localDay());
+
+// ---------- Estações: mudam toda segunda-feira ----------
+const ESTACOES = [
+  { id: 'primavera', nome: 'Primavera', icone: '🌸', plantas: ['alface', 'cenoura', 'morangueiro', 'tomate', 'cebola'],
+    grama: ['#86c450', '#9ad35e'], morro: '#6fae43', folha: '#3f8a2a', flores: 3 },
+  { id: 'verao', nome: 'Verão', icone: '☀️', plantas: ['melancia', 'milho', 'abacaxi', 'maracuja', 'pepino'],
+    grama: ['#94c24a', '#a8cf55'], morro: '#79a83f', folha: '#4a8f2a', flores: 1 },
+  { id: 'outono', nome: 'Outono', icone: '🍂', plantas: ['abobora', 'batata', 'macieira', 'videira', 'pera'],
+    grama: ['#a7b64c', '#b9c05a'], morro: '#8f9c3e', folha: '#d9822b', flores: 0, folhas: true },
+  { id: 'inverno', nome: 'Inverno', icone: '❄️', plantas: ['nabo', 'trigo', 'laranjeira', 'limao', 'cafe'],
+    grama: ['#a9cf92', '#c4e0b2'], morro: '#8fb87e', folha: '#2f6e3a', flores: 0, neve: true },
+];
+const ESTACAO_BONUS = 0.3; // plantas da estação rendem 30% a mais
+const estacao = () => ESTACOES[thisWeek() % 4];
+const daEstacao = id => estacao().plantas.includes(id);
+
+// ---------- Missões ----------
+// ev: o que conta. alvo: por faixa de nível (1–4, 5–14, 15+). need: só aparece se fizer sentido.
+const temProd = () => state.animals.some(a => ANIMAL[a.k].tipo === 'prod');
+const MISSOES_DIA = [
+  { ev: 'colher', txt: 'Colha {n} vezes', alvo: [10, 20, 30] },
+  { ev: 'plantar', txt: 'Plante {n} sementes', alvo: [10, 20, 30] },
+  { ev: 'regar', txt: 'Regue {n} canteiros (seus ou dos vizinhos)', alvo: [3, 5, 8] },
+  { ev: 'coletar', txt: 'Recolha {n} produtos dos animais', alvo: [4, 8, 12], need: temProd },
+  { ev: 'alimentar', txt: 'Alimente {n} animais', alvo: [4, 8, 12], need: temProd },
+  { ev: 'vender', txt: 'Venda {n} moedas no celeiro', alvo: [300, 1500, 5000] },
+  { ev: 'ajudar', txt: 'Ajude os vizinhos {n} vezes', alvo: [3, 5, 8] },
+  { ev: 'pegar', txt: 'Pegue {n} itens nas roças dos vizinhos', alvo: [2, 4, 6] },
+  { ev: 'adubar', txt: 'Use {n} fertilizantes', alvo: [2, 3, 5] },
+];
+const MISSOES_SEMANA = [
+  { ev: 'colher', txt: 'Colha {n} vezes', alvo: [100, 200, 350] },
+  { ev: 'plantar', txt: 'Plante {n} sementes', alvo: [100, 200, 350] },
+  { ev: 'coletar', txt: 'Recolha {n} produtos dos animais', alvo: [30, 60, 100], need: temProd },
+  { ev: 'vender', txt: 'Venda {n} moedas no celeiro', alvo: [4000, 20000, 60000] },
+  { ev: 'ajudar', txt: 'Ajude os vizinhos {n} vezes', alvo: [20, 35, 50] },
+  { ev: 'estacao', txt: 'Colha {n} vezes plantas da estação', alvo: [15, 30, 60] },
+  { ev: 'dourada', txt: 'Faça {n} colheita dourada', alvo: [1, 1, 2] },
+  { ev: 'adubar', txt: 'Use {n} fertilizantes', alvo: [10, 20, 30] },
+];
+const faixaNivel = () => state.level < 5 ? 0 : state.level < 15 ? 1 : 2;
+function sortear(pool, n) {
+  const ok = pool.filter(m => !m.need || m.need()), out = [];
+  while (out.length < n && ok.length) out.push(ok.splice(Math.floor(Math.random() * ok.length), 1)[0]);
+  return out.map(m => ({ ev: m.ev, txt: m.txt, alvo: m.alvo[faixaNivel()], feito: 0, pego: false }));
+}
+const premioDia = () => ({ moedas: Math.round((60 + state.level * 15) / 10) * 10, xp: 10 + state.level * 2 });
+const premioSemana = () => ({ moedas: Math.round((600 + state.level * 150) / 10) * 10, xp: 80 + state.level * 10, racao: 1 });
+// Todo dia, à meia-noite, troca as missões do dia; toda segunda, as da semana.
+function rollPeriods() {
+  const d = localDay(), w = thisWeek();
+  const m = state.missions || (state.missions = { d: -1, w: -1, dia: [], semana: [] });
+  const novoDia = m.d !== d;
+  if (novoDia) { m.d = d; m.dia = sortear(MISSOES_DIA, 3); }
+  if (m.w !== w) { m.w = w; m.semana = sortear(MISSOES_SEMANA, 3); }
+  if (novoDia && state.helpDay !== d) { state.helpDay = d; npcHelps(); }
+}
+function track(ev, n = 1) {
+  if (!state) return;
+  if (!state.missions) rollPeriods();
+  let pronto = false;
+  for (const m of [...state.missions.dia, ...state.missions.semana]) {
+    if (m.ev !== ev || m.feito >= m.alvo) continue;
+    m.feito = Math.min(m.alvo, m.feito + n);
+    if (m.feito >= m.alvo) pronto = true;
+  }
+  if (pronto) { toast('Missão cumprida! Pegue o prêmio em Missões.', 'good'); sfx('level'); renderTabs(); }
+}
+function claimMission(tipo, k) {
+  const m = state.missions[tipo][k];
+  if (!m || m.pego || m.feito < m.alvo) return;
+  const p = tipo === 'dia' ? premioDia() : premioSemana();
+  m.pego = true;
+  state.coins += p.moedas; addXP(p.xp, null);
+  if (p.racao) state.racaoEsp += p.racao;
+  sfx('coin');
+  toast(`Prêmio: +${p.moedas.toLocaleString('pt-BR')} moedas e +${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}!`, 'good');
+  renderTabs(); done();
+}
+const missoesProntas = () => state && state.missions ? [...state.missions.dia, ...state.missions.semana].filter(m => m.feito >= m.alvo && !m.pego).length : 0;
+
+// ---------- Presente diário: 7 dias, depois vem uma leva nova ----------
+const PRESENTES = [
+  [{ moedas: 100 }, { fert: 'basico', n: 2 }, { moedas: 200 }, { racao: 2 }, { fert: 'rapido', n: 1 }, { moedas: 500 }, { moedas: 1000, fert: 'premium', n: 1 }],
+  [{ moedas: 150 }, { racaoCao: 2 }, { fert: 'basico', n: 3 }, { moedas: 300 }, { racao: 3 }, { fert: 'rapido', n: 2 }, { moedas: 1500, fert: 'premium', n: 1 }],
+  [{ moedas: 200 }, { fert: 'rapido', n: 1 }, { moedas: 400 }, { racao: 2 }, { racaoCao: 3 }, { moedas: 800 }, { moedas: 2000, fert: 'premium', n: 2 }],
+];
+const leva = () => PRESENTES[(state.gift.ciclo || 0) % PRESENTES.length];
+const giftReady = () => state && state.gift && state.gift.last !== localDay();
+function giftText(g) {
+  const p = [];
+  if (g.moedas) p.push(`${g.moedas.toLocaleString('pt-BR')} moedas`);
+  if (g.fert) p.push(`${g.n} ${FERT[g.fert].nome.toLowerCase()}`);
+  if (g.racao) p.push(`${g.racao} ração especial`);
+  if (g.racaoCao) p.push(`${g.racaoCao} ração de cachorro`);
+  return p.join(' + ');
+}
+function openGift() {
+  if (!giftReady()) return;
+  const g = leva()[state.gift.i];
+  if (g.moedas) state.coins += g.moedas;
+  if (g.fert) state.fert[g.fert] = (state.fert[g.fert] || 0) + g.n;
+  if (g.racao) state.racaoEsp += g.racao;
+  if (g.racaoCao) state.dogFood += g.racaoCao;
+  state.gift.last = localDay();
+  state.gift.i++;
+  if (state.gift.i >= 7) { state.gift.i = 0; state.gift.ciclo = (state.gift.ciclo || 0) + 1; }
+  sfx('level');
+  toast(`Presente do dia: ${giftText(g)}!`, 'good');
+  renderGift(); renderGiftBtn(); renderTools(); done();
+}
+function renderGiftBtn() {
+  const b = $('#giftBtn'); if (!b || !state) return;
+  const old = b.querySelector('.badge'); if (old) old.remove();
+  if (giftReady()) b.insertAdjacentHTML('beforeend', '<span class="badge" aria-label="presente esperando">1</span>');
+}
+function renderGift() {
+  if (!state) return;
+  const ready = giftReady(), dia = state.gift.i, lista = leva();
+  // Já abriu hoje: o dia de hoje é o anterior (que pode ser o último da leva passada).
+  const hoje = ready ? dia : (dia + 6) % 7, levaHoje = ready || dia ? lista : PRESENTES[((state.gift.ciclo || 0) + PRESENTES.length - 1) % PRESENTES.length];
+  $('#giftDays').innerHTML = levaHoje.map((g, k) => {
+    const cls = k < hoje || (!ready && k === hoje) ? 'got' : k === hoje ? 'today' : '';
+    return `<div class="gday ${cls}"><b>Dia ${k + 1}</b><img alt="" src="${giftIcon(g)}"><small>${giftText(g)}</small></div>`;
+  }).join('');
+  $('#giftOpen').disabled = !ready;
+  $('#giftOpen').textContent = ready ? 'Abrir presente' : 'Volte amanhã!';
+  $('#giftNote').textContent = ready ? `Hoje é o dia ${hoje + 1} de 7.` : 'Você já abriu o presente de hoje. Depois do dia 7 vem uma leva nova.';
+}
+const giftIcon = g => g.fert && !g.moedas ? fertIcon(g.fert) : g.racao ? bowlIcon() : g.racaoCao ? dogIcon('caramelo') : makeIcon('gift:' + (g.fert ? 'big' : 'coin'), () => {
+  if (g.fert) { // o baú do dia 7
+    ctx.fillStyle = '#8a5a2b'; ctx.fillRect(18, 40, 60, 40); ctx.fillStyle = '#a86b38'; ctx.fillRect(14, 30, 68, 16);
+    ctx.fillStyle = '#f2b705'; ctx.fillRect(44, 30, 8, 50); ctx.fillRect(14, 44, 68, 5);
+    ctx.fillStyle = '#ffd54a'; for (const [x, y] of [[30, 22], [62, 18], [48, 12]]) { ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill(); }
+    return;
+  }
+  for (const [x, y] of [[36, 64], [60, 64], [48, 46]]) {
+    ctx.fillStyle = '#c98c00'; ctx.beginPath(); ctx.ellipse(x, y + 3, 16, 7, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f2b705'; ctx.beginPath(); ctx.ellipse(x, y, 16, 7, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.ellipse(x, y - 1, 9, 3.5, 0, 0, 7); ctx.fill();
+  }
+});
+function showGift() { renderGift(); $('#gift').hidden = false; $('#giftOpen').focus(); }
+function closeGift() { $('#gift').hidden = true; }
+
+// ---------- Ajuda de volta ----------
+// Quem ajudou a sua roça fica marcado por 2 dias. Ajudar essa pessoa de volta dá um bônus.
+const AJUDA_BONUS = { moedas: 50, xp: 15 }, AJUDA_PRAZO = 2 * DAY;
+function helpedBy(key, nome) {
+  state.owe[key] = { nome, at: Date.now() };
+}
+function helpBack(pos) {
+  const key = view.kind === 'friend' ? view.uid : view.id, o = state.owe[key];
+  if (!o) return;
+  delete state.owe[key];
+  if (Date.now() - o.at > AJUDA_PRAZO) return;
+  addCoins(AJUDA_BONUS.moedas, pos); addXP(AJUDA_BONUS.xp, pos);
+  toast(`Você retribuiu a ajuda de ${o.nome}! +${AJUDA_BONUS.moedas} moedas`, 'good');
+}
+// Os vizinhos da vila também dão uma mão de vez em quando (uma vez por dia, no máximo).
+function npcHelps() {
+  if (Math.random() > 0.6) return;
+  const nb = NEIGHBORS[Math.floor(Math.random() * NEIGHBORS.length)];
+  const p = state.plots.find(q => q.s === 'growing' && (q.b || q.dry));
+  if (p) { p.b = 0; p.dry = false; }
+  helpedBy(nb.id, nb.nome);
+  addNews(`${nb.nome} passou aqui e ${p ? 'cuidou de uma planta sua' : 'deu uma olhada na sua roça'}. Ajude de volta em até 2 dias e ganhe ${AJUDA_BONUS.moedas} moedas!`);
+}
+const owes = key => state.owe[key] && Date.now() - state.owe[key].at < AJUDA_PRAZO;
+
+// ---------- Livro de coleção ----------
+// Cada planta e produto dos animais ganha carimbos com o número de colheitas.
+const CARIMBOS = [
+  { n: 10, nome: 'bronze', cor: '#cd7f32', moedas: 100, xp: 10 },
+  { n: 50, nome: 'prata', cor: '#b8c2cc', moedas: 500, xp: 50 },
+  { n: 200, nome: 'ouro', cor: '#f2b705', moedas: 2000, xp: 150 },
+];
+const COLECAO = () => [...CROPS.map(c => ({ id: c.prod, nome: c.prodNome, icon: () => cropIcon(c.id), nivel: c.nivel })),
+  ...PRODUCTS.filter(p => p.id !== 'leitao').map(p => ({ id: p.id, nome: p.nome, icon: () => productIcon(p.id), nivel: 0 }))];
+function collect(id, pos) {
+  const n = state.col[id] = (state.col[id] || 0) + 1, lv = state.stamps[id] || 0, c = CARIMBOS[lv];
+  if (!c || n < c.n) return;
+  state.stamps[id] = lv + 1;
+  state.coins += c.moedas; addXP(c.xp, pos);
+  sfx('level');
+  toast(`Carimbo de ${c.nome} no livro de coleção: ${item(id).nome}! +${c.moedas.toLocaleString('pt-BR')} moedas`, 'good');
+}
+
+// ---------- Temas da roça ----------
+const TEMAS = [
+  { id: 'classico', nome: 'Clássico', nivel: 1, custo: 0, desc: 'Cerca de madeira e macieiras.', trilho: '#b98050', poste: '#a4703f', topo: '#c99260' },
+  { id: 'branca', nome: 'Cerca branca', nivel: 5, custo: 3000, desc: 'Cerca branca com roseiras.', trilho: '#f4f1ea', poste: '#dcd6ca', topo: '#ffffff', rosas: true },
+  { id: 'pedra', nome: 'Muro de pedra', nivel: 10, custo: 6000, desc: 'Muro baixo de pedra, bem de sítio.', trilho: '#a8a294', poste: '#8f897b', topo: '#c7c1b3', pedra: true },
+  { id: 'tropical', nome: 'Tropical', nivel: 15, custo: 10000, desc: 'Cerca de bambu e coqueiros.', trilho: '#c9b35a', poste: '#8fae3e', topo: '#b5cf5a', bambu: true, coqueiro: true },
+  { id: 'lago', nome: 'Lago dos patos', nivel: 20, custo: 15000, desc: 'Cerca azul e um lago com patinhos.', trilho: '#6b8fb5', poste: '#4f7299', topo: '#8fb0d1', lago: true },
+];
+const TEMA = Object.fromEntries(TEMAS.map(t => [t.id, t]));
+const temaDe = s => TEMA[s && s.tema] || TEMA.classico;
+function buyTema(id) {
+  const t = TEMA[id];
+  if (state.temas[id]) { state.tema = id; toast(`Tema ${t.nome} na roça!`, 'good'); if (isHome()) setScene('roca'); return done(); }
+  if (state.level < t.nivel) return toast(`${t.nome} libera no nível ${t.nivel}.`);
+  if (state.coins < t.custo) return toast(`${t.nome} custa ${t.custo.toLocaleString('pt-BR')} moedas.`, 'bad');
+  state.coins -= t.custo; state.temas[id] = true; state.tema = id;
+  sfx('buy'); addXP(10, null);
+  toast(`Tema ${t.nome} comprado e colocado na roça!`, 'good');
+  if (isHome()) { setScene('roca'); closePanel(); }
+  done();
+}
+const temaIcon = id => makeIcon('tema:' + id, () => {
+  L.W = 40; L.ox = 48; L.oy = 30;
+  const tm = TEMA[id];
+  quad(iso(0, 0), iso(1.6, 0), iso(1.6, 1.6), iso(0, 1.6), '#8cc84b');
+  if (tm.lago) { ctx.fillStyle = '#5aa9e6'; ctx.beginPath(); ctx.ellipse(48, 62, 22, 10, 0, 0, 7); ctx.fill(); }
+  fenceRun(iso(0, 0), iso(1.6, 0), 4, false, tm);
+  fenceRun(iso(0, 0), iso(0, 1.6), 4, true, tm);
+});
+
+// ---------- Chuva (e neve no inverno) ----------
+// Cada bloco de 20 minutos tem uma chance de começar com 5 minutos de chuva. É o mesmo para todo mundo.
+const CHUVA_BLOCO = 20 * 60e3, CHUVA_DURA = 5 * 60e3;
+function hash01(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+const raining = () => { const b = Math.floor(Date.now() / CHUVA_BLOCO); return hash01(b) < 0.2 && Date.now() - b * CHUVA_BLOCO < CHUVA_DURA; };
+let wasRaining = false;
+function weatherTick() {
+  const r = raining();
+  if (r) for (const p of state.plots) if (p.s === 'growing') p.dry = false; // a chuva rega tudo
+  if (r !== wasRaining) {
+    wasRaining = r;
+    if (r && !isGated()) toast(estacao().neve ? 'Começou a nevar! A neve está molhando a roça.' : 'Começou a chover! A chuva está regando a roça.', 'good');
+  }
+  if (window.RFAudio && window.RFAudio.rain) window.RFAudio.rain(r && scene !== 'casa' && !isGated());
+}
+const DROPS = Array.from({ length: 140 }, () => [Math.random(), Math.random(), 0.6 + Math.random() * 0.8]);
+function drawWeather(t) {
+  if (!raining()) return;
+  const { cw, ch } = L, neve = estacao().neve;
+  ctx.fillStyle = neve ? 'rgba(230,240,255,.15)' : 'rgba(40,60,90,.25)'; ctx.fillRect(0, 0, cw, ch);
+  if (neve) {
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    for (const [x, y, k] of DROPS) {
+      const py = (y * ch + t * 0.03 * k) % ch, px = (x * cw + Math.sin(t / 900 + y * 20) * 12) % cw;
+      ctx.beginPath(); ctx.arc(px, py, 1.5 + k, 0, 7); ctx.fill();
+    }
+    return;
+  }
+  ctx.strokeStyle = 'rgba(70,110,170,.6)'; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  for (const [x, y, k] of DROPS) {
+    const py = (y * ch + t * 0.6 * k) % ch, px = (x * cw - py * 0.15 + cw) % cw;
+    ctx.moveTo(px, py); ctx.lineTo(px - 4, py + 16 * k);
+  }
+  ctx.stroke();
+}
+
+// ---------- Borboletas, passarinhos e vaga-lumes ----------
+const BUGS = Array.from({ length: 5 }, (_, k) => ({ x: Math.random(), y: 0.4 + Math.random() * 0.5, s: Math.random() * 10, cor: ['#ffd54a', '#ffffff', '#ff9a3c', '#6fb6ff', '#f48fb1'][k] }));
+const PASSAROS = Array.from({ length: 3 }, () => ({ x: Math.random(), y: 0.55 + Math.random() * 0.35, hop: Math.random() * 5, dir: Math.random() < 0.5 ? 1 : -1 }));
+let bando = { t0: -1e9, y: 0.4 };
+function drawCritters(t, tod) {
+  const { cw, ch, horizon, W } = L;
+  if (raining()) return;
+  if (tod === 'noite') {
+    // vaga-lumes
+    for (let k = 0; k < 14; k++) {
+      const x = (hash01(k) * cw + Math.sin(t / 1700 + k) * 30), y = horizon + (0.2 + hash01(k + 50) * 0.75) * (ch - horizon) + Math.cos(t / 1300 + k * 2) * 20;
+      ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t / 500 + k * 3));
+      ctx.fillStyle = 'rgba(255,240,120,.35)'; ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff59a'; ctx.beginPath(); ctx.arc(x, y, 2, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    return;
+  }
+  const est = estacao(), sz = clamp(W * 0.07, 5, 10);
+  // borboletas (não aparecem no inverno)
+  if (!est.neve) for (const b of BUGS) {
+    const x = ((b.x + t / 60000 * (0.5 + (b.s % 1))) % 1.2 - 0.1) * cw + Math.sin(t / 900 + b.s) * 40;
+    const y = horizon + b.y * (ch - horizon) + Math.sin(t / 600 + b.s * 3) * 25;
+    const flap = Math.abs(Math.sin(t / 90 + b.s));
+    ctx.fillStyle = b.cor; ctx.strokeStyle = 'rgba(60,40,20,.5)'; ctx.lineWidth = 0.8;
+    for (const sgn of [-1, 1]) {
+      ctx.beginPath(); ctx.ellipse(x + sgn * sz * 0.55 * flap, y - sz * 0.2, sz * 0.6 * flap + 0.5, sz * 0.5, sgn * 0.4, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(x + sgn * sz * 0.4 * flap, y + sz * 0.35, sz * 0.4 * flap + 0.4, sz * 0.35, -sgn * 0.3, 0, 7); ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = '#3a2412'; ctx.fillRect(x - 0.8, y - sz * 0.5, 1.6, sz);
+  }
+  // passarinhos ciscando na grama
+  for (const p of PASSAROS) {
+    const hop = Math.max(0, Math.sin(t / 400 + p.hop * 7)) ** 8;
+    p.x += p.dir * hop * 0.0004; if (p.x < 0.05 || p.x > 0.95) p.dir *= -1;
+    const x = p.x * cw, y = horizon + p.y * (ch - horizon) - hop * sz * 1.2, r = sz * 0.75;
+    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, horizon + p.y * (ch - horizon) + r * 0.8, r, r * 0.3, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#8a5a33'; ctx.beginPath(); ctx.ellipse(x, y, r * 1.1, r * 0.8, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + p.dir * r * 0.8, y - r * 0.5, r * 0.55, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e8b04a'; ctx.beginPath(); ctx.moveTo(x + p.dir * r * 1.3, y - r * 0.55); ctx.lineTo(x + p.dir * r * 1.8, y - r * 0.4); ctx.lineTo(x + p.dir * r * 1.3, y - r * 0.3); ctx.fill();
+    ctx.fillStyle = '#e25a3a'; ctx.beginPath(); ctx.ellipse(x + p.dir * r * 0.3, y + r * 0.1, r * 0.5, r * 0.4, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x + p.dir * r * 0.95, y - r * 0.6, r * 0.1, 0, 7); ctx.fill();
+  }
+  // um bando passa voando no céu de vez em quando
+  if (t - bando.t0 > 26000) bando = { t0: t, y: 0.25 + Math.random() * 0.4 };
+  const age = (t - bando.t0) / 14000;
+  if (age < 1) {
+    ctx.strokeStyle = '#3a3a4a'; ctx.lineWidth = 1.6;
+    for (let k = 0; k < 4; k++) {
+      const x = -40 + age * (cw + 80) - k * 18, y = horizon * bando.y + (k % 2) * 10 + k * 4, w = 7 + Math.sin(t / 120 + k) * 3;
+      ctx.beginPath(); ctx.moveTo(x - 8, y - w * 0.5); ctx.quadraticCurveTo(x - 4, y - w, x, y); ctx.quadraticCurveTo(x + 4, y - w, x + 8, y - w * 0.5); ctx.stroke();
+    }
+  }
+}
+
+// ---------- Tela de missões e coleção ----------
+let missSeg = 'dia';
+function missoesHTML() {
+  rollPeriods();
+  const segs = [['dia', 'Diárias'], ['semana', 'Semanais'], ['colecao', 'Coleção']];
+  let html = `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-mseg="${id}" aria-selected="${missSeg === id}">${n}</button>`).join('')}</div>`;
+  const est = estacao();
+  html += `<div class="row sel"><div class="avatar" style="background:#7aa35a;font-size:26px">${est.icone}</div><div><div class="name">${est.nome}</div>
+    <div class="meta">Esta semana rendem ${Math.round(ESTACAO_BONUS * 100)}% a mais: ${est.plantas.map(id => CROP[id].nome.toLowerCase()).join(', ')}.</div></div><div></div></div>`;
+  if (missSeg === 'colecao') {
+    const lista = COLECAO(), temCarimbo = lista.filter(c => state.stamps[c.id]).length;
+    html += `<p class="hint">Cada colheita ou produto recolhido conta. ${CARIMBOS.map(c => `${c.n} dão o carimbo de ${c.nome} (+${c.moedas.toLocaleString('pt-BR')} moedas)`).join(', ')}. Você já tem ${temCarimbo} de ${lista.length} com carimbo.</p><div class="colgrid">`;
+    for (const c of lista) {
+      const n = state.col[c.id] || 0, lv = state.stamps[c.id] || 0, next = CARIMBOS[lv];
+      html += `<div class="colcard ${n ? '' : 'unknown'}" title="${esc(c.nome)}"><img alt="" src="${c.icon()}"><b>${n ? esc(c.nome) : '???'}</b><small>${n}${next ? ` / ${next.n}` : ''}</small>
+        <span class="stamps">${CARIMBOS.map((s, k) => `<i style="background:${k < lv ? s.cor : 'transparent'}" title="${s.nome}"></i>`).join('')}</span></div>`;
+    }
+    return html + '</div>';
+  }
+  const tipo = missSeg, lista = state.missions[tipo], p = tipo === 'dia' ? premioDia() : premioSemana();
+  html += `<p class="hint">${tipo === 'dia' ? 'Missões novas todo dia à meia-noite.' : 'Missões novas toda segunda-feira à meia-noite.'} Cada uma dá ${p.moedas.toLocaleString('pt-BR')} moedas e ${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}.</p>`;
+  lista.forEach((m, k) => {
+    const ok = m.feito >= m.alvo;
+    html += `<div class="row ${m.pego ? 'locked' : ok ? 'sel' : ''}"><div class="avatar" style="background:${ok ? '#4f9a2f' : '#d39a5c'}">${ok ? '✓' : k + 1}</div>
+      <div><div class="name">${m.txt.replace('{n}', m.alvo.toLocaleString('pt-BR'))}</div>
+      <div class="meta">${m.feito.toLocaleString('pt-BR')} de ${m.alvo.toLocaleString('pt-BR')}</div><div class="mbar"><i style="width:${m.feito / m.alvo * 100}%"></i></div></div>
+      ${m.pego ? '<button class="btn ghost" disabled>Pego</button>' : `<button class="btn gold" data-claim="${tipo}:${k}" ${ok ? '' : 'disabled'}>${ok ? 'Pegar' : moeda(p.moedas)}</button>`}</div>`;
+  });
+  return html;
+}
+
+// ============================================================
 // Laço principal
 // ============================================================
 let last = performance.now(), lastSave = 0, lastUI = 0, lastInfo = 0, lastSentCheck = 0;
@@ -3605,7 +4059,7 @@ function frame(now) {
   tick(dt);
   if (!isGated() && L.cw > 20) draw(now, dt);
   if (now - lastUI > 250) { updateTip(); lastUI = now; }
-  if (now - lastInfo > 2000) { tickLife(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
+  if (now - lastInfo > 2000) { tickLife(); rollPeriods(); weatherTick(); renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
   if (now - lastSave > 5000) { save(); lastSave = now; }
   if (user && dirty && now - lastCloud > 15000) cloudSave();
   if (user && now - lastSentCheck > 60000) { lastSentCheck = now; checkSent(); }
@@ -3615,7 +4069,9 @@ function frame(now) {
 function start(data) {
   state = (data && data.state && migrate(data.state)) || load() || newState();
   applySettings();
-  resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons(); afterUpdate();
+  rollPeriods();
+  resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons(); afterUpdate(); renderTabs();
+  if (!Cloud.available) setTimeout(() => { if (giftReady()) showGift(); }, 1500);
   requestAnimationFrame(t => { last = t; frame(t); });
   if (Cloud.available) {
     showGate('loading');
