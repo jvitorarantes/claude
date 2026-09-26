@@ -3492,7 +3492,7 @@ function renderPane() {
         html += `<div class="row ${locked ? 'locked' : ''} ${owned ? 'sel' : ''}">
           <img alt="" src="${decorIcon(d.id)}">
           <div><div class="name">${d.nome}</div><div class="meta">${d.custo} moedas · +${d.conforto} de conforto</div></div>
-          ${owned ? `<button class="btn ghost" data-see-house>Na casa</button>` : locked ? `<button class="btn" disabled>Nível ${d.nivel}</button>` : `<button class="btn" data-buy-decor="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>${moeda(d.custo)}</button>`}
+          ${owned ? `<div class="stack"><button class="btn ghost" data-see-house>Na casa</button>${venderBtn('dec:' + d.id, Math.floor(d.custo / 2))}</div>` : locked ? `<button class="btn" disabled>Nível ${d.nivel}</button>` : `<button class="btn" data-buy-decor="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>${moeda(d.custo)}</button>`}
         </div>`;
       }
     }
@@ -3618,6 +3618,7 @@ $('#pane').addEventListener('click', e => {
   if ('skin' in d) { state.skin = d.skin || null; toast(d.skin ? 'Celeiro e casa dos Pioneiros!' : 'Celeiro e casa clássicos.', 'good'); if (isHome()) setScene('roca'); return done(); }
   if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar);
   if (d.invPor) return invPor(d.invPor, d.sc);
+  if (d.venderDec) return venderDecoracao(d.venderDec);
   if (d.invGuardar) { const [sc, i] = d.invGuardar.split(':'); return invGuardar(sc, Number(i)); }
   if (d.pocao) {
     const n = Number(d.pocao) || 1;
@@ -4936,6 +4937,33 @@ function drawMoving(sc, t) {
   else drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro);
   ctx.globalAlpha = 1;
 }
+// Vender decoração: metade do que custou, com um clique a mais para confirmar. Itens de evento não se vendem.
+let vendaArmed = null;
+const venderBtn = (key, preco) => vendaArmed === key
+  ? `<button class="btn danger" data-vender-dec="${key}">Confirmar</button>`
+  : `<button class="btn ghost" data-vender-dec="${key}">Vender ${moeda(preco)}</button>`;
+function venderDecoracao(key) {
+  if (vendaArmed !== key) {
+    vendaArmed = key; renderPane();
+    setTimeout(() => { if (vendaArmed === key) { vendaArmed = null; renderPane(); } }, 4000);
+    return;
+  }
+  vendaArmed = null;
+  const [tipo, id] = key.split(':');
+  let nome, preco;
+  if (tipo === 'enf') {
+    const e = ENFEITE[id];
+    if (!e || e.especial || !(state.enfeites[id] > 0)) return;
+    state.enfeites[id]--; nome = e.nome; preco = Math.floor(e.custo / 2);
+  } else {
+    const d = DECO[id];
+    if (!d || !state.decor[id]) return;
+    delete state.decor[id]; nome = d.nome; preco = Math.floor(d.custo / 2);
+  }
+  state.coins += preco; sfx('coin');
+  toast(`Vendeu ${nome.toLowerCase()} por ${preco.toLocaleString('pt-BR')} moedas.`, 'good');
+  done();
+}
 function comprarEnfeite(id) {
   const e = ENFEITE[id];
   if (e.especial) return;
@@ -4953,13 +4981,14 @@ function actEnfeite(id) {
 // ---------- Inventário: enfeites guardados e os que estão na roça ou no rancho ----------
 function inventarioHTML() {
   if (state.invNovos) { state.invNovos = 0; setTimeout(renderTabs, 0); save(); }
-  let html = `<p class="hint">Aqui ficam os enfeites que você comprou ou ganhou. Para pôr um na roça ou no rancho, escolha e clique no lugar. Para mudar de lugar, use o botão Mover.</p>`;
+  let html = `<p class="hint">Dá para vender enfeites guardados pela metade do preço (os de eventos não se vendem).</p><p class="hint">Aqui ficam os enfeites que você comprou ou ganhou. Para pôr um na roça ou no rancho, escolha e clique no lugar. Para mudar de lugar, use o botão Mover.</p>`;
   const guardados = ENFEITES.filter(e => state.enfeites[e.id] > 0);
   html += `<h3>Guardados</h3>`;
   if (!guardados.length) html += `<div class="empty">Nada guardado. Compre enfeites na Loja › Enfeites.</div>`;
   for (const e of guardados) {
     html += `<div class="row wide ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome} × ${state.enfeites[e.id]}${e.especial ? ' <span class="tag">⭐ pioneiros</span>' : ''}</div><div class="meta">+${e.conforto}% de XP quando está na roça ou no rancho</div></div>
-      <div class="actions"><button class="btn gold" data-inv-por="${e.id}" data-sc="roca">Pôr na roça</button><button class="btn gold" data-inv-por="${e.id}" data-sc="animais">Pôr no rancho</button></div></div>`;
+      <div class="actions"><button class="btn gold" data-inv-por="${e.id}" data-sc="roca">Pôr na roça</button><button class="btn gold" data-inv-por="${e.id}" data-sc="animais">Pôr no rancho</button>
+      ${e.especial ? '' : venderBtn('enf:' + e.id, Math.floor(e.custo / 2))}</div></div>`;
   }
   for (const sc of ['roca', 'animais']) {
     const l = objetosDe(state, sc);
