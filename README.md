@@ -2,6 +2,8 @@
 
 Um jogo de fazenda no navegador, inspirado no clássico *Colheita Feliz* do Orkut.
 
+A fazenda ocupa a tela toda, como no original. O cartão do jogador (foto, nível, experiência e moedas) fica no canto de cima. Os lugares (Roça, Rancho e Casa) ficam à esquerda, e o menu (Loja, Celeiro, Terreno e Amigos) à direita, abrindo uma janela por cima do jogo. As ferramentas são botões redondos embaixo.
+
 Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, abra o `index.html` num servidor qualquer (veja abaixo) ou publique no GitHub Pages.
 
 ## O que tem no jogo
@@ -12,9 +14,10 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **3 fertilizantes**: básico (corta 10% do tempo, 50 moedas), rápido (25%, 200) e premium (50%, 1.000). Um por colheita.
 - **Música e sons**: 3 músicas calmas de roça e sons para cliques, regar, enxada, colher e mais. Tudo é sintetizado no navegador (`js/audio.js`), sem arquivos de áudio.
 - **Configurações** (engrenagem no topo): liga e desliga música e sons, volume de cada um, escolha da música e tema (automático, dia ou noite).
-- **Animais de produção**: galinha, pato, coelho, cabra, ovelha, vaca, colmeia, porca e búfala. Cada produção custa uma ração em moedas. Nenhum animal morre: sem comida ele só para, e depois do período produtivo (30 a 60 dias) precisa do veterinário. A porca tem leitões, que viram porquinhos no curral. A ração especial faz a próxima produção render em dobro. Botões para alimentar e recolher tudo de uma vez.
+- **Rancho com 8 abrigos**, cada um com o seu cercado: galinheiro (galinha e pato), coelheira, chiqueiro (porca e porquinho), apiário (colmeias), aprisco (cabra e ovelha), estábulo (bezerro, vaca e búfala), cocheira (cavalo, potro e burro) e viveiro (pavão e avestruz). O galinheiro já vem pronto. Os outros são construídos na Loja (aba Abrigos) ou clicando na placa no rancho. Cada abrigo tem 3 níveis: cabem 4, 6 e 8 animais. No celular, dá para arrastar o rancho para ver tudo.
+- **Animais de produção**: galinha, pato, coelho, cabra, ovelha, vaca, colmeia, porca e búfala. Cada produção custa uma ração em moedas. Nenhum animal morre: sem comida ele só para, e depois do período produtivo (30 a 60 dias) precisa do veterinário. A porca tem leitões, que viram porquinhos no chiqueiro. A ração especial faz a próxima produção render em dobro. Botões para alimentar e recolher tudo de uma vez.
 - **Animais para criar e vender**: porquinho, bezerro, burro, potro e avestruz. Comem uma vez por dia e são vendidos adultos.
-- **Companhia**: gato, tartaruga e arara moram dentro de casa; cavalo e pavão, no curral. Dá para trocar o nome e fazer carinho.
+- **Companhia**: gato, tartaruga e arara moram dentro de casa; o cavalo mora na cocheira e o pavão no viveiro. Dá para trocar o nome e fazer carinho.
 - **Cães de guarda**: a casinha fica do lado do celeiro. Dá para ter 2 cachorros, um para a plantação e outro para os animais, de 3 raças com preço, vida e força diferentes. Com ração (dura 8h) o cachorro fica acordado, espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. Ele também dá XP por dia e por ladrão pego.
 - **Plantação pronta** aparece com um check verde.
 - **Casa com 6 decorações**: tapete, vaso de planta, quadro, abajur, sofá e televisão. Cada uma dá conforto, e cada ponto de conforto vale +1% de XP.

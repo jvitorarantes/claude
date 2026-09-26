@@ -46,102 +46,120 @@
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html, body { margin: 0; }
+  html, body { margin: 0; min-height: 100%; }
   body {
     background: linear-gradient(var(--bg1), var(--bg2) 260px, var(--bg3));
     color: var(--ink);
     font-family: 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
     font-size: 15px;
     line-height: 1.35;
-    padding: 12px 16px 28px;
-    min-height: 100%;
   }
   button, input { font: inherit; color: inherit; }
   button { cursor: pointer; }
   button:focus-visible, input:focus-visible { outline: 3px solid var(--xp); outline-offset: 2px; }
-  .app { max-width: 1240px; margin: 0 auto; display: grid; gap: 12px; }
 
-  /* HUD */
-  .hud {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
-    background: var(--wood); color: #fff1d6;
-    border-radius: 14px; padding: 8px 16px;
-    box-shadow: inset 0 -4px 0 rgba(0,0,0,.22), 0 2px 0 rgba(0,0,0,.08);
+  /* O jogo ocupa a tela toda; os botões ficam por cima, como no Colheita Feliz */
+  .app { position: fixed; inset: 0; overflow: hidden; }
+  .stage {
+    position: absolute; inset: 0; background: #8cc84b;
+    touch-action: none; user-select: none; -webkit-user-select: none;
   }
-  .brand {
-    font-family: 'Chewy', 'Comic Sans MS', cursive; font-size: 30px; line-height: 1;
-    color: #ffe08a; text-shadow: 0 3px 0 #4a2a10; letter-spacing: .5px;
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .over { position: absolute; z-index: 2; }
+  .outline { color: #fff; text-shadow: 0 1px 0 #3a2412, 0 -1px 0 #3a2412, 1px 0 0 #3a2412, -1px 0 0 #3a2412, 0 2px 3px rgba(0,0,0,.5); }
+
+  /* Cartão do jogador (canto de cima) */
+  .player {
+    top: 10px; left: 10px; display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(#a86b38, #7a4a22); border: 3px solid #f3d9a4; border-radius: 40px 18px 18px 40px;
+    padding: 4px 14px 4px 4px; color: #fff1d6; box-shadow: 0 4px 0 rgba(0,0,0,.25);
+    max-width: calc(100% - 120px);
   }
-  .hud .spacer { flex: 1; }
-  .stat { display: flex; align-items: center; gap: 8px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .avatar-ring { position: relative; width: 58px; height: 58px; flex: none; }
+  .avatar-ring .face {
+    width: 58px; height: 58px; border-radius: 50%; border: 3px solid #ffe08a; background: #ffe9b8; overflow: hidden;
+    display: grid; place-items: center; font: 400 28px/1 Chewy, cursive; color: #7a4a22;
+  }
+  .avatar-ring img { width: 100%; height: 100%; object-fit: cover; }
   .lvl {
-    width: 38px; height: 38px; border-radius: 50%;
-    display: grid; place-items: center;
-    background: #ffd54a; color: #5a3a0c; font-size: 18px;
-    box-shadow: inset 0 -3px 0 #d69c00;
+    position: absolute; right: -6px; bottom: -4px; min-width: 28px; height: 28px; padding: 0 4px; border-radius: 14px;
+    display: grid; place-items: center; background: #ffd54a; color: #5a3a0c; font-weight: 800; font-size: 15px;
+    border: 2px solid #a87400; box-shadow: 0 2px 0 rgba(0,0,0,.25); font-variant-numeric: tabular-nums;
   }
-  .xpwrap { display: grid; gap: 2px; min-width: 150px; }
-  .xpwrap small { font-weight: 600; opacity: .85; font-size: 12px; }
-  .xpbar { height: 10px; border-radius: 6px; background: rgba(0,0,0,.3); overflow: hidden; }
-  .xpbar i { display: block; height: 100%; width: 0; background: linear-gradient(#7cc8f5, var(--xp)); transition: width .3s; }
+  .pinfo { display: grid; gap: 2px; min-width: 0; }
+  .pname { font-weight: 800; font-size: 15px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .xpbar { position: relative; height: 14px; width: 150px; max-width: 40vw; border-radius: 8px; background: rgba(0,0,0,.35); overflow: hidden; border: 1px solid rgba(255,255,255,.3); }
+  .xpbar i { display: block; height: 100%; width: 0; background: linear-gradient(#9fe06a, #4caf2a); transition: width .3s; }
+  .xpbar small { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 1px #000; line-height: 1; }
+  .coins { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; color: #ffe08a; line-height: 1.1; }
   .coin {
-    width: 22px; height: 22px; border-radius: 50%;
+    width: 18px; height: 18px; border-radius: 50%; flex: none;
     background: radial-gradient(circle at 35% 35%, #fff2a8, var(--gold) 55%, #c98c00);
     box-shadow: inset 0 0 0 2px #b77f00;
   }
-  .coins { font-size: 20px; }
-  .acct { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
-  .acct img { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #ffe08a; background: #fff; }
-  .acct .who { display: grid; line-height: 1.15; }
-  .acct .who small { opacity: .8; font-weight: 400; }
-  .acct-note { opacity: .85; font-size: 13px; }
-  .gbtn {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: #fff; color: #3c4043; border: 0; border-radius: 20px;
-    padding: 5px 14px 5px 8px; font-weight: 700; font-size: 14px;
-    box-shadow: 0 2px 0 rgba(0,0,0,.25);
+  .topright { top: 12px; right: 10px; display: flex; align-items: center; gap: 8px; }
+  .sceneinfo {
+    font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums; color: #fff;
+    background: rgba(60,36,14,.6); border-radius: 14px; padding: 3px 10px;
   }
-  .gbtn svg { width: 20px; height: 20px; }
-  .linkbtn { background: none; border: 0; color: #ffe08a; text-decoration: underline; padding: 0; font-size: 13px; }
-
-  /* Principal */
-  .main { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 12px; align-items: start; }
-  @media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
-  .left { display: grid; gap: 10px; min-width: 0; }
+  .sceneinfo:empty { display: none; }
+  .iconbtn {
+    width: 44px; height: 44px; border-radius: 50%; border: 3px solid #f3d9a4; display: grid; place-items: center;
+    background: linear-gradient(#a86b38, #7a4a22); color: #ffe08a; box-shadow: 0 3px 0 rgba(0,0,0,.25);
+  }
+  .iconbtn:hover { filter: brightness(1.1); }
+  .iconbtn svg { width: 24px; height: 24px; }
 
   .banner {
-    display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between;
-    background: #fff3c4; border: 3px solid var(--wood-3); border-radius: 12px; padding: 6px 12px;
-    font-weight: 600; color: #2f2a1f;
+    top: 78px; left: 50%; transform: translateX(-50%); width: max-content; max-width: min(720px, calc(100% - 240px));
+    display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: center;
+    background: #fff3c4; border: 3px solid var(--wood-3); border-radius: 14px; padding: 6px 12px;
+    font-weight: 600; color: #2f2a1f; box-shadow: 0 3px 0 rgba(0,0,0,.15); font-size: 14px;
   }
-  .scenebar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
-  .seg { display: inline-flex; background: var(--wood-2); border-radius: 12px; padding: 3px; gap: 3px; }
-  .seg button {
-    border: 0; border-radius: 9px; padding: 4px 14px; font-weight: 800;
-    background: transparent; color: #fff1d6;
-  }
-  .seg button[aria-selected="true"] { background: var(--panel); color: var(--heading); }
-  .seg.small button { padding: 3px 10px; font-size: 13px; }
-  .seg.small { flex-wrap: wrap; }
-  .seg.small button { padding: 3px 8px; }
-  .row.wide { grid-template-columns: 48px minmax(0, 1fr); }
-  .row .actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
-  .row .actions .btn { flex: 1; }
-  .news { display: grid; gap: 4px; }
-  .news > div { background: var(--card); border: 2px solid var(--panel-2); border-radius: 10px; padding: 5px 10px; font-size: 13px; }
-  .news > div.new { border-color: var(--gold); background: var(--sel); font-weight: 600; }
-  .news time { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
-  .sceneinfo { font-weight: 700; color: var(--heading); font-size: 14px; font-variant-numeric: tabular-nums; }
 
-  .stage {
-    position: relative; border: 5px solid var(--wood); border-radius: 16px; overflow: hidden;
-    background: #8cc84b; aspect-ratio: 16 / 10; max-width: 100%;
-    box-shadow: 0 4px 0 rgba(0,0,0,.12);
-    touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  /* Botões redondos (lugares, menu e ferramentas) */
+  .roundbtn { display: grid; justify-items: center; gap: 1px; background: none; border: 0; padding: 0; width: 70px; position: relative; }
+  .roundbtn .ic {
+    width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 35%, #fffdf2, #f1ddb0); border: 3px solid #8a5a2b;
+    box-shadow: 0 3px 0 #5a3614; transition: transform .1s;
   }
-  .stage canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .roundbtn .ic svg, .roundbtn .ic img { width: 34px; height: 34px; }
+  .roundbtn .lb { font-size: 12px; font-weight: 800; line-height: 1.1; white-space: nowrap; max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
+  .roundbtn:hover .ic { transform: translateY(-2px); }
+  .roundbtn:active .ic { transform: translateY(2px); box-shadow: 0 1px 0 #5a3614; }
+  .roundbtn[aria-selected="true"] .ic, .roundbtn[aria-pressed="true"] .ic {
+    background: radial-gradient(circle at 50% 35%, #fffbe0, #ffd54a); border-color: #b77f00;
+    box-shadow: 0 3px 0 #8a5a00, 0 0 0 4px rgba(255,236,140,.75);
+  }
+  .roundbtn .badge { position: absolute; top: -2px; right: 6px; margin: 0; }
+  .scenes { left: 10px; top: 92px; display: grid; gap: 6px; }
+  .menu { right: 10px; top: 70px; display: grid; gap: 6px; }
+
+  .bottombar {
+    bottom: 10px; left: 8px; right: 8px; pointer-events: none;
+    display: grid; justify-items: center; gap: 4px;
+  }
+  .bottombar > * { pointer-events: auto; }
+  .tools, .penactions {
+    display: flex; gap: 2px; align-items: flex-end; padding: 6px 10px 4px;
+    background: rgba(74,42,16,.55); border: 2px solid rgba(255,235,190,.45); border-radius: 44px;
+    max-width: 100%; overflow-x: auto; scrollbar-width: none;
+  }
+  .tools::-webkit-scrollbar { display: none; }
+  .tool { width: 64px; flex: none; }
+  .tool .ic { width: 50px; height: 50px; }
+  .tool .ic svg, .tool .ic img { width: 30px; height: 30px; }
+  .tool[aria-pressed="true"] .ic { transform: translateY(-4px); }
+  .penactions { gap: 10px; padding: 8px 12px; }
+  .penactions .btn { font-size: 15px; padding: 6px 16px; border-radius: 22px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+  .hintline {
+    max-width: 560px; text-align: center; font-size: 13px; font-weight: 600; color: #fff;
+    background: rgba(60,36,14,.6); border-radius: 12px; padding: 3px 12px;
+  }
+
   .tip {
-    position: absolute; pointer-events: none; z-index: 3;
+    position: absolute; pointer-events: none; z-index: 6;
     background: rgba(40, 26, 12, .92); color: #fff4df;
     border-radius: 10px; padding: 6px 10px; font-size: 13px; line-height: 1.3;
     max-width: 230px; box-shadow: 0 4px 12px rgba(0,0,0,.25);
@@ -150,7 +168,7 @@
   .tip .bar { height: 6px; background: rgba(255,255,255,.2); border-radius: 4px; margin-top: 4px; overflow: hidden; }
   .tip .bar i { display: block; height: 100%; background: #8fdc5a; }
   .tip .warn { color: #ffb4a4; }
-  .toasts { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; z-index: 4; pointer-events: none; width: max-content; max-width: 90%; }
+  .toasts { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; z-index: 8; pointer-events: none; width: max-content; max-width: 90%; }
   .toast {
     background: #fffbe8; color: #2f2a1f; border: 3px solid var(--wood-2);
     border-radius: 12px; padding: 4px 12px; font-weight: 700; text-align: center;
@@ -160,31 +178,35 @@
   .toast.good { border-color: var(--leaf); }
   @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-  /* Ferramentas */
-  .tools { display: flex; flex-wrap: wrap; gap: 8px; }
-  .tool {
-    display: flex; align-items: center; gap: 6px;
-    background: var(--panel); border: 3px solid var(--wood-2); border-radius: 12px;
-    padding: 4px 10px 4px 6px; font-weight: 700;
-    box-shadow: 0 3px 0 var(--wood);
-    transition: transform .08s;
+  /* Janela da loja, celeiro, terreno e amigos */
+  .panel {
+    position: absolute; z-index: 5; top: 70px; right: 92px; bottom: 12px; width: 390px;
+    display: flex; flex-direction: column;
+    background: var(--panel); border: 5px solid var(--wood); border-radius: 20px; overflow: hidden;
+    box-shadow: 0 8px 0 rgba(0,0,0,.2), 0 10px 30px rgba(0,0,0,.25); animation: pop .18s ease-out;
   }
-  .tool:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--wood); }
-  .tool svg, .tool img { width: 28px; height: 28px; flex: none; }
-  .tool kbd { font: 600 11px/1 'Baloo 2', monospace; color: var(--muted); border: 1px solid #c9c3a8; border-radius: 4px; padding: 2px 4px; }
-  .tool[aria-pressed="true"] { background: #ffe08a; border-color: var(--wood); color: #2f2a1f; }
-  .hintline { color: var(--muted); font-size: 13px; }
-
-  /* Painel */
-  .panel { background: var(--panel); border: 4px solid var(--wood-2); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 0 rgba(0,0,0,.1); }
-  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--wood-2); gap: 3px; padding: 4px 4px 0; }
-  .tab {
-    border: 0; border-radius: 10px 10px 0 0; padding: 6px 2px;
-    background: var(--wood-3); color: #4a2a10; font-weight: 800; font-size: 14px;
+  .panel-head { display: flex; align-items: center; justify-content: space-between; background: linear-gradient(#a86b38, #7a4a22); padding: 6px 8px 6px 16px; flex: none; }
+  .panel-head h2 { margin: 0; font: 400 26px/1.1 Chewy, cursive; color: #ffe08a; letter-spacing: .5px; text-shadow: 0 2px 0 #4a2a10; }
+  .panel-head .iconbtn { width: 36px; height: 36px; border-width: 2px; }
+  .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 4px; padding: 0 5px; border-radius: 10px; background: var(--red); color: #fff; font-size: 12px; font-weight: 800; line-height: 1; border: 2px solid #fff; }
+  .seg { display: inline-flex; background: var(--wood-2); border-radius: 12px; padding: 3px; gap: 3px; }
+  .seg button {
+    border: 0; border-radius: 9px; padding: 4px 14px; font-weight: 800;
+    background: transparent; color: #fff1d6;
   }
-  .tab[aria-selected="true"] { background: var(--panel); color: var(--heading); }
-  .badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; padding: 0 4px; border-radius: 9px; background: var(--red); color: #fff; font-size: 11px; line-height: 1; vertical-align: 1px; }
-  .pane { padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; max-height: 640px; overflow-y: auto; overflow-x: hidden; }
+  .seg button[aria-selected="true"] { background: var(--panel); color: var(--heading); }
+  .seg.small { flex-wrap: wrap; }
+  .seg.small button { padding: 3px 8px; font-size: 13px; }
+  .row.wide { grid-template-columns: 48px minmax(0, 1fr); }
+  .row .actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .row .actions .btn { flex: 1; }
+  .row.flash { animation: flash 1.2s ease-out 2; }
+  @keyframes flash { 0%, 100% { box-shadow: none; } 40% { box-shadow: 0 0 0 4px var(--gold); } }
+  .news { display: grid; gap: 4px; }
+  .news > div { background: var(--card); border: 2px solid var(--panel-2); border-radius: 10px; padding: 5px 10px; font-size: 13px; }
+  .news > div.new { border-color: var(--gold); background: var(--sel); font-weight: 600; }
+  .news time { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+  .pane { padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; align-content: start; overflow-y: auto; overflow-x: hidden; flex: 1; overscroll-behavior: contain; }
   .pane h3 { margin: 4px 0 0; font-family: 'Chewy', cursive; font-weight: 400; font-size: 22px; color: var(--heading); letter-spacing: .3px; }
   .pane p.hint { margin: 0; color: var(--muted); font-size: 13px; }
   .row {
@@ -202,11 +224,13 @@
     border: 0; border-radius: 10px; padding: 4px 12px; font-weight: 800;
     background: var(--leaf); color: #fff; box-shadow: 0 3px 0 var(--leaf-d);
   }
+  .btn small { font-weight: 700; opacity: .9; }
   .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--leaf-d); }
   .btn:disabled { background: #b7b39c; box-shadow: 0 3px 0 #8f8a73; cursor: not-allowed; }
   .btn.gold { background: #e9a800; box-shadow: 0 3px 0 #a87400; }
   .btn.ghost { background: transparent; color: var(--heading); box-shadow: none; border: 2px solid var(--wood-3); }
   .btn.danger { background: var(--red); box-shadow: 0 3px 0 #862516; }
+  .penactions .btn.ghost { color: #fff; }
   .stack { display: grid; gap: 4px; }
   .total { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 800; }
   .kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-variant-numeric: tabular-nums; }
@@ -222,14 +246,23 @@
     flex: 1; min-width: 0; border: 2px solid var(--wood-3); border-radius: 10px; padding: 4px 10px;
     background: var(--card); text-transform: uppercase; letter-spacing: 2px; font-weight: 700;
   }
-  .foot { text-align: center; color: var(--muted); font-size: 12px; }
-  /* Configurações */
-  .iconbtn {
-    width: 38px; height: 38px; border-radius: 50%; border: 0; display: grid; place-items: center;
-    background: rgba(255,255,255,.15); color: #ffe08a;
+  .brand {
+    font-family: 'Chewy', 'Comic Sans MS', cursive; font-size: 30px; line-height: 1;
+    color: #ffe08a; text-shadow: 0 3px 0 #4a2a10; letter-spacing: .5px;
   }
-  .iconbtn:hover { background: rgba(255,255,255,.25); }
-  .iconbtn svg { width: 24px; height: 24px; }
+  .acct { display: flex; align-items: center; gap: 10px; font-weight: 600; flex-wrap: wrap; }
+  .acct img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--wood-3); background: #fff; }
+  .acct .who { display: grid; line-height: 1.15; flex: 1; }
+  .acct .who small { color: var(--muted); font-weight: 400; }
+  .acct-note { color: var(--muted); font-size: 13px; }
+  .gbtn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #fff; color: #3c4043; border: 2px solid #dadce0; border-radius: 20px;
+    padding: 5px 14px 5px 8px; font-weight: 700; font-size: 14px;
+    box-shadow: 0 2px 0 rgba(0,0,0,.15);
+  }
+  .gbtn svg { width: 20px; height: 20px; }
+  /* Configurações */
   .modal {
     position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
     background: rgba(20, 14, 6, .55); padding: 16px;
@@ -264,7 +297,7 @@
   .tema button { padding: 6px 4px; }
 
   /* Tela de entrada */
-  .gate { display: none; min-height: calc(100vh - 40px); min-height: calc(100dvh - 40px); place-items: center; }
+  .gate { display: none; min-height: 100vh; min-height: 100dvh; place-items: center; padding: 16px; }
   .gated .gate { display: grid; }
   .gated .app { display: none; }
   .gate-card {
@@ -284,12 +317,32 @@
   .gbtn.big svg { width: 24px; height: 24px; }
   .gate-note { color: var(--muted); max-width: 34ch; }
 
-  @media (max-width: 560px) {
-    .stage { aspect-ratio: 4 / 3; }
+  @media (max-width: 699px) {
+    .player { top: 6px; left: 6px; gap: 6px; padding-right: 10px; }
+    .avatar-ring, .avatar-ring .face { width: 48px; height: 48px; }
+    .xpbar { width: 110px; }
+    .topright { top: 8px; right: 6px; }
+    .topright .sceneinfo { display: none; }
+    .roundbtn { width: 46px; }
+    .roundbtn .ic { width: 42px; height: 42px; border-width: 2px; }
+    .roundbtn .ic svg, .roundbtn .ic img { width: 26px; height: 26px; }
+    .roundbtn .lb { font-size: 10px; max-width: 50px; }
+    .scenes { left: 2px; top: 80px; gap: 4px; }
+    .menu { right: 2px; top: 60px; gap: 4px; }
+    .tool { width: 50px; }
+    .tool .ic { width: 42px; height: 42px; }
+    .tool .ic svg, .tool .ic img { width: 26px; height: 26px; }
+    .tools { padding: 4px 6px 2px; }
+    .bottombar { bottom: 6px; }
+    .hintline, .penactions .wide { display: none; }
+    .banner { top: 64px; max-width: calc(100% - 100px); font-size: 12px; padding: 4px 8px; }
+    .toasts { top: 70px; }
     .toast { font-size: 12px; padding: 2px 8px; }
-    .brand { font-size: 26px; }
+    .panel { top: 74px; right: 50px; left: 4px; bottom: 4px; width: auto; }
+    .penactions { gap: 6px; padding: 6px 8px; }
+    .penactions .btn { font-size: 13px; padding: 5px 10px; }
   }
-  @media (prefers-reduced-motion: reduce) { .toast { animation: none; } .xpbar i { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .toast, .panel { animation: none; } .xpbar i { transition: none; } .row.flash { animation: none; } }
 </style>
 </head>
 <body>
@@ -311,61 +364,60 @@
   </div>
 </div>
 <div class="app">
-  <header class="hud">
-    <div class="brand">Roça Feliz</div>
-    <div class="stat">
-      <div class="lvl" id="lvl" title="Nível">1</div>
-      <div class="xpwrap">
-        <small id="xptxt">0 / 30 XP</small>
-        <div class="xpbar"><i id="xpbar"></i></div>
-      </div>
-    </div>
-    <div class="stat coins"><div class="coin" aria-hidden="true"></div><span id="coins">0</span></div>
-    <div class="spacer"></div>
-    <div class="acct" id="account"></div>
-    <button class="iconbtn" id="openSettings" type="button" aria-label="Configurações" title="Configurações"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
-  </header>
+  <div class="stage" id="stage">
+    <canvas id="cv" aria-label="Sua roça"></canvas>
+    <div class="tip" id="tip" hidden></div>
 
-  <div class="main">
-    <div class="left">
-      <div class="banner" id="banner" hidden>
-        <span id="bannerTxt"></span>
-        <button class="btn" id="goHome" type="button">Voltar para minha roça</button>
+    <header class="player over outline" aria-label="Você">
+      <div class="avatar-ring"><div class="face" id="face">R</div><div class="lvl" id="lvl" title="Nível">1</div></div>
+      <div class="pinfo">
+        <div class="pname" id="pname">Roça Feliz</div>
+        <div class="xpbar" title="Experiência"><i id="xpbar"></i><small id="xptxt">0 / 100</small></div>
+        <div class="coins"><span class="coin" aria-hidden="true"></span><span id="coins">0</span></div>
       </div>
-      <div class="scenebar">
-        <div class="seg" role="tablist" aria-label="Lugar" id="scenes">
-          <button type="button" role="tab" data-scene="roca" aria-selected="true">Roça</button>
-          <button type="button" role="tab" data-scene="animais" aria-selected="false">Animais</button>
-          <button type="button" role="tab" data-scene="casa" aria-selected="false">Casa</button>
-        </div>
-        <span class="sceneinfo" id="sceneInfo"></span>
-      </div>
-      <div class="stage" id="stage">
-        <canvas id="cv" aria-label="Sua roça"></canvas>
-        <div class="tip" id="tip" hidden></div>
-        <div class="toasts" id="toasts"></div>
-      </div>
-      <div class="tools" id="tools" role="toolbar" aria-label="Ferramentas"></div>
-      <div class="tools" id="penActions" hidden></div>
+    </header>
+    <div class="topright over">
+      <span class="sceneinfo" id="sceneInfo"></span>
+      <button class="iconbtn" id="openSettings" type="button" aria-label="Configurações" title="Configurações"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    </div>
+    <div class="banner over" id="banner" hidden>
+      <span id="bannerTxt"></span>
+      <button class="btn" id="goHome" type="button">Voltar para minha roça</button>
+    </div>
+    <div class="toasts" id="toasts"></div>
+
+    <nav class="scenes over outline" id="scenes" role="tablist" aria-label="Lugar">
+      <button class="roundbtn" type="button" role="tab" data-scene="roca" aria-selected="true"><span class="ic"></span><span class="lb">Roça</span></button>
+      <button class="roundbtn" type="button" role="tab" data-scene="animais" aria-selected="false"><span class="ic"></span><span class="lb">Rancho</span></button>
+      <button class="roundbtn" type="button" role="tab" data-scene="casa" aria-selected="false"><span class="ic"></span><span class="lb">Casa</span></button>
+    </nav>
+    <nav class="menu over outline" aria-label="Menu">
+      <button class="roundbtn tab" type="button" data-tab="loja" aria-selected="false"><span class="ic"></span><span class="lb">Loja</span></button>
+      <button class="roundbtn tab" type="button" data-tab="celeiro" aria-selected="false"><span class="ic"></span><span class="lb">Celeiro</span></button>
+      <button class="roundbtn tab" type="button" data-tab="terreno" aria-selected="false"><span class="ic"></span><span class="lb">Terreno</span></button>
+      <button class="roundbtn tab" type="button" data-tab="amigos" aria-selected="false"><span class="ic"></span><span class="lb">Amigos</span></button>
+    </nav>
+
+    <div class="bottombar over">
       <div class="hintline" id="sceneHint" hidden></div>
+      <div class="tools outline" id="tools" role="toolbar" aria-label="Ferramentas"></div>
+      <div class="penactions" id="penActions" hidden></div>
     </div>
 
-    <aside class="panel">
-      <div class="tabs" role="tablist">
-        <button class="tab" role="tab" data-tab="loja" aria-selected="true">Loja</button>
-        <button class="tab" role="tab" data-tab="celeiro" aria-selected="false">Celeiro</button>
-        <button class="tab" role="tab" data-tab="terreno" aria-selected="false">Terreno</button>
-        <button class="tab" role="tab" data-tab="amigos" aria-selected="false">Amigos</button>
-      </div>
+    <aside class="panel" id="panel" hidden aria-labelledby="panelTitle">
+      <div class="panel-head"><h2 id="panelTitle">Loja</h2><button class="iconbtn" type="button" id="closePanel" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="pane" id="pane"></div>
     </aside>
   </div>
-  <div class="foot">Atalhos na roça: 1–7 trocam de ferramenta. A engrenagem no topo tem música, sons e tema.</div>
 </div>
 
 <div class="modal" id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="setTitle">
   <div class="modal-card">
     <div class="modal-head"><h2 id="setTitle">Configurações</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <section>
+      <h3>Conta</h3>
+      <div class="acct" id="account"></div>
+    </section>
     <section>
       <h3>Música</h3>
       <div class="setrow"><label for="optMusic">Tocar música</label><input type="checkbox" class="switch" id="optMusic"></div>
@@ -384,7 +436,7 @@
         <button type="button" data-tema="dia">Dia</button>
         <button type="button" data-tema="noite">Noite</button>
       </div>
-      <p class="hint" style="margin:0;color:var(--muted);font-size:13px">Automático segue o relógio: de noite, a roça escurece.</p>
+      <p class="hint" style="margin:0;color:var(--muted);font-size:13px">Automático segue o relógio: de noite, a roça escurece. Na roça, as teclas 1 a 7 trocam de ferramenta.</p>
     </section>
   </div>
 </div>

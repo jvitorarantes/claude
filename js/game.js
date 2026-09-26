@@ -6,7 +6,7 @@
 // ============================================================
 const COLS = 10, ROWS = 10, N = COLS * ROWS;
 const START_LOTS = [0, 1, 2, 10, 11, 12]; // os 6 canteiros iniciais, no canto perto do celeiro
-const PEN_C = 6, PEN_R = 4, ROOM = 5, MAX_ANIMALS = 20;
+const ROOM = 5;
 const HOUR = 3600, DAY = 86400e3; // HOUR em segundos (tempos de produção), DAY em milissegundos (idades)
 const SAVE_KEY = 'roca-feliz-v3', OLD_SAVE_KEYS = ['roca-feliz-v2', 'roca-feliz-v1'], SETTINGS_KEY = 'roca-feliz-config';
 const settings = Object.assign(
@@ -107,6 +107,42 @@ const ANIMAL = Object.fromEntries(ANIMALS.map(a => [a.id, a]));
 const RACAO_ESP = 100; // ração especial: a próxima produção rende em dobro
 const vetCost = d => Math.round(d.custo * 0.25);
 const inPen = a => ANIMAL[a.k].tipo !== 'pet' || ANIMAL[a.k].lugar === 'curral';
+
+// Abrigos do rancho: cada bicho mora no seu. Cada nível aumenta quantos cabem.
+// precos: construir (nível 1), depois aumentar para o nível 2 e o 3.
+const ABRIGOS = [
+  { id: 'galinheiro', nome: 'Galinheiro',   o: 'o', nivel: 1,  precos: [0, 1500, 4000],     bichos: ['galinha', 'pato'] },
+  { id: 'coelheira',  nome: 'Coelheira',    o: 'a', nivel: 5,  precos: [2000, 3000, 6000],  bichos: ['coelho'] },
+  { id: 'chiqueiro',  nome: 'Chiqueiro',    o: 'o', nivel: 3,  precos: [1500, 3000, 6000],  bichos: ['porco', 'porca'] },
+  { id: 'apiario',    nome: 'Apiário',      o: 'o', nivel: 12, precos: [3000, 4500, 9000],  bichos: ['abelha'] },
+  { id: 'aprisco',    nome: 'Aprisco',      o: 'o', nivel: 7,  precos: [3500, 5000, 10000], bichos: ['cabra', 'ovelha'] },
+  { id: 'estabulo',   nome: 'Estábulo',     o: 'o', nivel: 6,  precos: [4000, 6000, 12000], bichos: ['bezerro', 'vaca', 'bufala'] },
+  { id: 'cocheira',   nome: 'Cocheira',     o: 'a', nivel: 10, precos: [6000, 9000, 18000], bichos: ['cavalo', 'potro', 'burro'] },
+  { id: 'cercado',    nome: 'Viveiro',      o: 'o', nivel: 15, precos: [8000, 12000, 24000], bichos: ['pavao', 'avestruz'] },
+];
+const ABRIGO = Object.fromEntries(ABRIGOS.map(b => [b.id, b]));
+const ABRIGO_CAP = [0, 4, 6, 8];               // animais que cabem em cada nível
+const ABRIGO_NIVEL = [0, 0, 3, 6];             // níveis de jogador a mais para aumentar
+const abrigoOf = k => ABRIGOS.find(b => b.bichos.includes(k));
+// O rancho é uma grade de 4 × 2 cercados, cada um com 4 × 3,8 casas.
+const YARD_W = 4, YARD_D = 3.8, RANCH_C = YARD_W * 4, RANCH_R = YARD_D * 2;
+const yardOf = id => { const k = ABRIGOS.findIndex(b => b.id === id); return { u0: (k % 4) * YARD_W, v0: Math.floor(k / 4) * YARD_D, u1: (k % 4 + 1) * YARD_W, v1: (Math.floor(k / 4) + 1) * YARD_D }; };
+const abrigoLv = (s, id) => (s.abrigos && s.abrigos[id]) || 0;
+const livesIn = (s, id) => s.animals.filter(a => inPen(a) && abrigoOf(a.k).id === id);
+const vagas = (s, id) => ABRIGO_CAP[abrigoLv(s, id)] - livesIn(s, id).length;
+// Saves antigos e roças de vizinhos não têm abrigos: constrói os que os bichos já usam.
+function ensureAbrigos(s) {
+  const ab = s.abrigos && typeof s.abrigos === 'object' ? s.abrigos : {};
+  s.abrigos = {};
+  for (const b of ABRIGOS) {
+    const n = s.animals.filter(a => inPen(a) && abrigoOf(a.k) === b).length;
+    let lv = clamp(Number(ab[b.id]) || 0, 0, 3);
+    while (lv < 3 && ABRIGO_CAP[lv] < n) lv++;
+    if (b.id === 'galinheiro') lv = Math.max(1, lv);
+    if (lv) s.abrigos[b.id] = lv;
+  }
+  return s;
+}
 const drawKind = a => ANIMAL[a.k].desenho || a.k;
 const isTired = a => ANIMAL[a.k].tipo === 'prod' && Date.now() - a.born > ANIMAL[a.k].periodo * DAY;
 const isAdult = a => ANIMAL[a.k].tipo === 'cria' && a.g >= ANIMAL[a.k].tempo;
@@ -209,7 +245,7 @@ function newState() {
   return {
     v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0,
     tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
-    animals: [], decor: {},
+    animals: [], decor: {}, abrigos: { galinheiro: 1 },
     friends: [], sent: {}, code: null, owner: null, log: {},
     fert: { basico: 2 }, fertSel: 'basico',
     dogs: { roca: null, animais: null }, dogFood: 0, news: [], newsSeen: 0, limits: {},
@@ -230,6 +266,7 @@ function migrate(s) {
   s.animals = Array.isArray(s.animals) ? s.animals.filter(a => a && ANIMAL[a.k]) : [];
   s.animals = s.animals.map(a => Object.assign(newAnimal(a.k), a));
   s.racaoEsp = Math.max(0, Number(s.racaoEsp) || 0);
+  ensureAbrigos(s);
   const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
   s.dogs = {};
   for (const slot of ['roca', 'animais']) { const d = dogs[slot]; s.dogs[slot] = d && DOG[d.raca] ? d : null; }
@@ -316,7 +353,7 @@ const pointer = { x: 0, y: 0, inside: false, touch: false, tipUntil: 0 };
 const popups = [];
 let hits = [];                      // alvos clicáveis desenhados no último quadro
 const amb = {};                     // posição dos animais andando (só na tela)
-const L = { W: 60, ox: 0, oy: 0, cw: 0, ch: 0, horizon: 0, dpr: 1 };
+const L = { W: 60, ox: 0, oy: 0, cw: 0, ch: 0, horizon: 0, dpr: 1, pan: { x: 0, y: 0 }, canPan: false };
 
 // Nuvem
 let user = null, cloudStatus = Cloud.available ? 'loading' : 'off', syncStatus = '', dirty = false, lastCloud = 0;
@@ -476,7 +513,7 @@ function fertilize(p, pos) {
   if (ripe(p)) return toast('Essa planta já está pronta para colher.');
   if (p.fert) return toast('Essa colheita já foi adubada. Dá para adubar de novo na próxima.');
   if (p.poda) return toast('Essa árvore precisa de poda antes.');
-  if (have <= 0) { tab = 'loja'; shopSeg = 'adubo'; renderPane(); return toast(`Você não tem ${f.nome}. Compre na Loja.`); }
+  if (have <= 0) { openPanel('loja', 'adubo'); return toast(`Você não tem ${f.nome}. Compre na Loja.`); }
   const T = phaseTempo(p), corte = Math.min(T - p.g, T * f.corta);
   state.fert[f.id] = have - 1;
   p.g += corte;
@@ -574,11 +611,11 @@ function collectAnimal(a, pos) {
   a.ready = false; a.g = 0; a.n++; a.dobro = false;
   sfx('collect');
   if (d.prod === 'leitao') {
-    // A porca teve leitões: um vai para o curral para crescer (se couber).
-    if (state.animals.filter(inPen).length < MAX_ANIMALS) {
-      for (let k = 0; k < qty && state.animals.filter(inPen).length < MAX_ANIMALS; k++) state.animals.push(newAnimal('porco'));
-      popupAt(pos, qty > 1 ? '+2 porquinhos!' : '+1 porquinho!', '#ffffff');
-    } else { addCoins(PRODUCT.leitao.preco * qty, pos); toast(`O curral está cheio: ${qty > 1 ? 'os leitões foram vendidos' : 'o leitão foi vendido'} por ${PRODUCT.leitao.preco * qty} moedas.`); }
+    // A porca teve leitões: vão para o chiqueiro para crescer (se couber).
+    let born = 0;
+    while (born < qty && vagas(state, 'chiqueiro') > 0) { state.animals.push(newAnimal('porco')); born++; }
+    if (born) popupAt(pos, born > 1 ? '+2 porquinhos!' : '+1 porquinho!', '#ffffff');
+    if (born < qty) { const n = qty - born; addCoins(PRODUCT.leitao.preco * n, pos); toast(`O chiqueiro está cheio: ${n > 1 ? 'os leitões foram vendidos' : 'o leitão foi vendido'} por ${PRODUCT.leitao.preco * n} moedas.`); }
   } else gain(d.prod, qty, pos);
   addXP(d.xp, pos); state.stats.coletas++;
 }
@@ -652,7 +689,7 @@ function actDog(slot) {
     return toast(dogAwake(d) ? `${d.nome} está acordado vigiando a ${SLOT_NAME[slot]}. Cuidado!` : `${d.nome} está dormindo… é a sua chance.`);
   }
   if (!d) {
-    tab = 'loja'; shopSeg = 'caes'; renderPane();
+    openPanel('loja', 'caes');
     return toast(`Compre um cachorro na Loja para vigiar a ${SLOT_NAME[slot]}.`);
   }
   if (!dogAwake(d)) return feedDog(slot);
@@ -663,7 +700,7 @@ function feedDog(slot) {
   const d = state.dogs[slot];
   if (!d || dogAwake(d)) return;
   if (state.dogFood <= 0) {
-    tab = 'loja'; shopSeg = 'caes'; renderPane();
+    openPanel('loja', 'caes');
     return toast(`Acabou a ração de cachorro. Compre na Loja (${DOG_FOOD.custo} moedas, dura ${DOG_FOOD.horas}h).`, 'bad');
   }
   state.dogFood--;
@@ -737,26 +774,45 @@ function tickLife() {
   if (changed) done();
 }
 
+function actAbrigo(id) {
+  if (!isHome()) return toast(`${ABRIGO[id].nome} de ${view.nome}.`);
+  openPanel('loja', 'abrigos', id);
+}
 function actDecor(id) {
   const d = DECO[id];
   if (!isHome()) return toast(`${d.nome} de ${view.nome}.`);
   if (state.decor[id]) return toast(`${d.nome}: +${d.conforto}% de XP.`);
-  tab = 'loja'; shopSeg = 'decor'; renderPane();
+  openPanel('loja', 'decor');
   toast(`Compre ${d.nome} na Loja para colocar aqui.`);
 }
 
 function buyAnimal(k) {
   const d = ANIMAL[k];
   if (d.lugar === 'casa' && state.animals.some(a => a.k === k)) return toast(`Você já tem ${d.f ? 'uma' : 'um'} ${d.nome.toLowerCase()} em casa.`);
-  if (d.lugar !== 'casa' && state.animals.filter(inPen).length >= MAX_ANIMALS) return toast(`O curral cabe ${MAX_ANIMALS} animais.`);
   if (state.level < d.nivel) return toast(`${d.nome} libera no nível ${d.nivel}.`);
+  const ab = d.lugar !== 'casa' && abrigoOf(k);
+  if (ab && !abrigoLv(state, ab.id)) return toast(`${d.nome} precisa de um${ab.o === 'a' ? 'a' : ''} ${ab.nome.toLowerCase()}. Construa na aba Abrigos.`, 'bad');
+  if (ab && vagas(state, ab.id) <= 0) return toast(`${ab.o === 'a' ? 'A' : 'O'} ${ab.nome.toLowerCase()} está ${ab.o === 'a' ? 'cheia' : 'cheio'}. Aumente na aba Abrigos.`, 'bad');
   if (state.coins < d.custo) return toast(`${d.nome} custa ${d.custo} moedas.`, 'bad');
   state.coins -= d.custo;
   state.animals.push(newAnimal(k));
   sfx('buy');
   addXP(4, null);
-  toast(d.lugar === 'casa' ? `${d.nome} chegou em casa!` : `${d.nome} chegou no curral!`, 'good');
+  toast(d.lugar === 'casa' ? `${d.nome} chegou em casa!` : `${d.nome} chegou ${ab.o === 'a' ? 'na' : 'no'} ${ab.nome.toLowerCase()}!`, 'good');
   if (isHome()) setScene(d.lugar === 'casa' ? 'casa' : 'animais');
+  done();
+}
+// Constrói um abrigo ou aumenta o nível dele.
+function buyAbrigo(id) {
+  const b = ABRIGO[id], lv = abrigoLv(state, id);
+  if (lv >= 3) return toast(`${b.nome} já está no nível máximo.`);
+  const preco = b.precos[lv], nivel = b.nivel + ABRIGO_NIVEL[lv + 1];
+  if (state.level < nivel) return toast(`${lv ? 'Aumentar' : 'Construir'} ${b.o} ${b.nome.toLowerCase()} libera no nível ${nivel}.`);
+  if (state.coins < preco) return toast(`Faltam moedas: custa ${preco.toLocaleString('pt-BR')}.`, 'bad');
+  state.coins -= preco; state.abrigos[id] = lv + 1;
+  sfx('buy'); addXP(lv ? 10 : 15, null);
+  toast(lv ? `${b.nome} no nível ${lv + 1}: agora cabem ${ABRIGO_CAP[lv + 1]} animais!` : `${b.nome} construíd${b.o}! Cabem ${ABRIGO_CAP[1]} animais.`, 'good');
+  if (isHome()) setScene('animais');
   done();
 }
 function buyDecor(id) {
@@ -821,13 +877,13 @@ function genNeighbor() {
   }
   const decor = {};
   for (const d of DECOR) if (Math.random() < 0.55) decor[d.id] = true;
-  return { plots, animals, decor, refreshAt: Date.now() + 4 * 60 * 1000 };
+  return ensureAbrigos({ plots, animals, decor, refreshAt: Date.now() + 4 * 60 * 1000 });
 }
 
 function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
   const cur = state.nb[id];
-  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born)) state.nb[id] = genNeighbor();
+  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos) state.nb[id] = genNeighbor();
   view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id] };
   afterVisit();
   save();
@@ -1227,17 +1283,21 @@ function tick(dt) {
   for (const a of state.animals) growAnimal(a, dt);
 }
 
-// Faz os bichos passearem dentro de uma área (curral ou sala). Os com fome vão para o cocho.
-const PEN_AREA = { u0: 0.5, u1: PEN_C - 0.5, v0: 0.9, v1: PEN_R - 0.4, trough: true };
+// Faz os bichos passearem dentro de uma área (cercado ou sala). Os com fome vão para o cocho.
 const ROOM_AREA = { u0: 1.3, u1: 4.1, v0: 1.2, v1: 4.2 };
-const FIXED_SPOTS = { curral: [[5.3, 2.2], [5.3, 3.1], [4.5, 3.45], [3.7, 3.5], [5.35, 1.4]], casa: [[4.45, 1.5]] };
+function fixedSpot(a, list) {
+  const same = list.filter(x => ANIMAL[x.k].fixo), n = same.indexOf(a);
+  if (ANIMAL[a.k].lugar === 'casa') return [4.45, 1.5];
+  const y = yardOf('apiario'), [u, v] = HIVE_SPOTS[n % HIVE_SPOTS.length];
+  return [y.u0 + u, y.v0 + v];
+}
 function updateWander(list, dt, area) {
   for (const a of list) {
     const d = ANIMAL[a.k];
     let m = amb[a.id];
     if (!m) {
       let u, v;
-      if (d.fixo) { const same = list.filter(x => ANIMAL[x.k].fixo), spots = FIXED_SPOTS[d.lugar || 'curral']; [u, v] = spots[same.indexOf(a) % spots.length]; }
+      if (d.fixo) [u, v] = fixedSpot(a, list);
       else { u = rand(area.u0, area.u1); v = rand(area.v0, area.v1); }
       m = amb[a.id] = { u, v, tu: u, tv: v, wait: rand(0, 2), dir: Math.random() < 0.5 ? 1 : -1, moving: false };
     }
@@ -1247,7 +1307,7 @@ function updateWander(list, dt, area) {
     const du = m.tu - m.u, dv = m.tv - m.v, dist = Math.hypot(du, dv);
     if (dist < 0.05) {
       m.wait = hungry ? rand(2, 5) : rand(1, 4); m.moving = false;
-      if (hungry) { m.tu = rand(0.8, 2.2); m.tv = rand(0.75, 1.0); }
+      if (hungry) { m.tu = rand(area.trough.u0, area.trough.u1); m.tv = rand(area.trough.v0, area.trough.v1); }
       else { m.tu = rand(area.u0, area.u1); m.tv = rand(area.v0, area.v1); }
       continue;
     }
@@ -1289,13 +1349,18 @@ function animalBubble(a, home) {
 // ============================================================
 function resize() {
   const r = stage.getBoundingClientRect();
-  const cw = Math.max(0, r.width - 10), ch = Math.max(0, r.height - 10); // borda de 5px
+  const cw = Math.max(0, r.width), ch = Math.max(0, r.height);
   L.dpr = Math.min(2, window.devicePixelRatio || 1);
   cv.width = Math.round(cw * L.dpr); cv.height = Math.round(ch * L.dpr);
   L.cw = cw; L.ch = ch;
 }
+// Espaço da tela que os botões por cima do jogo cobrem.
+function insets() {
+  return L.cw < 700 ? { t: 70, b: 92, l: 44, r: 52 } : { t: 76, b: 104, l: 96, r: 104 };
+}
 function layout(sc) {
-  const { cw, ch } = L;
+  const { cw, ch } = L, I = insets();
+  const aw = Math.max(80, cw - I.l - I.r), ah = Math.max(80, ch - I.t - I.b), cx = I.l + aw / 2;
   if (sc === 'roca') {
     // A câmera enquadra só a terra em uso (mais o lote à venda) e se afasta conforme a roça cresce.
     const plots = S().plots, home = isHome();
@@ -1308,20 +1373,26 @@ function layout(sc) {
     if (c0 > c1) { c0 = 0; c1 = COLS; r0 = 0; r1 = ROWS; }
     c0 = Math.max(0, c0 - 1); c1 = Math.min(COLS, c1 + 1); r0 = Math.max(0, r0 - 1); r1 = Math.min(ROWS, r1 + 1);
     const span = (c1 - c0) + (r1 - r0);
-    const full = Math.min(cw / 7.4, ch / 4.9);
-    L.W = Math.max(full, Math.min(cw * 1.8 / span, ch * 0.86 / (span / 4 + 0.9), cw / 5, ch / 3.6));
+    const full = Math.min(aw / 7.4, ah / 4.9);
+    L.W = Math.max(full, Math.min(aw * 1.8 / span, ah * 0.86 / (span / 4 + 0.9), aw / 5, ah / 3.6));
     const cc = (c0 + c1) / 2, rc = (r0 + r1) / 2;
-    L.ox = cw / 2 - (cc - rc) * L.W / 2;
-    L.oy = Math.min(ch * 0.6 - (cc + rc) * L.W / 4, ch - (c1 + r1) * L.W / 4 - 0.25 * L.W);
+    L.ox = cx - (cc - rc) * L.W / 2;
+    L.oy = Math.min(I.t + ah * 0.6 - (cc + rc) * L.W / 4, I.t + ah - (c1 + r1) * L.W / 4 - 0.25 * L.W);
   } else if (sc === 'animais') {
-    L.W = Math.min(cw / 6.6, ch / 4.5);
-    L.ox = cw / 2 - (PEN_C - PEN_R) * L.W / 4 + L.W * 0.4;
-    L.oy = ch - (PEN_C + PEN_R) * L.W / 4 - 0.4 * L.W;
+    // O rancho inteiro cabe na tela; no celular fica maior e dá para arrastar.
+    const bw = (RANCH_C + RANCH_R) / 2 + 0.8, bh = (RANCH_C + RANCH_R) / 4 + 1.6;
+    L.W = Math.max(Math.min(aw / bw, ah / bh), cw < 700 ? 66 : 0);
+    const ovx = Math.max(0, (bw * L.W - aw) / 2), ovy = Math.max(0, (bh * L.W - ah) / 2);
+    L.pan.x = clamp(L.pan.x, -ovx, ovx); L.pan.y = clamp(L.pan.y, -ovy, ovy);
+    L.ox = cx - (RANCH_C - RANCH_R) * L.W / 4 + 0.1 * L.W + L.pan.x;
+    L.oy = I.t + ah / 2 - ((RANCH_C + RANCH_R) / 8 - 0.55) * L.W + L.pan.y;
+    L.canPan = ovx > 0 || ovy > 0;
   } else {
-    L.W = Math.min(cw / 5.9, ch / 4.35);
-    L.ox = cw / 2;
-    L.oy = ch - ROOM / 2 * L.W - 0.3 * L.W;
+    L.W = Math.min(aw / 5.9, ah / 4.35);
+    L.ox = cx;
+    L.oy = I.t + ah - ROOM / 2 * L.W - 0.3 * L.W;
   }
+  if (sc !== 'animais') L.canPan = false;
   L.horizon = Math.max(ch * 0.08, L.oy - L.W * 0.9);
 }
 function iso(c, r) { return { x: L.ox + (c - r) * L.W / 2, y: L.oy + (c + r) * L.W / 4 }; }
@@ -1405,6 +1476,13 @@ function drawGround() {
   const g = ctx.createLinearGradient(0, horizon, 0, ch);
   g.addColorStop(0, '#86c450'); g.addColorStop(1, '#9ad35e');
   ctx.fillStyle = g; ctx.fillRect(0, horizon, cw, ch - horizon);
+  const FL = ['#ffffff', '#ffd54a', '#f06292', '#ffffff', '#ba68c8'];
+  TUFTS.forEach(([x, y, k], n) => {
+    if (n % 9) return;
+    const px = x * cw, py = horizon + 10 + y * (ch - horizon - 10), r = Math.max(1.8, W * 0.025);
+    for (let f = 0; f < 3; f++) { ctx.fillStyle = FL[(n + f) % FL.length]; ctx.beginPath(); ctx.arc(px + f * r * 2.4 - r * 2.4, py + (f % 2) * r * 1.5, r, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#f2b705'; ctx.beginPath(); ctx.arc(px, py, r * 0.45, 0, 7); ctx.fill();
+  });
   ctx.strokeStyle = 'rgba(46,110,30,.45)'; ctx.lineWidth = 1.2;
   for (const [x, y, k] of TUFTS) {
     const px = x * cw, py = horizon + 6 + y * (ch - horizon - 6), s = W * (0.04 + k * 0.04);
@@ -1564,8 +1642,9 @@ function dogBubble(slot, s, t, home) {
 }
 
 // Cerca do lado de trás ('back') ou da frente ('front') de uma área cols×rows.
-function drawFence(cols, rows, side) {
-  const W = L.W, e = -0.14;
+function drawFence(cols, rows, side) { const e = -0.14; drawFenceRect(e, e, cols - e, rows - e, side); }
+function drawFenceRect(u0, v0, u1, v1, side) {
+  const W = L.W;
   const post = p => {
     ctx.fillStyle = '#a4703f'; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.2);
     ctx.fillStyle = '#c99260'; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.03);
@@ -1575,8 +1654,9 @@ function drawFence(cols, rows, side) {
     for (const h of [0.08, 0.16]) line({ x: a.x, y: a.y - W * h }, { x: b.x, y: b.y - W * h }, '#b98050', W * 0.03);
     for (let k = skipFirst ? 1 : 0; k <= steps; k++) post(lerp(a, b, k / steps));
   };
-  if (side === 'back') { run(e, e, cols - e, e, cols * 2); run(e, e, e, rows - e, rows * 2, true); }
-  else { run(e, rows - e, cols - e, rows - e, cols * 2, true); run(cols - e, e, cols - e, rows - e, rows * 2, true); }
+  const nu = Math.round((u1 - u0) * 2), nv = Math.round((v1 - v0) * 2);
+  if (side === 'back') { run(u0, v0, u1, v0, nu); run(u0, v0, u0, v1, nv, true); }
+  else { run(u0, v1, u1, v1, nu, true); run(u1, v0, u1, v1, nv, true); }
 }
 
 // ============================================================
@@ -2215,7 +2295,6 @@ function drawPlot(i, p, t, home) {
   const [p1, p2, p3, p4] = diamond(c, r, 0.05);
   const hov = hover && hover.kind === 'plot' && hover.i === i;
   if (p.s === 'locked') {
-    quad(p1, p2, p3, p4, 'rgba(255,255,255,.07)', 'rgba(40,90,20,.22)', 1);
     if (home && canBuy(i)) {
       ctx.setLineDash([4, 4]); quad(p1, p2, p3, p4, 'rgba(255,255,255,.08)', 'rgba(255,255,255,.6)', 1.5); ctx.setLineDash([]);
       const m = cellCenter(i);
@@ -2240,17 +2319,24 @@ function drawPlot(i, p, t, home) {
     if (hov) quad(p1, p2, p3, p4, null, 'rgba(255,255,255,.9)', 2);
     return;
   }
-  const d = W * 0.07;
+  // Terra fofa: borda mais clara, miolo escuro com leiras e torrões.
+  const d = W * 0.09;
   const dry = p.s === 'growing' && p.dry;
   const dn = pt => ({ x: pt.x, y: pt.y + d });
-  quad(p4, p3, dn(p3), dn(p4), '#5e3a1c');
-  quad(p3, p2, dn(p2), dn(p3), '#4a2c14');
-  quad(p1, p2, p3, p4, dry ? '#b88a58' : p.s === 'withered' ? '#94704a' : p.fert ? '#74462a' : '#8b5a33');
-  if (p.fert && p.s === 'growing') {
-    ctx.fillStyle = 'rgba(255,225,120,.75)';
-    for (const [u, v] of [[0.2, 0.5], [0.5, 0.82], [0.8, 0.45], [0.5, 0.2], [0.35, 0.35], [0.65, 0.65]]) { const q = iso(c + u, r + v); ctx.fillRect(q.x - 1, q.y - 1, 2, 2); }
+  const tone = dry ? ['#c29266', '#a87a4e', '#8a6038'] : p.s === 'withered' ? ['#a8825a', '#8f6b45', '#6e5034'] : p.fert ? ['#9a5f34', '#6e3e1e', '#58300f'] : ['#a86b3c', '#7e4a26', '#633718'];
+  quad(p4, p3, dn(p3), dn(p4), '#6b3f1d');
+  quad(p3, p2, dn(p2), dn(p3), '#52301a');
+  quad(p1, p2, p3, p4, tone[0]);
+  line(p4, p1, 'rgba(255,230,190,.35)', 1.5); line(p1, p2, 'rgba(255,230,190,.35)', 1.5);
+  const [q1, q2, q3, q4] = diamond(c, r, 0.14);
+  quad(q1, q2, q3, q4, tone[1]);
+  for (let k = 0; k < 4; k++) {
+    const a = lerp(q1, q4, (k + 0.5) / 4), b = lerp(q2, q3, (k + 0.5) / 4);
+    line({ x: a.x, y: a.y + 1 }, { x: b.x, y: b.y + 1 }, tone[2], Math.max(1.5, W * 0.035));
+    line({ x: a.x, y: a.y - W * 0.012 }, { x: b.x, y: b.y - W * 0.012 }, 'rgba(255,220,170,.18)', Math.max(1, W * 0.012));
   }
-  for (let k = 1; k <= 3; k++) line(lerp(p1, p4, k / 4), lerp(p2, p3, k / 4), dry ? 'rgba(120,80,40,.5)' : 'rgba(60,34,14,.5)', Math.max(1, W * 0.018));
+  ctx.fillStyle = p.fert && p.s === 'growing' ? 'rgba(255,225,120,.85)' : 'rgba(40,20,5,.35)';
+  for (const [u, v] of [[0.25, 0.5], [0.5, 0.8], [0.78, 0.42], [0.5, 0.22], [0.35, 0.3], [0.66, 0.66]]) { const q = iso(c + u, r + v); ctx.fillRect(q.x - 1, q.y - 1, 2.5, 2); }
   if (dry) {
     const m = cellCenter(i); ctx.strokeStyle = 'rgba(90,60,30,.6)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(m.x - W * .15, m.y); ctx.lineTo(m.x - W * .05, m.y + W * .03); ctx.lineTo(m.x + W * .02, m.y - W * .02); ctx.lineTo(m.x + W * .14, m.y + W * .02); ctx.stroke();
@@ -2308,42 +2394,151 @@ function drawRoca(s, t, home) {
 // ============================================================
 // Cena: animais
 // ============================================================
-const DIRT = [[1.2, 2.2, .5], [3.6, 1.6, .4], [4.4, 3.1, .45], [2.4, 3.3, .35]];
+// Cada abrigo tem um cercado. O prédio fica no fundo, o cocho à direita e os bichos passeiam na frente.
+const SHED = { u: 0.3, v: 0.25, w: 1.7, d: 1.1 };
+const yardArea = id => {
+  const y = yardOf(id);
+  return { u0: y.u0 + 0.45, u1: y.u1 - 0.4, v0: y.v0 + 1.65, v1: y.v1 - 0.4, trough: id !== 'apiario' && { u0: y.u0 + 2.45, u1: y.u0 + 3.45, v0: y.v0 + 0.95, v1: y.v0 + 1.15 } };
+};
+const HIVE_SPOTS = [[0.9, 1.95], [1.9, 1.95], [2.9, 1.95], [0.9, 2.9], [1.9, 2.9], [2.9, 2.9], [3.5, 2.4], [3.5, 3.3]];
+// Estilo de cada prédio: paredes, telhado e detalhes.
+const SHED_LOOK = {
+  galinheiro: { wall: '#ecc98c', wallR: '#d2a869', roof: '#c8402f', roofD: '#8f2a1e', chao: '#dccb8e', h: 0.55, legs: 0.12 },
+  coelheira:  { wall: '#d9a86a', wallR: '#bf8c50', roof: '#5a9a3a', roofD: '#3d7326', chao: '#b5dc7a', h: 0.45, legs: 0.2, small: true },
+  chiqueiro:  { wall: '#d99a7c', wallR: '#bd7f62', roof: '#8a5a33', roofD: '#6b4220', chao: '#b99264', h: 0.5 },
+  apiario:    { wall: '#f4d774', wallR: '#dcb957', roof: '#e08a2e', roofD: '#b86a1a', chao: '#b5dc7a', h: 0.45, small: true },
+  aprisco:    { wall: '#cfc8b8', wallR: '#b3ab98', roof: '#6c8f3a', roofD: '#4f6e28', chao: '#bfe08a', h: 0.6, pedra: true },
+  estabulo:   { wall: '#c8402f', wallR: '#a53325', roof: '#7a2a1e', roofD: '#5a1d14', chao: '#cdb97c', h: 0.75, trim: true },
+  cocheira:   { wall: '#b07a44', wallR: '#94622f', roof: '#3f6fa8', roofD: '#2c5282', chao: '#c9b27a', h: 0.72, trim: true },
+  cercado:    { wall: '#e3bf62', wallR: '#c9a24a', roof: '#e3bf62', roofD: '#b8943a', chao: '#b5dc7a', h: 0.8, aberto: true },
+};
+// Prédio com telhado de duas águas. A cumeeira corre no sentido u.
+function drawShed(id, u0, v0, lv, t) {
+  const k = SHED_LOOK[id], sm = k.small ? 0.78 : 1;
+  const a0 = u0 + SHED.u, b0 = v0 + SHED.v, a1 = a0 + SHED.w * sm, b1 = b0 + SHED.d * sm;
+  const h0 = k.legs || 0, h = h0 + k.h * sm, rh = 0.42 * sm, vm = (b0 + b1) / 2, o = 0.1;
+  const W = L.W;
+  ctx.fillStyle = 'rgba(0,0,0,.16)'; poly([P(a0, b1 + 0.12), P(a1 + 0.15, b1 + 0.12), P(a1 + 0.15, b0), P(a0, b0)]); ctx.fill();
+  if (k.legs) for (const [u, v] of [[a0 + 0.08, b1 - 0.08], [a1 - 0.08, b1 - 0.08], [a1 - 0.08, b0 + 0.1]]) { const q = P(u, v); ctx.fillStyle = '#6e4424'; ctx.fillRect(q.x - W * 0.02, q.y - h0 * W, W * 0.04, h0 * W); }
+  if (k.aberto) {
+    // viveiro: telhado de palha em quatro postes, com um poleiro
+    for (const [u, v] of [[a0 + 0.1, b1 - 0.1], [a1 - 0.1, b1 - 0.1], [a1 - 0.1, b0 + 0.1], [a0 + 0.1, b0 + 0.1]]) {
+      const q = P(u, v); ctx.fillStyle = '#8a5a33'; ctx.fillRect(q.x - W * 0.025, q.y - h * W, W * 0.05, h * W);
+    }
+    line(P(a0 + 0.3, vm, 0.35), P(a1 - 0.3, vm, 0.35), '#8a5a33', W * 0.04);
+  } else {
+    isoBox(a0, b0, a1, b1, h0, h, k.wall, k.wall, k.wallR);
+    if (k.pedra) {
+      ctx.strokeStyle = 'rgba(90,80,60,.35)'; ctx.lineWidth = 1;
+      for (let r = 1; r < 4; r++) { const hh = h0 + (h - h0) * r / 4; line(P(a0, b1, hh), P(a1, b1, hh), 'rgba(90,80,60,.35)', 1); line(P(a1, b0, hh), P(a1, b1, hh), 'rgba(90,80,60,.3)', 1); }
+    } else {
+      for (let r = 1; r < 4; r++) { const hh = h0 + (h - h0) * r / 4; line(P(a0, b1, hh), P(a1, b1, hh), 'rgba(80,40,10,.22)', 1); line(P(a1, b0, hh), P(a1, b1, hh), 'rgba(80,40,10,.2)', 1); }
+    }
+    // porta virada para o cercado
+    const dm = (a0 + a1) / 2, dw = 0.26 * sm, dh = h0 + (h - h0) * 0.72;
+    if (k.trim) {
+      quad(P(dm - dw, b1, h0), P(dm + dw, b1, h0), P(dm + dw, b1, dh), P(dm - dw, b1, dh), '#fff4e0');
+      quad(P(dm - dw + 0.04, b1, h0), P(dm + dw - 0.04, b1, h0), P(dm + dw - 0.04, b1, dh - 0.04), P(dm - dw + 0.04, b1, dh - 0.04), k.wallR);
+      line(P(dm - dw + 0.04, b1, h0), P(dm + dw - 0.04, b1, dh - 0.04), '#fff4e0', 2);
+      line(P(dm + dw - 0.04, b1, h0), P(dm - dw + 0.04, b1, dh - 0.04), '#fff4e0', 2);
+      quad(P(a1, vm - 0.14, h * 0.55), P(a1, vm + 0.14, h * 0.55), P(a1, vm + 0.14, h * 0.8), P(a1, vm - 0.14, h * 0.8), '#fff4e0');
+      quad(P(a1, vm - 0.1, h * 0.58), P(a1, vm + 0.1, h * 0.58), P(a1, vm + 0.1, h * 0.77), P(a1, vm - 0.1, h * 0.77), '#3a2412');
+    } else {
+      quad(P(dm - dw, b1, h0), P(dm + dw, b1, h0), P(dm + dw, b1, dh), P(dm - dw, b1, dh), '#3a2412');
+      if (id === 'coelheira') { ctx.strokeStyle = 'rgba(230,230,230,.7)'; ctx.lineWidth = 1; for (let q = 1; q < 4; q++) line(P(dm - dw + q * dw / 2, b1, h0), P(dm - dw + q * dw / 2, b1, dh), 'rgba(230,230,230,.7)', 1); }
+    }
+    if (id === 'galinheiro') line(P(dm, b1, h0), P(dm + 0.1, b1 + 0.4), '#a0703f', W * 0.05); // rampa
+    if (id === 'apiario') { const q = P(a1, vm, h * 0.55); ctx.fillStyle = '#f2b705'; ctx.beginPath(); ctx.ellipse(q.x + W * 0.04, q.y, W * 0.07, W * 0.09, 0, 0, 7); ctx.fill(); }
+    // oitão (a ponta triangular do telhado)
+    ctx.fillStyle = k.wallR; poly([P(a1, b0, h), P(a1, b1, h), P(a1, vm, h + rh)]); ctx.fill();
+  }
+  // telhado: a água de trás, a da frente e a beirada
+  quad(P(a0 - o, b0 - o, h - 0.04), P(a1 + o, b0 - o, h - 0.04), P(a1 + o, vm, h + rh), P(a0 - o, vm, h + rh), k.roofD);
+  quad(P(a0 - o, vm, h + rh), P(a1 + o, vm, h + rh), P(a1 + o, b1 + o, h - 0.04), P(a0 - o, b1 + o, h - 0.04), k.roof);
+  quad(P(a1 + o, vm, h + rh), P(a1 + o, b1 + o, h - 0.04), P(a1 + o, b1 + o, h - 0.1), P(a1 + o, vm, h + rh - 0.06), k.roofD);
+  quad(P(a1 + o, vm, h + rh), P(a1 + o, b0 - o, h - 0.04), P(a1 + o, b0 - o, h - 0.1), P(a1 + o, vm, h + rh - 0.06), k.roofD);
+  for (let r = 1; r < 4; r++) { const f = r / 4; line(lerp(P(a0 - o, vm, h + rh), P(a0 - o, b1 + o, h - 0.04), f), lerp(P(a1 + o, vm, h + rh), P(a1 + o, b1 + o, h - 0.04), f), 'rgba(0,0,0,.14)', 1); }
+  line(P(a0 - o, vm, h + rh), P(a1 + o, vm, h + rh), k.roofD, W * 0.03);
+  // estrelinhas do nível no telhado
+  for (let s = 0; s < lv; s++) { const q = lerp(P(a0, vm, h + rh * 0.55), P(a1, vm, h + rh * 0.55), (s + 1) / (lv + 1)); star(q.x, q.y + W * 0.08, W * 0.07); }
+  return { x: P((a0 + a1) / 2, (b0 + b1) / 2, h).x, y: P((a0 + a1) / 2, (b0 + b1) / 2, h * 0.6).y, top: P(a0, vm, h + rh).y };
+}
+function star(x, y, r) {
+  ctx.fillStyle = '#ffd54a'; ctx.strokeStyle = '#a87400'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+}
+// Cocho com ração (ou flores, no apiário).
+function drawTrough(y, id) {
+  if (id === 'apiario') {
+    for (const [u, v, c] of [[2.6, 0.6, '#f06292'], [3.0, 0.9, '#ffd54a'], [3.4, 0.55, '#ffffff'], [2.8, 1.2, '#ba68c8'], [3.5, 1.15, '#ff8a65']]) {
+      const q = iso(y.u0 + u, y.v0 + v); ctx.fillStyle = '#4f9a2f'; ctx.beginPath(); ctx.ellipse(q.x, q.y, L.W * 0.12, L.W * 0.05, 0, 0, 7); ctx.fill();
+      for (let p = 0; p < 5; p++) { const a = p * 1.26; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(q.x + Math.cos(a) * L.W * 0.035, q.y - L.W * 0.05 + Math.sin(a) * L.W * 0.02, L.W * 0.025, 0, 7); ctx.fill(); }
+    }
+    return;
+  }
+  isoBox(y.u0 + 2.5, y.v0 + 0.45, y.u0 + 3.5, y.v0 + 0.75, 0, 0.14, '#e3bf62', '#8a5a33', '#6e4424');
+  ctx.fillStyle = '#c9a24a'; for (let k = 0; k < 6; k++) { const q = P(y.u0 + 2.6 + k * 0.15, y.v0 + 0.6, 0.14); ctx.fillRect(q.x - 1, q.y - 1.5, 2, 2); }
+}
+// Lugar vazio de um abrigo: contorno pontilhado e uma placa.
+function drawEmptyYard(b, y, home) {
+  const W = L.W;
+  if (!home) return;
+  const lv = 0, nivel = b.nivel, locked = state.level < nivel;
+  const pts = [iso(y.u0 + 0.15, y.v0 + 0.15), iso(y.u1 - 0.15, y.v0 + 0.15), iso(y.u1 - 0.15, y.v1 - 0.15), iso(y.u0 + 0.15, y.v1 - 0.15)];
+  ctx.setLineDash([6, 6]); quad(...pts, 'rgba(255,255,255,.08)', 'rgba(255,255,255,.7)', 2); ctx.setLineDash([]);
+  const m = iso((y.u0 + y.u1) / 2, (y.v0 + y.v1) / 2);
+  const hov = hover && hover.kind === 'abrigo' && hover.id === b.id;
+  ctx.fillStyle = '#7a4a22'; ctx.fillRect(m.x - W * 0.035, m.y - W * 0.45, W * 0.07, W * 0.45);
+  const bw = Math.max(W * 1.25, 84), bh = Math.max(W * 0.5, 34), top = m.y - W * 0.45 - bh * 0.6;
+  ctx.fillStyle = hov ? '#e8b273' : '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.roundRect(m.x - bw / 2, top, bw, bh, 6); ctx.fill(); ctx.stroke();
+  const fs = Math.round(clamp(W * 0.15, 11, 16));
+  ctx.fillStyle = '#4a2a10'; ctx.font = `800 ${fs}px 'Baloo 2', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(b.nome, m.x, top + bh * 0.32);
+  ctx.font = `700 ${Math.round(fs * 0.85)}px 'Baloo 2', sans-serif`;
+  ctx.fillStyle = locked ? '#7a1d10' : '#2f5e14';
+  ctx.fillText(locked ? `Nível ${nivel}` : `Construir · ${b.precos[lv].toLocaleString('pt-BR')}`, m.x, top + bh * 0.72);
+  hits.push({ kind: 'abrigo', id: b.id, x: m.x, y: top + bh / 2, r: Math.max(W * 0.7, 44) });
+}
+function drawYard(b, s, t, home, dt, bubbles) {
+  const y = yardOf(b.id), lv = abrigoLv(s, b.id), W = L.W, k = SHED_LOOK[b.id];
+  if (!lv) return drawEmptyYard(b, y, home);
+  const e = 0.12, R = [y.u0 + e, y.v0 + e, y.u1 - e, y.v1 - e];
+  quad(iso(R[0], R[1]), iso(R[2], R[1]), iso(R[2], R[3]), iso(R[0], R[3]), k.chao);
+  if (b.id === 'chiqueiro') { const q = iso(y.u0 + 1.4, y.v0 + 2.6); ctx.fillStyle = '#8a6a44'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.5, W * 0.2, 0, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.beginPath(); ctx.ellipse(q.x - W * 0.12, q.y - W * 0.04, W * 0.18, W * 0.05, 0, 0, 7); ctx.fill(); }
+  if (b.id === 'galinheiro') { ctx.fillStyle = 'rgba(200,160,70,.5)'; for (let j = 0; j < 14; j++) { const q = iso(y.u0 + 0.5 + (j * 0.37) % 3, y.v0 + 1.7 + (j * 0.61) % 1.8); ctx.fillRect(q.x, q.y, W * 0.08, 1.5); } }
+  drawFenceRect(R[0], R[1], R[2], R[3], 'back');
+  drawTrough(y, b.id);
+  const c = drawShed(b.id, y.u0, y.v0, lv, t);
+  const hov = hover && hover.kind === 'abrigo' && hover.id === b.id;
+  if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(c.x, c.y, W * 0.75, W * 0.45, 0, 0, 7); ctx.stroke(); }
+  hits.push({ kind: 'abrigo', id: b.id, x: c.x, y: c.y, r: W * 0.55 });
+  const list = livesIn(s, b.id);
+  updateWander(list, dt, yardArea(b.id));
+  const base = W / 100 * 1.35;
+  const sorted = list.map(a => ({ a, m: amb[a.id] })).sort((p, q) => (p.m.u + p.m.v) - (q.m.u + q.m.v));
+  for (const { a, m } of sorted) drawAnimalAt(a, m, base, t);
+  drawFenceRect(R[0], R[1], R[2], R[3], 'front');
+  for (const { a, m } of sorted) {
+    const kk = animalBubble(a, home);
+    if (kk) bubbles.push([a, m, kk, animalScale(a, base)]);
+  }
+}
 function drawPen(s, t, home, dt) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
-  drawCoop(L.ox - W * 1.8, L.oy + W * 0.35, W * 1.2);
-  drawTree(L.ox + W * 2.3, L.oy + W * 0.45, W * 0.9, t);
-  if (view.kind === 'npc') { const q = iso(-0.6, 3.0); drawDog(q.x, q.y, W * 0.6, t); }
-  else drawKennelSpot('animais', s, home);
-  quad(iso(0, 0), iso(PEN_C, 0), iso(PEN_C, PEN_R), iso(0, PEN_R), '#a9d36c');
-  ctx.fillStyle = 'rgba(170,130,70,.35)';
-  for (const [c, r, k] of DIRT) { const q = iso(c, r); ctx.beginPath(); ctx.ellipse(q.x, q.y, W * k, W * k * 0.45, 0, 0, 7); ctx.fill(); }
-  drawFence(PEN_C, PEN_R, 'back');
-  if (view.kind !== 'npc') drawDogSpot('animais', s, t, home);
-  // cocho com ração e fardo de feno
-  isoBox(0.6, 0.15, 2.4, 0.55, 0, 0.2, '#e3bf62', '#8a5a33', '#6e4424');
-  ctx.fillStyle = '#c9a24a'; for (let k = 0; k < 8; k++) { const q = P(0.75 + k * 0.2, 0.35, 0.2); ctx.fillRect(q.x - 1, q.y - 2, 2, 2); }
-  isoBox(4.9, 0.15, 5.8, 0.8, 0, 0.35, '#efcf6a', '#d6b24c', '#bf9a3e');
-  line(P(4.9, 0.8, 0.12), P(5.8, 0.8, 0.12), '#a8852e', 1.5); line(P(4.9, 0.8, 0.24), P(5.8, 0.8, 0.24), '#a8852e', 1.5);
-
-  const penList = s.animals.filter(inPen);
-  updateWander(penList, dt, PEN_AREA);
-  const list = penList.map(a => ({ a, m: amb[a.id] })).sort((x, y) => (x.m.u + x.m.v) - (y.m.u + y.m.v));
-  const base = W / 100 * 1.15;
-  for (const { a, m } of list) drawAnimalAt(a, m, base, t);
-  drawFence(PEN_C, PEN_R, 'front');
+  drawTree(iso(-0.9, RANCH_R - 0.6).x, iso(-0.9, RANCH_R - 0.6).y, W * 1.0, t);
+  drawTree(iso(RANCH_C + 0.8, 0.8).x, iso(RANCH_C + 0.8, 0.8).y, W * 1.1, t);
+  if (view.kind === 'npc') { const q = DOG_AT(); drawDog(q.x, q.y, W * 0.72, t); }
+  else { drawKennelSpot('animais', s, home); drawDogSpot('animais', s, t, home); }
+  const bubbles = [];
+  const order = ABRIGOS.slice().sort((a, b) => { const p = yardOf(a.id), q = yardOf(b.id); return (p.u0 + p.v0) - (q.u0 + q.v0); });
+  for (const b of order) drawYard(b, s, t, home, dt, bubbles);
   nightOverlay(tod);
-  for (const { a, m } of list) {
-    const k = animalBubble(a, home), sc = animalScale(a, base);
-    if (k) { const p = iso(m.u, m.v); drawBubbleAt(p.x, p.y - ANIMAL_H[drawKind(a)] * sc - W * 0.2, k, a, t, m.u * 7); }
-  }
+  for (const [a, m, k, sc] of bubbles) { const p = iso(m.u, m.v); drawBubbleAt(p.x, p.y - ANIMAL_H[drawKind(a)] * sc - W * 0.2, k, a, t, m.u * 7); }
   dogBubble('animais', s, t, home);
-  if (!penList.length) {
-    const q = iso(PEN_C / 2, PEN_R / 2);
-    ctx.fillStyle = '#4a2a10'; ctx.font = `800 ${Math.round(clamp(W * 0.16, 13, 20))}px 'Baloo 2', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(home ? 'Compre animais na Loja' : 'Nenhum animal por aqui', q.x, q.y);
-  }
 }
 
 // ============================================================
@@ -2530,6 +2725,12 @@ const decorIcon = id => makeIcon('d:' + id, () => {
   if (id === 'quadro') { ctx.fillStyle = '#f1dcae'; ctx.fillRect(8, 8, 80, 80); }
   DRAW_DECOR[id](0);
 });
+const abrigoIcon = id => makeIcon('ab:' + id, () => {
+  L.W = 58; L.ox = 0; L.oy = 0;
+  const m = P(SHED.u + SHED.w / 2, SHED.v + SHED.d / 2, 0.3);
+  L.ox = 44 - m.x; L.oy = 60 - m.y;
+  drawShed(id, 0, 0, 0, 0);
+});
 const itemIcon = id => PRODUCE[id] ? cropIcon(PRODUCE[id].planta) : productIcon(id);
 const dogIcon = raca => makeIcon('dog:' + raca, () => drawDog(50, 88, 118, 0, raca, false));
 const bowlIcon = () => makeIcon('bowl', () => {
@@ -2576,19 +2777,19 @@ function renderTools() {
   box.hidden = scene !== 'roca';
   hint.hidden = scene === 'roca';
   hint.textContent = scene === 'animais'
-    ? (isHome() ? 'Clique num animal para alimentar, recolher ou vender. Os botões acima alimentam e recolhem tudo de uma vez. O cachorro fica do lado do galinheiro.' : 'Dê comida aos animais com fome para ajudar. Produto pronto dá para pegar um pouquinho.')
+    ? (isHome() ? 'Clique num animal para alimentar, recolher ou vender. Clique num abrigo para aumentar ou para construir um novo.' : 'Dê comida aos animais com fome para ajudar. Produto pronto dá para pegar um pouquinho.')
     : (isHome() ? 'Os espaços com + são lugares para decoração. Cada peça dá conforto, e conforto aumenta o XP que você ganha. Gato, tartaruga e arara moram aqui: clique neles para fazer carinho.' : 'Esta é a casa do seu vizinho.');
   box.innerHTML = '';
   availTools().forEach((t, k) => {
     const b = document.createElement('button');
-    b.className = 'tool'; b.type = 'button';
+    b.className = 'roundbtn tool'; b.type = 'button';
     b.setAttribute('aria-pressed', String(state.tool === t.id));
     const icon = t.id === 'seed' ? `<img alt="" src="${cropIcon(state.seed)}">`
       : t.id === 'fert' ? `<img alt="" src="${fertIcon(state.fertSel)}">` : TOOL_ICONS[t.id];
     const label = t.id === 'seed' ? CROP[state.seed].nome
       : t.id === 'fert' ? `${FERT[state.fertSel].curto} ×${state.fert[state.fertSel] || 0}` : t.nome;
-    b.innerHTML = `${icon}<span>${label}</span><kbd>${k + 1}</kbd>`;
-    b.title = t.id === 'hand' ? 'Faz a ação certa: colhe, rega, tira mato e pragas, planta' : t.nome;
+    b.innerHTML = `<span class="ic">${icon}</span><span class="lb">${label}</span>`;
+    b.title = (t.id === 'hand' ? 'Faz a ação certa: colhe, rega, tira mato e pragas, planta' : t.nome) + ` (tecla ${k + 1})`;
     b.addEventListener('click', () => setTool(t.id));
     box.appendChild(b);
   });
@@ -2598,6 +2799,7 @@ function setTool(id) {
   state.tool = id; renderTools(); renderPane();
 }
 function setScene(sc) {
+  if (sc !== scene) L.pan = { x: 0, y: 0 };
   scene = sc; hover = null;
   document.querySelectorAll('#scenes button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.scene === sc)));
   renderTools(); renderSceneInfo();
@@ -2606,9 +2808,13 @@ function setScene(sc) {
 function renderHUD() {
   $('#lvl').textContent = state.level;
   const n = need(state.level);
-  $('#xptxt').textContent = `${state.xp} / ${n} XP`;
+  $('#xptxt').textContent = `${state.xp} / ${n}`;
   $('#xpbar').style.width = `${Math.min(100, state.xp / n * 100)}%`;
   $('#coins').textContent = state.coins.toLocaleString('pt-BR');
+  const nome = user ? firstName(user.name) : 'Roça Feliz';
+  if ($('#pname').textContent !== nome) $('#pname').textContent = nome;
+  const face = user && user.photo ? `<img alt="" referrerpolicy="no-referrer" src="${esc(user.photo)}">` : esc(user ? nome[0] : '☺');
+  if ($('#face').dataset.k !== face) { $('#face').innerHTML = face; $('#face').dataset.k = face; }
 }
 
 function renderPenActions() {
@@ -2622,33 +2828,37 @@ function renderPenActions() {
   const key = hungry.length + ':' + cost + ':' + ready.length;
   if (el.dataset.key === key) return;
   el.dataset.key = key;
-  el.innerHTML = `<button class="btn" type="button" data-feed-all ${hungry.length ? '' : 'disabled'}>Alimentar todos${hungry.length ? ` (${hungry.length}) · ${cost.toLocaleString('pt-BR')} moedas` : ''}</button>
-    <button class="btn gold" type="button" data-collect-all ${ready.length ? '' : 'disabled'}>Recolher tudo${ready.length ? ` (${ready.length})` : ''}</button>`;
+  el.innerHTML = `<button class="btn" type="button" data-feed-all ${hungry.length ? '' : 'disabled'} aria-label="Alimentar todos${hungry.length ? ` (${hungry.length}) por ${cost} moedas` : ''}">Alimentar<span class="wide"> todos</span>${hungry.length ? ` (${hungry.length}) · <span class="coin"></span>${cost.toLocaleString('pt-BR')}` : ''}</button>
+    <button class="btn gold" type="button" data-collect-all ${ready.length ? '' : 'disabled'}>Recolher<span class="wide"> tudo</span>${ready.length ? ` (${ready.length})` : ''}</button>`;
 }
 function renderSceneInfo() {
   renderPenActions();
   const s = S(), el = $('#sceneInfo');
   const owner = isHome() ? '' : `${view.nome} · `;
   if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length}${isHome() ? ` de ${allowedLots()}` : ''} canteiros`;
-  else if (scene === 'animais') el.textContent = owner + `${s.animals.filter(inPen).length}${isHome() ? ` de ${MAX_ANIMALS}` : ''} animais`;
+  else if (scene === 'animais') {
+    const cap = ABRIGOS.reduce((t, b) => t + ABRIGO_CAP[abrigoLv(s, b.id)], 0);
+    el.textContent = owner + `${s.animals.filter(inPen).length}${isHome() ? ` de ${cap}` : ''} animais`;
+  }
   else el.textContent = owner + `Conforto ${comfort(s)} · +${comfort(s)}% de XP`;
 }
 
 function renderAccount() {
+  if (state) renderHUD();
   const el = $('#account');
   if (!Cloud.available) { el.innerHTML = '<span class="acct-note">Salvo neste navegador</span>'; return; }
   if (cloudStatus === 'loading') { el.innerHTML = '<span class="acct-note">Conectando…</span>'; return; }
   if (user) {
     el.innerHTML = `${user.photo ? `<img alt="" referrerpolicy="no-referrer" src="${esc(user.photo)}">` : ''}
       <span class="who"><span>${esc(firstName(user.name))}</span><small>${esc(syncStatus)}</small></span>
-      <button class="linkbtn" type="button" data-logout>Sair</button>`;
+      <button class="btn ghost" type="button" data-logout>Sair</button>`;
     return;
   }
   el.innerHTML = `<button class="gbtn" type="button" data-login>${GOOGLE_G}Entrar com Google</button>`;
 }
 $('#account').addEventListener('click', e => {
-  if (e.target.closest('[data-login]')) login();
-  if (e.target.closest('[data-logout]')) logout();
+  if (e.target.closest('[data-login]')) { closeSettings(); login(); }
+  if (e.target.closest('[data-logout]')) { closeSettings(); logout(); }
 });
 function login() {
   if (!Cloud.available) return;
@@ -2676,14 +2886,32 @@ let resetArmed = false, unfriendArmed = null;
 function renderTabs() {
   const b = document.querySelector('.tab[data-tab="amigos"]');
   const unread = state ? state.news.filter(n => n.at > state.newsSeen).length : 0, n = requests.length + unread;
-  b.innerHTML = n ? `Amigos<span class="badge" aria-label="${n} novidades">${n}</span>` : 'Amigos';
+  const old = b.querySelector('.badge'); if (old) old.remove();
+  if (n) b.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${n} novidades">${n}</span>`);
+}
+const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos' };
+// A janela abre por cima do jogo. Clicar de novo no mesmo botão fecha.
+function openPanel(t, seg, focus) {
+  tab = t; if (seg) shopSeg = seg;
+  $('#panel').hidden = false;
+  renderPane(); $('#pane').scrollTop = 0;
+  if (t === 'amigos') checkSent();
+  if (focus) focusRow('abrigo-' + focus);
+}
+function closePanel() { $('#panel').hidden = true; renderPane(); }
+function focusRow(id) {
+  const el = document.getElementById(id); if (!el) return;
+  el.scrollIntoView({ block: 'center' }); el.classList.add('flash');
 }
 function renderPane() {
-  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  const open = !$('#panel').hidden;
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(open && b.dataset.tab === tab)));
+  $('#panelTitle').textContent = TAB_NAMES[tab];
+  if (!open) return;
   const pane = $('#pane');
   let html = '';
   if (tab === 'loja') {
-    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['caes', 'Cães'], ['decor', 'Casa']];
+    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
     if (shopSeg === 'sementes' || shopSeg === 'mudas') {
       const trees = shopSeg === 'mudas';
@@ -2728,16 +2956,20 @@ function renderPane() {
         </div>`;
       }
     } else if (shopSeg === 'animais') {
-      const noCurral = state.animals.filter(inPen).length;
-      html += `<p class="hint">Curral: ${noCurral} de ${MAX_ANIMALS} animais. Nenhum animal morre: sem comida ele só para, e quem termina o período produtivo precisa do veterinário.</p>`;
+      html += `<p class="hint">Cada bicho mora no seu abrigo, que você constrói e aumenta na aba Abrigos. Nenhum animal morre: sem comida ele só para, e quem termina o período produtivo precisa do veterinário.</p>`;
       const row = (d, meta, btn) => `<div class="row ${d.nivel > state.level ? 'locked' : ''}"><img alt="" src="${animalIcon(d.id)}">
         <div><div class="name">${d.nome}${state.animals.some(x => x.k === d.id) ? ` <span class="meta">(${state.animals.filter(x => x.k === d.id).length})</span>` : ''}</div><div class="meta">${meta}</div></div>${btn}</div>`;
-      const buyBtn = d => d.nivel > state.level ? `<button class="btn" disabled>Nível ${d.nivel}</button>`
-        : `<button class="btn" data-buy-animal="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>Comprar</button>`;
+      const buyBtn = d => {
+        if (d.nivel > state.level) return `<button class="btn" disabled>Nível ${d.nivel}</button>`;
+        const ab = d.lugar !== 'casa' && abrigoOf(d.id);
+        if (ab && !abrigoLv(state, ab.id)) return `<button class="btn ghost" data-seg="abrigos" data-focus="${ab.id}">Precisa ${ab.o === 'a' ? 'da' : 'do'} ${ab.nome.toLowerCase()}</button>`;
+        if (ab && vagas(state, ab.id) <= 0) return `<button class="btn ghost" data-seg="abrigos" data-focus="${ab.id}">${ab.nome} ${ab.o === 'a' ? 'cheia' : 'cheio'}</button>`;
+        return `<button class="btn" data-buy-animal="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>Comprar</button>`;
+      };
       const visible = tipo => { const l = ANIMALS.filter(d => d.tipo === tipo); const up = l.filter(d => d.nivel > state.level); return [...l.filter(d => d.nivel <= state.level), ...up.slice(0, 2)]; };
       html += `<h3>Produção</h3>`;
       for (const d of visible('prod')) {
-        const prodTxt = d.prod === 'leitao' ? 'leitões (viram porquinhos no curral)' : `${PRODUCT[d.prod].nome.toLowerCase()} (vende por ${PRODUCT[d.prod].preco})`;
+        const prodTxt = d.prod === 'leitao' ? 'leitões (viram porquinhos no chiqueiro)' : `${PRODUCT[d.prod].nome.toLowerCase()} (vende por ${PRODUCT[d.prod].preco})`;
         html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · ração ${d.racao} por produção<br>${prodTxt} a cada ${fmt(d.tempo)}<br>produz por ${d.periodo} dias · ${d.xp} XP por coleta`, buyBtn(d));
       }
       html += `<h3>Para criar e vender</h3>`;
@@ -2745,11 +2977,23 @@ function renderPane() {
         html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · ração ${d.racao} por dia<br>cresce em ${fmt(d.tempo)} e vende por ${d.venda.toLocaleString('pt-BR')}<br>lucro ${(d.venda - d.custo - d.racao * Math.ceil(d.tempo / (24 * HOUR))).toLocaleString('pt-BR')} · ${d.xp} XP na venda`, buyBtn(d));
       }
       html += `<h3>Companhia</h3>`;
-      for (const d of visible('pet')) html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · mora ${d.lugar === 'casa' ? 'dentro de casa' : 'no curral'}<br>não come nem produz · carinho dá 2 XP por dia`, buyBtn(d));
+      for (const d of visible('pet')) html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · mora ${d.lugar === 'casa' ? 'dentro de casa' : (abrigoOf(d.id).o === 'a' ? 'na ' : 'no ') + abrigoOf(d.id).nome.toLowerCase()}<br>não come nem produz · carinho dá 2 XP por dia`, buyBtn(d));
       const pets = state.animals.filter(a => ANIMAL[a.k].tipo === 'pet');
       if (pets.length) {
         html += `<h3>Nomes dos seus bichos</h3>`;
         for (const a of pets) html += `<form class="addform" data-rename="${a.id}"><input id="pet-${a.id}" maxlength="18" value="${esc(a.nome || ANIMAL[a.k].nome)}" aria-label="Nome do ${esc(ANIMAL[a.k].nome.toLowerCase())}" style="text-transform:none;letter-spacing:0"><button class="btn" type="submit">Salvar</button></form>`;
+      }
+    } else if (shopSeg === 'abrigos') {
+      html += `<p class="hint">Cada abrigo tem o seu cercado no rancho. Nível 1 cabe ${ABRIGO_CAP[1]} animais, nível 2 cabe ${ABRIGO_CAP[2]} e nível 3 cabe ${ABRIGO_CAP[3]}.</p>`;
+      for (const b of ABRIGOS) {
+        const lv = abrigoLv(state, b.id), max = lv >= 3, nivel = b.nivel + ABRIGO_NIVEL[Math.min(3, lv + 1)], preco = b.precos[Math.min(2, lv)];
+        const quem = b.bichos.map(k => ANIMAL[k].nome).join(', ');
+        const btn = max ? '<button class="btn ghost" disabled>Nível máximo</button>'
+          : state.level < nivel ? `<button class="btn" disabled>Nível ${nivel}</button>`
+          : `<button class="btn ${lv ? '' : 'gold'}" data-abrigo="${b.id}" ${state.coins < preco ? 'disabled' : ''}>${lv ? 'Aumentar' : 'Construir'}<br><small>${preco ? preco.toLocaleString('pt-BR') : 'grátis'}</small></button>`;
+        html += `<div class="row ${state.level < b.nivel ? 'locked' : ''} ${lv ? 'sel' : ''}" id="abrigo-${b.id}"><img alt="" src="${abrigoIcon(b.id)}">
+          <div><div class="name">${b.nome}${lv ? ` · nível ${lv}` : ''}</div>
+          <div class="meta">${quem}<br>${lv ? `${livesIn(state, b.id).length} de ${ABRIGO_CAP[lv]} animais${max ? '' : ` · nível ${lv + 1} cabe ${ABRIGO_CAP[lv + 1]}`}` : `cabe ${ABRIGO_CAP[1]} animais`}</div></div>${btn}</div>`;
       }
     } else if (shopSeg === 'caes') {
       html += `<p class="hint">A casinha fica do lado do celeiro. Um cachorro vigia a plantação e outro os animais. Acordado (com ração), ele espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. A ração dura ${DOG_FOOD.horas}h.</p>`;
@@ -2803,7 +3047,8 @@ function renderPane() {
   } else if (tab === 'terreno') {
     html += `<h3>Terreno</h3><div class="kv">
       <span>Canteiros</span><span>${state.owned} de ${allowedLots()}</span>
-      <span>Animais</span><span>${state.animals.length} de ${MAX_ANIMALS}</span>
+      <span>Animais</span><span>${state.animals.length}</span>
+      <span>Abrigos</span><span>${Object.keys(state.abrigos).length} de ${ABRIGOS.length}</span>
       <span>Decorações</span><span>${Object.keys(state.decor).length} de ${DECOR.length}</span>
       <span>Colheitas</span><span>${state.stats.colheitas}</span>
       <span>Produtos dos animais</span><span>${state.stats.coletas}</span>
@@ -2888,15 +3133,16 @@ function renderPane() {
 $('#pane').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   const d = b.dataset;
-  if (d.seg) { shopSeg = d.seg; renderPane(); }
-  else if (d.seed) { state.seed = d.seed; state.tool = 'seed'; if (!isHome()) goHome(); setScene('roca'); renderPane(); save(); }
+  if (d.seg) { shopSeg = d.seg; renderPane(); $('#pane').scrollTop = 0; if (d.focus) focusRow('abrigo-' + d.focus); }
+  else if (d.abrigo) buyAbrigo(d.abrigo);
+  else if (d.seed) { state.seed = d.seed; state.tool = 'seed'; if (!isHome()) goHome(); setScene('roca'); closePanel(); save(); toast(`${CROP[d.seed].nome} na mão: clique na terra arada para plantar.`); }
   else if (d.buyAnimal) buyAnimal(d.buyAnimal);
   else if (d.buyDecor) buyDecor(d.buyDecor);
-  else if ('seeHouse' in d) { if (!isHome()) goHome(); setScene('casa'); }
+  else if ('seeHouse' in d) { if (!isHome()) goHome(); setScene('casa'); closePanel(); }
   else if (d.sell) sell(d.sell, false);
   else if (d.sellallOf) sell(d.sellallOf, true);
   else if ('sellall' in d) sellAll();
-  else if ('seeLand' in d) { if (!isHome()) goHome(); setScene('roca'); toast('Clique num + encostado na sua terra para colocar um canteiro.'); }
+  else if ('seeLand' in d) { if (!isHome()) goHome(); setScene('roca'); closePanel(); toast('Clique num + encostado na sua terra para colocar um canteiro.'); }
   else if ('expand' in d) buyExpansion();
   else if (d.buyFert) buyFert(d.buyFert, Number(d.n) || 1);
   else if (d.racaoEsp) {
@@ -2911,9 +3157,9 @@ $('#pane').addEventListener('click', e => {
   else if (d.buyDog) buyDog(d.buyDog, d.slot);
   else if (d.dogFood) buyDogFood(Number(d.dogFood) || 1);
   else if (d.feedDog) feedDog(d.feedDog);
-  else if (d.useFert) { state.fertSel = d.useFert; if (!isHome()) goHome(); setScene('roca'); setTool('fert'); save(); }
-  else if (d.visit) { visitNpc(d.visit); }
-  else if (d.visitFriend) { visitFriend(d.visitFriend); }
+  else if (d.useFert) { state.fertSel = d.useFert; if (!isHome()) goHome(); setScene('roca'); setTool('fert'); closePanel(); save(); }
+  else if (d.visit) { visitNpc(d.visit); closePanel(); }
+  else if (d.visitFriend) { visitFriend(d.visitFriend); closePanel(); }
   else if (d.accept) acceptRequest(d.accept);
   else if (d.refuse) refuseRequest(d.refuse);
   else if (d.cancelRequest) cancelRequest(d.cancelRequest);
@@ -2951,7 +3197,24 @@ $('#pane').addEventListener('submit', e => {
   e.preventDefault();
   addFriend($('#friendCode').value);
 });
-document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; renderPane(); $('#pane').scrollTop = 0; if (tab === 'amigos') checkSent(); }));
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
+  if (!$('#panel').hidden && tab === b.dataset.tab) closePanel(); else openPanel(b.dataset.tab);
+}));
+$('#closePanel').addEventListener('click', closePanel);
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#panel').hidden && $('#settings').hidden) closePanel(); });
+// Ícones dos botões redondos
+const MENU_ICONS = {
+  loja: '<svg viewBox="0 0 32 32"><path d="M5 14h22v13H5z" fill="#f1dcae" stroke="#7a4a22" stroke-width="1.6"/><path d="M12 19h8v8h-8z" fill="#8a5a33"/><path d="M3 8h26l-2 7H5z" fill="#fff" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 8l-1 7M13.5 8 13 15M18.5 8l.5 7M24 8l1 7" stroke="#e0463a" stroke-width="3"/><path d="M3 8l3-4h20l3 4" fill="#e0463a" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  celeiro: '<svg viewBox="0 0 32 32"><path d="M4 14 16 5l12 9v14H4z" fill="#c8402f" stroke="#6b1f14" stroke-width="1.6" stroke-linejoin="round"/><path d="M11 28V18h10v10" fill="#fff4e0"/><path d="M11 18l10 10M21 18 11 28" stroke="#c8402f" stroke-width="1.6"/><circle cx="16" cy="12" r="2.2" fill="#fff4e0"/></svg>',
+  terreno: '<svg viewBox="0 0 32 32"><path d="M16 9 29 17 16 25 3 17z" fill="#8b5a33" stroke="#4a2c14" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 17l7-4.3M12 19l7-4.3M15 21l7-4.3" stroke="#5e3a1c" stroke-width="1.2"/><circle cx="24" cy="8" r="6" fill="#4f9a2f" stroke="#2f6e1e" stroke-width="1.4"/><path d="M24 5v6M21 8h6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  amigos: '<svg viewBox="0 0 32 32"><circle cx="11" cy="12" r="5" fill="#ffd9b0" stroke="#6b4220" stroke-width="1.5"/><path d="M3 27c0-5 3.5-8 8-8s8 3 8 8z" fill="#4aa3df" stroke="#1d5f8f" stroke-width="1.5"/><circle cx="22" cy="13" r="4.5" fill="#f3c08e" stroke="#6b4220" stroke-width="1.5"/><path d="M15 27c0-4.5 3-7.5 7-7.5s7 3 7 7.5z" fill="#e9a800" stroke="#a87400" stroke-width="1.5"/></svg>',
+  casa: '<svg viewBox="0 0 32 32"><path d="M5 15 16 6l11 9v13H5z" fill="#f1dcae" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M2 16 16 4l14 12" fill="none" stroke="#b5532f" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 28v-8h6v8" fill="#8a5a33"/><path d="M20 15h5v4h-5z" fill="#9fd4f5" stroke="#7a4a22" stroke-width="1.2"/></svg>',
+};
+function paintMenuIcons() {
+  document.querySelectorAll('.tab .ic').forEach(el => { el.innerHTML = MENU_ICONS[el.parentNode.dataset.tab]; });
+  const sc = { roca: `<img alt="" src="${cropIcon('milho')}">`, animais: `<img alt="" src="${animalIcon('vaca')}">`, casa: MENU_ICONS.casa };
+  document.querySelectorAll('#scenes .ic').forEach(el => { el.innerHTML = sc[el.parentNode.dataset.scene]; });
+}
 document.querySelectorAll('#scenes button').forEach(b => b.addEventListener('click', () => setScene(b.dataset.scene)));
 $('#goHome').addEventListener('click', () => goHome());
 $('#penActions').addEventListener('click', e => {
@@ -3013,6 +3276,14 @@ function tipDog(slot) {
   const dias = Math.max(1, Math.ceil((d.born + b.vida * DAY - Date.now()) / DAY));
   return h + `<br>Vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}`;
 }
+function tipAbrigo(id) {
+  const b = ABRIGO[id], s = S(), lv = abrigoLv(s, id);
+  const quem = b.bichos.map(k => ANIMAL[k].nome.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' e $1');
+  if (!lv) return `<b>${b.nome}</b><br>Para ${quem}.<br>${state.level < b.nivel ? `Libera no nível ${b.nivel}.` : `Construir por ${b.precos[0].toLocaleString('pt-BR')} moedas. Clique para ver.`}`;
+  let h = `<b>${b.nome}</b> · nível ${lv}<br>${livesIn(s, id).length} de ${ABRIGO_CAP[lv]} animais · ${quem}`;
+  if (isHome()) h += lv < 3 ? `<br>Clique para aumentar ou comprar animais.` : `<br>Clique para comprar animais.`;
+  return h;
+}
 function tipDecor(id) {
   const d = DECO[id];
   if (S().decor[id]) return `<b>${d.nome}</b><br>+${d.conforto} de conforto`;
@@ -3021,7 +3292,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -3043,13 +3314,26 @@ function pick(x, y) {
   return null;
 }
 function localPos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+// Arrastar move a câmera quando o rancho não cabe na tela (celular).
+let drag = null;
 cv.addEventListener('pointermove', e => {
   const q = localPos(e); pointer.x = q.x; pointer.y = q.y; pointer.inside = true; pointer.touch = e.pointerType === 'touch';
+  if (drag && L.canPan) {
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) > 8) { drag.moved = true; try { cv.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ } }
+    if (drag.moved) { L.pan.x = drag.px + dx; L.pan.y = drag.py + dy; hover = null; return; }
+  }
   hover = pick(q.x, q.y);
 });
 cv.addEventListener('pointerleave', () => { pointer.inside = false; if (!pointer.touch) hover = null; });
-cv.addEventListener('pointerdown', e => { pointer.touch = e.pointerType === 'touch'; });
+cv.addEventListener('pointerdown', e => {
+  pointer.touch = e.pointerType === 'touch';
+  drag = { x: e.clientX, y: e.clientY, px: L.pan.x, py: L.pan.y, moved: false };
+});
+cv.addEventListener('pointerup', () => { if (drag && !drag.moved) drag = null; });
 cv.addEventListener('click', e => {
+  if (drag && drag.moved) { drag = null; return; }
+  drag = null;
   const q = localPos(e); pointer.x = q.x; pointer.y = q.y;
   const target = pick(q.x, q.y); hover = target;
   if (pointer.touch) pointer.tipUntil = performance.now() + 2200;
@@ -3058,6 +3342,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'animal') actAnimal(target.id);
   else if (target.kind === 'decor') actDecor(target.id);
   else if (target.kind === 'dog') actDog(target.slot);
+  else if (target.kind === 'abrigo') actAbrigo(target.id);
 });
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input, textarea')) return;
@@ -3134,7 +3419,7 @@ function frame(now) {
 function start(data) {
   state = (data && data.state && migrate(data.state)) || load() || newState();
   applySettings();
-  resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane();
+  resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons();
   requestAnimationFrame(t => { last = t; frame(t); });
   if (Cloud.available) {
     showGate('loading');
