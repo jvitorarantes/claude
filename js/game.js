@@ -83,7 +83,7 @@ function newState() {
     v: 2, coins: 60, xp: 0, level: 1, plots, barn: {}, owned: START_PLOTS,
     tool: 'hand', seed: 'nabo', t: Date.now(), nb: {},
     animals: [newAnimal('galinha'), newAnimal('galinha')], decor: {},
-    friends: [], code: null, owner: null, log: {},
+    friends: [], sent: {}, code: null, owner: null, log: {},
     stats: { colheitas: 0, coletas: 0, vendido: 0, roubado: 0, ajudas: 0 },
   };
 }
@@ -102,6 +102,7 @@ function migrate(s) {
   for (const a of s.animals) { if (!a.id) a.id = newId(); a.n = a.n || 0; }
   s.decor = s.decor && typeof s.decor === 'object' ? s.decor : {};
   s.friends = Array.isArray(s.friends) ? s.friends.filter(f => typeof f === 'string') : [];
+  s.sent = s.sent && typeof s.sent === 'object' && !Array.isArray(s.sent) ? s.sent : {};
   s.log = s.log && typeof s.log === 'object' ? s.log : {};
   s.nb = s.nb && typeof s.nb === 'object' ? s.nb : {};
   s.barn = s.barn && typeof s.barn === 'object' ? s.barn : {};
@@ -166,7 +167,8 @@ const L = { W: 60, ox: 0, oy: 0, cw: 0, ch: 0, horizon: 0, dpr: 1 };
 
 // Nuvem
 let user = null, cloudStatus = Cloud.available ? 'loading' : 'off', syncStatus = '', dirty = false, lastCloud = 0;
-let unsubVisits = null;
+let unsubVisits = null, unsubRequests = null;
+let requests = [];                  // pedidos de amizade recebidos (ao vivo)
 const friendInfo = {};
 
 const $ = s => document.querySelector(s);
@@ -491,9 +493,8 @@ function applyVisits(list) {
     const note = m => (msgs[who] = msgs[who] || []).push(m);
     const p = Number.isInteger(v.plot) && v.plot >= 0 && v.plot < N ? state.plots[v.plot] : null;
     const a = typeof v.animal === 'string' ? state.animals.find(x => x.id === v.animal) : null;
-    if (v.t === 'friend') {
-      if (!state.friends.includes(v.from)) { state.friends.push(v.from); note('te adicionou como amigo'); }
-    } else if (v.t === 'help' && p && p.id === v.pid) {
+    if (!state.friends.includes(v.from)) continue;
+    if (v.t === 'help' && p && p.id === v.pid) {
       if (v.what === 'w') p.w = Math.max(0, p.w - 1);
       if (v.what === 'b') p.b = Math.max(0, p.b - 1);
       if (v.what === 'dry') p.dry = false;
@@ -523,9 +524,11 @@ async function cloudSave() {
   syncStatus = 'Salvando…'; renderAccount();
   try {
     state.owner = user.uid;
+    // friends e sent ficam fora do JSON para as regras do Firestore decidirem quem pode ver a roça.
     await Cloud.saveFarm(user.uid, {
       stateJson: JSON.stringify(state), name: user.name || '', photo: user.photo || '',
       level: state.level, code: state.code || '', updatedAt: Date.now(),
+      friends: state.friends.slice(), sent: Object.keys(state.sent),
     });
     syncStatus = 'Salvo na nuvem';
   } catch (e) {
@@ -536,12 +539,13 @@ async function cloudSave() {
 
 async function onUser(u) {
   if (unsubVisits) { unsubVisits(); unsubVisits = null; }
-  user = u;
+  if (unsubRequests) { unsubRequests(); unsubRequests = null; }
+  user = u; requests = [];
   for (const k of Object.keys(friendInfo)) delete friendInfo[k];
   if (!u) {
     cloudStatus = 'out'; syncStatus = '';
     if (view.kind === 'friend') goHome();
-    renderAccount(); renderPane();
+    renderAccount(); renderPane(); renderTabs();
     return;
   }
   cloudStatus = 'loading'; renderAccount();
@@ -561,13 +565,31 @@ async function onUser(u) {
     cloudStatus = 'ready';
     await cloudSave();
     unsubVisits = Cloud.watchVisits(u.uid, applyVisits);
+    unsubRequests = Cloud.watchRequests(u.uid, onRequests);
+    checkSent();
     toast(`Olá, ${firstName(u.name)}! Sua roça agora fica salva na nuvem.`, 'good');
   } catch (e) {
     console.warn(e);
     cloudStatus = 'ready'; syncStatus = 'Sem conexão';
     toast('Não consegui falar com a nuvem. Seguimos salvando neste navegador.', 'bad');
   }
-  renderTools(); renderHUD(); renderAccount(); renderPane(); renderSceneInfo();
+  renderTools(); renderHUD(); renderAccount(); renderPane(); renderSceneInfo(); renderTabs();
+}
+
+// ---------- Pedidos de amizade ----------
+// Quem digita o código cria farms/{outro}/requests/{eu}. O outro aceita ou recusa.
+// Aceitar = colocar na lista friends e salvar; quem pediu percebe isso em checkSent().
+function onRequests(list) {
+  const seen = new Set(requests.map(r => r.from));
+  requests = list
+    .map(r => r.data)
+    .filter(r => r && typeof r.from === 'string' && r.from !== user.uid && !state.friends.includes(r.from))
+    .map(r => ({ from: r.from, name: String(r.fromName || 'Alguém').slice(0, 60), photo: typeof r.fromPhoto === 'string' ? r.fromPhoto : '', at: r.at || 0 }));
+  // Se a pessoa já é amiga (ex.: pediu de novo), o pedido é só apagado.
+  for (const r of list) if (r.data && state.friends.includes(r.data.from)) Cloud.deleteRequest(user.uid, r.data.from).catch(() => {});
+  for (const r of requests) if (!seen.has(r.from)) toast(`${firstName(r.name)} quer ser seu amigo! Veja na aba Amigos.`, 'good');
+  renderTabs();
+  if (tab === 'amigos') renderPane();
 }
 
 async function addFriend(code) {
@@ -579,14 +601,78 @@ async function addFriend(code) {
     const uid = await Cloud.findCode(code);
     if (!uid) return toast('Não achei ninguém com esse código.', 'bad');
     if (state.friends.includes(uid)) return toast('Vocês já são amigos.');
-    state.friends.push(uid);
-    await Cloud.sendVisit(uid, { t: 'friend', from: user.uid, fromName: user.name || 'Um amigo', at: Date.now() });
-    toast('Amigo adicionado!', 'good');
+    if (requests.some(r => r.from === uid)) return acceptRequest(uid);
+    if (state.sent[uid]) return toast('Você já mandou um pedido para essa pessoa.');
+    state.sent[uid] = { at: Date.now(), code };
+    await cloudSave(); // libera a sua roça para essa pessoa espiar antes de aceitar
+    await Cloud.sendRequest(uid, { from: user.uid, fromName: user.name || 'Alguém', fromPhoto: user.photo || '', at: Date.now() });
+    toast('Pedido enviado! A amizade começa quando a pessoa aceitar.', 'good');
     done();
   } catch (e) {
     console.warn(e);
-    toast('Não consegui adicionar agora. Tente de novo.', 'bad');
+    toast('Não consegui mandar o pedido agora. Tente de novo.', 'bad');
   }
+}
+
+async function acceptRequest(uid) {
+  if (!user) return;
+  if (!state.friends.includes(uid)) state.friends.push(uid);
+  delete state.sent[uid];
+  const r = requests.find(x => x.from === uid);
+  requests = requests.filter(x => x.from !== uid);
+  delete friendInfo[uid];
+  save(); await cloudSave();
+  Cloud.deleteRequest(user.uid, uid).catch(e => console.warn(e));
+  toast(`Agora você e ${firstName(r ? r.name : 'seu amigo')} são amigos!`, 'good');
+  renderTabs(); renderPane();
+}
+
+function refuseRequest(uid) {
+  if (!user) return;
+  requests = requests.filter(x => x.from !== uid);
+  Cloud.deleteRequest(user.uid, uid).catch(e => console.warn(e));
+  renderTabs(); renderPane();
+}
+
+async function cancelRequest(uid) {
+  if (!user) return;
+  delete state.sent[uid];
+  Cloud.deleteRequest(uid, user.uid).catch(e => console.warn(e));
+  done(); await cloudSave();
+}
+
+async function unfriend(uid) {
+  state.friends = state.friends.filter(f => f !== uid);
+  delete friendInfo[uid];
+  if (view.kind === 'friend' && view.uid === uid) goHome();
+  done(); await cloudSave();
+  toast('Amizade desfeita.');
+}
+
+// Confere os pedidos que você mandou: aceito (a pessoa te colocou na lista) ou recusado (o pedido sumiu).
+let checkingSent = false;
+async function checkSent() {
+  if (!user || checkingSent) return;
+  const pending = Object.keys(state.sent);
+  if (!pending.length) return;
+  checkingSent = true;
+  let changed = false;
+  try {
+    for (const uid of pending) {
+      let farm = null;
+      try { farm = await Cloud.loadFarm(uid); } catch (e) { farm = null; }
+      if (farm && Array.isArray(farm.friends) && farm.friends.includes(user.uid)) {
+        delete state.sent[uid];
+        if (!state.friends.includes(uid)) state.friends.push(uid);
+        toast(`${firstName(farm.name || 'Seu amigo')} aceitou seu pedido de amizade!`, 'good');
+        changed = true;
+        continue;
+      }
+      const still = await Cloud.requestExists(uid, user.uid).catch(() => true);
+      if (!still) { delete state.sent[uid]; changed = true; }
+    }
+  } finally { checkingSent = false; }
+  if (changed) { done(); cloudSave(); }
 }
 
 function fetchFriendInfo(uid) {
@@ -594,7 +680,14 @@ function fetchFriendInfo(uid) {
   friendInfo[uid] = 'loading';
   Cloud.loadFarm(uid).then(f => {
     friendInfo[uid] = f ? { name: f.name || 'Amigo', photo: f.photo || '', level: f.level || 1 } : null;
-  }).catch(() => { friendInfo[uid] = null; }).finally(() => { if (tab === 'amigos') renderPane(); });
+  }).catch(e => {
+    friendInfo[uid] = null;
+    // Sem permissão = a pessoa desfez a amizade. Tira da sua lista também.
+    if (e && e.code === 'permission-denied' && state.friends.includes(uid)) {
+      state.friends = state.friends.filter(f => f !== uid);
+      done(); cloudSave();
+    }
+  }).finally(() => { if (tab === 'amigos') renderPane(); });
 }
 
 // ============================================================
@@ -1486,7 +1579,11 @@ function login() {
   });
 }
 
-let resetArmed = false;
+let resetArmed = false, unfriendArmed = null;
+function renderTabs() {
+  const b = document.querySelector('.tab[data-tab="amigos"]');
+  b.innerHTML = requests.length ? `Amigos<span class="badge" aria-label="${requests.length} pedidos">${requests.length}</span>` : 'Amigos';
+}
 function renderPane() {
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   const pane = $('#pane');
@@ -1573,17 +1670,39 @@ function renderPane() {
       html += `<div class="codebox"><div><div class="meta">Seu código de amigo</div><strong>${esc(state.code || '······')}</strong></div>
           <button class="btn ghost" data-copy-code type="button">Copiar</button></div>
         <form class="addform" id="addFriend"><input id="friendCode" maxlength="7" placeholder="Código do amigo" autocomplete="off" aria-label="Código do amigo"><button class="btn" type="submit">Adicionar</button></form>`;
-      if (!state.friends.length) html += `<div class="empty">Mande seu código para um amigo e peça o dele.</div>`;
+      const avatar = (photo, name, color) => photo
+        ? `<img class="avatar" alt="" referrerpolicy="no-referrer" src="${esc(photo)}">`
+        : `<div class="avatar" style="background:${color}">${esc((name || '?')[0])}</div>`;
+      if (requests.length) {
+        html += `<h3>Pedidos de amizade</h3>`;
+        for (const r of requests) {
+          html += `<div class="row sel">${avatar(r.photo, r.name, '#d9a441')}
+            <div><div class="name">${esc(r.name)}</div><div class="meta">quer ser seu amigo</div></div>
+            <div class="stack"><button class="btn" data-accept="${esc(r.from)}">Aceitar</button><button class="btn ghost" data-refuse="${esc(r.from)}">Recusar</button></div></div>`;
+        }
+      }
+      html += `<h3>Seus amigos</h3>`;
+      if (!state.friends.length) html += `<div class="empty">Mande seu código para um amigo e peça o dele. A amizade começa quando um aceitar o pedido do outro.</div>`;
       for (const uid of state.friends) {
         fetchFriendInfo(uid);
         const f = friendInfo[uid];
         const here = view.kind === 'friend' && view.uid === uid;
         if (f === 'loading') { html += `<div class="row"><div class="avatar" style="background:#c9c3a8"></div><div class="meta">Carregando…</div><div></div></div>`; continue; }
-        const name = f ? f.name : 'Amigo sem roça ainda';
-        const av = f && f.photo ? `<img class="avatar" alt="" referrerpolicy="no-referrer" src="${esc(f.photo)}">` : `<div class="avatar" style="background:#7aa35a">${esc(name[0] || '?')}</div>`;
-        html += `<div class="row ${here ? 'sel' : ''}">${av}
+        const name = f ? f.name : 'Amigo';
+        const armed = unfriendArmed === uid;
+        html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
           <div><div class="name">${esc(name)}</div><div class="meta">${f ? `Nível ${f.level}` : 'Ainda não entrou no jogo'}</div></div>
-          ${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`}</div>`;
+          <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`}
+          <button class="btn ${armed ? 'danger' : 'ghost'}" data-unfriend="${esc(uid)}">${armed ? 'Confirmar' : 'Desfazer'}</button></div></div>`;
+      }
+      const sent = Object.entries(state.sent);
+      if (sent.length) {
+        html += `<h3>Pedidos enviados</h3>`;
+        for (const [uid, info] of sent) {
+          html += `<div class="row">${avatar('', '?', '#b7b39c')}
+            <div><div class="name">Código ${esc(info.code || '')}</div><div class="meta">Esperando a pessoa aceitar</div></div>
+            <button class="btn ghost" data-cancel-request="${esc(uid)}">Cancelar</button></div>`;
+        }
       }
     }
     html += `<h3>Vizinhos da vila</h3><p class="hint">Sempre tem alguém em casa por aqui. Cada vizinho tem um cachorro de guarda.</p>`;
@@ -1611,6 +1730,15 @@ $('#pane').addEventListener('click', e => {
   else if ('buylot' in d) { const i = nextLot(); if (i != null) { if (!isHome()) goHome(); buyLot(i); } }
   else if (d.visit) { visitNpc(d.visit); }
   else if (d.visitFriend) { visitFriend(d.visitFriend); }
+  else if (d.accept) acceptRequest(d.accept);
+  else if (d.refuse) refuseRequest(d.refuse);
+  else if (d.cancelRequest) cancelRequest(d.cancelRequest);
+  else if (d.unfriend) {
+    if (unfriendArmed !== d.unfriend) {
+      unfriendArmed = d.unfriend; renderPane();
+      setTimeout(() => { if (unfriendArmed === d.unfriend) { unfriendArmed = null; if (tab === 'amigos') renderPane(); } }, 4000);
+    } else { unfriendArmed = null; unfriend(d.unfriend); }
+  }
   else if ('home' in d) goHome();
   else if ('login' in d) login();
   else if ('copyCode' in d) {
@@ -1621,7 +1749,7 @@ $('#pane').addEventListener('click', e => {
   else if ('reset' in d) {
     if (!resetArmed) { resetArmed = true; renderPane(); setTimeout(() => { resetArmed = false; if (tab === 'terreno') renderPane(); }, 4000); return; }
     resetArmed = false;
-    const keep = { owner: state.owner, code: state.code, friends: state.friends };
+    const keep = { owner: state.owner, code: state.code, friends: state.friends, sent: state.sent };
     state = Object.assign(newState(), keep);
     goHome(); setScene('roca'); done();
     toast('Roça nova em folha!', 'good');
@@ -1632,7 +1760,7 @@ $('#pane').addEventListener('submit', e => {
   e.preventDefault();
   addFriend($('#friendCode').value);
 });
-document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; renderPane(); }));
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; renderPane(); if (tab === 'amigos') checkSent(); }));
 document.querySelectorAll('#scenes button').forEach(b => b.addEventListener('click', () => setScene(b.dataset.scene)));
 $('#goHome').addEventListener('click', () => goHome());
 
@@ -1723,7 +1851,7 @@ new ResizeObserver(resize).observe(stage);
 // ============================================================
 // Laço principal
 // ============================================================
-let last = performance.now(), lastSave = 0, lastUI = 0, lastInfo = 0;
+let last = performance.now(), lastSave = 0, lastUI = 0, lastInfo = 0, lastSentCheck = 0;
 function frame(now) {
   const dt = Math.min(1, (now - last) / 1000); last = now;
   tick(dt);
@@ -1732,6 +1860,7 @@ function frame(now) {
   if (now - lastInfo > 2000) { renderSceneInfo(); lastInfo = now; }
   if (now - lastSave > 5000) { save(); lastSave = now; }
   if (user && dirty && now - lastCloud > 15000) cloudSave();
+  if (user && now - lastSentCheck > 60000) { lastSentCheck = now; checkSent(); }
   requestAnimationFrame(frame);
 }
 

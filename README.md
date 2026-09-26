@@ -13,7 +13,8 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **Celeiro** para vender colheitas e produtos.
 - **Vizinhos da vila** (Tia Cida, Seu Juca e Dona Neide) para visitar a qualquer hora.
 - **Login com Google, salvamento na nuvem e amigos de verdade** (precisa do Firebase, veja abaixo).
-  - Cada jogador ganha um **código de amigo** de 6 letras. Quem digita o código do outro vira amigo dos dois lados.
+  - Cada jogador ganha um **código de amigo** de 6 letras. Digitar o código de alguém manda um **pedido de amizade**, que a pessoa pode **aceitar ou recusar** na aba Amigos. Dá para cancelar um pedido enviado e desfazer uma amizade.
+  - Só amigos veem e visitam a sua roça. Quem recebe um pedido pode espiar a roça de quem pediu antes de aceitar.
   - Na roça de um amigo você pode tirar mato e pragas, regar, alimentar os animais ou pegar um pouquinho da colheita (se o cachorro deixar!). O dono vê o que aconteceu quando abre o jogo.
 
 Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no navegador e não tem amigos de verdade.
@@ -66,8 +67,9 @@ No repositório do GitHub: **Settings > Pages > Build and deployment**, escolha 
 
 ## Como os dados ficam guardados
 
-- `farms/{uid}`: a roça de cada jogador (o estado do jogo em JSON, mais nome, foto, nível e código). Todo jogador logado pode ler, para poder visitar. Só o dono escreve.
-- `farms/{uid}/visits/{id}`: o que os amigos fizeram na sua roça. Quem visita só cria, sempre em seu próprio nome. O dono aplica e apaga.
+- `farms/{uid}`: a roça de cada jogador (o estado do jogo em JSON, mais nome, foto, nível, código e as listas `friends` e `sent`). Podem ler o dono, os amigos e quem recebeu um pedido de amizade dele. Só o dono escreve.
+- `farms/{uid}/requests/{quemPediu}`: pedidos de amizade recebidos. Aceitar coloca a pessoa em `friends`; recusar apaga o pedido.
+- `farms/{uid}/visits/{id}`: o que os amigos fizeram na sua roça. Só amigos criam, sempre em seu próprio nome. O dono aplica e apaga.
 - `codes/{código}`: liga o código de amigo ao jogador.
 
 Ao entrar com o Google pela primeira vez, a roça que já estava no navegador vai para a sua conta.

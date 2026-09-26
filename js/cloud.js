@@ -69,7 +69,7 @@
     return d.exists ? d.data().uid : null;
   }
 
-  // Visitas: o que um amigo fez na sua roça (ajudou, pegou colheita, te adicionou).
+  // Visitas: o que um amigo fez na sua roça (ajudou, alimentou, pegou colheita).
   // O dono aplica e apaga quando abre o jogo.
   const sendVisit = (toUid, visit) => farm(toUid).collection('visits').add(visit);
   function watchVisits(uid, cb) {
@@ -80,5 +80,19 @@
   }
   const deleteVisit = (uid, id) => farm(uid).collection('visits').doc(id).delete();
 
-  window.RFCloud = { available, init, signIn, signOut, loadFarm, saveFarm, claimCode, findCode, normalizeCode, sendVisit, watchVisits, deleteVisit };
+  // Pedidos de amizade: farms/{destino}/requests/{quemPediu}.
+  const requestRef = (toUid, fromUid) => farm(toUid).collection('requests').doc(fromUid);
+  const sendRequest = (toUid, data) => requestRef(toUid, data.from).set(data);
+  const deleteRequest = (toUid, fromUid) => requestRef(toUid, fromUid).delete();
+  async function requestExists(toUid, fromUid) { return (await requestRef(toUid, fromUid).get()).exists; }
+  function watchRequests(uid, cb) {
+    return farm(uid).collection('requests').onSnapshot(qs => {
+      cb(qs.docs.map(d => ({ id: d.id, data: d.data() })));
+    }, e => console.warn('pedidos:', e));
+  }
+
+  window.RFCloud = {
+    available, init, signIn, signOut, loadFarm, saveFarm, claimCode, findCode, normalizeCode,
+    sendVisit, watchVisits, deleteVisit, sendRequest, deleteRequest, requestExists, watchRequests,
+  };
 })();
