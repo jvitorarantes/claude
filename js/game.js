@@ -546,9 +546,11 @@ async function onUser(u) {
     cloudStatus = 'out'; syncStatus = '';
     if (view.kind === 'friend') goHome();
     renderAccount(); renderPane(); renderTabs();
+    showGate('login');
     return;
   }
   cloudStatus = 'loading'; renderAccount();
+  showGate('entering');
   try {
     const remote = await Cloud.loadFarm(u.uid);
     const rs = remote && remote.stateJson ? migrate(JSON.parse(remote.stateJson)) : null;
@@ -567,13 +569,67 @@ async function onUser(u) {
     unsubVisits = Cloud.watchVisits(u.uid, applyVisits);
     unsubRequests = Cloud.watchRequests(u.uid, onRequests);
     checkSent();
-    toast(`Olá, ${firstName(u.name)}! Sua roça agora fica salva na nuvem.`, 'good');
+    enterGame();
+    toast(`Olá, ${firstName(u.name)}! Bom te ver na roça.`, 'good');
   } catch (e) {
     console.warn(e);
     cloudStatus = 'ready'; syncStatus = 'Sem conexão';
-    toast('Não consegui falar com a nuvem. Seguimos salvando neste navegador.', 'bad');
+    enterGame();
+    toast('Não consegui falar com a nuvem. Seguimos salvando neste aparelho.', 'bad');
   }
   renderTools(); renderHUD(); renderAccount(); renderPane(); renderSceneInfo(); renderTabs();
+}
+
+// ---------- Tela de entrada (só quando o login está ligado) ----------
+const root = document.documentElement;
+const isGated = () => root.classList.contains('gated');
+function showGate(mode, msg) {
+  root.classList.add('gated');
+  tip.hidden = true;
+  drawGateArt();
+  $('#gateLogin').hidden = mode !== 'login';
+  $('#gateRetry').hidden = mode !== 'error';
+  const st = $('#gateStatus');
+  st.className = 'gate-status' + (mode === 'error' ? ' bad' : '');
+  st.textContent = msg || { loading: 'Abrindo a porteira…', entering: 'Carregando sua roça…', waiting: 'Esperando o Google…' }[mode] || '';
+}
+function enterGame() {
+  root.classList.remove('gated');
+  resize(); setScene(scene);
+}
+// Recado para o jogador: na tela de entrada, vai no status; no jogo, vira aviso.
+function notify(msg, kind) {
+  if (isGated()) { const st = $('#gateStatus'); st.className = 'gate-status' + (kind === 'bad' ? ' bad' : ''); st.textContent = msg; }
+  else toast(msg, kind);
+}
+$('#gateLogin').addEventListener('click', () => login());
+$('#gateRetry').addEventListener('click', () => location.reload());
+
+// Ilustração da tela de entrada, feita com os mesmos desenhos do jogo.
+let gateArtDone = false;
+function drawGateArt() {
+  if (gateArtDone) return;
+  const g = $('#gateArt'), saved = Object.assign({}, L);
+  ctx = g.getContext('2d');
+  try {
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    Object.assign(L, { cw: 480, ch: 280, W: 96, ox: 262, oy: 108, horizon: 86, dpr: 2 });
+    drawSky(0, 'dia'); drawGround();
+    drawBarn(72, 172, 96);
+    drawTree(430, 150, 80, 0);
+    drawFence(3, 2, 'back');
+    const crops = ['tomate', 'milho', 'abobora', 'cenoura', 'morango', 'melancia'];
+    for (let sum = 0; sum <= 3; sum++) for (let c = 0; c < 3; c++) {
+      const r = sum - c; if (r < 0 || r > 1) continue;
+      const crop = CROP[crops[r * 3 + c]];
+      drawPlot(r * COLS + c, Object.assign(emptyPlot('growing'), { c: crop.id, g: crop.tempo, id: 'g' }), 0, true);
+    }
+    const q1 = iso(3.4, 1.2), q3 = iso(3.0, 2.0);
+    drawAnimal('vaca', 150, 256, 1.15, 0, 1, false);
+    drawAnimal('galinha', q1.x, q1.y, 1.1, 0, -1, false);
+    drawAnimal('galinha', q3.x, q3.y, 1.0, 0, 1, false);
+    gateArtDone = true;
+  } finally { ctx = mainCtx; Object.assign(L, saved); }
 }
 
 // ---------- Pedidos de amizade ----------
@@ -737,7 +793,7 @@ function updateWander(list, dt) {
 // ============================================================
 function resize() {
   const r = stage.getBoundingClientRect();
-  const cw = r.width - 10, ch = r.height - 10; // borda de 5px
+  const cw = Math.max(0, r.width - 10), ch = Math.max(0, r.height - 10); // borda de 5px
   L.dpr = Math.min(2, window.devicePixelRatio || 1);
   cv.width = Math.round(cw * L.dpr); cv.height = Math.round(ch * L.dpr);
   L.cw = cw; L.ch = ch;
@@ -1568,15 +1624,28 @@ function renderAccount() {
 }
 $('#account').addEventListener('click', e => {
   if (e.target.closest('[data-login]')) login();
-  if (e.target.closest('[data-logout]')) { if (dirty) cloudSave(); Cloud.signOut(); }
+  if (e.target.closest('[data-logout]')) logout();
 });
 function login() {
   if (!Cloud.available) return;
+  if (isGated()) showGate('login', 'Esperando o Google…');
   Cloud.signIn().catch(e => {
-    if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
+    if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) {
+      if (isGated()) showGate('login');
+      return;
+    }
     console.warn(e);
-    toast('Não deu para entrar com o Google agora.', 'bad');
+    const why = e && e.code === 'auth/unauthorized-domain'
+      ? 'Este endereço ainda não foi autorizado no Firebase (Authentication > Configurações > Domínios autorizados).'
+      : 'Não deu para entrar com o Google agora. Tente de novo.';
+    if (isGated()) showGate('login', why); else toast(why, 'bad');
   });
+}
+async function logout() {
+  save();
+  if (dirty) await cloudSave();
+  showGate('loading', 'Saindo…');
+  try { await Cloud.signOut(); } catch (e) { console.warn(e); showGate('login'); }
 }
 
 let resetArmed = false, unfriendArmed = null;
@@ -1855,7 +1924,7 @@ let last = performance.now(), lastSave = 0, lastUI = 0, lastInfo = 0, lastSentCh
 function frame(now) {
   const dt = Math.min(1, (now - last) / 1000); last = now;
   tick(dt);
-  draw(now, dt);
+  if (!isGated() && L.cw > 20) draw(now, dt);
   if (now - lastUI > 250) { updateTip(); lastUI = now; }
   if (now - lastInfo > 2000) { renderSceneInfo(); lastInfo = now; }
   if (now - lastSave > 5000) { save(); lastSave = now; }
@@ -1869,9 +1938,10 @@ function start(data) {
   resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane();
   requestAnimationFrame(t => { last = t; frame(t); });
   if (Cloud.available) {
+    showGate('loading');
     Cloud.init(onUser).catch(e => {
       console.warn(e); cloudStatus = 'off';
-      toast('Não consegui carregar o login do Google. Seguimos salvando neste navegador.', 'bad');
+      showGate('error', 'Não consegui abrir o login do Google. Confira a internet e tente de novo.');
       renderAccount();
     });
   }
