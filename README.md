@@ -27,7 +27,7 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **Vizinhos da vila** (Seu Zé e Dona Maria), que não são amigos de verdade, para visitar a qualquer hora.
 - **Caixa de correio** no menu: as novidades da sua roça (visitas dos amigos, presentes, o que o cachorro fez e recados da vila).
 - **Login com Google, salvamento na nuvem e amigos de verdade** (precisa do Firebase, veja abaixo).
-  - Cada jogador ganha um **código de amigo** de 6 letras. Digitar o código de alguém manda um **pedido de amizade**, que a pessoa pode **aceitar ou recusar** na aba Amigos. Dá para cancelar um pedido enviado e desfazer uma amizade.
+  - Cada jogador ganha um **código de amigo** de 6 letras. Digitar o código de alguém manda um **pedido de amizade**, que a pessoa pode **aceitar ou recusar** na aba Amigos. Dá para cancelar um pedido enviado e excluir um amigo.
   - Só amigos veem e visitam a sua roça. Quem recebe um pedido pode espiar a roça de quem pediu antes de aceitar.
   - Na roça de um amigo você pode tirar pragas, regar, alimentar os animais ou pegar um pouquinho: até 3 itens da plantação e 3 dos animais por roça, em no máximo 5 roças por dia (se o cachorro deixar!). Os limites voltam à meia-noite. O dono recebe um aviso na caixa de correio. O nível da roça de cada amigo aparece na lista e durante a visita.
 
