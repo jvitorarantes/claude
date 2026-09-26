@@ -2856,7 +2856,7 @@ function drawYard(b, s, t, home, dt, bubbles) {
   drawTrough(y, b.id);
   const c = drawShed(b.id, y.u0, y.v0, lv, t);
   const hov = hover && hover.kind === 'abrigo' && hover.id === b.id;
-  if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(c.x, c.y, W * 0.75, W * 0.45, 0, 0, 7); ctx.stroke(); }
+  if (hov) { ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)'; poly([iso(R[0], R[1]), iso(R[2], R[1]), iso(R[2], R[3]), iso(R[0], R[3])]); ctx.stroke(); }
   hits.push({ kind: 'abrigo', id: b.id, x: c.x, y: c.y, r: W * 0.55 });
   const list = livesIn(s, b.id);
   updateWander(list, dt, yardArea(b.id));
@@ -3828,7 +3828,7 @@ function tipDecor(id) {
 }
 let lastTip = '';
 function updateTip() {
-  const show = hover && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
+  const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
   const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
@@ -3848,6 +3848,14 @@ function pick(x, y) {
   for (const h of hits) { const d = Math.hypot(x - h.x, y - h.y); if (d < h.r && d < bd) { best = h; bd = d; } }
   if (best) return best;
   if (scene === 'roca') { const i = cellAt(x, y); if (i >= 0) return { kind: 'plot', i }; }
+  // No rancho, o cercado inteiro abre o abrigo (os bichos lá dentro têm preferência, pelos hits acima)
+  if (scene === 'animais') {
+    const [u, v] = screenToWorld(x, y);
+    for (const b of ABRIGOS) {
+      const r = yardOf(b.id);
+      if (u >= r.u0 && u < r.u1 && v >= r.v0 && v < r.v1 && (isHome() || abrigoLv(S(), b.id))) return { kind: 'abrigo', id: b.id };
+    }
+  }
   return null;
 }
 function localPos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
@@ -3876,23 +3884,66 @@ cv.addEventListener('pointermove', e => {
   if (drag && L.canPan) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) > 8) { drag.moved = true; try { cv.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ } }
-    if (drag.moved) { L.pan.x = drag.px + dx; L.pan.y = drag.py + dy; hover = null; return; }
+    if (drag.moved) { clearTimeout(holdTimer); L.pan.x = drag.px + dx; L.pan.y = drag.py + dy; hover = null; return; }
   }
   hover = pick(q.x, q.y);
 });
 cv.addEventListener('pointerleave', () => { pointer.inside = false; if (!pointer.touch) hover = null; });
+// Segurar em cima de uma casa, árvore ou enfeite abre um menu (mover / guardar). No mouse, o botão direito também.
+let holdTimer = null, holdFired = false;
+function objAt(x, y) {
+  if (!isHome() || scene === 'casa') return null;
+  let best = null, bd = Infinity;
+  for (const o of objList(state, scene)) {
+    const q = iso(o.u, o.v), r = L.W * Math.max(0.4, o.r * 0.55), d = Math.hypot(x - q.x, y - (q.y - L.W * 0.3));
+    if (d < r && d < bd) { best = o; bd = d; }
+  }
+  return best;
+}
+function abrirMenuObj(o, x, y) {
+  const m = $('#ctxMenu'), nome = o.id ? ENFEITE[o.id].nome : OBJ_INFO[o.key].nome;
+  m.innerHTML = `<b>${esc(nome)}</b><button type="button" data-ctx="mover">↔️ Mover</button>${o.id ? '<button type="button" data-ctx="guardar">📦 Guardar no inventário</button>' : ''}<button type="button" data-ctx="fechar">Cancelar</button>`;
+  m.dataset.key = o.key;
+  m.hidden = false;
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = `${clamp(x - w / 2, 6, L.cw - w - 6)}px`; m.style.top = `${clamp(y - h - 16, 6, L.ch - h - 6)}px`;
+  sfx('click');
+}
+function fecharMenuObj() { $('#ctxMenu').hidden = true; }
+$('#ctxMenu').addEventListener('click', e => {
+  const b = e.target.closest('[data-ctx]'); if (!b) return;
+  const key = $('#ctxMenu').dataset.key; fecharMenuObj();
+  if (b.dataset.ctx === 'mover') {
+    moveMode = true; moving = { key, uma: true }; renderMoveBtn(); renderTools();
+    const o = objList(state, scene).find(x => x.key === key);
+    toast(`${o && o.id ? ENFEITE[o.id].nome : OBJ_INFO[key] ? OBJ_INFO[key].nome : 'Pronto'}: clique no lugar novo. Esc cancela.`);
+  } else if (b.dataset.ctx === 'guardar' && key.startsWith('enf:')) invGuardar(scene, Number(key.slice(4)));
+});
+cv.addEventListener('contextmenu', e => {
+  const q = localPos(e), o = objAt(q.x, q.y);
+  if (!o) return;
+  e.preventDefault(); abrirMenuObj(o, q.x, q.y);
+});
 cv.addEventListener('pointerdown', e => {
   pointer.touch = e.pointerType === 'touch';
   if (e.pointerType === 'touch') fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (fingers.size >= 2) return;
   drag = { x: e.clientX, y: e.clientY, px: L.pan.x, py: L.pan.y, moved: false };
+  fecharMenuObj();
+  clearTimeout(holdTimer); holdFired = false;
+  if (e.button === 0 && !moving) {
+    const q = localPos(e), o = objAt(q.x, q.y);
+    if (o) holdTimer = setTimeout(() => { if (drag && !drag.moved) { holdFired = true; abrirMenuObj(o, q.x, q.y); } }, 550);
+  }
 });
+cv.addEventListener('pointerup', () => clearTimeout(holdTimer));
 cv.addEventListener('pointerup', e => {
   endTouch(e);
   if (drag && !drag.moved) drag = null;
   else if (drag && drag.dead && !fingers.size) setTimeout(() => { if (drag && drag.dead) drag = null; }, 0);
 });
 cv.addEventListener('click', e => {
+  if (holdFired) { holdFired = false; drag = null; return; } // o clique que termina o "segurar" não conta
   if (drag && (drag.moved || drag.dead)) { drag = null; return; }
   drag = null;
   const q = localPos(e); pointer.x = q.x; pointer.y = q.y;
@@ -4912,6 +4963,7 @@ function moveClick(x, y) {
   } else {
     state.pos = state.pos || {}; (state.pos[scene] = state.pos[scene] || {})[moving.key] = [u, v];
   }
+  if (moving.uma) { moveMode = false; renderMoveBtn(); }
   moving = null; sfx('buy'); done();
 }
 // Desenha os objetos da cena. "tras": os que ficam atrás da cerca (u ou v negativos); "frente": o resto.

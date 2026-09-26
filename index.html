@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roça Feliz</title>
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="35">
-<script src="firebase-config.js?v=35"></script>
+<meta name="rf-version" content="36">
+<script src="firebase-config.js?v=36"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -230,6 +230,10 @@
     background: rgba(60,36,14,.6); border-radius: 12px; padding: 3px 12px;
   }
 
+  .ctxmenu { position: absolute; z-index: 7; display: grid; gap: 4px; min-width: 190px; padding: 8px; background: var(--panel); border: 3px solid var(--wood); border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.3); animation: pop .15s ease-out; }
+  .ctxmenu b { font-size: 13px; color: var(--heading); padding: 0 4px; }
+  .ctxmenu button { text-align: left; border: 0; border-radius: 10px; padding: 7px 10px; font-weight: 800; background: var(--card); color: var(--ink); }
+  .ctxmenu button:hover, .ctxmenu button:focus-visible { background: var(--sel); }
   .tip {
     position: absolute; pointer-events: none; z-index: 6;
     background: rgba(40, 26, 12, .92); color: #fff4df;
@@ -528,6 +532,7 @@
   <div class="stage" id="stage">
     <canvas id="cv" aria-label="Sua roça"></canvas>
     <div class="tip" id="tip" hidden></div>
+    <div class="ctxmenu" id="ctxMenu" hidden role="menu"></div>
 
     <header class="player over outline" aria-label="Você">
       <div class="avatar-ring"><div class="face" id="face">R</div><div class="lvl" id="lvl" title="Nível">1</div></div>
@@ -668,8 +673,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=35"></script>
-<script src="js/cloud.js?v=35"></script>
-<script src="js/game.js?v=35"></script>
+<script src="js/audio.js?v=36"></script>
+<script src="js/cloud.js?v=36"></script>
+<script src="js/game.js?v=36"></script>
 </body>
 </html>

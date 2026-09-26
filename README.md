@@ -46,6 +46,8 @@ Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no nav
 - **Enfeites** (Loja › Enfeites): canteiro de flores, banco, espantalho, carrinho de mão, poço, fonte e cata-vento. Vão para o **Inventário** (no menu), de onde você escolhe onde pôr, na roça ou no rancho, fora dos canteiros e cercados. Cada um dá conforto (+XP). Também dá para guardar de volta, e vender o que está guardado pela metade do preço (itens de eventos não se vendem). Os móveis da casa também podem ser vendidos pela metade, em Loja › Casa.
 - **Modo Mover** (botão à esquerda): clique na casa, no celeiro, na casinha do cachorro, numa árvore ou num enfeite e depois no lugar novo. Uma sombra verde mostra onde pode e vermelha onde não pode. Esc cancela.
 - **Celeiro na roça**: clicar nele abre o Celeiro.
+- **Segurar em cima** de uma casa, árvore ou enfeite (ou clicar com o botão direito) abre um menu com **Mover** e, nos enfeites, **Guardar no inventário**.
+- **Cercados do rancho**: clicar em qualquer parte do cercado abre o abrigo (os bichos lá dentro continuam clicáveis).
 - **Presente dos pioneiros**: quem jogar até 31/10/2026 ganha a Bandeira dos Pioneiros e um Bolo de boas-vindas (chegam no Inventário, com aviso no correio) e o celeiro e a casa azuis com detalhes dourados (dá para trocar em Loja › Temas).
 - **A casa aparece na roça**, atrás dos canteiros. Clicar nela entra na casa.
 - **Abrigos**: clicar num abrigo no rancho mostra quem mora lá, o botão de aumentar e os bichos que dá para comprar para ele.
