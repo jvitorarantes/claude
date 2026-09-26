@@ -6,7 +6,7 @@
 // ============================================================
 const COLS = 10, ROWS = 10, N = COLS * ROWS;
 const START_LOTS = [0, 1, 2, 10, 11, 12]; // os 6 canteiros iniciais, no canto perto do celeiro
-const PEN_C = 6, PEN_R = 4, ROOM = 5, MAX_ANIMALS = 15;
+const PEN_C = 6, PEN_R = 4, ROOM = 5, MAX_ANIMALS = 20;
 const HOUR = 3600, DAY = 86400e3; // HOUR em segundos (tempos de produção), DAY em milissegundos (idades)
 const SAVE_KEY = 'roca-feliz-v3', OLD_SAVE_KEYS = ['roca-feliz-v2', 'roca-feliz-v1'], SETTINGS_KEY = 'roca-feliz-config';
 const settings = Object.assign(
@@ -64,41 +64,58 @@ const CROP = Object.fromEntries(CROPS.map(c => [c.id, c]));
 // O que vai para o celeiro: a fruta/verdura de cada plantação.
 const PRODUCE = Object.fromEntries(CROPS.map(c => [c.prod, { id: c.prod, nome: c.prodNome, preco: c.preco, planta: c.id }]));
 
-// Produtos dos animais. O esterco do jumento não vai para o celeiro: vira 2 fertilizantes básicos.
+// Produtos dos animais de produção (o leitão da porca não vai para o celeiro: vira um porquinho).
 const PRODUCTS = [
-  { id: 'ovo',       nome: 'Ovo',             preco: 10 },
-  { id: 'pelo',      nome: 'Pelo de coelho',  preco: 12 },
-  { id: 'ovoangola', nome: 'Ovo de angola',   preco: 18 },
-  { id: 'ovopata',   nome: 'Ovo de pata',     preco: 22 },
-  { id: 'leite',     nome: 'Leite',           preco: 40 },
-  { id: 'la',        nome: 'Lã',              preco: 60 },
-  { id: 'esterco',   nome: 'Esterco',         preco: 0, vira: 'basico', qtd: 2 },
-  { id: 'bacon',     nome: 'Bacon',           preco: 80 },
-  { id: 'crina',     nome: 'Crina',           preco: 110 },
-  { id: 'pena',      nome: 'Pena de pavão',   preco: 200 },
+  { id: 'ovo',         nome: 'Ovo',             preco: 60 },
+  { id: 'ovopata',     nome: 'Ovo de pata',     preco: 90 },
+  { id: 'pelo',        nome: 'Pelo de coelho',  preco: 120 },
+  { id: 'leitecabra',  nome: 'Leite de cabra',  preco: 180 },
+  { id: 'la',          nome: 'Lã',              preco: 250 },
+  { id: 'leite',       nome: 'Leite',           preco: 300 },
+  { id: 'mel',         nome: 'Mel',             preco: 400 },
+  { id: 'leitebufala', nome: 'Leite de búfala', preco: 500 },
 ];
 const PRODUCT = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
+PRODUCT.leitao = { id: 'leitao', nome: 'Leitão', preco: 700 };
 
-// tempo = horas para produzir; vida = dias de vida; racao = moedas por refeição (ou milho do celeiro).
-// XP por coleta ≈ valor do produto ÷ 4 + 2, para quem espera mais ganhar mais.
+// tipo 'prod': produz a cada "tempo" se alimentado (racao = moedas por produção) durante "periodo" dias;
+//   depois para até a visita do veterinário.
+// tipo 'cria': compra pequeno, alimenta 1 vez por dia (racao) e vende adulto por "venda".
+// tipo 'pet': companhia, não come nem produz. lugar: 'casa' ou 'curral'.
 const ANIMALS = [
-  { id: 'galinha', nome: 'Galinha',          f: 1, custo: 50,   nivel: 1,  tempo: 6 * HOUR,  vida: 10, prod: 'ovo',       racao: 1 },
-  { id: 'coelho',  nome: 'Coelho',           f: 0, custo: 80,   nivel: 2,  tempo: 5 * HOUR,  vida: 12, prod: 'pelo',      racao: 1 },
-  { id: 'angola',  nome: 'Galinha-d\'angola', f: 1, custo: 100,  nivel: 3,  tempo: 7 * HOUR,  vida: 14, prod: 'ovoangola', racao: 2 },
-  { id: 'pato',    nome: 'Pata',             f: 1, custo: 120,  nivel: 3,  tempo: 8 * HOUR,  vida: 15, prod: 'ovopata',   racao: 2 },
-  { id: 'vaca',    nome: 'Vaca',             f: 1, custo: 200,  nivel: 4,  tempo: 12 * HOUR, vida: 20, prod: 'leite',     racao: 4 },
-  { id: 'ovelha',  nome: 'Ovelha',           f: 1, custo: 300,  nivel: 5,  tempo: 8 * HOUR,  vida: 25, prod: 'la',        racao: 6 },
-  { id: 'jumento', nome: 'Jumento',          f: 0, custo: 350,  nivel: 6,  tempo: 12 * HOUR, vida: 25, prod: 'esterco',   racao: 3 },
-  { id: 'porco',   nome: 'Porco',            f: 0, custo: 400,  nivel: 6,  tempo: 18 * HOUR, vida: 30, prod: 'bacon',     racao: 8 },
-  { id: 'cavalo',  nome: 'Cavalo',           f: 0, custo: 900,  nivel: 8,  tempo: 20 * HOUR, vida: 35, prod: 'crina',     racao: 10 },
-  { id: 'pavao',   nome: 'Pavão',            f: 0, custo: 1500, nivel: 10, tempo: 24 * HOUR, vida: 40, prod: 'pena',      racao: 18 },
+  { id: 'galinha',   tipo: 'prod', nome: 'Galinha',   f: 1, nivel: 2,  custo: 500,  racao: 20,  tempo: 4 * HOUR,  prod: 'ovo',         periodo: 30, xp: 2 },
+  { id: 'pato',      tipo: 'prod', nome: 'Pato',      f: 0, nivel: 4,  custo: 900,  racao: 30,  tempo: 6 * HOUR,  prod: 'ovopata',     periodo: 30, xp: 3 },
+  { id: 'coelho',    tipo: 'prod', nome: 'Coelho',    f: 0, nivel: 5,  custo: 1200, racao: 40,  tempo: 8 * HOUR,  prod: 'pelo',        periodo: 30, xp: 3 },
+  { id: 'cabra',     tipo: 'prod', nome: 'Cabra',     f: 1, nivel: 7,  custo: 2000, racao: 60,  tempo: 8 * HOUR,  prod: 'leitecabra',  periodo: 45, xp: 4 },
+  { id: 'ovelha',    tipo: 'prod', nome: 'Ovelha',    f: 1, nivel: 8,  custo: 2500, racao: 80,  tempo: 10 * HOUR, prod: 'la',          periodo: 45, xp: 5 },
+  { id: 'vaca',      tipo: 'prod', nome: 'Vaca',      f: 1, nivel: 10, custo: 4000, racao: 120, tempo: 8 * HOUR,  prod: 'leite',       periodo: 45, xp: 5 },
+  { id: 'abelha',    tipo: 'prod', nome: 'Colmeia',   f: 1, nivel: 12, custo: 3000, racao: 100, tempo: 12 * HOUR, prod: 'mel',         periodo: 60, xp: 6, fixo: true },
+  { id: 'porca',     tipo: 'prod', nome: 'Porca',     f: 1, nivel: 15, custo: 5000, racao: 150, tempo: 24 * HOUR, prod: 'leitao',      periodo: 45, xp: 5, desenho: 'porco', escala: 1.15 },
+  { id: 'bufala',    tipo: 'prod', nome: 'Búfala',    f: 1, nivel: 18, custo: 8000, racao: 250, tempo: 12 * HOUR, prod: 'leitebufala', periodo: 60, xp: 7 },
+  { id: 'porco',     tipo: 'cria', nome: 'Porquinho', f: 0, nivel: 3,  custo: 1000, racao: 50,  tempo: 24 * HOUR, venda: 1600,  xp: 10 },
+  { id: 'bezerro',   tipo: 'cria', nome: 'Bezerro',   f: 0, nivel: 6,  custo: 2000, racao: 80,  tempo: 48 * HOUR, venda: 3200,  xp: 15, desenho: 'vaca' },
+  { id: 'potro',     tipo: 'cria', nome: 'Potro',     f: 0, nivel: 12, custo: 5000, racao: 120, tempo: 72 * HOUR, venda: 8000,  xp: 25, desenho: 'cavalo' },
+  { id: 'burro',     tipo: 'cria', nome: 'Burro',     f: 0, nivel: 14, custo: 3500, racao: 100, tempo: 60 * HOUR, venda: 5500,  xp: 20, desenho: 'jumento' },
+  { id: 'avestruz',  tipo: 'cria', nome: 'Avestruz',  f: 1, nivel: 20, custo: 8000, racao: 200, tempo: 96 * HOUR, venda: 13000, xp: 35 },
+  { id: 'gato',      tipo: 'pet',  nome: 'Gato',      f: 0, nivel: 4,  custo: 800,  lugar: 'casa' },
+  { id: 'cavalo',    tipo: 'pet',  nome: 'Cavalo',    f: 0, nivel: 10, custo: 4000, lugar: 'curral' },
+  { id: 'pavao',     tipo: 'pet',  nome: 'Pavão',     f: 0, nivel: 15, custo: 6000, lugar: 'curral' },
+  { id: 'tartaruga', tipo: 'pet',  nome: 'Tartaruga', f: 1, nivel: 18, custo: 5000, lugar: 'casa' },
+  { id: 'arara',     tipo: 'pet',  nome: 'Arara',     f: 1, nivel: 22, custo: 8000, lugar: 'casa', fixo: true },
 ];
-for (const a of ANIMALS) {
-  const p = PRODUCTS.find(x => x.id === a.prod);
-  a.xp = Math.round((p.vira ? 36 : p.preco) / 4) + 2;
-  a.milho = Math.max(1, Math.round(a.racao / 4)); // quantos milhos do celeiro valem uma refeição
-}
 const ANIMAL = Object.fromEntries(ANIMALS.map(a => [a.id, a]));
+const RACAO_ESP = 100; // ração especial: a próxima produção rende em dobro
+const vetCost = d => Math.round(d.custo * 0.25);
+const inPen = a => ANIMAL[a.k].tipo !== 'pet' || ANIMAL[a.k].lugar === 'curral';
+const drawKind = a => ANIMAL[a.k].desenho || a.k;
+const isTired = a => ANIMAL[a.k].tipo === 'prod' && Date.now() - a.born > ANIMAL[a.k].periodo * DAY;
+const isAdult = a => ANIMAL[a.k].tipo === 'cria' && a.g >= ANIMAL[a.k].tempo;
+function isHungry(a) {
+  const d = ANIMAL[a.k];
+  if (d.tipo === 'prod') return !a.fed && !a.ready && !isTired(a);
+  if (d.tipo === 'cria') return !isAdult(a) && (a.food || 0) <= 0;
+  return false;
+}
 const seuSua = a => (a.f ? 'Sua ' : 'Seu ') + a.nome.toLowerCase();
 
 // Cães de guarda: um vigia a plantação, outro os animais. Só protegem acordados (com comida).
@@ -168,7 +185,23 @@ const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganh
 const newId = () => Math.random().toString(36).slice(2, 10);
 
 function emptyPlot(s = 'locked') { return { s, c: null, g: 0, dry: false, w: 0, b: 0, dmg: 0, id: null, th: [], fert: false, h: 0, adult: false, poda: false }; }
-function newAnimal(k) { return { id: newId(), k, fed: true, g: 0, ready: false, n: 0, born: Date.now() }; }
+function newAnimal(k) {
+  const d = ANIMAL[k], a = { id: newId(), k, born: Date.now() };
+  if (d.tipo === 'prod') Object.assign(a, { fed: true, g: 0, ready: false, n: 0 }); // a primeira refeição vem junto
+  else if (d.tipo === 'cria') Object.assign(a, { g: 0, food: Math.min(24 * HOUR, d.tempo) });
+  else Object.assign(a, { nome: d.nome, lastPet: 0 });
+  return a;
+}
+// Faz o animal produzir ou crescer por "sec" segundos.
+function growAnimal(a, sec) {
+  const d = ANIMAL[a.k];
+  if (d.tipo === 'prod') {
+    if (a.fed && !a.ready) { a.g += sec; if (a.g >= d.tempo) { a.g = d.tempo; a.ready = true; a.fed = false; } }
+  } else if (d.tipo === 'cria' && a.g < d.tempo) {
+    const use = Math.min(sec, a.food || 0);
+    a.g = Math.min(d.tempo, a.g + use); a.food = (a.food || 0) - use;
+  }
+}
 
 function newState() {
   const plots = Array.from({ length: N }, () => emptyPlot());
@@ -195,7 +228,8 @@ function migrate(s) {
   }
   if (s.v !== 3 || !Array.isArray(s.plots) || s.plots.length !== N) return null;
   s.animals = Array.isArray(s.animals) ? s.animals.filter(a => a && ANIMAL[a.k]) : [];
-  for (const a of s.animals) { if (!a.id) a.id = newId(); a.n = a.n || 0; if (!a.born) a.born = Date.now(); }
+  s.animals = s.animals.map(a => Object.assign(newAnimal(a.k), a));
+  s.racaoEsp = Math.max(0, Number(s.racaoEsp) || 0);
   const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
   s.dogs = {};
   for (const slot of ['roca', 'animais']) { const d = dogs[slot]; s.dogs[slot] = d && DOG[d.raca] ? d : null; }
@@ -249,10 +283,7 @@ function growPlot(p, sec, events) {
 function catchUp(s, sec) {
   sec = Math.max(0, sec || 0);
   for (const p of s.plots) growPlot(p, sec, false);
-  for (const a of s.animals) {
-    const def = ANIMAL[a.k];
-    if (a.fed && !a.ready) { a.g += sec; if (a.g >= def.tempo) { a.g = def.tempo; a.ready = true; a.fed = false; } }
-  }
+  for (const a of s.animals) growAnimal(a, sec);
 }
 
 function load() {
@@ -519,29 +550,96 @@ function harvest(p, pos) {
 function actAnimal(id) {
   const s = S(), a = s.animals.find(x => x.id === id);
   if (!a) return;
-  const def = ANIMAL[a.k], prod = PRODUCT[def.prod], pos = animalPos(a.id);
-  if (!isHome()) return awayAnimal(a, def, prod, pos);
-  if (a.ready) {
-    a.ready = false; a.g = 0; a.n++;
-    sfx('collect');
-    if (prod.vira) {
-      state.fert[prod.vira] = (state.fert[prod.vira] || 0) + prod.qtd;
-      popupAt(pos, `+${prod.qtd} ${FERT[prod.vira].nome}`, '#9be36a');
-      renderTools();
-    } else gain(prod.id, 1, pos);
-    addXP(def.xp, pos); state.stats.coletas++;
-    return done();
+  const d = ANIMAL[a.k], pos = animalPos(a.id);
+  if (!isHome()) return awayAnimal(a, d, PRODUCT[d.prod], pos);
+  if (d.tipo === 'pet') return petAnimal(a, pos);
+  if (d.tipo === 'cria') {
+    if (isAdult(a)) return confirmTwice('sell' + a.id, `Vender ${d.nome.toLowerCase()} adulto por ${d.venda.toLocaleString('pt-BR')} moedas? Clique de novo para vender.`, () => sellAdult(a, pos));
+    if (isHungry(a)) return feedAnimal(a, pos) && done();
+    return toast(`${d.nome} está crescendo: falta ${fmt(d.tempo - a.g)}. Comida por mais ${fmt(a.food)}.`);
   }
-  if (!a.fed) {
-    if ((state.barn.milho || 0) >= def.milho) {
-      state.barn.milho -= def.milho; if (!state.barn.milho) delete state.barn.milho;
-      popupAt(pos, `−${def.milho} Milho`, '#ffe08a');
-    } else if (state.coins >= def.racao) addCoins(-def.racao, pos);
-    else return toast(`Faltam moedas para a ração (${def.racao}).`, 'bad');
-    a.fed = true; sfx('feed'); addXP(1, pos);
-    return done();
+  if (a.ready) { collectAnimal(a, pos); return done(); }
+  if (!a.fed && isTired(a)) return confirmTwice('vet' + a.id, `${seuSua(d)} precisa do veterinário para voltar a produzir (${vetCost(d)} moedas). Clique de novo para chamar.`, () => callVet(a, pos));
+  if (!a.fed) return feedAnimal(a, pos, true) && done();
+  toast(`${d.nome} está produzindo ${PRODUCT[d.prod].nome.toLowerCase()}: falta ${fmt(d.tempo - a.g)}.`);
+}
+// Ações que pedem um segundo clique para confirmar.
+function confirmTwice(key, msg, fn) {
+  if (buyPending && buyPending.i === key && performance.now() < buyPending.until) { buyPending = null; return fn(); }
+  buyPending = { i: key, until: performance.now() + 4000 };
+  toast(msg);
+}
+function collectAnimal(a, pos) {
+  const d = ANIMAL[a.k], qty = a.dobro ? 2 : 1;
+  a.ready = false; a.g = 0; a.n++; a.dobro = false;
+  sfx('collect');
+  if (d.prod === 'leitao') {
+    // A porca teve leitões: um vai para o curral para crescer (se couber).
+    if (state.animals.filter(inPen).length < MAX_ANIMALS) {
+      for (let k = 0; k < qty && state.animals.filter(inPen).length < MAX_ANIMALS; k++) state.animals.push(newAnimal('porco'));
+      popupAt(pos, qty > 1 ? '+2 porquinhos!' : '+1 porquinho!', '#ffffff');
+    } else { addCoins(PRODUCT.leitao.preco * qty, pos); toast(`O curral está cheio: ${qty > 1 ? 'os leitões foram vendidos' : 'o leitão foi vendido'} por ${PRODUCT.leitao.preco * qty} moedas.`); }
+  } else gain(d.prod, qty, pos);
+  addXP(d.xp, pos); state.stats.coletas++;
+}
+// Alimenta um animal pagando a ração. Clicando nele, usa a ração especial se você tiver.
+function feedAnimal(a, pos, allowSpecial) {
+  const d = ANIMAL[a.k];
+  if (state.coins < d.racao) { toast(`Faltam moedas para a ração (${d.racao}).`, 'bad'); return false; }
+  addCoins(-d.racao, pos);
+  if (d.tipo === 'prod') {
+    a.fed = true;
+    if (allowSpecial && state.racaoEsp > 0) { state.racaoEsp--; a.dobro = true; popupAt(pos, 'Ração especial: produção em dobro!', '#ffe08a', 500); }
+  } else a.food = Math.min(24 * HOUR, d.tempo - a.g);
+  sfx('feed'); addXP(1, pos);
+  return true;
+}
+function callVet(a, pos) {
+  const d = ANIMAL[a.k], cost = vetCost(d);
+  if (state.coins < cost) return toast(`O veterinário cobra ${cost} moedas.`, 'bad');
+  addCoins(-cost, pos);
+  a.born = Date.now(); a.tiredNews = false;
+  sfx('level');
+  toast(`${seuSua(d)} está novinha em folha: mais ${d.periodo} dias produzindo!`.replace('novinha', d.f ? 'novinha' : 'novinho'), 'good');
+  done();
+}
+function sellAdult(a, pos) {
+  const d = ANIMAL[a.k];
+  state.animals = state.animals.filter(x => x !== a); delete amb[a.id];
+  addCoins(d.venda, pos);
+  state.stats.vendido += d.venda;
+  sfx('coin');
+  addXP(d.xp, pos);
+  toast(`Você vendeu ${d.f ? 'a' : 'o'} ${d.nome.toLowerCase()} por ${d.venda.toLocaleString('pt-BR')} moedas!`, 'good');
+  done();
+}
+function petAnimal(a, pos) {
+  const d = ANIMAL[a.k];
+  popupAt(pos, '♥', '#ff6b8a'); popupAt(pos, '♥', '#ff8aa3', 200);
+  sfx('collect');
+  if (Date.now() - (a.lastPet || 0) > DAY) { a.lastPet = Date.now(); addXP(2, pos); done(); }
+  else toast(`${a.nome || d.nome} adorou o carinho!`);
+}
+function feedAll() {
+  const list = state.animals.filter(isHungry);
+  if (!list.length) return toast('Nenhum animal com fome agora.');
+  let n = 0, spent = 0;
+  for (const a of list) {
+    const d = ANIMAL[a.k];
+    if (state.coins < d.racao) break;
+    const before = state.coins;
+    if (feedAnimal(a, animalPos(a.id), false)) { n++; spent += before - state.coins; }
   }
-  toast(`${def.nome} está produzindo ${prod.nome.toLowerCase()}: falta ${fmt(def.tempo - a.g)}.`);
+  if (n < list.length) toast(`Alimentou ${n} de ${list.length}: faltaram moedas para o resto.`, 'bad');
+  else toast(`Alimentou ${n} ${n > 1 ? 'animais' : 'animal'} por ${spent.toLocaleString('pt-BR')} moedas.`, 'good');
+  done();
+}
+function collectAll() {
+  const list = state.animals.filter(a => ANIMAL[a.k].tipo === 'prod' && a.ready);
+  if (!list.length) return toast('Nada pronto para recolher.');
+  for (const a of list) collectAnimal(a, animalPos(a.id));
+  toast(`Recolheu ${list.length} ${list.length > 1 ? 'produtos' : 'produto'}.`, 'good');
+  done();
 }
 
 // ---------- Cachorros ----------
@@ -610,12 +708,12 @@ function addNews(msg) {
 function tickLife() {
   const now = Date.now();
   let changed = false;
-  for (const a of state.animals.slice()) {
-    const def = ANIMAL[a.k];
-    if (now - a.born < def.vida * DAY) continue;
-    state.animals = state.animals.filter(x => x !== a); delete amb[a.id];
-    const msg = `${seuSua(def)} ficou ${def.f ? 'velhinha' : 'velhinho'} e foi descansar. Você pode comprar outr${def.f ? 'a' : 'o'} na Loja.`;
-    addNews(msg); toast(msg); changed = true;
+  for (const a of state.animals) {
+    if (!isTired(a) || a.tiredNews) continue;
+    const d = ANIMAL[a.k];
+    a.tiredNews = true;
+    addNews(`${seuSua(d)} terminou o período produtivo. Chame o veterinário (${vetCost(d)} moedas) para voltar a produzir.`);
+    changed = true;
   }
   for (const slot of ['roca', 'animais']) {
     const d = state.dogs[slot];
@@ -649,15 +747,16 @@ function actDecor(id) {
 
 function buyAnimal(k) {
   const d = ANIMAL[k];
-  if (state.animals.length >= MAX_ANIMALS) return toast(`O cercado cabe ${MAX_ANIMALS} animais.`);
+  if (d.lugar === 'casa' && state.animals.some(a => a.k === k)) return toast(`Você já tem ${d.f ? 'uma' : 'um'} ${d.nome.toLowerCase()} em casa.`);
+  if (d.lugar !== 'casa' && state.animals.filter(inPen).length >= MAX_ANIMALS) return toast(`O curral cabe ${MAX_ANIMALS} animais.`);
   if (state.level < d.nivel) return toast(`${d.nome} libera no nível ${d.nivel}.`);
   if (state.coins < d.custo) return toast(`${d.nome} custa ${d.custo} moedas.`, 'bad');
   state.coins -= d.custo;
   state.animals.push(newAnimal(k));
   sfx('buy');
   addXP(4, null);
-  toast(`${d.nome} chegou no cercado!`, 'good');
-  if (isHome()) setScene('animais');
+  toast(d.lugar === 'casa' ? `${d.nome} chegou em casa!` : `${d.nome} chegou no curral!`, 'good');
+  if (isHome()) setScene(d.lugar === 'casa' ? 'casa' : 'animais');
   done();
 }
 function buyDecor(id) {
@@ -713,7 +812,8 @@ function genNeighbor() {
   const animals = [];
   const nA = 3 + Math.floor(Math.random() * 5);
   for (let k = 0; k < nA; k++) {
-    const a = newAnimal(ANIMALS[Math.floor(Math.random() * ANIMALS.length)].id), r = Math.random();
+    const pool = ANIMALS.filter(x => x.tipo === 'prod' && x.prod !== 'leitao');
+    const a = newAnimal(pool[Math.floor(Math.random() * pool.length)].id), r = Math.random();
     if (r < 0.45) { a.ready = true; a.fed = false; a.g = ANIMAL[a.k].tempo; }
     else if (r < 0.7) { a.fed = false; }
     else a.g = ANIMAL[a.k].tempo * rand(0.1, 0.9);
@@ -819,7 +919,10 @@ function awayPlot(i, p) {
 }
 
 function awayAnimal(a, def, prod, pos) {
-  if (!a.fed && !a.ready) { a.fed = true; sfx('feed'); help(pos); sendVisit({ t: 'feed', animal: a.id }); return done(); }
+  if (def.tipo === 'pet') return petAnimal(a, pos);
+  if (def.tipo === 'cria') return toast(`${def.nome} de ${view.nome} ainda está crescendo.`);
+  if (def.prod === 'leitao' && a.ready) return toast('Leitão não dá para levar!');
+  if (!a.fed && !a.ready && !isTired(a)) { a.fed = true; sfx('feed'); help(pos); sendVisit({ t: 'feed', animal: a.id }); return done(); }
   if (a.ready) {
     const key = visitKey(a.id + ':' + a.n), lim = stealLimit();
     if (alreadyTook(a, key)) return toast('Você já pegou deste bicho. Não exagere!');
@@ -827,8 +930,7 @@ function awayAnimal(a, def, prod, pos) {
     a.stolen = true; state.log[key] = Date.now(); lim.animais++;
     if (guarded('animais', pos, { t: 'stealA', animal: a.id })) return done();
     sfx('collect');
-    if (prod.vira) { state.fert[prod.vira] = (state.fert[prod.vira] || 0) + 1; popupAt(pos, `+1 ${FERT[prod.vira].nome}`, '#9be36a'); }
-    else gain(prod.id, 1, pos);
+    gain(prod.id, 1, pos);
     addXP(1, pos); state.stats.roubado++;
     sendVisit({ t: 'stealA', animal: a.id });
     return done();
@@ -868,9 +970,9 @@ function applyVisits(list) {
       p.dmg = Math.min(CROP[p.c].rend - 1, p.dmg + qty);
       if (!p.th.includes(v.from)) p.th.push(v.from);
       note(`pegou ${qty} ${CROP[p.c].prodNome} da sua plantação`, true);
-    } else if (v.t === 'feed' && a && !a.fed && !a.ready) {
+    } else if (v.t === 'feed' && a && ANIMAL[a.k].tipo === 'prod' && isHungry(a)) {
       a.fed = true; note('alimentou seus animais');
-    } else if (v.t === 'stealA' && a && a.ready) {
+    } else if (v.t === 'stealA' && a && ANIMAL[a.k].tipo === 'prod' && a.ready) {
       a.ready = false; a.g = 0; a.n++;
       note(`pegou 1 ${PRODUCT[ANIMAL[a.k].prod].nome} dos seus animais`, true);
     }
@@ -1122,32 +1224,64 @@ function fetchFriendInfo(uid) {
 // ============================================================
 function tick(dt) {
   for (const p of state.plots) growPlot(p, dt, true);
-  for (const a of state.animals) {
-    const def = ANIMAL[a.k];
-    if (a.fed && !a.ready) { a.g += dt; if (a.g >= def.tempo) { a.g = def.tempo; a.ready = true; a.fed = false; } }
-  }
+  for (const a of state.animals) growAnimal(a, dt);
 }
 
-function updateWander(list, dt) {
+// Faz os bichos passearem dentro de uma área (curral ou sala). Os com fome vão para o cocho.
+const PEN_AREA = { u0: 0.5, u1: PEN_C - 0.5, v0: 0.9, v1: PEN_R - 0.4, trough: true };
+const ROOM_AREA = { u0: 1.3, u1: 4.1, v0: 1.2, v1: 4.2 };
+const FIXED_SPOTS = { curral: [[5.3, 2.2], [5.3, 3.1], [4.5, 3.45], [3.7, 3.5], [5.35, 1.4]], casa: [[4.45, 1.5]] };
+function updateWander(list, dt, area) {
   for (const a of list) {
+    const d = ANIMAL[a.k];
     let m = amb[a.id];
     if (!m) {
-      const u = rand(0.6, PEN_C - 0.6), v = rand(1.0, PEN_R - 0.5);
+      let u, v;
+      if (d.fixo) { const same = list.filter(x => ANIMAL[x.k].fixo), spots = FIXED_SPOTS[d.lugar || 'curral']; [u, v] = spots[same.indexOf(a) % spots.length]; }
+      else { u = rand(area.u0, area.u1); v = rand(area.v0, area.v1); }
       m = amb[a.id] = { u, v, tu: u, tv: v, wait: rand(0, 2), dir: Math.random() < 0.5 ? 1 : -1, moving: false };
     }
-    const hungry = !a.fed && !a.ready;
+    if (d.fixo) { m.moving = false; continue; }
+    const hungry = area.trough && isHungry(a);
     if (m.wait > 0) { m.wait -= dt; m.moving = false; continue; }
-    const du = m.tu - m.u, dv = m.tv - m.v, d = Math.hypot(du, dv);
-    if (d < 0.05) {
+    const du = m.tu - m.u, dv = m.tv - m.v, dist = Math.hypot(du, dv);
+    if (dist < 0.05) {
       m.wait = hungry ? rand(2, 5) : rand(1, 4); m.moving = false;
       if (hungry) { m.tu = rand(0.8, 2.2); m.tv = rand(0.75, 1.0); }
-      else { m.tu = rand(0.5, PEN_C - 0.5); m.tv = rand(0.9, PEN_R - 0.4); }
+      else { m.tu = rand(area.u0, area.u1); m.tv = rand(area.v0, area.v1); }
       continue;
     }
-    const k = Math.min(1, (SMALL_ANIMALS.includes(a.k) ? 0.55 : 0.3) * dt / d);
+    const kind = drawKind(a), speed = kind === 'tartaruga' ? 0.06 : SMALL_ANIMALS.includes(kind) ? 0.55 : 0.3;
+    const k = Math.min(1, speed * dt / dist);
     m.u += du * k; m.v += dv * k; m.moving = true;
     const sx = du - dv; if (Math.abs(sx) > 0.01) m.dir = sx > 0 ? 1 : -1;
   }
+}
+// Tamanho do bicho na tela: os de criação crescem de 60% até o tamanho adulto.
+function animalScale(a, base) {
+  const d = ANIMAL[a.k];
+  let k = base * (d.escala || 1);
+  if (d.tipo === 'cria') k *= 0.6 + 0.4 * Math.min(1, a.g / d.tempo);
+  return k;
+}
+function drawAnimalAt(a, m, base, t) {
+  const p = iso(m.u, m.v), W = L.W, kind = drawKind(a), sc = animalScale(a, base);
+  if (hover && hover.kind === 'animal' && hover.id === a.id) {
+    ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, W * 0.26, W * 0.09, 0, 0, 7); ctx.stroke();
+  }
+  drawAnimal(kind, p.x, p.y, sc, t, m.dir, m.moving);
+  const h = ANIMAL_H[kind] * sc;
+  hits.push({ kind: 'animal', id: a.id, x: p.x, y: p.y - h * 0.5, r: Math.max(W * 0.22, h * 0.7) });
+}
+function animalBubble(a, home) {
+  const d = ANIMAL[a.k];
+  if (d.tipo === 'pet') return null;
+  if (d.tipo === 'cria') return home ? (isAdult(a) ? 'sell' : isHungry(a) ? 'feed' : null) : null;
+  const took = !home && (a.stolen || state.log[visitKey(a.id + ':' + a.n)]);
+  if (a.ready) return took ? null : 'prod';
+  if (!a.fed && isTired(a)) return home ? 'vet' : null;
+  return !a.fed ? 'feed' : null;
 }
 
 // ============================================================
@@ -1697,10 +1831,10 @@ function drawProduct(id, x, y, s) {
     ctx.fillStyle = '#fff6df'; ctx.strokeStyle = '#cdb88c';
     ctx.beginPath(); ctx.ellipse(x, y + 1 * s, 4.6 * s, 6 * s, 0, 0, 7); ctx.fill(); ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.beginPath(); ctx.ellipse(x - 1.6 * s, y - 1.5 * s, 1.1 * s, 1.8 * s, 0.3, 0, 7); ctx.fill();
-  } else if (id === 'leite') {
+  } else if (id === 'leite' || id === 'leitecabra' || id === 'leitebufala') {
     ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#9fb4c8';
     ctx.beginPath(); ctx.moveTo(x - 4 * s, y + 7 * s); ctx.lineTo(x - 4 * s, y - 1 * s); ctx.lineTo(x - 2 * s, y - 4 * s); ctx.lineTo(x + 2 * s, y - 4 * s); ctx.lineTo(x + 4 * s, y - 1 * s); ctx.lineTo(x + 4 * s, y + 7 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#3a7bd5'; ctx.fillRect(x - 2.3 * s, y - 6.5 * s, 4.6 * s, 2.6 * s);
+    ctx.fillStyle = { leite: '#3a7bd5', leitecabra: '#b07a44', leitebufala: '#3a3a3a' }[id]; ctx.fillRect(x - 2.3 * s, y - 6.5 * s, 4.6 * s, 2.6 * s);
     ctx.fillRect(x - 4 * s, y + 1.5 * s, 8 * s, 2.4 * s);
   } else if (id === 'la') {
     ctx.fillStyle = '#f3eee2'; ctx.strokeStyle = '#c8bda2';
@@ -1711,6 +1845,18 @@ function drawProduct(id, x, y, s) {
     ctx.beginPath(); ctx.arc(x, y + 1 * s, 5.5 * s, 0, 7); ctx.arc(x - 3 * s, y - 2 * s, 3 * s, 0, 7); ctx.arc(x + 3 * s, y - 1.5 * s, 3.2 * s, 0, 7); ctx.fill();
     ctx.fillStyle = '#8a6448';
     for (const [dx, dy] of [[-2, 0], [2, 2], [0, -3], [3, -2]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 0.8 * s, 0, 7); ctx.fill(); }
+  } else if (id === 'mel') {
+    ctx.fillStyle = '#f2b52a'; ctx.strokeStyle = '#b07a14';
+    ctx.beginPath(); ctx.moveTo(x - 5 * s, y - 3 * s); ctx.lineTo(x - 5 * s, y + 6 * s); ctx.quadraticCurveTo(x, y + 8 * s, x + 5 * s, y + 6 * s); ctx.lineTo(x + 5 * s, y - 3 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c8402f'; ctx.fillRect(x - 5.8 * s, y - 6 * s, 11.6 * s, 3.2 * s);
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(x - 3.5 * s, y - 1 * s, 1.4 * s, 5 * s);
+  } else if (id === 'leitao') {
+    ctx.fillStyle = '#f5aebb'; ctx.beginPath(); ctx.arc(x, y, 6 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e991a0'; ctx.beginPath(); ctx.moveTo(x - 5 * s, y - 3 * s); ctx.lineTo(x - 4 * s, y - 8 * s); ctx.lineTo(x - 1.5 * s, y - 5 * s); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + 5 * s, y - 3 * s); ctx.lineTo(x + 4 * s, y - 8 * s); ctx.lineTo(x + 1.5 * s, y - 5 * s); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y + 2 * s, 2.8 * s, 2 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#b8606e'; ctx.beginPath(); ctx.arc(x - 1 * s, y + 2 * s, 0.6 * s, 0, 7); ctx.arc(x + 1 * s, y + 2 * s, 0.6 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 2.3 * s, y - 1.5 * s, 0.7 * s, 0, 7); ctx.arc(x + 2.3 * s, y - 1.5 * s, 0.7 * s, 0, 7); ctx.fill();
   } else if (id === 'bacon') {
     for (const dy of [-2.5, 2.5]) {
       ctx.save(); ctx.translate(x, y + dy * s); ctx.rotate(-0.25);
@@ -1760,7 +1906,7 @@ function drawAnimal(k, x, y, s, t, dir, moving) {
   const step = moving ? Math.sin(t / 90) : 0;
   ctx.save(); ctx.translate(x, y); ctx.scale(dir, 1);
   ctx.fillStyle = 'rgba(0,0,0,.16)';
-  const shadow = { galinha: 9, vaca: 22, ovelha: 16, porco: 16, coelho: 9, angola: 9, pato: 10, jumento: 21, cavalo: 23, pavao: 12 }[k];
+  const shadow = { galinha: 9, vaca: 22, ovelha: 16, porco: 16, coelho: 9, angola: 9, pato: 10, jumento: 21, cavalo: 23, pavao: 12, cabra: 14, bufala: 23, abelha: 11, avestruz: 13, gato: 8, tartaruga: 9, arara: 7 }[k];
   ctx.beginPath(); ctx.ellipse(0, 0, shadow * s, shadow * 0.28 * s, 0, 0, 7); ctx.fill();
   const leg = (lx, len, col, w) => { ctx.fillStyle = col; ctx.fillRect(lx * s - w * s / 2, -len * s, w * s, len * s); };
   if (k === 'galinha') {
@@ -1900,11 +2046,102 @@ function drawAnimal(k, x, y, s, t, dir, moving) {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(5.6 * s, -20.5 * s, 1 * s, 0.6 * s, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(5.8 * s, -20.5 * s, 0.5 * s, 0, 7); ctx.fill();
     ctx.fillStyle = '#c9b27a'; ctx.beginPath(); ctx.moveTo(7 * s, -20.5 * s); ctx.lineTo(8.8 * s, -19.8 * s); ctx.lineTo(7 * s, -19.2 * s); ctx.fill();
+  } else if (k === 'cabra') {
+    for (const [lx, ph] of [[-9, 1], [-5, -1], [5, -1], [9, 1]]) { leg(lx + step * ph, 9, '#d8d0c2', 2.2); ctx.fillStyle = '#3a2a1e'; ctx.fillRect((lx + step * ph) * s - 1.1 * s, -1.4 * s, 2.2 * s, 1.4 * s); }
+    ctx.fillStyle = '#f0ebe0'; ctx.beginPath(); ctx.moveTo(-12 * s, -18 * s); ctx.lineTo(-15 * s, -23 * s); ctx.lineTo(-10 * s, -20 * s); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -15 * s, 12.5 * s, 6.8 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#b8895a'; ctx.beginPath(); ctx.ellipse(-4 * s, -17 * s, 5 * s, 3.5 * s, 0.2, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f0ebe0';
+    ctx.beginPath(); ctx.moveTo(8 * s, -18 * s); ctx.lineTo(12 * s, -26 * s); ctx.lineTo(16 * s, -24 * s); ctx.lineTo(12 * s, -14 * s); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(15 * s, -25 * s, 5 * s, 3.4 * s, 0.35, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#6b6258'; ctx.lineWidth = 1.4 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(12.5 * s, -28 * s); ctx.quadraticCurveTo(9 * s, -34 * s, 7 * s, -30 * s); ctx.stroke();
+    ctx.fillStyle = '#e8e0d0'; ctx.beginPath(); ctx.moveTo(17 * s, -22.5 * s); ctx.lineTo(18.5 * s, -18 * s); ctx.lineTo(16 * s, -21.5 * s); ctx.fill();
+    ctx.fillStyle = '#c9bfae'; ctx.beginPath(); ctx.ellipse(11 * s, -27 * s, 2.8 * s, 1.1 * s, -0.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(15.5 * s, -26.5 * s, 0.8 * s, 0, 7); ctx.fill();
+    ctx.lineCap = 'butt';
+  } else if (k === 'bufala') {
+    for (const [lx, ph] of [[-12, 1], [-6, -1], [6, -1], [12, 1]]) { leg(lx + step * ph, 11, '#2e2b2b', 3.4); }
+    ctx.strokeStyle = '#2e2b2b'; ctx.lineWidth = 1.3 * s;
+    ctx.beginPath(); ctx.moveTo(-18 * s, -20 * s); ctx.quadraticCurveTo(-21 * s, -14 * s, -20 * s, -8 * s); ctx.stroke();
+    ctx.fillStyle = '#3d3a3a'; ctx.beginPath(); ctx.ellipse(0, -18 * s, 19 * s, 10 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#4a4646'; ctx.beginPath(); ctx.ellipse(-2 * s, -22 * s, 12 * s, 4 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3d3a3a'; ctx.beginPath(); ctx.ellipse(19 * s, -22 * s, 7 * s, 6 * s, 0.2, 0, 7); ctx.fill();
+    ctx.fillStyle = '#5a5454'; ctx.beginPath(); ctx.ellipse(23 * s, -19 * s, 4.2 * s, 3.2 * s, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#d9d0c0'; ctx.lineWidth = 2.4 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(17 * s, -27 * s); ctx.quadraticCurveTo(8 * s, -32 * s, 9 * s, -24 * s); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(21 * s, -27 * s); ctx.quadraticCurveTo(28 * s, -33 * s, 27 * s, -25 * s); ctx.stroke();
+    ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.arc(20 * s, -23.5 * s, 1 * s, 0, 7); ctx.fill();
+    ctx.lineCap = 'butt';
+  } else if (k === 'abelha') {
+    // colmeia de madeira com abelhas voando em volta
+    ctx.fillStyle = '#8a5a33'; ctx.fillRect(-9 * s, -3 * s, 18 * s, 3 * s);
+    ctx.fillStyle = '#e8b04a'; ctx.fillRect(-8 * s, -13 * s, 16 * s, 10 * s);
+    ctx.fillStyle = '#d99a3a'; ctx.fillRect(-8 * s, -23 * s, 16 * s, 10 * s);
+    ctx.strokeStyle = 'rgba(120,70,20,.5)'; ctx.lineWidth = 1; ctx.strokeRect(-8 * s, -13 * s, 16 * s, 10 * s); ctx.strokeRect(-8 * s, -23 * s, 16 * s, 10 * s);
+    ctx.fillStyle = '#c8402f'; ctx.fillRect(-10 * s, -26 * s, 20 * s, 3.2 * s);
+    ctx.fillStyle = '#3a2412'; ctx.fillRect(-4 * s, -5.5 * s, 8 * s, 1.6 * s);
+    for (let j = 0; j < 4; j++) {
+      const a = t / 400 + j * 1.6, bx = Math.cos(a) * 13 * s, by = -16 * s + Math.sin(a * 1.3) * 7 * s;
+      ctx.fillStyle = '#f2c230'; ctx.beginPath(); ctx.ellipse(bx, by, 1.8 * s, 1.3 * s, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.fillRect(bx - 0.3 * s, by - 1.2 * s, 0.7 * s, 2.4 * s);
+      ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.beginPath(); ctx.ellipse(bx, by - 1.6 * s, 1.1 * s, 0.7 * s, 0, 0, 7); ctx.fill();
+    }
+  } else if (k === 'avestruz') {
+    ctx.strokeStyle = '#e8a9a0'; ctx.lineWidth = 1.8 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-2 * s, -20 * s); ctx.lineTo(-3 * s + step * 2 * s, 0); ctx.moveTo(3 * s, -20 * s); ctx.lineTo(4 * s - step * 2 * s, 0); ctx.stroke();
+    ctx.fillStyle = '#2a2624'; ctx.beginPath(); ctx.ellipse(0, -26 * s, 11 * s, 8 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f3efe6'; ctx.beginPath(); ctx.ellipse(-10 * s, -28 * s, 4 * s, 3 * s, -0.4, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#e8b0a4'; ctx.lineWidth = 2.6 * s;
+    ctx.beginPath(); ctx.moveTo(7 * s, -30 * s); ctx.quadraticCurveTo(12 * s, -40 * s, 9 * s, -48 * s); ctx.stroke();
+    ctx.fillStyle = '#e8b0a4'; ctx.beginPath(); ctx.ellipse(10 * s, -49 * s, 3 * s, 2.3 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#d9a06a'; ctx.beginPath(); ctx.moveTo(12.5 * s, -49.5 * s); ctx.lineTo(15.5 * s, -48.5 * s); ctx.lineTo(12.5 * s, -47.8 * s); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(10.8 * s, -49.8 * s, 0.7 * s, 0, 7); ctx.fill();
+    ctx.lineCap = 'butt';
+  } else if (k === 'gato') {
+    const tail = Math.sin(t / 400) * 0.4;
+    ctx.strokeStyle = '#e08a3a'; ctx.lineWidth = 1.8 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-6 * s, -8 * s); ctx.quadraticCurveTo(-11 * s, -10 * s, -10 * s + tail * 4 * s, -17 * s); ctx.stroke();
+    for (const [lx, ph] of [[-4, 1], [-1.5, -1], [2.5, -1], [5, 1]]) leg(lx + step * ph * 0.6, 4, '#e08a3a', 1.6);
+    ctx.fillStyle = '#e8963f'; ctx.beginPath(); ctx.ellipse(0, -7 * s, 7.5 * s, 3.8 * s, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#c06a22'; ctx.lineWidth = 0.9 * s;
+    for (const dx of [-3.5, -1, 1.5]) { ctx.beginPath(); ctx.moveTo(dx * s, -10.4 * s); ctx.lineTo(dx * s + 0.6 * s, -7.5 * s); ctx.stroke(); }
+    ctx.fillStyle = '#e8963f'; ctx.beginPath(); ctx.arc(7 * s, -11 * s, 3.6 * s, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(4.8 * s, -13.3 * s); ctx.lineTo(5.4 * s, -16.8 * s); ctx.lineTo(7.2 * s, -14.2 * s); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(7.6 * s, -14.3 * s); ctx.lineTo(9.2 * s, -16.6 * s); ctx.lineTo(9.8 * s, -13 * s); ctx.fill();
+    ctx.fillStyle = '#2f6e1e'; ctx.beginPath(); ctx.arc(8.4 * s, -11.6 * s, 0.75 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e98a9a'; ctx.beginPath(); ctx.arc(10.3 * s, -10.4 * s, 0.6 * s, 0, 7); ctx.fill();
+    ctx.lineCap = 'butt';
+  } else if (k === 'tartaruga') {
+    const head = Math.sin(t / 900) * 0.8;
+    ctx.fillStyle = '#8fae5a';
+    for (const [lx, ly] of [[-5, -1], [5, -1], [-4, 0.5], [4, 0.5]]) { ctx.beginPath(); ctx.ellipse(lx * s, ly * s, 1.8 * s, 1.3 * s, 0, 0, 7); ctx.fill(); }
+    ctx.beginPath(); ctx.ellipse((9 + head) * s, -3 * s, 2.6 * s, 2 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc((10 + head) * s, -3.5 * s, 0.5 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#6b7a3a'; ctx.beginPath(); ctx.ellipse(0, -3.5 * s, 7.5 * s, 4.8 * s, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#5a6630'; ctx.fillRect(-7.5 * s, -3.8 * s, 15 * s, 1.2 * s);
+    ctx.strokeStyle = '#4a5528'; ctx.lineWidth = 0.8 * s;
+    for (const dx of [-4, 0, 4]) { ctx.beginPath(); ctx.moveTo(dx * s - 1.8 * s, -4 * s); ctx.lineTo(dx * s, -7.2 * s); ctx.lineTo(dx * s + 1.8 * s, -4 * s); ctx.stroke(); }
+  } else if (k === 'arara') {
+    // poleiro com a arara em cima
+    ctx.fillStyle = '#8a5a33'; ctx.fillRect(-1 * s, -30 * s, 2 * s, 30 * s); ctx.fillRect(-7 * s, -30 * s, 14 * s, 1.6 * s);
+    ctx.fillStyle = '#6b4424'; ctx.beginPath(); ctx.ellipse(0, 0, 6 * s, 1.8 * s, 0, 0, 7); ctx.fill();
+    const bob = Math.sin(t / 700) * 0.5 * s;
+    ctx.fillStyle = '#d8342a';
+    ctx.beginPath(); ctx.moveTo(-1.5 * s, -32 * s); ctx.lineTo(-3.5 * s, -18 * s + bob); ctx.lineTo(0.5 * s, -32 * s); ctx.fill();
+    ctx.fillStyle = '#2a6fc8'; ctx.beginPath(); ctx.moveTo(-0.5 * s, -32 * s); ctx.lineTo(-1.5 * s, -20 * s + bob); ctx.lineTo(1.5 * s, -32 * s); ctx.fill();
+    ctx.fillStyle = '#d8342a'; ctx.beginPath(); ctx.ellipse(0, -36 * s + bob, 3.6 * s, 5.5 * s, 0.15, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f2c230'; ctx.beginPath(); ctx.ellipse(-1.8 * s, -35 * s + bob, 2 * s, 3.4 * s, 0.25, 0, 7); ctx.fill();
+    ctx.fillStyle = '#2a6fc8'; ctx.beginPath(); ctx.ellipse(-2.2 * s, -33 * s + bob, 1.8 * s, 3 * s, 0.25, 0, 7); ctx.fill();
+    ctx.fillStyle = '#d8342a'; ctx.beginPath(); ctx.arc(1.2 * s, -42 * s + bob, 3 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f3efe6'; ctx.beginPath(); ctx.ellipse(2.4 * s, -42 * s + bob, 1.4 * s, 1.1 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(2.5 * s, -42.2 * s + bob, 0.5 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3a3a3a'; ctx.beginPath(); ctx.moveTo(3.8 * s, -43 * s + bob); ctx.quadraticCurveTo(6.5 * s, -42 * s + bob, 4.3 * s, -39.5 * s + bob); ctx.lineTo(3.8 * s, -41 * s + bob); ctx.fill();
   }
   ctx.restore();
 }
-const ANIMAL_H = { galinha: 24, vaca: 34, ovelha: 25, porco: 25, coelho: 22, angola: 23, pato: 22, jumento: 42, cavalo: 46, pavao: 30 };
-const SMALL_ANIMALS = ['galinha', 'coelho', 'angola', 'pato'];
+const ANIMAL_H = { galinha: 24, vaca: 34, ovelha: 25, porco: 25, coelho: 22, angola: 23, pato: 22, jumento: 42, cavalo: 46, pavao: 30, cabra: 32, bufala: 36, abelha: 26, avestruz: 52, gato: 16, tartaruga: 9, arara: 46 };
+const SMALL_ANIMALS = ['galinha', 'coelho', 'angola', 'pato', 'gato'];
 
 // ============================================================
 // Balões de aviso
@@ -1938,6 +2175,12 @@ function drawBubbleAt(x, y, kind, obj, t, seed) {
     ctx.strokeStyle = '#c8402f'; ctx.lineWidth = 1.6 * s;
     ctx.beginPath(); ctx.arc(x - 5 * s, y + 5 * s, 2.2 * s, 0, 7); ctx.moveTo(x + 7.2 * s, y + 5 * s); ctx.arc(x + 5 * s, y + 5 * s, 2.2 * s, 0, 7); ctx.stroke();
     ctx.lineCap = 'butt';
+  } else if (kind === 'vet') {
+    ctx.fillStyle = '#e03a2f'; ctx.fillRect(x - 1.8 * s, y - 6 * s, 3.6 * s, 12 * s); ctx.fillRect(x - 6 * s, y - 1.8 * s, 12 * s, 3.6 * s);
+  } else if (kind === 'sell') {
+    ctx.fillStyle = '#f2b705'; ctx.beginPath(); ctx.arc(x, y, 6.5 * s, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#b77f00'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.arc(x, y, 4.6 * s, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#8a5a00'; ctx.font = `800 ${Math.round(8 * s)}px 'Baloo 2', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('$', x, y + 0.5 * s);
   } else if (kind === 'bone') {
     ctx.fillStyle = '#f3ead6'; ctx.strokeStyle = '#b8a47a'; ctx.lineWidth = 0.8 * s;
     ctx.save(); ctx.translate(x, y); ctx.rotate(-0.5);
@@ -2084,27 +2327,19 @@ function drawPen(s, t, home, dt) {
   isoBox(4.9, 0.15, 5.8, 0.8, 0, 0.35, '#efcf6a', '#d6b24c', '#bf9a3e');
   line(P(4.9, 0.8, 0.12), P(5.8, 0.8, 0.12), '#a8852e', 1.5); line(P(4.9, 0.8, 0.24), P(5.8, 0.8, 0.24), '#a8852e', 1.5);
 
-  updateWander(s.animals, dt);
-  const list = s.animals.map(a => ({ a, m: amb[a.id] })).sort((x, y) => (x.m.u + x.m.v) - (y.m.u + y.m.v));
-  const sc = W / 100 * 1.15;
-  for (const { a, m } of list) {
-    const p = iso(m.u, m.v);
-    if (hover && hover.kind === 'animal' && hover.id === a.id) {
-      ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.ellipse(p.x, p.y, W * 0.26, W * 0.09, 0, 0, 7); ctx.stroke();
-    }
-    drawAnimal(a.k, p.x, p.y, sc, t, m.dir, m.moving);
-    hits.push({ kind: 'animal', id: a.id, x: p.x, y: p.y - ANIMAL_H[a.k] * sc * 0.5, r: Math.max(W * 0.22, ANIMAL_H[a.k] * sc * 0.7) });
-  }
+  const penList = s.animals.filter(inPen);
+  updateWander(penList, dt, PEN_AREA);
+  const list = penList.map(a => ({ a, m: amb[a.id] })).sort((x, y) => (x.m.u + x.m.v) - (y.m.u + y.m.v));
+  const base = W / 100 * 1.15;
+  for (const { a, m } of list) drawAnimalAt(a, m, base, t);
   drawFence(PEN_C, PEN_R, 'front');
   nightOverlay(tod);
   for (const { a, m } of list) {
-    const took = !home && (a.stolen || state.log[visitKey(a.id + ':' + a.n)]);
-    const k = a.ready && !took ? 'prod' : (!a.fed && !a.ready) ? 'feed' : null;
-    if (k) { const p = iso(m.u, m.v); drawBubbleAt(p.x, p.y - ANIMAL_H[a.k] * sc - W * 0.2, k, a, t, m.u * 7); }
+    const k = animalBubble(a, home), sc = animalScale(a, base);
+    if (k) { const p = iso(m.u, m.v); drawBubbleAt(p.x, p.y - ANIMAL_H[drawKind(a)] * sc - W * 0.2, k, a, t, m.u * 7); }
   }
   dogBubble('animais', s, t, home);
-  if (!s.animals.length) {
+  if (!penList.length) {
     const q = iso(PEN_C / 2, PEN_R / 2);
     ctx.fillStyle = '#4a2a10'; ctx.font = `800 ${Math.round(clamp(W * 0.16, 13, 20))}px 'Baloo 2', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(home ? 'Compre animais na Loja' : 'Nenhum animal por aqui', q.x, q.y);
@@ -2223,6 +2458,10 @@ function drawRoom(s, t, home) {
   const kn = P(0, 3.6, 0.45); ctx.fillStyle = '#e8c35a'; ctx.beginPath(); ctx.arc(kn.x, kn.y, W * 0.025, 0, 7); ctx.fill();
   // decorações
   for (const id of DECOR_ORDER) if (s.decor[id]) DRAW_DECOR[id](t);
+  // bichos de companhia que moram dentro de casa
+  const pets = s.animals.filter(a => ANIMAL[a.k].lugar === 'casa');
+  updateWander(pets, Math.min(0.05, 1 / 60), ROOM_AREA);
+  pets.map(a => ({ a, m: amb[a.id] })).sort((x, y) => (x.m.u + x.m.v) - (y.m.u + y.m.v)).forEach(({ a, m }) => drawAnimalAt(a, m, W / 100 * (a.k === 'arara' ? 1.35 : 2.1), t));
   for (const id of DECOR_ORDER) {
     if (home && !s.decor[id]) drawSlotHint(id);
     if (home || s.decor[id]) { const m = decorCenter(id); hits.push({ kind: 'decor', id, x: m.x, y: m.y, r: W * 0.4 }); }
@@ -2276,9 +2515,11 @@ const cropIcon = id => makeIcon('c:' + id, () => {
   const sc = { chao: 2.3, alto: 1.6, grao: 2.2, abacaxi: 2.6, folha: 2.8 }[crop.tipo] || 2.4;
   drawPlant(48, 78, sc, crop, 4, 0, false);
 });
-const animalIcon = k => makeIcon('a:' + k, () => {
-  const sc = { galinha: 2.6, vaca: 1.6, ovelha: 2.2, porco: 2.1, coelho: 2.7, angola: 2.5, pato: 2.5, jumento: 1.45, cavalo: 1.35, pavao: 2.0 }[k];
-  drawAnimal(k, SMALL_ANIMALS.includes(k) ? 46 : k === 'pavao' ? 56 : 38, 86, sc, 0, 1, false);
+const animalIcon = id => makeIcon('a:' + id, () => {
+  const k = ANIMAL[id].desenho || id;
+  const sc = { galinha: 2.6, vaca: 1.6, ovelha: 2.2, porco: 2.1, coelho: 2.7, angola: 2.5, pato: 2.5, jumento: 1.45, cavalo: 1.35, pavao: 2.0, cabra: 1.9, bufala: 1.5, abelha: 2.6, avestruz: 1.45, gato: 3.4, tartaruga: 3.6, arara: 1.75 }[k];
+  const x = SMALL_ANIMALS.includes(k) || k === 'tartaruga' ? 46 : k === 'pavao' ? 56 : k === 'abelha' || k === 'arara' ? 48 : k === 'avestruz' ? 42 : 38;
+  drawAnimal(k, x, 88, sc, 0, 1, false);
 });
 const productIcon = id => makeIcon('p:' + id, () => drawProduct(id, 48, 48, 5.5));
 const decorIcon = id => makeIcon('d:' + id, () => {
@@ -2335,8 +2576,8 @@ function renderTools() {
   box.hidden = scene !== 'roca';
   hint.hidden = scene === 'roca';
   hint.textContent = scene === 'animais'
-    ? (isHome() ? 'Clique num animal com fome para dar comida (milho do celeiro ou ração comprada na hora) e depois recolha o que ele produzir. O cachorro fica do lado do galinheiro.' : 'Dê comida aos animais com fome para ajudar. Produto pronto dá para pegar um pouquinho.')
-    : (isHome() ? 'Os espaços com + são lugares para decoração. Cada peça dá conforto, e conforto aumenta o XP que você ganha.' : 'Esta é a casa do seu vizinho.');
+    ? (isHome() ? 'Clique num animal para alimentar, recolher ou vender. Os botões acima alimentam e recolhem tudo de uma vez. O cachorro fica do lado do galinheiro.' : 'Dê comida aos animais com fome para ajudar. Produto pronto dá para pegar um pouquinho.')
+    : (isHome() ? 'Os espaços com + são lugares para decoração. Cada peça dá conforto, e conforto aumenta o XP que você ganha. Gato, tartaruga e arara moram aqui: clique neles para fazer carinho.' : 'Esta é a casa do seu vizinho.');
   box.innerHTML = '';
   availTools().forEach((t, k) => {
     const b = document.createElement('button');
@@ -2370,11 +2611,26 @@ function renderHUD() {
   $('#coins').textContent = state.coins.toLocaleString('pt-BR');
 }
 
+function renderPenActions() {
+  const el = $('#penActions');
+  if (!el) return;
+  const show = scene === 'animais' && isHome() && !isGated();
+  el.hidden = !show;
+  if (!show) return;
+  const hungry = state.animals.filter(isHungry), ready = state.animals.filter(a => ANIMAL[a.k].tipo === 'prod' && a.ready);
+  const cost = hungry.reduce((t, a) => t + ANIMAL[a.k].racao, 0);
+  const key = hungry.length + ':' + cost + ':' + ready.length;
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+  el.innerHTML = `<button class="btn" type="button" data-feed-all ${hungry.length ? '' : 'disabled'}>Alimentar todos${hungry.length ? ` (${hungry.length}) · ${cost.toLocaleString('pt-BR')} moedas` : ''}</button>
+    <button class="btn gold" type="button" data-collect-all ${ready.length ? '' : 'disabled'}>Recolher tudo${ready.length ? ` (${ready.length})` : ''}</button>`;
+}
 function renderSceneInfo() {
+  renderPenActions();
   const s = S(), el = $('#sceneInfo');
   const owner = isHome() ? '' : `${view.nome} · `;
   if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length}${isHome() ? ` de ${allowedLots()}` : ''} canteiros`;
-  else if (scene === 'animais') el.textContent = owner + `${s.animals.length} de ${MAX_ANIMALS} animais`;
+  else if (scene === 'animais') el.textContent = owner + `${s.animals.filter(inPen).length}${isHome() ? ` de ${MAX_ANIMALS}` : ''} animais`;
   else el.textContent = owner + `Conforto ${comfort(s)} · +${comfort(s)}% de XP`;
 }
 
@@ -2454,6 +2710,9 @@ function renderPane() {
       html += `<div class="row ${state.tools.enxada ? 'sel' : ''}"><div class="avatar" style="background:#8a5a33">${TOOL_ICONS.hoe}</div>
         <div><div class="name">Enxada</div><div class="meta">100 moedas · arranca qualquer plantação ou árvore</div></div>
         ${state.tools.enxada ? '<button class="btn ghost" disabled>Sua</button>' : `<button class="btn" data-buy-hoe ${state.coins < 100 ? 'disabled' : ''}>Comprar</button>`}</div>`;
+      html += `<div class="row"><img alt="" src="${bowlIcon()}">
+        <div><div class="name">Ração especial</div><div class="meta">${RACAO_ESP} moedas · a próxima produção do animal rende em dobro. É usada quando você alimenta um animal clicando nele. Você tem <b>${state.racaoEsp}</b></div></div>
+        <div class="stack"><button class="btn" data-racao-esp="1" ${state.coins < RACAO_ESP ? 'disabled' : ''}>Comprar 1</button><button class="btn ghost" data-racao-esp="5" ${state.coins < RACAO_ESP * 5 ? 'disabled' : ''}>Comprar 5</button></div></div>`;
       html += `<p class="hint">O regador é grátis. Fertilizante corta uma parte do tempo total da planta; escolha o tipo e clique numa planta com a ferramenta Adubo. Vale um por colheita.</p>`;
       for (const f of FERTS) {
         const locked = f.nivel > state.level, have = state.fert[f.id] || 0;
@@ -2469,17 +2728,28 @@ function renderPane() {
         </div>`;
       }
     } else if (shopSeg === 'animais') {
-      html += `<p class="hint">Depois de produzir, o animal fica com fome: dê milho do celeiro ou compre a ração na hora. Cada animal vive um tempo e depois vai descansar. Você tem ${state.animals.length} de ${MAX_ANIMALS}.</p>`;
-      for (const a of ANIMALS) {
-        const locked = a.nivel > state.level, prod = PRODUCT[a.prod];
-        const full = state.animals.length >= MAX_ANIMALS, have = state.animals.filter(x => x.k === a.id).length;
-        const rende = prod.vira ? `vira ${prod.qtd} ${FERT[prod.vira].nome.toLowerCase()}` : `vende por ${prod.preco}`;
-        html += `<div class="row ${locked ? 'locked' : ''}">
-          <img alt="" src="${animalIcon(a.id)}">
-          <div><div class="name">${a.nome}${have ? ` <span class="meta">(${have})</span>` : ''}</div>
-          <div class="meta">${a.custo} moedas · vive ${a.vida} dias<br>${prod.nome} a cada ${fmt(a.tempo)} · ${rende}<br>comida: ${a.milho} milho ou ${a.racao} ${a.racao > 1 ? 'moedas' : 'moeda'} · ${a.xp} XP</div></div>
-          ${locked ? `<button class="btn" disabled>Nível ${a.nivel}</button>` : `<button class="btn" data-buy-animal="${a.id}" ${full || state.coins < a.custo ? 'disabled' : ''}>Comprar</button>`}
-        </div>`;
+      const noCurral = state.animals.filter(inPen).length;
+      html += `<p class="hint">Curral: ${noCurral} de ${MAX_ANIMALS} animais. Nenhum animal morre: sem comida ele só para, e quem termina o período produtivo precisa do veterinário.</p>`;
+      const row = (d, meta, btn) => `<div class="row ${d.nivel > state.level ? 'locked' : ''}"><img alt="" src="${animalIcon(d.id)}">
+        <div><div class="name">${d.nome}${state.animals.some(x => x.k === d.id) ? ` <span class="meta">(${state.animals.filter(x => x.k === d.id).length})</span>` : ''}</div><div class="meta">${meta}</div></div>${btn}</div>`;
+      const buyBtn = d => d.nivel > state.level ? `<button class="btn" disabled>Nível ${d.nivel}</button>`
+        : `<button class="btn" data-buy-animal="${d.id}" ${state.coins < d.custo ? 'disabled' : ''}>Comprar</button>`;
+      const visible = tipo => { const l = ANIMALS.filter(d => d.tipo === tipo); const up = l.filter(d => d.nivel > state.level); return [...l.filter(d => d.nivel <= state.level), ...up.slice(0, 2)]; };
+      html += `<h3>Produção</h3>`;
+      for (const d of visible('prod')) {
+        const prodTxt = d.prod === 'leitao' ? 'leitões (viram porquinhos no curral)' : `${PRODUCT[d.prod].nome.toLowerCase()} (vende por ${PRODUCT[d.prod].preco})`;
+        html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · ração ${d.racao} por produção<br>${prodTxt} a cada ${fmt(d.tempo)}<br>produz por ${d.periodo} dias · ${d.xp} XP por coleta`, buyBtn(d));
+      }
+      html += `<h3>Para criar e vender</h3>`;
+      for (const d of visible('cria')) {
+        html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · ração ${d.racao} por dia<br>cresce em ${fmt(d.tempo)} e vende por ${d.venda.toLocaleString('pt-BR')}<br>lucro ${(d.venda - d.custo - d.racao * Math.ceil(d.tempo / (24 * HOUR))).toLocaleString('pt-BR')} · ${d.xp} XP na venda`, buyBtn(d));
+      }
+      html += `<h3>Companhia</h3>`;
+      for (const d of visible('pet')) html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · mora ${d.lugar === 'casa' ? 'dentro de casa' : 'no curral'}<br>não come nem produz · carinho dá 2 XP por dia`, buyBtn(d));
+      const pets = state.animals.filter(a => ANIMAL[a.k].tipo === 'pet');
+      if (pets.length) {
+        html += `<h3>Nomes dos seus bichos</h3>`;
+        for (const a of pets) html += `<form class="addform" data-rename="${a.id}"><input id="pet-${a.id}" maxlength="18" value="${esc(a.nome || ANIMAL[a.k].nome)}" aria-label="Nome do ${esc(ANIMAL[a.k].nome.toLowerCase())}" style="text-transform:none;letter-spacing:0"><button class="btn" type="submit">Salvar</button></form>`;
       }
     } else if (shopSeg === 'caes') {
       html += `<p class="hint">A casinha fica do lado do celeiro. Um cachorro vigia a plantação e outro os animais. Acordado (com ração), ele espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. A ração dura ${DOG_FOOD.horas}h.</p>`;
@@ -2629,6 +2899,11 @@ $('#pane').addEventListener('click', e => {
   else if ('seeLand' in d) { if (!isHome()) goHome(); setScene('roca'); toast('Clique num + encostado na sua terra para colocar um canteiro.'); }
   else if ('expand' in d) buyExpansion();
   else if (d.buyFert) buyFert(d.buyFert, Number(d.n) || 1);
+  else if (d.racaoEsp) {
+    const n = Number(d.racaoEsp) || 1;
+    if (state.coins < RACAO_ESP * n) toast(`Faltam moedas: ${n} ração especial custa ${RACAO_ESP * n}.`, 'bad');
+    else { state.coins -= RACAO_ESP * n; state.racaoEsp += n; sfx('buy'); toast(`+${n} ração especial`, 'good'); done(); }
+  }
   else if ('buyHoe' in d) {
     if (state.coins < 100) toast('A enxada custa 100 moedas.', 'bad');
     else { state.coins -= 100; state.tools.enxada = true; sfx('buy'); toast('Enxada comprada! Agora ela aparece nas ferramentas.', 'good'); renderTools(); done(); }
@@ -2665,6 +2940,13 @@ $('#pane').addEventListener('click', e => {
   }
 });
 $('#pane').addEventListener('submit', e => {
+  const rn = e.target.dataset && e.target.dataset.rename;
+  if (rn) {
+    e.preventDefault();
+    const a = state.animals.find(x => x.id === rn), v = $('#pet-' + rn).value.trim().slice(0, 18);
+    if (a && v) { a.nome = v; toast(`Agora ele${ANIMAL[a.k].f ? 'a' : ''} se chama ${v}!`, 'good'); done(); }
+    return;
+  }
   if (e.target.id !== 'addFriend') return;
   e.preventDefault();
   addFriend($('#friendCode').value);
@@ -2672,6 +2954,10 @@ $('#pane').addEventListener('submit', e => {
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; renderPane(); $('#pane').scrollTop = 0; if (tab === 'amigos') checkSent(); }));
 document.querySelectorAll('#scenes button').forEach(b => b.addEventListener('click', () => setScene(b.dataset.scene)));
 $('#goHome').addEventListener('click', () => goHome());
+$('#penActions').addEventListener('click', e => {
+  if (e.target.closest('[data-feed-all]')) feedAll();
+  else if (e.target.closest('[data-collect-all]')) collectAll();
+});
 
 // ============================================================
 // Dicas ao passar o mouse
@@ -2701,13 +2987,20 @@ function tipPlot(i) {
 }
 function tipAnimal(id) {
   const a = S().animals.find(x => x.id === id); if (!a) return null;
-  const def = ANIMAL[a.k], prod = PRODUCT[def.prod];
-  let h = `<b>${def.nome}</b><br>`;
-  if (a.ready) h += `${prod.nome} pronto! Clique para recolher.`;
-  else if (!a.fed) h += `Com fome. ${isHome() ? `Clique para dar comida (${def.milho} milho ou ${def.racao} ${def.racao > 1 ? 'moedas' : 'moeda'}).` : 'Clique para dar comida e ajudar.'}`;
-  else h += `Produzindo ${prod.nome.toLowerCase()}: falta ${fmt(def.tempo - a.g)}<div class="bar"><i style="width:${a.g / def.tempo * 100}%"></i></div>`;
-  const dias = Math.max(1, Math.ceil((a.born + def.vida * DAY - Date.now()) / DAY));
-  h += `<br>Vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}`;
+  const d = ANIMAL[a.k], home = isHome();
+  if (d.tipo === 'pet') return `<b>${esc(a.nome || d.nome)}</b> · ${d.nome.toLowerCase()}<br>Clique para fazer carinho.`;
+  let h = `<b>${d.nome}</b><br>`;
+  if (d.tipo === 'cria') {
+    if (isAdult(a)) return h + `Adulto! ${home ? `Clique para vender por ${d.venda.toLocaleString('pt-BR')} moedas.` : ''}`;
+    h += `Crescendo: falta ${fmt(d.tempo - a.g)}<div class="bar"><i style="width:${a.g / d.tempo * 100}%"></i></div>`;
+    return h + (a.food > 0 ? `Comida por mais ${fmt(a.food)}` : `<span class="warn">Com fome, parou de crescer.</span>${home ? ` Clique para dar ração (${d.racao}).` : ''}`);
+  }
+  const prod = PRODUCT[d.prod];
+  if (a.ready) h += `${prod.nome} pronto${a.dobro ? ' (em dobro!)' : ''}! Clique para recolher.`;
+  else if (!a.fed && isTired(a)) h += `<span class="warn">Terminou o período produtivo.</span>${home ? ` Clique para chamar o veterinário (${vetCost(d)} moedas).` : ''}`;
+  else if (!a.fed) h += `Com fome. ${home ? `Clique para dar ração (${d.racao} moedas${state.racaoEsp ? ', usa 1 ração especial' : ''}).` : 'Clique para dar comida e ajudar.'}`;
+  else h += `Produzindo ${prod.nome.toLowerCase()}${a.dobro ? ' em dobro' : ''}: falta ${fmt(d.tempo - a.g)}<div class="bar"><i style="width:${a.g / d.tempo * 100}%"></i></div>`;
+  if (!isTired(a)) { const dias = Math.max(1, Math.ceil((a.born + d.periodo * DAY - Date.now()) / DAY)); h += `<br>Produz por mais ${dias} ${dias > 1 ? 'dias' : 'dia'}`; }
   return h;
 }
 function tipDog(slot) {

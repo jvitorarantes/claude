@@ -12,7 +12,9 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **3 fertilizantes**: básico (corta 10% do tempo, 50 moedas), rápido (25%, 200) e premium (50%, 1.000). Um por colheita.
 - **Música e sons**: 3 músicas calmas de roça e sons para cliques, regar, enxada, colher e mais. Tudo é sintetizado no navegador (`js/audio.js`), sem arquivos de áudio.
 - **Configurações** (engrenagem no topo): liga e desliga música e sons, volume de cada um, escolha da música e tema (automático, dia ou noite).
-- **10 animais**: galinha, coelho, galinha-d'angola, pata, vaca, ovelha, jumento, porco, cavalo e pavão. Cada um produz em horas de verdade (o ovo leva 6h, o leite 12h, o bacon 18h…) e vive alguns dias. Depois de produzir, o animal fica com fome: dê milho do celeiro ou compre a ração na hora. O esterco do jumento vira adubo premium. Cabem 15 no cercado.
+- **Animais de produção**: galinha, pato, coelho, cabra, ovelha, vaca, colmeia, porca e búfala. Cada produção custa uma ração em moedas. Nenhum animal morre: sem comida ele só para, e depois do período produtivo (30 a 60 dias) precisa do veterinário. A porca tem leitões, que viram porquinhos no curral. A ração especial faz a próxima produção render em dobro. Botões para alimentar e recolher tudo de uma vez.
+- **Animais para criar e vender**: porquinho, bezerro, burro, potro e avestruz. Comem uma vez por dia e são vendidos adultos.
+- **Companhia**: gato, tartaruga e arara moram dentro de casa; cavalo e pavão, no curral. Dá para trocar o nome e fazer carinho.
 - **Cães de guarda**: a casinha fica do lado do celeiro. Dá para ter 2 cachorros, um para a plantação e outro para os animais, de 3 raças com preço, vida e força diferentes. Com ração (dura 8h) o cachorro fica acordado, espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. Ele também dá XP por dia e por ladrão pego.
 - **Plantação pronta** aparece com um check verde.
 - **Casa com 6 decorações**: tapete, vaso de planta, quadro, abajur, sofá e televisão. Cada uma dá conforto, e cada ponto de conforto vale +1% de XP.
