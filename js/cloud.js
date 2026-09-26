@@ -94,8 +94,18 @@
     }, e => console.warn('pedidos:', e));
   }
 
+  // Amizades guardadas à parte: farms/{dono}/amigos/{amigo}. Só mudam quando alguém vira amigo ou toca em
+  // Excluir, nunca num salvamento comum. É a lista "oficial": se a lista dentro do save se perder, volta daqui.
+  const amigoRef = (dono, amigo) => farm(dono).collection('amigos').doc(amigo);
+  const addAmigo = (dono, amigo) => amigoRef(dono, amigo).set({ at: Date.now() });
+  const removeAmigo = (dono, amigo) => amigoRef(dono, amigo).delete();
+  async function listAmigos(dono) { return (await farm(dono).collection('amigos').get()).docs.map(d => d.id); }
+  // O "amigo" ainda tem o "dono" como amigo? (pode ler porque é sobre si mesmo)
+  async function ehAmigoDe(dono, amigo) { return (await amigoRef(dono, amigo).get()).exists; }
+
   window.RFCloud = {
     available, init, signIn, signOut, loadFarm, saveFarm, claimSession, watchFarm, claimCode, findCode, normalizeCode,
     sendVisit, watchVisits, deleteVisit, sendRequest, deleteRequest, requestExists, watchRequests,
+    addAmigo, removeAmigo, listAmigos, ehAmigoDe,
   };
 })();

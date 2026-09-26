@@ -7,6 +7,8 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
     function me() { return request.auth.uid; }
+    // "me" está na lista oficial de amigos de "uid" (farms/{uid}/amigos/{me})
+    function amigoDe(uid) { return exists(/databases/$(database)/documents/farms/$(uid)/amigos/$(me())); }
 
     // Cada jogador tem uma roça. Só o dono salva. Podem ver: o dono, os amigos
     // (lista friends) e quem recebeu um pedido de amizade do dono (lista sent),
@@ -14,7 +16,8 @@ service cloud.firestore {
     match /farms/{uid} {
       allow read: if signedIn() && (me() == uid
                   || me() in resource.data.get('friends', [])
-                  || me() in resource.data.get('sent', []));
+                  || me() in resource.data.get('sent', [])
+                  || amigoDe(uid));
       allow write: if signedIn() && me() == uid
                    && request.resource.size() < 900000;
 
@@ -25,8 +28,16 @@ service cloud.firestore {
                       && request.resource.data.from == me()
                       && request.resource.data.t in ['help', 'steal', 'feed', 'stealA', 'gift', 'buy']
                       && request.resource.size() < 2000
-                      && me() in get(/databases/$(database)/documents/farms/$(uid)).data.get('friends', []);
+                      && (me() in get(/databases/$(database)/documents/farms/$(uid)).data.get('friends', []) || amigoDe(uid));
         allow read, delete: if signedIn() && me() == uid;
+      }
+
+      // Lista oficial de amigos: só o dono escreve (ao virar amigo ou ao Excluir).
+      // O dono e o próprio amigo podem ler (para cada um confirmar que a amizade continua).
+      match /amigos/{amigoUid} {
+        allow read: if signedIn() && (me() == uid || me() == amigoUid);
+        allow create, update: if signedIn() && me() == uid && amigoUid != uid && request.resource.data.size() < 5;
+        allow delete: if signedIn() && me() == uid;
       }
 
       // Pedidos de amizade: farms/{quemRecebe}/requests/{quemPediu}.

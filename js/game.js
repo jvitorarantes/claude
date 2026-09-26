@@ -1449,6 +1449,7 @@ async function acceptRequest(uid) {
   if (!user) return;
   if (!state.friends.includes(uid)) state.friends.push(uid);
   (state.amigosVistos ||= {})[uid] = 1;
+  oficializar(uid);
   delete state.sent[uid];
   const r = requests.find(x => x.from === uid);
   requests = requests.filter(x => x.from !== uid);
@@ -1476,6 +1477,7 @@ async function cancelRequest(uid) {
 async function unfriend(uid) {
   state.friends = state.friends.filter(f => f !== uid);
   if (state.amigosVistos) delete state.amigosVistos[uid];
+  if (user && Cloud.removeAmigo) Cloud.removeAmigo(user.uid, uid).catch(e => console.warn(e));
   delete friendInfo[uid];
   if (view.kind === 'friend' && view.uid === uid) goHome();
   done(); await cloudSave();
@@ -1498,6 +1500,7 @@ async function checkSent() {
         delete state.sent[uid];
         if (!state.friends.includes(uid)) state.friends.push(uid);
         (state.amigosVistos ||= {})[uid] = 1;
+        oficializar(uid);
         toast(`${firstName(farm.name || 'Seu amigo')} aceitou seu pedido de amizade!`, 'good');
         changed = true;
         continue;
@@ -1521,25 +1524,41 @@ function fetchFriendInfo(uid) {
     setTimeout(() => { if (friendInfo[uid] && friendInfo[uid].erro) delete friendInfo[uid]; }, 60000); // tenta de novo depois
   }).finally(() => { if (tab === 'amigos') renderPane(); });
 }
+// Lista oficial de amigos na nuvem (farms/{você}/amigos). Só muda ao virar amigo ou ao Excluir.
+function oficializar(uid) { if (user && Cloud.addAmigo) Cloud.addAmigo(user.uid, uid).catch(e => console.warn('amigos:', e)); }
 // Recupera amigos que sumiram da lista: procura quem já foi seu amigo (cópia de segurança e rastros
 // como visitas, presentes e ajudas) e devolve para a lista quem ainda tem você na lista dele.
-let recuperando = false;
+let recuperando = false, ultimaRecup = 0;
 async function recuperarAmigos() {
   if (!user || recuperando) return;
   recuperando = true;
   try {
+    const voltaram = [];
+    // 1) a lista oficial manda: quem está lá é amigo, ponto. E quem está só no save entra na lista oficial.
+    if (Cloud.listAmigos) {
+      try {
+        const oficial = await Cloud.listAmigos(user.uid);
+        for (const uid of oficial) if (!state.friends.includes(uid)) {
+          state.friends.push(uid); (state.amigosVistos ||= {})[uid] = 1; delete friendInfo[uid];
+          let nome = 'Amigo'; try { const f = await Cloud.loadFarm(uid); if (f && f.name) nome = firstName(f.name); } catch (e) { /* tanto faz */ }
+          voltaram.push(nome);
+        }
+        for (const uid of state.friends) if (!oficial.includes(uid)) oficializar(uid);
+      } catch (e) { console.warn('lista oficial de amigos:', e); } // regras antigas: segue só com os rastros
+    }
+    // 2) rastros (visitas, presentes, ajudas): volta quem ainda tem você como amigo
     const npc = new Set(NEIGHBORS.map(n => n.id)), cand = new Set(Object.keys(state.amigosVistos || {}));
     const add = k => { const uid = String(k).split(':')[0]; if (uid.length >= 20 && !npc.has(uid)) cand.add(uid); };
     Object.keys(state.log || {}).forEach(add); Object.keys(state.limits || {}).forEach(add); Object.keys(state.owe || {}).forEach(add);
     ((state.sentGifts && state.sentGifts.to) || []).forEach(add);
-    const voltaram = [];
     for (const uid of cand) {
       if (uid === user.uid || state.friends.includes(uid)) continue;
-      let farm = null;
-      try { farm = await Cloud.loadFarm(uid); } catch (e) { continue; }
-      if (farm && Array.isArray(farm.friends) && farm.friends.includes(user.uid)) {
-        state.friends.push(uid); (state.amigosVistos ||= {})[uid] = 1; delete friendInfo[uid];
-        voltaram.push(firstName(farm.name || 'Amigo'));
+      let farm = null, oficial = false;
+      try { oficial = Cloud.ehAmigoDe ? await Cloud.ehAmigoDe(uid, user.uid) : false; } catch (e) { /* regras antigas */ }
+      try { farm = await Cloud.loadFarm(uid); } catch (e) { if (!oficial) continue; }
+      if (oficial || (farm && Array.isArray(farm.friends) && farm.friends.includes(user.uid))) {
+        state.friends.push(uid); (state.amigosVistos ||= {})[uid] = 1; delete friendInfo[uid]; oficializar(uid);
+        voltaram.push(firstName((farm && farm.name) || 'Amigo'));
       }
     }
     if (voltaram.length) {
@@ -3546,7 +3565,7 @@ function openPanel(t, seg, focus) {
   tab = t; if (seg) shopSeg = seg;
   $('#panel').hidden = false;
   renderPane(); $('#pane').scrollTop = 0;
-  if (t === 'amigos') checkSent();
+  if (t === 'amigos') { checkSent(); if (Date.now() - ultimaRecup > 60000) { ultimaRecup = Date.now(); recuperarAmigos(); } }
   if (focus) focusRow('abrigo-' + focus);
 }
 function closePanel() { $('#panel').hidden = true; renderPane(); }
