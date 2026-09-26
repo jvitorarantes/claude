@@ -5,7 +5,8 @@
 // Dados do jogo
 // ============================================================
 const COLS = 8, ROWS = 5, N = COLS * ROWS, START_PLOTS = 6;
-const PEN_C = 6, PEN_R = 4, ROOM = 5, MAX_ANIMALS = 12;
+const PEN_C = 6, PEN_R = 4, ROOM = 5, MAX_ANIMALS = 15;
+const HOUR = 3600, DAY = 86400e3; // HOUR em segundos (tempos de produção), DAY em milissegundos (idades)
 const SAVE_KEY = 'roca-feliz-v2', OLD_SAVE_KEY = 'roca-feliz-v1', SETTINGS_KEY = 'roca-feliz-config';
 const settings = Object.assign(
   { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.7, track: 0, tema: 'auto' },
@@ -25,21 +26,54 @@ const CROPS = [
 ];
 const CROP = Object.fromEntries(CROPS.map(c => [c.id, c]));
 
+// Produtos dos animais. O esterco do jumento não vai para o celeiro: vira 2 adubos premium.
 const PRODUCTS = [
-  { id: 'ovo',   nome: 'Ovo',   preco: 6 },
-  { id: 'leite', nome: 'Leite', preco: 18 },
-  { id: 'la',    nome: 'Lã',    preco: 26 },
-  { id: 'trufa', nome: 'Trufa', preco: 48 },
+  { id: 'ovo',       nome: 'Ovo',             preco: 10 },
+  { id: 'pelo',      nome: 'Pelo de coelho',  preco: 12 },
+  { id: 'ovoangola', nome: 'Ovo de angola',   preco: 18 },
+  { id: 'ovopata',   nome: 'Ovo de pata',     preco: 22 },
+  { id: 'leite',     nome: 'Leite',           preco: 40 },
+  { id: 'la',        nome: 'Lã',              preco: 60 },
+  { id: 'esterco',   nome: 'Esterco',         preco: 0, vira: 'premium', qtd: 2 },
+  { id: 'bacon',     nome: 'Bacon',           preco: 80 },
+  { id: 'crina',     nome: 'Crina',           preco: 110 },
+  { id: 'pena',      nome: 'Pena de pavão',   preco: 200 },
 ];
 const PRODUCT = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
 
+// tempo = horas para produzir; vida = dias de vida; racao = moedas por refeição (ou milho do celeiro).
+// XP por coleta ≈ valor do produto ÷ 4 + 2, para quem espera mais ganhar mais.
 const ANIMALS = [
-  { id: 'galinha', nome: 'Galinha', custo: 60,  nivel: 1, tempo: 120, prod: 'ovo',   racao: 2,  xp: 3 },
-  { id: 'vaca',    nome: 'Vaca',    custo: 220, nivel: 3, tempo: 300, prod: 'leite', racao: 6,  xp: 8 },
-  { id: 'ovelha',  nome: 'Ovelha',  custo: 300, nivel: 4, tempo: 420, prod: 'la',    racao: 7,  xp: 11 },
-  { id: 'porco',   nome: 'Porco',   custo: 450, nivel: 6, tempo: 600, prod: 'trufa', racao: 10, xp: 18 },
+  { id: 'galinha', nome: 'Galinha',          f: 1, custo: 50,   nivel: 1,  tempo: 6 * HOUR,  vida: 10, prod: 'ovo',       racao: 1 },
+  { id: 'coelho',  nome: 'Coelho',           f: 0, custo: 80,   nivel: 2,  tempo: 5 * HOUR,  vida: 12, prod: 'pelo',      racao: 1 },
+  { id: 'angola',  nome: 'Galinha-d\'angola', f: 1, custo: 100,  nivel: 3,  tempo: 7 * HOUR,  vida: 14, prod: 'ovoangola', racao: 2 },
+  { id: 'pato',    nome: 'Pata',             f: 1, custo: 120,  nivel: 3,  tempo: 8 * HOUR,  vida: 15, prod: 'ovopata',   racao: 2 },
+  { id: 'vaca',    nome: 'Vaca',             f: 1, custo: 200,  nivel: 4,  tempo: 12 * HOUR, vida: 20, prod: 'leite',     racao: 4 },
+  { id: 'ovelha',  nome: 'Ovelha',           f: 1, custo: 300,  nivel: 5,  tempo: 8 * HOUR,  vida: 25, prod: 'la',        racao: 6 },
+  { id: 'jumento', nome: 'Jumento',          f: 0, custo: 350,  nivel: 6,  tempo: 12 * HOUR, vida: 25, prod: 'esterco',   racao: 3 },
+  { id: 'porco',   nome: 'Porco',            f: 0, custo: 400,  nivel: 6,  tempo: 18 * HOUR, vida: 30, prod: 'bacon',     racao: 8 },
+  { id: 'cavalo',  nome: 'Cavalo',           f: 0, custo: 900,  nivel: 8,  tempo: 20 * HOUR, vida: 35, prod: 'crina',     racao: 10 },
+  { id: 'pavao',   nome: 'Pavão',            f: 0, custo: 1500, nivel: 10, tempo: 24 * HOUR, vida: 40, prod: 'pena',      racao: 18 },
 ];
+for (const a of ANIMALS) {
+  const p = PRODUCTS.find(x => x.id === a.prod);
+  a.xp = Math.round((p.vira ? 36 : p.preco) / 4) + 2;
+  a.milho = Math.max(1, Math.round(a.racao / 4)); // quantos milhos do celeiro valem uma refeição
+}
 const ANIMAL = Object.fromEntries(ANIMALS.map(a => [a.id, a]));
+const seuSua = a => (a.f ? 'Sua ' : 'Seu ') + a.nome.toLowerCase();
+
+// Cães de guarda: um vigia a plantação, outro os animais. Só protegem acordados (com comida).
+const DOGS = [
+  { id: 'caramelo', nome: 'Vira-lata caramelo', custo: 150, nivel: 2, vida: 15, protege: 0.55, morde: 0.4, xpDia: 10, xpPega: 15, cor: '#d99a4e', cor2: '#b8793a' },
+  { id: 'pastor',   nome: 'Pastor-alemão',      custo: 450, nivel: 5, vida: 25, protege: 0.7,  morde: 0.5, xpDia: 20, xpPega: 25, cor: '#8a5a2e', cor2: '#2a221c' },
+  { id: 'fila',     nome: 'Fila brasileiro',    custo: 900, nivel: 8, vida: 35, protege: 0.85, morde: 0.6, xpDia: 30, xpPega: 40, cor: '#b8783e', cor2: '#3a2a20' },
+];
+const DOG = Object.fromEntries(DOGS.map(d => [d.id, d]));
+const DOG_FOOD = { custo: 15, horas: 8 };
+const DOG_NAMES = ['Totó', 'Rex', 'Pipoca', 'Thor', 'Mel', 'Bidu', 'Paçoca', 'Nina', 'Bolinha', 'Faísca', 'Pretinha', 'Caramelo'];
+const SLOT_NAME = { roca: 'plantação', animais: 'criação' };
+const STEAL_MAX = { roca: 3, animais: 2 }; // itens por amigo por dia
 
 const DECOR = [
   { id: 'tapete', nome: 'Tapete de crochê', custo: 60,  nivel: 1, conforto: 3 },
@@ -86,7 +120,7 @@ const lotLevel = owned => 2 + Math.floor((owned - START_PLOTS) / 3);
 const newId = () => Math.random().toString(36).slice(2, 10);
 
 function emptyPlot(s = 'locked') { return { s, c: null, g: 0, dry: false, w: 0, b: 0, sl: 0, dmg: 0, id: null, th: [], fert: false }; }
-function newAnimal(k) { return { id: newId(), k, fed: true, g: 0, ready: false, n: 0 }; }
+function newAnimal(k) { return { id: newId(), k, fed: true, g: 0, ready: false, n: 0, born: Date.now() }; }
 
 function newState() {
   const plots = Array.from({ length: N }, () => emptyPlot());
@@ -97,6 +131,7 @@ function newState() {
     animals: [newAnimal('galinha'), newAnimal('galinha')], decor: {},
     friends: [], sent: {}, code: null, owner: null, log: {},
     fert: { basico: 2 }, fertSel: 'basico',
+    dogs: { roca: null, animais: null }, dogFood: 0, news: [], newsSeen: 0, limits: {},
     stats: { colheitas: 0, coletas: 0, vendido: 0, roubado: 0, ajudas: 0 },
   };
 }
@@ -112,7 +147,15 @@ function migrate(s) {
   }
   if (s.v !== 2 || !Array.isArray(s.plots) || s.plots.length !== N) return null;
   s.animals = Array.isArray(s.animals) ? s.animals.filter(a => a && ANIMAL[a.k]) : [];
-  for (const a of s.animals) { if (!a.id) a.id = newId(); a.n = a.n || 0; }
+  for (const a of s.animals) { if (!a.id) a.id = newId(); a.n = a.n || 0; if (!a.born) a.born = Date.now(); }
+  const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
+  s.dogs = {};
+  for (const slot of ['roca', 'animais']) { const d = dogs[slot]; s.dogs[slot] = d && DOG[d.raca] ? d : null; }
+  s.dogFood = Math.max(0, Number(s.dogFood) || 0);
+  s.news = Array.isArray(s.news) ? s.news.slice(0, 30) : [];
+  s.newsSeen = Number(s.newsSeen) || 0;
+  s.limits = s.limits && typeof s.limits === 'object' ? s.limits : {};
+  if (s.barn && s.barn.trufa) { s.barn.bacon = (s.barn.bacon || 0) + s.barn.trufa; delete s.barn.trufa; } // a trufa virou bacon
   s.decor = s.decor && typeof s.decor === 'object' ? s.decor : {};
   s.friends = Array.isArray(s.friends) ? s.friends.filter(f => typeof f === 'string') : [];
   s.sent = s.sent && typeof s.sent === 'object' && !Array.isArray(s.sent) ? s.sent : {};
@@ -157,8 +200,9 @@ function load() {
     const s = migrate(JSON.parse(raw));
     if (!s) return null;
     catchUp(s, (Date.now() - (s.t || Date.now())) / 1000);
-    const old = Date.now() - 2 * 86400e3;
+    const old = Date.now() - 2 * 86400e3, today = Math.floor(Date.now() / DAY);
     for (const k of Object.keys(s.log)) if (s.log[k] < old) delete s.log[k];
+    for (const k of Object.keys(s.limits)) if (!(s.limits[k] && s.limits[k].d >= today)) delete s.limits[k];
     return s;
   } catch (e) { return null; }
 }
@@ -200,6 +244,13 @@ const isHome = () => view.kind === 'home';
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function quando(at) {
+  const min = Math.round((Date.now() - at) / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.round(min / 60);
+  return h < 24 ? `há ${h}h` : `há ${Math.round(h / 24)} ${Math.round(h / 24) > 1 ? 'dias' : 'dia'}`;
+}
 function fmt(sec) {
   sec = Math.max(0, Math.ceil(sec));
   const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
@@ -365,19 +416,119 @@ function actAnimal(id) {
   if (a.ready) {
     a.ready = false; a.g = 0; a.n++;
     sfx('collect');
-    gain(prod.id, 1, pos); addXP(def.xp, pos); state.stats.coletas++;
+    if (prod.vira) {
+      state.fert[prod.vira] = (state.fert[prod.vira] || 0) + prod.qtd;
+      popupAt(pos, `+${prod.qtd} ${FERT[prod.vira].nome}`, '#9be36a');
+      renderTools();
+    } else gain(prod.id, 1, pos);
+    addXP(def.xp, pos); state.stats.coletas++;
     return done();
   }
   if (!a.fed) {
-    if ((state.barn.milho || 0) > 0) {
-      state.barn.milho--; if (!state.barn.milho) delete state.barn.milho;
-      popupAt(pos, '−1 Milho', '#ffe08a');
+    if ((state.barn.milho || 0) >= def.milho) {
+      state.barn.milho -= def.milho; if (!state.barn.milho) delete state.barn.milho;
+      popupAt(pos, `−${def.milho} Milho`, '#ffe08a');
     } else if (state.coins >= def.racao) addCoins(-def.racao, pos);
     else return toast(`Faltam moedas para a ração (${def.racao}).`, 'bad');
     a.fed = true; sfx('feed'); addXP(1, pos);
     return done();
   }
   toast(`${def.nome} está produzindo ${prod.nome.toLowerCase()}: falta ${fmt(def.tempo - a.g)}.`);
+}
+
+// ---------- Cachorros ----------
+const dogAlive = d => d && Date.now() - d.born < DOG[d.raca].vida * DAY;
+const dogAwake = d => dogAlive(d) && d.fedUntil > Date.now();
+function actDog(slot) {
+  const d = S().dogs && S().dogs[slot];
+  if (!isHome()) {
+    if (!d) return;
+    return toast(dogAwake(d) ? `${d.nome} está acordado vigiando a ${SLOT_NAME[slot]}. Cuidado!` : `${d.nome} está dormindo… é a sua chance.`);
+  }
+  if (!d) {
+    tab = 'loja'; shopSeg = 'caes'; renderPane();
+    return toast(`Compre um cachorro na Loja para vigiar a ${SLOT_NAME[slot]}.`);
+  }
+  if (!dogAwake(d)) return feedDog(slot);
+  const dias = Math.ceil((d.born + DOG[d.raca].vida * DAY - Date.now()) / DAY);
+  toast(`${d.nome} está de guarda. Comida por mais ${fmt((d.fedUntil - Date.now()) / 1000)} · vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}.`);
+}
+function feedDog(slot) {
+  const d = state.dogs[slot];
+  if (!d || dogAwake(d)) return;
+  if (state.dogFood <= 0) {
+    tab = 'loja'; shopSeg = 'caes'; renderPane();
+    return toast(`Acabou a ração de cachorro. Compre na Loja (${DOG_FOOD.custo} moedas, dura ${DOG_FOOD.horas}h).`, 'bad');
+  }
+  state.dogFood--;
+  d.fedUntil = Date.now() + DOG_FOOD.horas * 3600e3;
+  sfx('feed');
+  const pos = dogPos(slot);
+  popupAt(pos, 'Acordado!', '#ffe08a');
+  addXP(2, pos);
+  done();
+}
+function buyDog(raca, slot) {
+  const b = DOG[raca];
+  if (state.dogs[slot]) return toast(`Já tem um cachorro vigiando a ${SLOT_NAME[slot]}.`);
+  if (state.level < b.nivel) return toast(`${b.nome} libera no nível ${b.nivel}.`);
+  if (state.coins < b.custo) return toast(`${b.nome} custa ${b.custo} moedas.`, 'bad');
+  const used = Object.values(state.dogs).filter(Boolean).map(d => d.nome);
+  const nome = DOG_NAMES.filter(n => !used.includes(n))[Math.floor(Math.random() * (DOG_NAMES.length - used.length))];
+  state.coins -= b.custo;
+  // O cachorro chega de barriga cheia.
+  state.dogs[slot] = { raca, nome, born: Date.now(), fedUntil: Date.now() + DOG_FOOD.horas * 3600e3, lastXp: Date.now() };
+  sfx('buy'); sfx('bark');
+  addXP(5, null);
+  toast(`${nome}, ${b.nome.toLowerCase()}, agora vigia a sua ${SLOT_NAME[slot]}!`, 'good');
+  if (isHome()) setScene(slot === 'roca' ? 'roca' : 'animais');
+  done();
+}
+function buyDogFood(n) {
+  const cost = DOG_FOOD.custo * n;
+  if (state.coins < cost) return toast(`Faltam moedas: ${n} ração custa ${cost}.`, 'bad');
+  state.coins -= cost; state.dogFood += n;
+  sfx('buy');
+  toast(`+${n} ração de cachorro`, 'good');
+  done();
+}
+
+// ---------- Tempo de vida, XP diário dos cães e avisos ----------
+function addNews(msg) {
+  state.news.unshift({ at: Date.now(), msg });
+  state.news.length = Math.min(state.news.length, 30);
+  renderTabs();
+}
+function tickLife() {
+  const now = Date.now();
+  let changed = false;
+  for (const a of state.animals.slice()) {
+    const def = ANIMAL[a.k];
+    if (now - a.born < def.vida * DAY) continue;
+    state.animals = state.animals.filter(x => x !== a); delete amb[a.id];
+    const msg = `${seuSua(def)} ficou ${def.f ? 'velhinha' : 'velhinho'} e foi descansar. Você pode comprar outr${def.f ? 'a' : 'o'} na Loja.`;
+    addNews(msg); toast(msg); changed = true;
+  }
+  for (const slot of ['roca', 'animais']) {
+    const d = state.dogs[slot];
+    if (!d) continue;
+    const b = DOG[d.raca];
+    if (!dogAlive(d)) {
+      state.dogs[slot] = null;
+      const msg = `${d.nome} ficou velhinho e foi descansar. A ${SLOT_NAME[slot]} está sem cachorro.`;
+      addNews(msg); toast(msg); changed = true;
+      continue;
+    }
+    const days = Math.floor((now - d.lastXp) / DAY);
+    if (days >= 1) {
+      const n = Math.min(days, 3) * b.xpDia;
+      d.lastXp += days * DAY;
+      addXP(n, null);
+      addNews(`${d.nome} vigiou a sua ${SLOT_NAME[slot]} e rendeu +${n} XP.`);
+      changed = true;
+    }
+  }
+  if (changed) done();
 }
 
 function actDecor(id) {
@@ -467,7 +618,7 @@ function genNeighbor() {
 function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
   const cur = state.nb[id];
-  if (!cur || Date.now() > cur.refreshAt || !cur.animals) state.nb[id] = genNeighbor();
+  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born)) state.nb[id] = genNeighbor();
   view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id] };
   afterVisit();
   save();
@@ -505,12 +656,26 @@ function goHome() {
 
 const visitKey = id => (view.kind === 'friend' ? view.uid : view.id) + ':' + id;
 function help(pos) { state.stats.ajudas++; addXP(2, pos); addCoins(2, pos); }
-function caught(pos) {
-  if (Math.random() >= view.pega) return false;
-  const loss = Math.min(state.coins, Math.round(rand(5, 15)));
-  addCoins(-loss, pos);
+// Limite de itens por amigo por dia: 3 da plantação e 2 dos animais.
+function stealLimit() {
+  const today = Math.floor(Date.now() / DAY), key = (view.kind === 'friend' ? view.uid : view.id) + ':' + today;
+  return state.limits[key] || (state.limits[key] = { d: today, roca: 0, animais: 0 });
+}
+// O cachorro do dono pode espantar (e às vezes morder) quem tenta pegar.
+// Nos vizinhos da vila o cachorro está sempre acordado; nos amigos, só se tiver comida.
+function guarded(slot, pos, visit) {
+  let nome, protege, morde;
+  if (view.kind === 'friend') {
+    const d = view.data.dogs && view.data.dogs[slot];
+    if (!dogAwake(d)) return false;
+    nome = d.nome; protege = DOG[d.raca].protege; morde = DOG[d.raca].morde;
+  } else { nome = view.cao; protege = view.pega; morde = 0.7; }
+  if (Math.random() >= protege) return false;
+  const bitten = Math.random() < morde, loss = bitten ? Math.min(state.coins, 10) : 0;
+  if (loss) addCoins(-loss, pos);
   sfx('bark');
-  toast(`${view.cao}, o cachorro de ${view.nome}, te pegou! −${loss} moedas`, 'bad');
+  toast(bitten ? `${nome}, o cachorro de ${view.nome}, te mordeu! −${loss} moedas` : `${nome}, o cachorro de ${view.nome}, te espantou!`, 'bad');
+  sendVisit(Object.assign(visit, { caught: true, coins: loss }));
   return true;
 }
 function sendVisit(v) {
@@ -531,14 +696,15 @@ function awayPlot(i, p) {
   else if (p.dry && has('water')) { p.dry = false; what = 'dry'; sfx('water'); }
   if (what) { help(pos); sendVisit({ t: 'help', what, plot: i, pid: p.id }); return done(); }
   if (ripe(p) && tool === 'hand') {
-    const key = visitKey(p.id);
+    const key = visitKey(p.id), lim = stealLimit();
     if (alreadyTook(p, key)) return toast('Você já pegou daqui. Não exagere!');
-    p.stolen = true; state.log[key] = Date.now();
-    if (caught(pos)) return done();
-    const crop = CROP[p.c], qty = 1 + (Math.random() < 0.4 ? 1 : 0);
+    if (lim.roca >= STEAL_MAX.roca) return toast(`Você já pegou ${STEAL_MAX.roca} itens da plantação de ${view.nome} hoje. Volte amanhã!`);
+    p.stolen = true; state.log[key] = Date.now(); lim.roca++;
+    if (guarded('roca', pos, { t: 'steal', plot: i, pid: p.id, qty: 0 })) return done();
+    const crop = CROP[p.c];
     sfx('harvest');
-    gain(crop.id, qty, pos); state.stats.roubado += qty; addXP(1, pos);
-    sendVisit({ t: 'steal', plot: i, pid: p.id, qty });
+    gain(crop.id, 1, pos); state.stats.roubado++; addXP(1, pos);
+    sendVisit({ t: 'steal', plot: i, pid: p.id, qty: 1 });
     return done();
   }
 }
@@ -546,12 +712,15 @@ function awayPlot(i, p) {
 function awayAnimal(a, def, prod, pos) {
   if (!a.fed && !a.ready) { a.fed = true; sfx('feed'); help(pos); sendVisit({ t: 'feed', animal: a.id }); return done(); }
   if (a.ready) {
-    const key = visitKey(a.id + ':' + a.n);
+    const key = visitKey(a.id + ':' + a.n), lim = stealLimit();
     if (alreadyTook(a, key)) return toast('Você já pegou deste bicho. Não exagere!');
-    a.stolen = true; state.log[key] = Date.now();
-    if (caught(pos)) return done();
+    if (lim.animais >= STEAL_MAX.animais) return toast(`Você já pegou ${STEAL_MAX.animais} itens dos animais de ${view.nome} hoje. Volte amanhã!`);
+    a.stolen = true; state.log[key] = Date.now(); lim.animais++;
+    if (guarded('animais', pos, { t: 'stealA', animal: a.id })) return done();
     sfx('collect');
-    gain(prod.id, 1, pos); addXP(1, pos); state.stats.roubado++;
+    if (prod.vira) { state.fert[prod.vira] = (state.fert[prod.vira] || 0) + 1; popupAt(pos, `+1 ${FERT[prod.vira].nome}`, '#9be36a'); }
+    else gain(prod.id, 1, pos);
+    addXP(1, pos); state.stats.roubado++;
     sendVisit({ t: 'stealA', animal: a.id });
     return done();
   }
@@ -565,28 +734,46 @@ function applyVisits(list) {
     Cloud.deleteVisit(user.uid, id).catch(() => {});
     if (!v || typeof v !== 'object' || typeof v.from !== 'string' || v.from === user.uid) continue;
     const who = firstName(String(v.fromName || 'Um amigo').slice(0, 40));
-    const note = m => (msgs[who] = msgs[who] || []).push(m);
+    const note = (m, steal) => (msgs[who] = msgs[who] || []).push(m);
     const p = Number.isInteger(v.plot) && v.plot >= 0 && v.plot < N ? state.plots[v.plot] : null;
     const a = typeof v.animal === 'string' ? state.animals.find(x => x.id === v.animal) : null;
     if (!state.friends.includes(v.from)) continue;
+    if (v.caught && (v.t === 'steal' || v.t === 'stealA')) {
+      // Seu cachorro espantou (ou mordeu) um amigo que tentou pegar coisas.
+      const slot = v.t === 'steal' ? 'roca' : 'animais', d = state.dogs[slot];
+      const coins = clamp(Math.round(Number(v.coins) || 0), 0, 10), nome = d ? d.nome : 'Seu cachorro';
+      if (coins) state.coins += coins;
+      addXP(d ? DOG[d.raca].xpPega : 5, null);
+      const msg = coins ? `${nome} mordeu ${who}, que tentou pegar da sua ${SLOT_NAME[slot]}, e ganhou ${coins} moedas!`
+        : `${nome} espantou ${who}, que tentou pegar da sua ${SLOT_NAME[slot]}.`;
+      addNews(msg); toast(msg, 'good');
+      continue;
+    }
     if (v.t === 'help' && p && p.id === v.pid) {
       if (v.what === 'w') p.w = Math.max(0, p.w - 1);
       if (v.what === 'b') p.b = Math.max(0, p.b - 1);
       if (v.what === 'dry') p.dry = false;
       note('ajudou na sua roça');
     } else if (v.t === 'steal' && p && p.id === v.pid && p.s === 'growing') {
-      const qty = clamp(Number(v.qty) || 1, 1, 2);
+      const qty = 1;
       p.dmg = Math.min(CROP[p.c].rend - 1, p.dmg + qty);
       if (!p.th.includes(v.from)) p.th.push(v.from);
-      note(`pegou ${qty} ${CROP[p.c].nome}`);
+      note(`pegou ${qty} ${CROP[p.c].nome} da sua plantação`, true);
     } else if (v.t === 'feed' && a && !a.fed && !a.ready) {
       a.fed = true; note('alimentou seus animais');
     } else if (v.t === 'stealA' && a && a.ready) {
       a.ready = false; a.g = 0; a.n++;
-      note(`pegou 1 ${PRODUCT[ANIMAL[a.k].prod].nome}`);
+      note(`pegou 1 ${PRODUCT[ANIMAL[a.k].prod].nome} dos seus animais`, true);
     }
   }
-  for (const [who, list2] of Object.entries(msgs)) toast(`${who} ${[...new Set(list2)].join(', ')}`, 'good');
+  for (const [who, list2] of Object.entries(msgs)) {
+    // Junta repetições: "pegou 1 Milho" duas vezes vira "pegou 2 Milho".
+    const count = {};
+    for (const m of list2) count[m] = (count[m] || 0) + 1;
+    const parts = Object.entries(count).map(([m, n]) => n > 1 && m.startsWith('pegou 1 ') ? m.replace('pegou 1 ', `pegou ${n} `) : m);
+    const msg = `${who} ${parts.join(', ')}.`;
+    addNews(msg); toast(msg, 'good');
+  }
   done();
 }
 
@@ -857,7 +1044,7 @@ function updateWander(list, dt) {
       else { m.tu = rand(0.5, PEN_C - 0.5); m.tv = rand(0.9, PEN_R - 0.4); }
       continue;
     }
-    const k = Math.min(1, (a.k === 'galinha' ? 0.55 : 0.3) * dt / d);
+    const k = Math.min(1, (SMALL_ANIMALS.includes(a.k) ? 0.55 : 0.3) * dt / d);
     m.u += du * k; m.v += dv * k; m.moving = true;
     const sx = du - dv; if (Math.abs(sx) > 0.01) m.dir = sx > 0 ? 1 : -1;
   }
@@ -1047,18 +1234,99 @@ function drawTree(x, y, s, t) {
   ctx.fillStyle = '#e53b2f';
   for (const [dx, dy] of [[-.15, -.7], [.12, -.8], [.2, -.55], [-.25, -.5]]) { ctx.beginPath(); ctx.arc(x + dx * s + sw, y + dy * s, s * 0.035, 0, 7); ctx.fill(); }
 }
-function drawDog(x, y, s, t) {
+// Cachorro virado para a esquerda. raca muda as cores; sleeping = deitado dormindo.
+function drawDog(x, y, s, t, raca = 'caramelo', sleeping = false) {
+  const b = DOG[raca] || DOG.caramelo, body = b.cor, dark = b.cor2;
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.32, s * 0.06, 0, 0, 7); ctx.fill();
+  ctx.lineCap = 'round';
+  if (sleeping) {
+    ctx.strokeStyle = body; ctx.lineWidth = s * 0.05;
+    ctx.beginPath(); ctx.moveTo(x + s * 0.26, y - s * 0.07); ctx.quadraticCurveTo(x + s * 0.38, y - s * 0.02, x + s * 0.3, y); ctx.stroke();
+    ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(x + s * 0.04, y - s * 0.08, s * 0.25, s * 0.09, 0, 0, 7); ctx.fill();
+    if (raca === 'pastor') { ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(x + s * 0.08, y - s * 0.13, s * 0.15, s * 0.05, 0, 0, 7); ctx.fill(); }
+    ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(x - s * 0.22, y - s * 0.08, s * 0.11, s * 0.08, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = raca === 'caramelo' ? '#a8692f' : dark;
+    ctx.beginPath(); ctx.ellipse(x - s * 0.19, y - s * 0.13, s * 0.045, s * 0.07, 0.9, 0, 7); ctx.fill();
+    if (raca === 'fila') { ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(x - s * 0.3, y - s * 0.07, s * 0.05, s * 0.04, 0, 0, 7); ctx.fill(); }
+    line({ x: x - s * 0.27, y: y - s * 0.095 }, { x: x - s * 0.225, y: y - s * 0.09 }, '#222', Math.max(1, s * 0.018));
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - s * 0.33, y - s * 0.075, s * 0.02, 0, 7); ctx.fill();
+    const k = (t / 1600) % 1;
+    ctx.fillStyle = `rgba(255,255,255,${0.95 - k * 0.9})`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `800 ${Math.max(9, Math.round(s * 0.17))}px 'Baloo 2', sans-serif`;
+    ctx.fillText('z', x - s * 0.16 + k * s * 0.12, y - s * 0.26 - k * s * 0.22);
+    ctx.font = `800 ${Math.max(8, Math.round(s * 0.12))}px 'Baloo 2', sans-serif`;
+    ctx.fillText('z', x - s * 0.05 + k * s * 0.12, y - s * 0.38 - k * s * 0.22);
+    ctx.lineCap = 'butt';
+    return;
+  }
   const wag = Math.sin(t / 120) * 0.5;
-  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.3, s * 0.06, 0, 0, 7); ctx.fill();
-  ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = s * 0.06; ctx.lineCap = 'round';
+  ctx.strokeStyle = body; ctx.lineWidth = s * 0.06;
   ctx.beginPath(); ctx.moveTo(x + s * 0.22, y - s * 0.22); ctx.lineTo(x + s * 0.36, y - s * 0.34 + wag * s * 0.1); ctx.stroke();
-  ctx.fillStyle = '#b0773d';
+  ctx.fillStyle = body;
   ctx.beginPath(); ctx.ellipse(x + s * 0.05, y - s * 0.18, s * 0.22, s * 0.12, 0, 0, 7); ctx.fill();
   ctx.fillRect(x - s * 0.12, y - s * 0.12, s * 0.06, s * 0.12); ctx.fillRect(x + s * 0.16, y - s * 0.12, s * 0.06, s * 0.12);
-  ctx.beginPath(); ctx.arc(x - s * 0.17, y - s * 0.3, s * 0.13, 0, 7); ctx.fill();
-  ctx.fillStyle = '#6e4420'; ctx.beginPath(); ctx.ellipse(x - s * 0.26, y - s * 0.28, s * 0.05, s * 0.1, 0.4, 0, 7); ctx.fill();
-  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - s * 0.21, y - s * 0.32, s * 0.02, 0, 7); ctx.arc(x - s * 0.29, y - s * 0.27, s * 0.025, 0, 7); ctx.fill();
+  if (raca === 'pastor') { ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(x + s * 0.09, y - s * 0.25, s * 0.15, s * 0.06, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = body; ctx.beginPath(); ctx.arc(x - s * 0.17, y - s * 0.3, s * 0.13, 0, 7); ctx.fill();
+  ctx.fillStyle = raca === 'caramelo' ? '#a8692f' : dark;
+  ctx.beginPath(); ctx.ellipse(x - s * 0.26, y - s * 0.28, s * 0.05, s * 0.1, 0.4, 0, 7); ctx.fill();
+  if (raca === 'pastor') { ctx.beginPath(); ctx.moveTo(x - s * 0.12, y - s * 0.4); ctx.lineTo(x - s * 0.08, y - s * 0.52); ctx.lineTo(x - s * 0.03, y - s * 0.39); ctx.fill(); }
+  if (raca === 'fila') { ctx.beginPath(); ctx.ellipse(x - s * 0.28, y - s * 0.26, s * 0.06, s * 0.05, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - s * 0.21, y - s * 0.32, s * 0.02, 0, 7); ctx.arc(x - s * 0.3, y - s * 0.27, s * 0.025, 0, 7); ctx.fill();
   ctx.lineCap = 'butt';
+}
+// Casinha de cachorro, com a base centrada em (x, y).
+function drawKennel(x, y, s) {
+  const w = s * 0.62, h = s * 0.4;
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, w * 0.7, s * 0.06, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#b07a44'; ctx.fillRect(x - w / 2, y - h, w, h);
+  ctx.strokeStyle = 'rgba(90,56,26,.45)'; ctx.lineWidth = 1;
+  for (let k = 1; k < 4; k++) { ctx.beginPath(); ctx.moveTo(x - w / 2, y - h * k / 4); ctx.lineTo(x + w / 2, y - h * k / 4); ctx.stroke(); }
+  ctx.fillStyle = '#c8402f';
+  ctx.beginPath(); ctx.moveTo(x - w * 0.64, y - h + s * 0.02); ctx.lineTo(x, y - h - s * 0.3); ctx.lineTo(x + w * 0.64, y - h + s * 0.02); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#8f2a1e'; ctx.fillRect(x - w * 0.64, y - h, w * 1.28, s * 0.035);
+  ctx.fillStyle = '#3a2412'; ctx.beginPath(); ctx.arc(x, y - h * 0.5, w * 0.22, Math.PI, 0); ctx.lineTo(x + w * 0.22, y); ctx.lineTo(x - w * 0.22, y); ctx.fill();
+  // tigela
+  ctx.fillStyle = '#7d8c9a'; ctx.beginPath(); ctx.ellipse(x + w * 0.62, y, s * 0.08, s * 0.035, 0, 0, 7); ctx.fill();
+}
+// Onde fica o cachorro de cada lugar (na cena atual).
+const KENNEL_AT = () => ({ x: L.ox - L.W * 0.8, y: L.oy + L.W * 0.22 });
+const DOG_AT = () => ({ x: L.ox - L.W * 1.35, y: L.oy + L.W * 0.55 });
+function dogPos(slot) {
+  if (scene !== (slot === 'roca' ? 'roca' : 'animais')) return null;
+  const p = DOG_AT(); return { x: p.x, y: p.y - L.W * 0.25 };
+}
+// Casinha + cachorro (ou o lugar vazio) na sua roça ou na de um amigo.
+// A casinha vai atrás da cerca; o cachorro, na frente, para aparecer bem.
+function drawKennelSpot(slot, s, home) {
+  const d = s.dogs && s.dogs[slot];
+  if (!home && !dogAlive(d)) return;
+  const k = KENNEL_AT();
+  drawKennel(k.x, k.y, L.W * 0.85);
+}
+function drawDogSpot(slot, s, t, home) {
+  const W = L.W, k = KENNEL_AT(), p = DOG_AT();
+  const d = s.dogs && s.dogs[slot];
+  if (!home && !dogAlive(d)) return;
+  if (dogAlive(d)) {
+    if (hover && hover.kind === 'dog' && hover.slot === slot) {
+      ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, W * 0.26, W * 0.08, 0, 0, 7); ctx.stroke();
+    }
+    drawDog(p.x, p.y, W * 0.72, t, d.raca, !dogAwake(d));
+  } else {
+    const R = clamp(W * 0.1, 9, 14), m = { x: k.x, y: k.y - W * 0.52 };
+    ctx.fillStyle = 'rgba(255,253,242,.95)'; ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(m.x, m.y, R, 0, 7); ctx.fill(); ctx.stroke();
+    line({ x: m.x - R * 0.5, y: m.y }, { x: m.x + R * 0.5, y: m.y }, '#4f9a2f', 2.5);
+    line({ x: m.x, y: m.y - R * 0.5 }, { x: m.x, y: m.y + R * 0.5 }, '#4f9a2f', 2.5);
+  }
+  hits.push({ kind: 'dog', slot, x: (k.x + p.x) / 2, y: p.y - W * 0.2, r: W * 0.4 });
+}
+function dogBubble(slot, s, t, home) {
+  const d = s.dogs && s.dogs[slot];
+  if (!home || !dogAlive(d) || dogAwake(d)) return;
+  const p = DOG_AT();
+  drawBubbleAt(p.x, p.y - L.W * 0.55, 'bone', d, t, 3);
 }
 
 // Cerca do lado de trás ('back') ou da frente ('front') de uma área cols×rows.
@@ -1218,6 +1486,45 @@ function drawProduct(id, x, y, s) {
     ctx.beginPath(); ctx.arc(x, y + 1 * s, 5.5 * s, 0, 7); ctx.arc(x - 3 * s, y - 2 * s, 3 * s, 0, 7); ctx.arc(x + 3 * s, y - 1.5 * s, 3.2 * s, 0, 7); ctx.fill();
     ctx.fillStyle = '#8a6448';
     for (const [dx, dy] of [[-2, 0], [2, 2], [0, -3], [3, -2]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 0.8 * s, 0, 7); ctx.fill(); }
+  } else if (id === 'bacon') {
+    for (const dy of [-2.5, 2.5]) {
+      ctx.save(); ctx.translate(x, y + dy * s); ctx.rotate(-0.25);
+      ctx.fillStyle = '#c8554a'; ctx.beginPath(); ctx.moveTo(-7 * s, -1.6 * s);
+      for (let k = -7; k <= 7; k += 2) ctx.lineTo(k * s, (k % 4 === 0 ? -2.4 : -1.2) * s);
+      for (let k = 7; k >= -7; k -= 2) ctx.lineTo(k * s, (k % 4 === 0 ? 1.2 : 2.4) * s);
+      ctx.fill();
+      ctx.strokeStyle = '#f3d2c4'; ctx.lineWidth = 0.9 * s;
+      ctx.beginPath(); ctx.moveTo(-6.5 * s, 0); for (let k = -6; k <= 6; k += 2) ctx.lineTo(k * s, (k % 4 === 0 ? -0.5 : 0.5) * s); ctx.stroke();
+      ctx.restore();
+    }
+  } else if (id === 'pelo') {
+    ctx.fillStyle = '#ece7de'; ctx.strokeStyle = '#c8bda2';
+    for (const [dx, dy, r] of [[-2.5, 1, 3.8], [2.5, 1, 3.8], [0, -2, 4]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, 7); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = '#f7f4ef'; ctx.beginPath(); ctx.arc(x - 1 * s, y - 2.5 * s, 1.6 * s, 0, 7); ctx.fill();
+  } else if (id === 'ovopata' || id === 'ovoangola') {
+    const pata = id === 'ovopata', rx = pata ? 5 : 3.8, ry = pata ? 6.5 : 5.2;
+    ctx.fillStyle = pata ? '#dcefe6' : '#efe0c4'; ctx.strokeStyle = pata ? '#a9c9ba' : '#c9b48c';
+    ctx.beginPath(); ctx.ellipse(x, y + 1 * s, rx * s, ry * s, 0, 0, 7); ctx.fill(); ctx.stroke();
+    if (!pata) { ctx.fillStyle = '#9a7650'; for (const [dx, dy] of [[-1.5, -1], [1.2, 0.5], [-0.5, 2.5], [1.6, 3], [0.3, -2.8], [-2, 2]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 0.45 * s, 0, 7); ctx.fill(); } }
+    ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.beginPath(); ctx.ellipse(x - 1.5 * s, y - 1.5 * s, 1 * s, 1.7 * s, 0.3, 0, 7); ctx.fill();
+  } else if (id === 'esterco') {
+    ctx.fillStyle = '#6b4a2a';
+    ctx.beginPath(); ctx.ellipse(x, y + 4 * s, 6.5 * s, 2.6 * s, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y + 1 * s, 4.8 * s, 2.3 * s, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x + 0.5 * s, y - 1.6 * s, 3 * s, 2 * s, 0, 0, 7); ctx.fill();
+    leaf(x + 2 * s, y - 2.5 * s, 5 * s, 1.6 * s, 0.5, '#4fa83a');
+  } else if (id === 'crina') {
+    ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1 * s; ctx.lineCap = 'round';
+    for (let k = -3; k <= 3; k++) { ctx.beginPath(); ctx.moveTo(x + k * 0.6 * s, y - 6 * s); ctx.quadraticCurveTo(x + k * 1.2 * s, y, x + k * 1.6 * s + 1 * s, y + 6 * s); ctx.stroke(); }
+    ctx.fillStyle = '#c8402f'; ctx.fillRect(x - 3 * s, y - 4 * s, 6 * s, 1.8 * s);
+    ctx.lineCap = 'butt';
+  } else if (id === 'pena') {
+    line({ x: x + 3 * s, y: y + 7 * s }, { x: x - 2 * s, y: y - 7 * s }, '#8a7a4a', 0.8 * s);
+    ctx.save(); ctx.translate(x - 1 * s, y - 3 * s); ctx.rotate(-0.35);
+    ctx.fillStyle = '#3f9a5a'; ctx.beginPath(); ctx.ellipse(0, 0, 3.4 * s, 5 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e0b030'; ctx.beginPath(); ctx.ellipse(0, -1 * s, 2 * s, 2.6 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1f4fa0'; ctx.beginPath(); ctx.ellipse(0, -1 * s, 1.1 * s, 1.5 * s, 0, 0, 7); ctx.fill();
+    ctx.restore();
   }
 }
 
@@ -1228,7 +1535,7 @@ function drawAnimal(k, x, y, s, t, dir, moving) {
   const step = moving ? Math.sin(t / 90) : 0;
   ctx.save(); ctx.translate(x, y); ctx.scale(dir, 1);
   ctx.fillStyle = 'rgba(0,0,0,.16)';
-  const shadow = { galinha: 9, vaca: 22, ovelha: 16, porco: 16 }[k];
+  const shadow = { galinha: 9, vaca: 22, ovelha: 16, porco: 16, coelho: 9, angola: 9, pato: 10, jumento: 21, cavalo: 23, pavao: 12 }[k];
   ctx.beginPath(); ctx.ellipse(0, 0, shadow * s, shadow * 0.28 * s, 0, 0, 7); ctx.fill();
   const leg = (lx, len, col, w) => { ctx.fillStyle = col; ctx.fillRect(lx * s - w * s / 2, -len * s, w * s, len * s); };
   if (k === 'galinha') {
@@ -1280,10 +1587,99 @@ function drawAnimal(k, x, y, s, t, dir, moving) {
     ctx.beginPath(); ctx.ellipse(19 * s, -14 * s, 2.8 * s, 3.4 * s, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#b8606e'; ctx.beginPath(); ctx.arc(18.6 * s, -15 * s, 0.7 * s, 0, 7); ctx.arc(19.6 * s, -13 * s, 0.7 * s, 0, 7); ctx.fill();
     ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(14.5 * s, -17.5 * s, 0.9 * s, 0, 7); ctx.fill();
+  } else if (k === 'coelho') {
+    const hop = moving ? Math.abs(Math.sin(t / 110)) * 3 * s : 0;
+    ctx.translate(0, -hop);
+    ctx.fillStyle = '#ece6dc'; ctx.beginPath(); ctx.ellipse(3 * s, -1 * s, 3 * s, 1.3 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f4f0ea'; ctx.beginPath(); ctx.ellipse(0, -7 * s, 8 * s, 6 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(-8 * s, -8 * s, 2.6 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f4f0ea'; ctx.beginPath(); ctx.arc(6 * s, -11 * s, 4.6 * s, 0, 7); ctx.fill();
+    for (const [ex, a] of [[4.3, -0.25], [7.4, 0.18]]) {
+      ctx.fillStyle = '#f4f0ea'; ctx.beginPath(); ctx.ellipse(ex * s, -19 * s, 1.7 * s, 5.2 * s, a, 0, 7); ctx.fill();
+      ctx.fillStyle = '#f2a7b0'; ctx.beginPath(); ctx.ellipse(ex * s, -19 * s, 0.8 * s, 3.6 * s, a, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(7.8 * s, -12 * s, 0.8 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e98a9a'; ctx.beginPath(); ctx.arc(10.4 * s, -10.5 * s, 0.8 * s, 0, 7); ctx.fill();
+  } else if (k === 'angola') {
+    ctx.strokeStyle = '#8a8f99'; ctx.lineWidth = 1.3 * s;
+    ctx.beginPath(); ctx.moveTo(-2 * s, -5 * s); ctx.lineTo(-2 * s + step * 1.5 * s, 0); ctx.moveTo(2 * s, -5 * s); ctx.lineTo(2 * s - step * 1.5 * s, 0); ctx.stroke();
+    ctx.fillStyle = '#4a4f5a'; ctx.beginPath(); ctx.ellipse(0, -10 * s, 9 * s, 6.8 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    for (const [dx, dy] of [[-5, -12], [-2, -14], [1, -11], [4, -13], [-6, -8], [-3, -9], [0, -7], [3, -8], [6, -10], [-1, -5], [2, -4], [5, -6]]) { ctx.beginPath(); ctx.arc(dx * s, dy * s, 0.55 * s, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#4a4f5a'; ctx.beginPath(); ctx.ellipse(6 * s, -15 * s, 2 * s, 3.5 * s, 0.3, 0, 7); ctx.fill();
+    ctx.fillStyle = '#a9cbe6'; ctx.beginPath(); ctx.arc(7.2 * s, -18 * s, 2.8 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#d9a441'; ctx.beginPath(); ctx.moveTo(6 * s, -20 * s); ctx.lineTo(7 * s, -23.5 * s); ctx.lineTo(8.2 * s, -20 * s); ctx.fill();
+    ctx.fillStyle = '#e03a2f'; ctx.beginPath(); ctx.ellipse(9 * s, -15.5 * s, 0.9 * s, 1.4 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#d9c29a'; ctx.beginPath(); ctx.moveTo(9.6 * s, -19 * s); ctx.lineTo(12 * s, -18 * s); ctx.lineTo(9.6 * s, -17 * s); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(8 * s, -18.6 * s, 0.7 * s, 0, 7); ctx.fill();
+  } else if (k === 'pato') {
+    ctx.fillStyle = '#f0a020';
+    ctx.beginPath(); ctx.ellipse((-2 + step) * s, -0.5 * s, 2.4 * s, 1 * s, 0, 0, 7); ctx.ellipse((3 - step) * s, -0.5 * s, 2.4 * s, 1 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fbfbf7';
+    ctx.beginPath(); ctx.moveTo(-9 * s, -9 * s); ctx.lineTo(-13 * s, -14 * s); ctx.lineTo(-6 * s, -12 * s); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -7.5 * s, 10 * s, 5.8 * s, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#d8d2c4'; ctx.lineWidth = 0.8 * s; ctx.stroke();
+    ctx.fillStyle = '#eeeae0'; ctx.beginPath(); ctx.ellipse(-2 * s, -8 * s, 5.5 * s, 3 * s, 0.1, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fbfbf7'; ctx.beginPath(); ctx.ellipse(6 * s, -12.5 * s, 2.8 * s, 5 * s, 0.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(7.2 * s, -17.5 * s, 3.8 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f0a020'; ctx.beginPath(); ctx.ellipse(11.8 * s, -16.8 * s, 3.4 * s, 1.4 * s, 0.05, 0, 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(8.5 * s, -18.6 * s, 0.8 * s, 0, 7); ctx.fill();
+  } else if (k === 'jumento' || k === 'cavalo') {
+    const horse = k === 'cavalo';
+    const body = horse ? '#8a5a33' : '#9a9590', light = horse ? '#a8744a' : '#d9d3c8', mane = horse ? '#3a2412' : '#5a5550';
+    const legH = horse ? 14 : 11;
+    for (const [lx, ph] of [[-12, 1], [-7, -1], [8, -1], [13, 1]]) { leg(lx + step * ph, legH, body, 3); ctx.fillStyle = '#2a1e16'; ctx.fillRect((lx + step * ph) * s - 1.6 * s, -1.8 * s, 3.2 * s, 1.8 * s); }
+    ctx.strokeStyle = mane; ctx.lineWidth = (horse ? 3 : 1.4) * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-16 * s, -(legH + 8) * s); ctx.quadraticCurveTo(-21 * s, -(legH + 2) * s, -19 * s, -(legH - 4) * s); ctx.stroke();
+    ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(0, -(legH + 7) * s, 17 * s, 8.5 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = light; ctx.beginPath(); ctx.ellipse(1 * s, -(legH + 3) * s, 12 * s, 3.5 * s, 0, 0, 7); ctx.fill();
+    // pescoço e cabeça
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.moveTo(10 * s, -(legH + 12) * s); ctx.lineTo(17 * s, -(legH + 24) * s); ctx.lineTo(23 * s, -(legH + 20) * s); ctx.lineTo(16 * s, -(legH + 5) * s); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(21 * s, -(legH + 20) * s, 6.5 * s, 4 * s, 0.55, 0, 7); ctx.fill();
+    ctx.fillStyle = light; ctx.beginPath(); ctx.ellipse(24.5 * s, -(legH + 16.5) * s, 3.4 * s, 2.8 * s, 0.4, 0, 7); ctx.fill();
+    ctx.fillStyle = '#2a1e16'; ctx.beginPath(); ctx.arc(25.5 * s, -(legH + 16.5) * s, 0.6 * s, 0, 7); ctx.fill();
+    if (horse) {
+      ctx.strokeStyle = mane; ctx.lineWidth = 2.4 * s;
+      ctx.beginPath(); ctx.moveTo(10 * s, -(legH + 13) * s); ctx.lineTo(17 * s, -(legH + 25) * s); ctx.stroke();
+      ctx.fillStyle = '#f3efe6'; ctx.beginPath(); ctx.ellipse(22 * s, -(legH + 20.5) * s, 1 * s, 2.6 * s, 0.55, 0, 7); ctx.fill();
+      ctx.fillStyle = body; ctx.beginPath(); ctx.moveTo(17 * s, -(legH + 24) * s); ctx.lineTo(17.5 * s, -(legH + 28) * s); ctx.lineTo(19 * s, -(legH + 24.5) * s); ctx.fill();
+    } else {
+      ctx.strokeStyle = mane; ctx.lineWidth = 1.4 * s;
+      ctx.beginPath(); ctx.moveTo(10.5 * s, -(legH + 13) * s); ctx.lineTo(17 * s, -(legH + 24) * s); ctx.stroke();
+      for (const [ex, a] of [[15.5, -0.35], [18.5, 0.05]]) {
+        ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(ex * s, -(legH + 29) * s, 1.8 * s, 6 * s, a, 0, 7); ctx.fill();
+        ctx.fillStyle = mane; ctx.beginPath(); ctx.ellipse(ex * s + Math.sin(a) * 4 * s, -(legH + 33.5) * s, 1.2 * s, 1.6 * s, a, 0, 7); ctx.fill();
+      }
+    }
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(20 * s, -(legH + 22) * s, 0.9 * s, 0, 7); ctx.fill();
+    ctx.lineCap = 'butt';
+  } else if (k === 'pavao') {
+    // leque de penas atrás do corpo
+    const fan = moving ? 0.75 : 1;
+    for (let j = 0; j < 9; j++) {
+      const a = -Math.PI * (0.08 + 0.84 * j / 8), len = 17 * s * fan, cx = -3 * s, cy = -10 * s;
+      const ex = cx + Math.cos(a) * len, ey = cy + Math.sin(a) * len * 0.95;
+      line({ x: cx, y: cy }, { x: ex, y: ey }, '#2e7d4f', 2.2 * s);
+      ctx.fillStyle = '#3f9a5a'; ctx.beginPath(); ctx.ellipse(ex, ey, 2.6 * s, 3.4 * s, a + Math.PI / 2, 0, 7); ctx.fill();
+      ctx.fillStyle = '#e0b030'; ctx.beginPath(); ctx.arc(ex, ey, 1.6 * s, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1f4fa0'; ctx.beginPath(); ctx.arc(ex, ey, 0.9 * s, 0, 7); ctx.fill();
+    }
+    ctx.strokeStyle = '#8a8f99'; ctx.lineWidth = 1.2 * s;
+    ctx.beginPath(); ctx.moveTo(-1 * s, -4 * s); ctx.lineTo(-1 * s + step * 1.4 * s, 0); ctx.moveTo(2 * s, -4 * s); ctx.lineTo(2 * s - step * 1.4 * s, 0); ctx.stroke();
+    ctx.fillStyle = '#1f5fa8'; ctx.beginPath(); ctx.ellipse(0, -9 * s, 6 * s, 6.5 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#2a78c8'; ctx.beginPath(); ctx.ellipse(3 * s, -15 * s, 2 * s, 5 * s, 0.25, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(4.8 * s, -20 * s, 2.5 * s, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#1f5fa8'; ctx.lineWidth = 0.6 * s;
+    for (const d of [-1, 0, 1]) { ctx.beginPath(); ctx.moveTo(4.6 * s, -22 * s); ctx.lineTo((4.6 + d * 1.4) * s, -25.5 * s); ctx.stroke(); ctx.fillStyle = '#2a78c8'; ctx.beginPath(); ctx.arc((4.6 + d * 1.4) * s, -25.8 * s, 0.7 * s, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(5.6 * s, -20.5 * s, 1 * s, 0.6 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(5.8 * s, -20.5 * s, 0.5 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#c9b27a'; ctx.beginPath(); ctx.moveTo(7 * s, -20.5 * s); ctx.lineTo(8.8 * s, -19.8 * s); ctx.lineTo(7 * s, -19.2 * s); ctx.fill();
   }
   ctx.restore();
 }
-const ANIMAL_H = { galinha: 24, vaca: 34, ovelha: 25, porco: 25 };
+const ANIMAL_H = { galinha: 24, vaca: 34, ovelha: 25, porco: 25, coelho: 22, angola: 23, pato: 22, jumento: 42, cavalo: 46, pavao: 30 };
+const SMALL_ANIMALS = ['galinha', 'coelho', 'angola', 'pato'];
 
 // ============================================================
 // Balões de aviso
@@ -1305,8 +1701,17 @@ function drawBubbleAt(x, y, kind, obj, t, seed) {
     line({ x: x - 6 * s, y: y + 6 * s }, { x: x + 4 * s, y: y - 5 * s }, '#8a5a2b', 2 * s);
     ctx.fillStyle = '#8f9aa3'; ctx.beginPath(); ctx.moveTo(x + 1 * s, y - 7 * s); ctx.lineTo(x + 8 * s, y - 2 * s); ctx.lineTo(x + 6 * s, y); ctx.lineTo(x + 2 * s, y - 4 * s); ctx.fill();
   } else if (kind === 'ripe') {
-    const crop = CROP[obj.c]; ball(x, y + 1 * s, 5.5 * s, crop.cor);
-    leaf(x, y - 4 * s, 5 * s, 1.8 * s, 0.6, '#4fa83a');
+    // Pronto para colher: um check verde.
+    ctx.fillStyle = '#43a047'; ctx.beginPath(); ctx.arc(x, y, 7.5 * s, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.2 * s; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(x - 3.6 * s, y + 0.2 * s); ctx.lineTo(x - 1 * s, y + 3 * s); ctx.lineTo(x + 4 * s, y - 2.8 * s); ctx.stroke();
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+  } else if (kind === 'bone') {
+    ctx.fillStyle = '#f3ead6'; ctx.strokeStyle = '#b8a47a'; ctx.lineWidth = 0.8 * s;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-0.5);
+    ctx.fillRect(-4.5 * s, -1.3 * s, 9 * s, 2.6 * s);
+    for (const dx of [-4.5, 4.5]) for (const dy of [-1.5, 1.5]) { ctx.beginPath(); ctx.arc(dx * s, dy * s, 1.8 * s, 0, 7); ctx.fill(); }
+    ctx.restore();
   } else if (kind === 'prod') {
     drawProduct(ANIMAL[obj.k].prod, x, y, s * 0.95);
   } else if (kind === 'feed') {
@@ -1314,7 +1719,7 @@ function drawBubbleAt(x, y, kind, obj, t, seed) {
     for (const [dx, dy] of [[-3, 2], [0, -1], [3, 2], [-1.5, 5], [1.5, 5], [0, 2]]) { ctx.beginPath(); ctx.ellipse(x + dx * s, y + dy * s - 1 * s, 1.5 * s, 2.2 * s, 0, 0, 7); ctx.fill(); }
     ctx.strokeStyle = '#b8862a'; ctx.lineWidth = 0.8 * s; ctx.beginPath(); ctx.moveTo(x, y - 6 * s); ctx.lineTo(x, y - 2 * s); ctx.stroke();
   }
-  if (kind === 'ripe' || kind === 'prod') {
+  if (kind === 'prod') {
     ctx.fillStyle = '#ffd54a'; const sp = 1 + Math.sin(t / 200 + seed) * 0.3;
     ctx.beginPath(); ctx.arc(x + 7 * s, y - 6 * s, 1.5 * s * sp, 0, 7); ctx.fill();
   }
@@ -1404,8 +1809,10 @@ function drawRoca(s, t, home) {
   else drawHouse(L.ox - W * 1.9, L.oy + W * 0.3, W * 1.15, view.casa);
   drawTree(L.ox + W * 2.6, L.oy + W * 0.5, W * 1.0, t);
   drawTree(L.ox + W * 3.6, L.oy + W * 1.1, W * 0.8, t);
-  if (!home) { const q = iso(-0.55, 1.6); drawDog(q.x, q.y, W * 0.7, t); }
+  if (view.kind === 'npc') { const q = iso(-0.55, 1.6); drawDog(q.x, q.y, W * 0.7, t); }
+  else drawKennelSpot('roca', s, home);
   drawFence(COLS, ROWS, 'back');
+  if (view.kind !== 'npc') drawDogSpot('roca', s, t, home);
   for (let sum = 0; sum <= COLS + ROWS - 2; sum++)
     for (let c = 0; c < COLS; c++) { const r = sum - c; if (r >= 0 && r < ROWS) drawPlot(r * COLS + c, s.plots[r * COLS + c], t, home); }
   nightOverlay(tod);
@@ -1413,6 +1820,7 @@ function drawRoca(s, t, home) {
     const k = plotBubble(s.plots[i], home);
     if (k) { const m = cellCenter(i); drawBubbleAt(m.x, m.y - W * 0.55, k, s.plots[i], t, i); }
   }
+  dogBubble('roca', s, t, home);
 }
 
 // ============================================================
@@ -1424,11 +1832,13 @@ function drawPen(s, t, home, dt) {
   drawSky(t, tod); drawGround();
   drawCoop(L.ox - W * 1.8, L.oy + W * 0.35, W * 1.2);
   drawTree(L.ox + W * 2.3, L.oy + W * 0.45, W * 0.9, t);
-  if (!home) { const q = iso(-0.6, 3.0); drawDog(q.x, q.y, W * 0.6, t); }
+  if (view.kind === 'npc') { const q = iso(-0.6, 3.0); drawDog(q.x, q.y, W * 0.6, t); }
+  else drawKennelSpot('animais', s, home);
   quad(iso(0, 0), iso(PEN_C, 0), iso(PEN_C, PEN_R), iso(0, PEN_R), '#a9d36c');
   ctx.fillStyle = 'rgba(170,130,70,.35)';
   for (const [c, r, k] of DIRT) { const q = iso(c, r); ctx.beginPath(); ctx.ellipse(q.x, q.y, W * k, W * k * 0.45, 0, 0, 7); ctx.fill(); }
   drawFence(PEN_C, PEN_R, 'back');
+  if (view.kind !== 'npc') drawDogSpot('animais', s, t, home);
   // cocho com ração e fardo de feno
   isoBox(0.6, 0.15, 2.4, 0.55, 0, 0.2, '#e3bf62', '#8a5a33', '#6e4424');
   ctx.fillStyle = '#c9a24a'; for (let k = 0; k < 8; k++) { const q = P(0.75 + k * 0.2, 0.35, 0.2); ctx.fillRect(q.x - 1, q.y - 2, 2, 2); }
@@ -1454,6 +1864,7 @@ function drawPen(s, t, home, dt) {
     const k = a.ready && !took ? 'prod' : (!a.fed && !a.ready) ? 'feed' : null;
     if (k) { const p = iso(m.u, m.v); drawBubbleAt(p.x, p.y - ANIMAL_H[a.k] * sc - W * 0.2, k, a, t, m.u * 7); }
   }
+  dogBubble('animais', s, t, home);
   if (!s.animals.length) {
     const q = iso(PEN_C / 2, PEN_R / 2);
     ctx.fillStyle = '#4a2a10'; ctx.font = `800 ${Math.round(clamp(W * 0.16, 13, 20))}px 'Baloo 2', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1625,8 +2036,8 @@ const cropIcon = id => makeIcon('c:' + id, () => {
   drawPlant(48, 78, crop.tipo === 'chao' ? 2.3 : crop.tipo === 'alto' ? 1.6 : 2.4, crop, 4, 0, false);
 });
 const animalIcon = k => makeIcon('a:' + k, () => {
-  const sc = { galinha: 2.6, vaca: 1.6, ovelha: 2.2, porco: 2.1 }[k];
-  drawAnimal(k, k === 'galinha' ? 46 : 42, 84, sc, 0, 1, false);
+  const sc = { galinha: 2.6, vaca: 1.6, ovelha: 2.2, porco: 2.1, coelho: 2.7, angola: 2.5, pato: 2.5, jumento: 1.45, cavalo: 1.35, pavao: 2.0 }[k];
+  drawAnimal(k, SMALL_ANIMALS.includes(k) ? 46 : k === 'pavao' ? 56 : 38, 86, sc, 0, 1, false);
 });
 const productIcon = id => makeIcon('p:' + id, () => drawProduct(id, 48, 48, 5.5));
 const decorIcon = id => makeIcon('d:' + id, () => {
@@ -1638,6 +2049,14 @@ const decorIcon = id => makeIcon('d:' + id, () => {
   DRAW_DECOR[id](0);
 });
 const itemIcon = id => CROP[id] ? cropIcon(id) : productIcon(id);
+const dogIcon = raca => makeIcon('dog:' + raca, () => drawDog(50, 88, 118, 0, raca, false));
+const bowlIcon = () => makeIcon('bowl', () => {
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(48, 74, 32, 7, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#c8402f'; ctx.beginPath(); ctx.moveTo(18, 50); ctx.lineTo(78, 50); ctx.lineTo(70, 72); ctx.lineTo(26, 72); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#a0301f'; ctx.beginPath(); ctx.ellipse(48, 50, 30, 8, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#9a6a3a';
+  for (const [dx, dy] of [[-16, 0], [-8, -4], [0, -2], [8, -5], [16, -1], [-4, 3], [6, 2], [-12, -6], [12, 3]]) { ctx.beginPath(); ctx.arc(48 + dx, 49 + dy, 4, 0, 7); ctx.fill(); }
+});
 const fertIcon = id => makeIcon('f:' + id, () => {
   const f = FERT[id];
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(48, 86, 28, 6, 0, 0, 7); ctx.fill();
@@ -1675,7 +2094,7 @@ function renderTools() {
   box.hidden = scene !== 'roca';
   hint.hidden = scene === 'roca';
   hint.textContent = scene === 'animais'
-    ? (isHome() ? 'Clique num animal com fome para dar comida (1 Milho do celeiro ou ração comprada na hora) e depois colha o que ele produzir.' : 'Dê comida aos animais com fome para ajudar. Produto pronto dá para pegar um pouquinho.')
+    ? (isHome() ? 'Clique num animal com fome para dar comida (milho do celeiro ou ração comprada na hora) e depois recolha o que ele produzir. O cachorro fica do lado do galinheiro.' : 'Dê comida aos animais com fome para ajudar. Produto pronto dá para pegar um pouquinho.')
     : (isHome() ? 'Os espaços com + são lugares para decoração. Cada peça dá conforto, e conforto aumenta o XP que você ganha.' : 'Esta é a casa do seu vizinho.');
   box.innerHTML = '';
   availTools().forEach((t, k) => {
@@ -1759,14 +2178,15 @@ async function logout() {
 let resetArmed = false, unfriendArmed = null;
 function renderTabs() {
   const b = document.querySelector('.tab[data-tab="amigos"]');
-  b.innerHTML = requests.length ? `Amigos<span class="badge" aria-label="${requests.length} pedidos">${requests.length}</span>` : 'Amigos';
+  const unread = state ? state.news.filter(n => n.at > state.newsSeen).length : 0, n = requests.length + unread;
+  b.innerHTML = n ? `Amigos<span class="badge" aria-label="${n} novidades">${n}</span>` : 'Amigos';
 }
 function renderPane() {
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   const pane = $('#pane');
   let html = '';
   if (tab === 'loja') {
-    const segs = [['sementes', 'Sementes'], ['adubo', 'Adubo'], ['animais', 'Animais'], ['decor', 'Casa']];
+    const segs = [['sementes', 'Sementes'], ['adubo', 'Adubo'], ['animais', 'Animais'], ['caes', 'Cães'], ['decor', 'Casa']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
     if (shopSeg === 'sementes') {
       html += `<p class="hint">Escolha uma semente e clique na terra arada para plantar. O preço é cobrado no plantio.</p>`;
@@ -1796,16 +2216,41 @@ function renderPane() {
         </div>`;
       }
     } else if (shopSeg === 'animais') {
-      html += `<p class="hint">Os animais comem 1 Milho do celeiro. Sem milho, a ração é comprada na hora. Você tem ${state.animals.length} de ${MAX_ANIMALS}.</p>`;
+      html += `<p class="hint">Depois de produzir, o animal fica com fome: dê milho do celeiro ou compre a ração na hora. Cada animal vive um tempo e depois vai descansar. Você tem ${state.animals.length} de ${MAX_ANIMALS}.</p>`;
       for (const a of ANIMALS) {
         const locked = a.nivel > state.level, prod = PRODUCT[a.prod];
         const full = state.animals.length >= MAX_ANIMALS, have = state.animals.filter(x => x.k === a.id).length;
+        const rende = prod.vira ? `vira ${prod.qtd} ${FERT[prod.vira].nome.toLowerCase()}` : `vende por ${prod.preco}`;
         html += `<div class="row ${locked ? 'locked' : ''}">
           <img alt="" src="${animalIcon(a.id)}">
           <div><div class="name">${a.nome}${have ? ` <span class="meta">(${have})</span>` : ''}</div>
-          <div class="meta">${a.custo} moedas · ${prod.nome} a cada ${fmt(a.tempo)}<br>vende por ${prod.preco} · ração ${a.racao} · ${a.xp} XP</div></div>
+          <div class="meta">${a.custo} moedas · vive ${a.vida} dias<br>${prod.nome} a cada ${fmt(a.tempo)} · ${rende}<br>comida: ${a.milho} milho ou ${a.racao} ${a.racao > 1 ? 'moedas' : 'moeda'} · ${a.xp} XP</div></div>
           ${locked ? `<button class="btn" disabled>Nível ${a.nivel}</button>` : `<button class="btn" data-buy-animal="${a.id}" ${full || state.coins < a.custo ? 'disabled' : ''}>Comprar</button>`}
         </div>`;
+      }
+    } else if (shopSeg === 'caes') {
+      html += `<p class="hint">A casinha fica do lado do celeiro. Um cachorro vigia a plantação e outro os animais. Acordado (com ração), ele espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. A ração dura ${DOG_FOOD.horas}h.</p>`;
+      for (const slot of ['roca', 'animais']) {
+        const d = state.dogs[slot];
+        if (!d) { html += `<div class="row"><div class="avatar" style="background:#b7b39c">?</div><div><div class="name">${slot === 'roca' ? 'Plantação' : 'Animais'} sem cachorro</div><div class="meta">Escolha uma raça aqui embaixo.</div></div><div></div></div>`; continue; }
+        const b = DOG[d.raca], awake = dogAwake(d), dias = Math.max(1, Math.ceil((d.born + b.vida * DAY - Date.now()) / DAY));
+        html += `<div class="row ${awake ? '' : 'sel'}"><img alt="" src="${dogIcon(d.raca)}">
+          <div><div class="name">${esc(d.nome)} · ${slot === 'roca' ? 'plantação' : 'animais'}</div>
+          <div class="meta">${awake ? `Acordado · ração por mais ${fmt((d.fedUntil - Date.now()) / 1000)}` : '<b>Dormindo de fome!</b> Não está vigiando.'}<br>${b.nome} · vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}</div></div>
+          ${awake ? '<div></div>' : `<button class="btn" data-feed-dog="${slot}">Dar ração</button>`}</div>`;
+      }
+      html += `<div class="row"><img alt="" src="${bowlIcon()}">
+        <div><div class="name">Ração de cachorro</div><div class="meta">${DOG_FOOD.custo} moedas · dura ${DOG_FOOD.horas}h · você tem <b>${state.dogFood}</b></div></div>
+        <div class="stack"><button class="btn" data-dog-food="1" ${state.coins < DOG_FOOD.custo ? 'disabled' : ''}>Comprar 1</button>
+        <button class="btn ghost" data-dog-food="3" ${state.coins < DOG_FOOD.custo * 3 ? 'disabled' : ''}>Comprar 3</button></div></div>`;
+      html += `<h3>Raças</h3>`;
+      for (const b of DOGS) {
+        const locked = b.nivel > state.level;
+        const btn = slot => `<button class="btn ${slot === 'animais' ? 'ghost' : ''}" data-buy-dog="${b.id}" data-slot="${slot}" ${state.dogs[slot] || state.coins < b.custo ? 'disabled' : ''}>${slot === 'roca' ? 'Para a plantação' : 'Para os animais'}</button>`;
+        html += `<div class="row wide ${locked ? 'locked' : ''}"><img alt="" src="${dogIcon(b.id)}">
+          <div><div class="name">${b.nome}</div>
+          <div class="meta">${b.custo} moedas · vive ${b.vida} dias<br>espanta ${Math.round(b.protege * 100)}% dos ladrões · morde ${Math.round(b.morde * 100)}% deles<br>+${b.xpDia} XP por dia · +${b.xpPega} XP por ladrão</div></div>
+          <div class="actions">${locked ? `<button class="btn" disabled>Nível ${b.nivel}</button>` : btn('roca') + btn('animais')}</div></div>`;
       }
     } else {
       html += `<p class="hint">Decore a sua casa. Cada peça dá conforto, e cada ponto de conforto vale +1% de XP. Agora: +${comfort(state)}%.</p>`;
@@ -1851,6 +2296,11 @@ function renderPane() {
     html += `<p class="hint">Mato e pragas diminuem a colheita enquanto ficam lá. Terra seca faz a planta crescer na metade da velocidade.</p>
       <button class="btn danger" data-reset>${resetArmed ? 'Clique de novo para apagar tudo' : 'Recomeçar do zero'}</button>`;
   } else if (tab === 'amigos') {
+    if (state.news.length) {
+      html += `<h3>Novidades da sua roça</h3><div class="news">${state.news.slice(0, 8).map(n =>
+        `<div class="${n.at > state.newsSeen ? 'new' : ''}"><time>${quando(n.at)}</time>${esc(n.msg)}</div>`).join('')}</div>`;
+      if (state.news[0].at > state.newsSeen) { state.newsSeen = state.news[0].at; setTimeout(renderTabs, 0); save(); }
+    }
     html += `<h3>Amigos</h3>`;
     if (!Cloud.available) {
       html += `<p class="hint">Login com Google e amigos de verdade funcionam quando o jogo está publicado com o Firebase ligado (o passo a passo está no README). Nesta versão, a roça fica salva só neste navegador.</p>`;
@@ -1920,6 +2370,9 @@ $('#pane').addEventListener('click', e => {
   else if ('sellall' in d) sellAll();
   else if ('seeLand' in d) { if (!isHome()) goHome(); setScene('roca'); toast('Clique num lote com + para comprar.'); }
   else if (d.buyFert) buyFert(d.buyFert, Number(d.n) || 1);
+  else if (d.buyDog) buyDog(d.buyDog, d.slot);
+  else if (d.dogFood) buyDogFood(Number(d.dogFood) || 1);
+  else if (d.feedDog) feedDog(d.feedDog);
   else if (d.useFert) { state.fertSel = d.useFert; if (!isHome()) goHome(); setScene('roca'); setTool('fert'); save(); }
   else if (d.visit) { visitNpc(d.visit); }
   else if (d.visitFriend) { visitFriend(d.visitFriend); }
@@ -1985,9 +2438,21 @@ function tipAnimal(id) {
   const def = ANIMAL[a.k], prod = PRODUCT[def.prod];
   let h = `<b>${def.nome}</b><br>`;
   if (a.ready) h += `${prod.nome} pronto! Clique para recolher.`;
-  else if (!a.fed) h += `Com fome. ${isHome() ? `Clique para dar comida (1 Milho ou ${def.racao} moedas).` : 'Clique para dar comida e ajudar.'}`;
+  else if (!a.fed) h += `Com fome. ${isHome() ? `Clique para dar comida (${def.milho} milho ou ${def.racao} ${def.racao > 1 ? 'moedas' : 'moeda'}).` : 'Clique para dar comida e ajudar.'}`;
   else h += `Produzindo ${prod.nome.toLowerCase()}: falta ${fmt(def.tempo - a.g)}<div class="bar"><i style="width:${a.g / def.tempo * 100}%"></i></div>`;
+  const dias = Math.max(1, Math.ceil((a.born + def.vida * DAY - Date.now()) / DAY));
+  h += `<br>Vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}`;
   return h;
+}
+function tipDog(slot) {
+  const d = S().dogs && S().dogs[slot];
+  if (!dogAlive(d)) return isHome() ? `<b>Casinha vazia</b><br>Compre um cachorro para vigiar a ${SLOT_NAME[slot]}.` : null;
+  const b = DOG[d.raca], awake = dogAwake(d);
+  let h = `<b>${esc(d.nome)}</b> · ${b.nome}<br>`;
+  if (!isHome()) return h + (awake ? 'Acordado e de olho em você!' : 'Dormindo… pode ser a sua chance.');
+  h += awake ? `De guarda. Ração por mais ${fmt((d.fedUntil - Date.now()) / 1000)}` : `<span class="warn">Dormindo de fome. Clique para dar ração (você tem ${state.dogFood}).</span>`;
+  const dias = Math.max(1, Math.ceil((d.born + b.vida * DAY - Date.now()) / DAY));
+  return h + `<br>Vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}`;
 }
 function tipDecor(id) {
   const d = DECO[id];
@@ -1997,7 +2462,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -2033,6 +2498,7 @@ cv.addEventListener('click', e => {
   if (target.kind === 'plot') actPlot(target.i);
   else if (target.kind === 'animal') actAnimal(target.id);
   else if (target.kind === 'decor') actDecor(target.id);
+  else if (target.kind === 'dog') actDog(target.slot);
 });
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input, textarea')) return;
@@ -2099,7 +2565,7 @@ function frame(now) {
   tick(dt);
   if (!isGated() && L.cw > 20) draw(now, dt);
   if (now - lastUI > 250) { updateTip(); lastUI = now; }
-  if (now - lastInfo > 2000) { renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
+  if (now - lastInfo > 2000) { tickLife(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
   if (now - lastSave > 5000) { save(); lastSave = now; }
   if (user && dirty && now - lastCloud > 15000) cloudSave();
   if (user && now - lastSentCheck > 60000) { lastSentCheck = now; checkSent(); }

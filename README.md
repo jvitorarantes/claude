@@ -11,14 +11,16 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **3 adubos**: básico (corta 25% do tempo que falta), premium (50%) e pro (deixa pronto na hora). Um por safra.
 - **Música e sons**: 3 músicas calmas de roça e sons para cliques, regar, enxada, colher e mais. Tudo é sintetizado no navegador (`js/audio.js`), sem arquivos de áudio.
 - **Configurações** (engrenagem no topo): liga e desliga música e sons, volume de cada um, escolha da música e tema (automático, dia ou noite).
-- **Animais**: galinha (ovo), vaca (leite), ovelha (lã) e porco (trufa). Eles comem 1 Milho do celeiro ou ração comprada na hora e produzem enquanto estão alimentados. Cabem 12 no cercado.
+- **10 animais**: galinha, coelho, galinha-d'angola, pata, vaca, ovelha, jumento, porco, cavalo e pavão. Cada um produz em horas de verdade (o ovo leva 6h, o leite 12h, o bacon 18h…) e vive alguns dias. Depois de produzir, o animal fica com fome: dê milho do celeiro ou compre a ração na hora. O esterco do jumento vira adubo premium. Cabem 15 no cercado.
+- **Cães de guarda**: a casinha fica do lado do celeiro. Dá para ter 2 cachorros, um para a plantação e outro para os animais, de 3 raças com preço, vida e força diferentes. Com ração (dura 8h) o cachorro fica acordado, espanta quem tenta pegar suas coisas e às vezes morde, ganhando até 10 moedas do ladrão. Ele também dá XP por dia e por ladrão pego.
+- **Plantação pronta** aparece com um check verde.
 - **Casa com 6 decorações**: tapete, vaso de planta, quadro, abajur, sofá e televisão. Cada uma dá conforto, e cada ponto de conforto vale +1% de XP.
 - **Celeiro** para vender colheitas e produtos.
 - **Vizinhos da vila** (Tia Cida, Seu Juca e Dona Neide) para visitar a qualquer hora.
 - **Login com Google, salvamento na nuvem e amigos de verdade** (precisa do Firebase, veja abaixo).
   - Cada jogador ganha um **código de amigo** de 6 letras. Digitar o código de alguém manda um **pedido de amizade**, que a pessoa pode **aceitar ou recusar** na aba Amigos. Dá para cancelar um pedido enviado e desfazer uma amizade.
   - Só amigos veem e visitam a sua roça. Quem recebe um pedido pode espiar a roça de quem pediu antes de aceitar.
-  - Na roça de um amigo você pode tirar mato e pragas, regar, alimentar os animais ou pegar um pouquinho da colheita (se o cachorro deixar!). O dono vê o que aconteceu quando abre o jogo.
+  - Na roça de um amigo você pode tirar mato e pragas, regar, alimentar os animais ou pegar um pouquinho: até 3 itens da plantação e 2 dos animais por amigo por dia (se o cachorro deixar!). O dono recebe um aviso em "Novidades da sua roça", na aba Amigos.
 
 Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no navegador e não tem amigos de verdade.
 
