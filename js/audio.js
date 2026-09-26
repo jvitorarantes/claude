@@ -236,6 +236,37 @@
     feed: t => { for (let k = 0; k < 3; k++) noise(t + k * 0.07, 0.07, 'bandpass', 3000, 1800, 0.12, 2); },
     collect: t => { pluck(sfxBus, t, 79, 0.3, 0.16, 4000); pluck(sfxBus, t + 0.08, 84, 0.4, 0.16, 4000); },
     error: t => { blip(t, 'square', 220, 200, 0.09, 0.05); blip(t + 0.11, 'square', 185, 165, 0.12, 0.05); },
+    // Sapo: dois "croac" graves com o som tremendo.
+    sapo: t => {
+      for (const d of [0, 0.28]) {
+        const o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(150, t + d); o.frequency.linearRampToValueAtTime(110, t + d + 0.18);
+        f.type = 'bandpass'; f.frequency.value = 600; f.Q.value = 3;
+        lfo.frequency.value = 38; lg.gain.value = 0.25; lfo.connect(lg); lg.connect(g.gain);
+        o.connect(f); f.connect(g); g.connect(sfxBus);
+        g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.4, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.2);
+        o.start(t + d); o.stop(t + d + 0.22); lfo.start(t + d); lfo.stop(t + d + 0.22);
+      }
+    },
+    // Grilo: "cri-cri" agudo, em pulsinhos.
+    grilo: t => {
+      for (let k = 0; k < 6; k++) {
+        const d = (k % 3) * 0.045 + Math.floor(k / 3) * 0.3, o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sine'; o.frequency.value = 4400; o.connect(g); g.connect(sfxBus);
+        g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.18, t + d + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.035);
+        o.start(t + d); o.stop(t + d + 0.04);
+      }
+    },
+    // Porquinho-da-índia: "uíí!" que sobe, duas vezes.
+    prea: t => {
+      for (const d of [0, 0.22]) {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'triangle'; o.frequency.setValueAtTime(900, t + d); o.frequency.exponentialRampToValueAtTime(2000, t + d + 0.16);
+        o.connect(g); g.connect(sfxBus);
+        g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.25, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.18);
+        o.start(t + d); o.stop(t + d + 0.2);
+      }
+    },
     bark: t => { for (const d of [0, 0.22]) { const o = ac.createOscillator(), b = ac.createBiquadFilter(), g = ac.createGain(); o.type = 'sawtooth'; b.type = 'bandpass'; b.frequency.value = 900; b.Q.value = 2; o.frequency.setValueAtTime(380, t + d); o.frequency.exponentialRampToValueAtTime(170, t + d + 0.14); o.connect(b); b.connect(g); g.connect(sfxBus); g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.35, t + d + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.16); o.start(t + d); o.stop(t + d + 0.2); } },
   };
 

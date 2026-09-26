@@ -3610,6 +3610,10 @@ function tipAbrigo(id) {
   if (isHome()) h += lv < 3 ? `<br>Clique para aumentar ou comprar animais.` : `<br>Clique para comprar animais.`;
   return h;
 }
+function tipBicho(i) {
+  const c = crittersOf(scene).list[i];
+  return c ? `<b>${BICHO[c.tipo].nome}</b><br>Clique para ouvir.` : null;
+}
 function tipLand() {
   const next = EXPANSOES[state.exp + 1];
   if (freeLots()) return `<b>Terra para colocar</b><br>Clique duas vezes num + encostado na sua terra.`;
@@ -3624,7 +3628,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -3700,6 +3704,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'dog') actDog(target.slot);
   else if (target.kind === 'abrigo') actAbrigo(target.id);
   else if (target.kind === 'land') openPanel('terreno');
+  else if (target.kind === 'bicho') actBicho(target.i);
 });
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input, textarea')) return;
@@ -3883,7 +3888,8 @@ function claimMission(tipo, k) {
   toast(`Prêmio: +${p.moedas.toLocaleString('pt-BR')} moedas e +${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}!`, 'good');
   renderTabs(); done();
 }
-const missoesProntas = () => state && state.missions ? [...state.missions.dia, ...state.missions.semana].filter(m => m.feito >= m.alvo && !m.pego).length : 0;
+const prontasDe = tipo => state && state.missions ? state.missions[tipo].filter(m => m.feito >= m.alvo && !m.pego).length : 0;
+const missoesProntas = () => prontasDe('dia') + prontasDe('semana') + ((state && state.newStamps) || 0);
 
 // ---------- Presente diário: 7 dias, depois vem uma leva nova ----------
 const PRESENTES = [
@@ -4018,7 +4024,7 @@ const COLECAO = () => [...CROPS.map(c => ({ id: c.prod, nome: c.prodNome, icon: 
 function collect(id, pos) {
   const n = state.col[id] = (state.col[id] || 0) + 1, lv = state.stamps[id] || 0, c = CARIMBOS[lv];
   if (!c || n < c.n) return;
-  state.stamps[id] = lv + 1;
+  state.stamps[id] = lv + 1; state.newStamps = (state.newStamps || 0) + 1; renderTabs();
   state.coins += c.moedas; addXP(c.xp, pos);
   sfx('level');
   toast(`Carimbo de ${c.nome} no livro de coleção: ${item(id).nome}! +${c.moedas.toLocaleString('pt-BR')} moedas`, 'good');
@@ -4133,6 +4139,15 @@ function moveCritter(c, t) {
   c.t0 = t;
   return 0;
 }
+// Clique num bichinho: ele faz o seu som e dá um pulinho (ou sai andando).
+const BICHO = { sapo: { nome: 'Sapo', som: 'sapo', fala: 'Croac!' }, 'preá': { nome: 'Porquinho-da-índia', som: 'prea', fala: 'Uíí!' }, grilo: { nome: 'Grilo', som: 'grilo', fala: 'Cri-cri!' } };
+function actBicho(i) {
+  const c = crittersOf(scene).list[i]; if (!c) return;
+  const b = BICHO[c.tipo], q = P(c.u, c.v, 0.25);
+  sfx(b.som);
+  popupAt(q, b.fala, '#ffffff');
+  c.t0 = -1e9; c.wait = 0; // já parte para o próximo pulo
+}
 function drawFrog(x, y, s, dir, t, jump) {
   ctx.save(); ctx.translate(x, y); ctx.scale(dir * s, s);
   ctx.fillStyle = '#3f8a2a';
@@ -4193,6 +4208,9 @@ function drawCritters(t, tod) {
     const pulo = c.tipo !== 'preá' && k > 0 && k < 1 ? Math.sin(k * Math.PI) * (c.tipo === 'sapo' ? 0.35 : 0.18) : 0;
     const g = iso(u, v), q = P(u, v, pulo);
     ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(g.x, g.y, W * (c.tipo === 'grilo' ? 0.05 : 0.1), W * 0.03, 0, 0, 7); ctx.fill();
+    const idx = cena.list.indexOf(c), hov = hover && hover.kind === 'bicho' && hover.i === idx;
+    if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(g.x, g.y, W * 0.14, W * 0.05, 0, 0, 7); ctx.stroke(); }
+    hits.push({ kind: 'bicho', i: idx, x: q.x, y: q.y - W * 0.06, r: Math.max(W * 0.13, 16) });
     if (c.tipo === 'sapo') drawFrog(q.x, q.y, s, c.dir, t, pulo > 0);
     else if (c.tipo === 'preá') drawCavy(q.x, q.y, s * 0.95, c.dir, t, c.cor, k > 0 && k < 1);
     else drawCricket(q.x, q.y, s * 0.8, c.dir, t);
@@ -4228,8 +4246,10 @@ function drawCritters(t, tod) {
 let missSeg = 'dia';
 function missoesHTML() {
   rollPeriods();
+  if (missSeg === 'colecao' && state.newStamps) { state.newStamps = 0; setTimeout(renderTabs, 0); save(); }
   const segs = [['dia', 'Diárias'], ['semana', 'Semanais'], ['colecao', 'Coleção']];
-  let html = `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-mseg="${id}" aria-selected="${missSeg === id}">${n}</button>`).join('')}</div>`;
+  const conta = { dia: prontasDe('dia'), semana: prontasDe('semana'), colecao: state.newStamps || 0 };
+  let html = `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-mseg="${id}" aria-selected="${missSeg === id}">${n}${conta[id] ? `<span class="badge" aria-label="${conta[id]} novidades">${conta[id]}</span>` : ''}</button>`).join('')}</div>`;
   const est = estacao();
   html += `<div class="row sel"><div class="avatar" style="background:#7aa35a;font-size:26px">${est.icone}</div><div><div class="name">${est.nome}</div>
     <div class="meta">Esta semana rendem ${Math.round(ESTACAO_BONUS * 100)}% a mais: ${est.plantas.map(id => CROP[id].nome.toLowerCase()).join(', ')}.</div></div><div></div></div>`;
