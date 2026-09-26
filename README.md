@@ -25,7 +25,8 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 - **Casa com 6 lugares de decoração** (tapete, vaso, quadro, luz, sofá e TV), cada um com 3 modelos: tapete de crochê, azul listrado ou xadrez; vaso de flores, cacto ou girassóis; quadro de paisagem, da vaca ou do pôr do sol; abajur, abajur de franja ou lampião; sofá verde, vermelho ou de couro; rádio, TV de tubo ou TV de tela plana. Compre os que quiser e escolha qual fica em uso (Loja › Casa). O conforto do modelo em uso vale +1% de XP por ponto.
 - **Celeiro** para vender colheitas e produtos.
 - **Vizinhos da vila** (Seu Zé e Dona Maria), que não são amigos de verdade, para visitar a qualquer hora.
-- Ir ou voltar da roça de alguém mostra uma tela de carregamento. Na roça de outra pessoa só aparecem os botões que servem lá (Amigos e Negócios, e as ferramentas de ajudar).
+- **Avatar** (na engrenagem de Configurações): escolha menino ou menina, a cor da pele e 3 tipos de camisa (camiseta, xadrez, regata), calça (jeans, bermuda, macacão) e sapato (bota, tênis, chinelo). Ele passeia pela sua roça e pelo rancho e vai junto nas visitas.
+- Ir ou voltar da roça de alguém mostra uma tela de carregamento de 3 segundos com o seu avatar indo de carroça até a roça do vizinho (e fazendo o caminho inverso na volta). Na roça de outra pessoa só aparecem os botões que servem lá (Amigos e Negócios, e as ferramentas de ajudar).
 - Clicar numa terra arada vazia com a Mão abre a Loja para escolher a semente; só planta quando há uma semente na mão.
 - **Caixa de correio** no menu: as novidades da sua roça (visitas dos amigos, presentes, o que o cachorro fez e recados da vila).
 - **Login com Google, salvamento na nuvem e amigos de verdade** (precisa do Firebase, veja abaixo).

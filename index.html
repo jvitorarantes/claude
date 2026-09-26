@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roça Feliz</title>
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="40">
-<script src="firebase-config.js?v=40"></script>
+<meta name="rf-version" content="41">
+<script src="firebase-config.js?v=41"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -247,13 +247,11 @@
   .loading { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #a8d86a, #5e9a34 70%, #3f7424); }
   .loading[hidden] { display: none; }
   .loadbox { display: grid; justify-items: center; gap: 14px; padding: 24px; text-align: center; }
-  .loadsun { width: 96px; height: 96px; animation: girar 2.4s linear infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
+  .stage .loadcv { cursor: default;  width: min(560px, 92vw); height: min(240px, 42vh); border-radius: 18px; border: 4px solid #fff8; box-shadow: 0 8px 24px rgba(0,0,0,.25); background: #bfe6ff; }
   .loading p { margin: 0; color: #fff; font-size: 20px; font-weight: 800; text-shadow: 0 2px 3px rgba(0,0,0,.35); }
   .loadbar { width: min(260px, 70vw); height: 12px; border-radius: 8px; background: rgba(0,0,0,.25); overflow: hidden; border: 2px solid #fff6; }
   .loadbar i { display: block; height: 100%; width: 100%; background: #f2c14e; transform-origin: left; animation: encher 3s ease-in-out forwards; }
-  @keyframes girar { to { transform: rotate(360deg); } }
   @keyframes encher { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-  @media (prefers-reduced-motion: reduce) { .loadsun { animation: none; } }
   /* Na roça de outra pessoa só ficam os botões que servem lá */
   .visitando .menu .tab:not([data-tab=amigos]):not([data-tab=fabrica]), .visitando #giftBtn, .visitando #moveBtn { display: none !important; }
   .toasts { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; z-index: 8; pointer-events: none; width: max-content; max-width: 90%; }
@@ -379,6 +377,14 @@
   .switch:checked { background: var(--leaf); }
   .switch:checked::after { transform: translateX(20px); }
   .tracks { display: grid; gap: 6px; }
+  .avcfg { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .avcfg canvas { cursor: default;  width: 120px; height: 150px; border-radius: 14px; background: linear-gradient(#d9f1ff, #eaf7d6); flex: none; }
+  .avopts { display: grid; gap: 6px; flex: 1; min-width: 220px; }
+  .avrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .avrow > span { width: 58px; font-weight: 700; font-size: 13px; }
+  .peles { display: flex; gap: 6px; }
+  .pele { width: 28px; height: 28px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25); cursor: pointer; padding: 0; }
+  .pele[aria-checked="true"] { box-shadow: 0 0 0 3px var(--heading, #6b3f1f); }
   .track {
     display: flex; align-items: center; gap: 10px; text-align: left; width: 100%;
     background: var(--card); border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px 10px; font-weight: 700;
@@ -566,11 +572,7 @@
     <div class="toasts" id="toasts"></div>
     <div class="loading" id="loading" role="status" aria-live="polite" hidden>
       <div class="loadbox">
-        <svg class="loadsun" viewBox="0 0 64 64" aria-hidden="true"><g fill="#f2c14e">
-          <ellipse cx="32" cy="10" rx="6" ry="10"/><ellipse cx="32" cy="54" rx="6" ry="10"/><ellipse cx="10" cy="32" rx="10" ry="6"/><ellipse cx="54" cy="32" rx="10" ry="6"/>
-          <ellipse cx="16.5" cy="16.5" rx="6" ry="10" transform="rotate(-45 16.5 16.5)"/><ellipse cx="47.5" cy="47.5" rx="6" ry="10" transform="rotate(-45 47.5 47.5)"/>
-          <ellipse cx="47.5" cy="16.5" rx="6" ry="10" transform="rotate(45 47.5 16.5)"/><ellipse cx="16.5" cy="47.5" rx="6" ry="10" transform="rotate(45 16.5 47.5)"/></g>
-          <circle cx="32" cy="32" r="13" fill="#7a4a24"/><circle cx="32" cy="32" r="9" fill="#5a3614"/></svg>
+        <canvas class="loadcv" id="loadCv" aria-hidden="true"></canvas>
         <p id="loadingTxt">Carregando…</p>
         <div class="loadbar"><i></i></div>
       </div>
@@ -668,6 +670,11 @@
       <div class="acct" id="account"></div>
     </section>
     <section>
+      <h3>Seu avatar</h3>
+      <p class="hint" style="margin:0 0 6px;color:var(--muted);font-size:13px">Ele passeia pela sua roça e pelo rancho e vai junto de carroça quando você visita alguém.</p>
+      <div class="avcfg" id="avatarCfg"></div>
+    </section>
+    <section>
       <h3>Música</h3>
       <div class="setrow"><label for="optMusic">Tocar música</label><input type="checkbox" class="switch" id="optMusic"></div>
       <div class="setrow"><label for="volMusic">Volume</label><input type="range" id="volMusic" min="0" max="100" step="5"><output id="volMusicOut" for="volMusic"></output></div>
@@ -696,8 +703,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=40"></script>
-<script src="js/cloud.js?v=40"></script>
-<script src="js/game.js?v=40"></script>
+<script src="js/audio.js?v=41"></script>
+<script src="js/cloud.js?v=41"></script>
+<script src="js/game.js?v=41"></script>
 </body>
 </html>

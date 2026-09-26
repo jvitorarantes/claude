@@ -310,7 +310,7 @@ function migrate(s) {
   ensureAbrigos(s);
   const obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   s.gift = Object.assign({ i: 0, ciclo: 0, last: -1 }, obj(s.gift));
-  s.owe = obj(s.owe); s.col = obj(s.col); s.stamps = obj(s.stamps);
+  s.owe = obj(s.owe); s.col = obj(s.col); s.stamps = obj(s.stamps); s.avatar = avatarOk(s.avatar);
   s.temas = Object.assign({ classico: true }, obj(s.temas));
   if (!s.temas[s.tema]) s.tema = 'classico';
   if (!s.missions || !Array.isArray(s.missions.dia) || !Array.isArray(s.missions.semana)) s.missions = null;
@@ -1048,18 +1048,22 @@ function genNeighbor() {
 const CARREGA_MS = 3000;
 let carregaTimer = 0;
 const espera = ms => new Promise(r => setTimeout(r, ms));
-function telaCarregando(txt, ms = CARREGA_MS) {
+// A carroça leva o seu avatar até a roça do vizinho (e traz de volta, no caminho inverso).
+function telaCarregando(txt, ms = CARREGA_MS, nome = 'Vizinho', volta = false) {
   const el = $('#loading'); if (!el) return;
   $('#loadingTxt').textContent = txt;
+  const ini = performance.now(), ativo = viagem;
+  viagem = { ini, fim: ini + CARREGA_MS, nome, volta, espera: !ms };
+  if (!ativo) requestAnimationFrame(drawViagem);
   const bar = el.querySelector('.loadbar i'); bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
   el.hidden = false; clearTimeout(carregaTimer);
   if (ms) carregaTimer = setTimeout(fecharCarregando, ms);
 }
-function fecharCarregando() { clearTimeout(carregaTimer); const el = $('#loading'); if (el) el.hidden = true; }
+function fecharCarregando() { clearTimeout(carregaTimer); const el = $('#loading'); if (el) el.hidden = true; viagem = null; }
 
 function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
-  telaCarregando(`Indo até a roça de ${nb.nome}…`);
+  telaCarregando(`Indo até a roça de ${nb.nome}…`, CARREGA_MS, nb.nome);
   const cur = state.nb[id];
   if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry)) || !cur.plots.some(p => 'podre' in p) || !cur.banca) state.nb[id] = genNeighbor();
   view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima };
@@ -1070,7 +1074,8 @@ function visitNpc(id) {
 async function visitFriend(uid) {
   if (!user) return;
   const amigo = friendInfo[uid];
-  telaCarregando(`Indo até a roça de ${amigo && amigo.name ? firstName(amigo.name) : 'um amigo'}…`, 0);
+  const nomeAmigo = amigo && amigo.name ? firstName(amigo.name) : 'Amigo';
+  telaCarregando(`Indo até a roça de ${nomeAmigo}…`, 0, nomeAmigo);
   try {
     const [f] = await Promise.all([Cloud.loadFarm(uid), espera(CARREGA_MS)]);
     const data = f && f.stateJson ? migrate(JSON.parse(f.stateJson)) : null;
@@ -1103,7 +1108,7 @@ function renderVisita() {
   renderMoveBtn();
 }
 function goHome() {
-  if (!isHome()) telaCarregando('Voltando para a sua roça…');
+  if (!isHome()) telaCarregando('Voltando para a sua roça…', CARREGA_MS, (view.kind === 'npc' ? view.nome : firstName(view.nome)) || 'Vizinho', true);
   view = { kind: 'home' }; hover = null; renderVisita();
   setScene('roca'); // voltar para a sua fazenda sempre começa na roça
   $('#banner').hidden = true; cv.setAttribute('aria-label', 'Sua roça');
@@ -2788,6 +2793,7 @@ function drawRoca(s, t, home) {
   if (home) drawLandSign();
   for (let sum = 0; sum <= COLS + ROWS - 2; sum++)
     for (let c = 0; c < COLS; c++) { const r = sum - c; if (r >= 0 && r < ROWS) drawPlot(r * COLS + c, s.plots[r * COLS + c], t, home); }
+  drawAvatarWalk('roca', t);
   drawObjetos(s, 'roca', t, home, 'frente');
   drawMoving('roca', t);
   drawCritters(t, tod);
@@ -2942,6 +2948,7 @@ function drawPen(s, t, home, dt) {
   const bubbles = [];
   const order = ABRIGOS.slice().sort((a, b) => { const p = yardOf(a.id), q = yardOf(b.id); return (p.u0 + p.v0) - (q.u0 + q.v0); });
   for (const b of order) drawYard(b, s, t, home, dt, bubbles);
+  drawAvatarWalk('animais', t);
   drawObjetos(s, 'animais', t, home, 'frente');
   drawMoving('animais', t);
   drawCritters(t, tod);
@@ -4127,6 +4134,7 @@ function saveSettings() {
 }
 const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde'];
 function renderSettings() {
+  renderAvatarCfg();
   $('#optMusic').checked = settings.music;
   $('#optSfx').checked = settings.sfx;
   $('#volMusic').value = Math.round(settings.musicVol * 100); $('#volMusicOut').textContent = $('#volMusic').value;
@@ -4192,6 +4200,7 @@ $('#gift').addEventListener('click', e => { if (e.target === $('#gift') || e.tar
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gift').hidden) closeGift(); });
 $('#settings').addEventListener('click', e => {
   if (e.target === $('#settings') || e.target.closest('[data-close]')) return closeSettings();
+  if (avatarClick(e)) return;
   // Só os botões de dentro da janela (a página inteira também tem data-tema).
   const tr = e.target.closest('#tracks [data-track]');
   if (tr) { settings.track = Number(tr.dataset.track); settings.music = true; saveSettings(); renderSettings(); }
@@ -4615,6 +4624,223 @@ function drawCricket(x, y, s, dir, t) {
   ctx.fillStyle = '#6b4a1e'; ctx.beginPath(); ctx.ellipse(0, -3.5, 5.5, 2.3, -0.1, 0, 7); ctx.fill();
   ctx.fillStyle = '#4a3212'; ctx.beginPath(); ctx.arc(4.5, -4, 2, 0, 7); ctx.fill();
   ctx.restore();
+}
+// ============================================================
+// Avatar: a pessoa do jogador. Anda pela roça e pelo rancho e vai junto nas visitas.
+// ============================================================
+const AV_PELE = ['#f6d3b3', '#e8b48a', '#c98b5e', '#9a6440', '#6b4128'];
+const AV_CABELO = { m: '#4a2e17', f: '#6b3a1e' };
+const AV_OPC = {
+  sexo: [['m', 'Menino'], ['f', 'Menina']],
+  camisa: [['camiseta', 'Camiseta'], ['xadrez', 'Xadrez'], ['regata', 'Regata']],
+  calca: [['jeans', 'Jeans'], ['bermuda', 'Bermuda'], ['macacao', 'Macacão']],
+  sapato: [['bota', 'Bota'], ['tenis', 'Tênis'], ['chinelo', 'Chinelo']],
+};
+const AV_PADRAO = { sexo: 'm', pele: 1, camisa: 'xadrez', calca: 'jeans', sapato: 'bota' };
+function avatarOk(a) {
+  const r = Object.assign({}, AV_PADRAO);
+  if (a && typeof a === 'object') {
+    for (const k of Object.keys(AV_OPC)) if (AV_OPC[k].some(([id]) => id === a[k])) r[k] = a[k];
+    if (Number.isInteger(a.pele) && a.pele >= 0 && a.pele < AV_PELE.length) r.pele = a.pele;
+  }
+  return r;
+}
+// Desenha o avatar de frente, com os pés em (x, y). "passo" balança pernas e braços.
+function drawAvatar(g, x, y, s, av, t, andando, dir = 1) {
+  av = avatarOk(av);
+  const pele = AV_PELE[av.pele], f = av.sexo === 'f';
+  const ph = andando ? Math.sin(t / 110) : 0, pe = [Math.max(0, ph) * 3, Math.max(0, -ph) * 3];
+  const jeans = '#3f6fa8', jeansD = '#2c5282';
+  g.save(); g.translate(x, y); g.scale(s, s); g.translate(0, andando ? -Math.abs(Math.cos(t / 110)) * 1.2 : 0);
+  const rr = (x0, y0, w, h, r, c) => { g.fillStyle = c; g.beginPath(); g.roundRect(x0, y0, w, h, r); g.fill(); };
+  // cabelo comprido fica atrás de tudo
+  if (f) { g.fillStyle = AV_CABELO.f; g.beginPath(); g.roundRect(-11.5, -60, 23, 26, 8); g.fill(); }
+  // pernas e calça
+  for (const [k, lx] of [[0, -6.5], [1, 1.5]]) {
+    const up = pe[k];
+    rr(lx, -25 - up, 5, 21, 2, pele);
+    if (av.calca === 'bermuda') rr(lx - 0.5, -25 - up, 6, 11, 2, '#c9a66b');
+    else rr(lx - 0.5, -25 - up, 6, 20, 2, k ? jeansD : jeans);
+    // sapatos
+    const sy = -5 - up;
+    if (av.sapato === 'bota') { rr(lx - 1, sy - 4, 7.5, 9, 2, '#7a4a24'); rr(lx - 1, sy + 3.5, 8, 1.8, 1, '#4a2c14'); }
+    else if (av.sapato === 'tenis') { rr(lx - 1, sy, 7.5, 5, 2.2, '#f4f1ea'); g.fillStyle = '#d8402f'; g.fillRect(lx, sy + 1.5, 5.5, 1.3); rr(lx - 1, sy + 4, 7.5, 1.4, 0.7, '#9a9a9a'); }
+    else { rr(lx - 1, sy + 3, 7.5, 2.2, 1, '#e08a2e'); rr(lx, sy, 5, 3.5, 1.5, pele); g.strokeStyle = '#3f6fa8'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(lx, sy + 3); g.lineTo(lx + 2.5, sy + 0.8); g.lineTo(lx + 5, sy + 3); g.stroke(); }
+  }
+  // braços (balançam ao contrário das pernas)
+  const manga = { camiseta: 8, xadrez: 16, regata: 0 }[av.camisa], corCamisa = { camiseta: '#d8402f', xadrez: '#c8402f', regata: '#f2c14e' }[av.camisa];
+  for (const [sx, k] of [[-1, 1], [1, 0]]) {
+    g.save(); g.translate(sx * 10.5, -41); g.rotate(sx * 0.12 + (andando ? (k ? ph : -ph) * 0.35 : 0));
+    rr(-2.5, 0, 5, 17, 2.5, pele);
+    if (manga) rr(-3, -0.5, 6, manga, 2.5, av.camisa === 'xadrez' ? '#a53325' : corCamisa);
+    g.restore();
+  }
+  // tronco
+  g.save(); g.beginPath(); g.roundRect(-10.5, -44, 21, 21, f ? 7 : 5); g.clip();
+  g.fillStyle = corCamisa; g.fillRect(-11, -45, 22, 23);
+  if (av.camisa === 'xadrez') {
+    g.fillStyle = 'rgba(40,20,20,.35)'; for (let k = -10; k < 11; k += 5) g.fillRect(k, -45, 2, 23);
+    g.fillStyle = 'rgba(255,240,220,.3)'; for (let k = -43; k < -22; k += 5) g.fillRect(-11, k, 22, 2);
+  }
+  if (av.camisa === 'regata') { g.fillStyle = pele; g.beginPath(); g.ellipse(-11, -44, 5, 7, 0, 0, 7); g.ellipse(11, -44, 5, 7, 0, 0, 7); g.ellipse(0, -45, 5, 3.5, 0, 0, 7); g.fill(); }
+  if (av.calca === 'macacao') {
+    g.fillStyle = jeans; g.fillRect(-7, -35, 14, 13); g.fillRect(-11, -26, 22, 5);
+    g.strokeStyle = jeans; g.lineWidth = 2.5; g.beginPath(); g.moveTo(-6, -35); g.lineTo(-7, -45); g.moveTo(6, -35); g.lineTo(7, -45); g.stroke();
+    g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(-5, -33, 1.2, 0, 7); g.arc(5, -33, 1.2, 0, 7); g.fill();
+  } else { g.fillStyle = av.calca === 'bermuda' ? '#b08d55' : jeansD; g.fillRect(-11, -26, 22, 4); g.fillStyle = '#e8c65a'; g.fillRect(-1.5, -25.5, 3, 3); }
+  g.restore();
+  // pescoço e cabeça
+  rr(-2.5, -47, 5, 4, 1, pele); rr(-2.5, -47, 5, 4, 1, 'rgba(90,40,20,.2)');
+  g.fillStyle = pele; g.beginPath(); g.arc(0, -56, 10.5, 0, 7); g.fill();
+  g.fillStyle = pele; g.beginPath(); g.arc(-10.2, -55, 2.4, 0, 7); g.arc(10.2, -55, 2.4, 0, 7); g.fill();
+  // cabelo
+  g.fillStyle = AV_CABELO[av.sexo];
+  g.beginPath(); g.arc(0, -57, 11, Math.PI * 1.02, Math.PI * 1.98); g.fill();
+  g.beginPath(); g.moveTo(-10.5, -59); g.quadraticCurveTo(-3, -54 + (f ? 0 : 1), 4, -60); g.quadraticCurveTo(8, -56, 10.5, -59); g.lineTo(10, -63); g.lineTo(-10, -63); g.fill();
+  if (f) { g.fillStyle = '#e25b8f'; g.beginPath(); g.ellipse(7.5, -65, 3.2, 2, 0.5, 0, 7); g.ellipse(11, -63, 3.2, 2, -0.3, 0, 7); g.fill(); g.fillStyle = '#b83a6b'; g.beginPath(); g.arc(9.2, -64, 1.3, 0, 7); g.fill(); }
+  // rosto (olha um pouquinho para onde anda)
+  const o = dir * 1.2;
+  g.fillStyle = '#2a1a10'; g.beginPath(); g.ellipse(-3.8 + o, -55, 1.3, 1.8, 0, 0, 7); g.ellipse(3.8 + o, -55, 1.3, 1.8, 0, 0, 7); g.fill();
+  if (f) { g.strokeStyle = '#2a1a10'; g.lineWidth = 0.9; g.beginPath(); g.moveTo(-5.5 + o, -56.5); g.lineTo(-6.3 + o, -57.5); g.moveTo(5.5 + o, -56.5); g.lineTo(6.3 + o, -57.5); g.stroke(); }
+  g.fillStyle = 'rgba(230,110,110,.45)'; g.beginPath(); g.ellipse(-6.5 + o, -51.5, 2.3, 1.4, 0, 0, 7); g.ellipse(6.5 + o, -51.5, 2.3, 1.4, 0, 0, 7); g.fill();
+  g.strokeStyle = '#7a3a22'; g.lineWidth = 1.1; g.lineCap = 'round'; g.beginPath(); g.arc(o, -51.5, 2.6, 0.25, Math.PI - 0.25); g.stroke();
+  g.restore();
+}
+// Passeio pela cena: escolhe um ponto, anda até lá, espera um pouco e repete.
+const avWalk = {};
+function avatarArea(sc) {
+  if (sc === 'animais') return { u0: 0.3, u1: RANCH_C - 0.3, v0: RANCH_R + 0.35, v1: RANCH_R + 1.3 };
+  let c0 = COLS, c1 = 0, r0 = ROWS, r1 = 0;
+  S().plots.forEach((p, i) => { if (p.s !== 'locked') { const c = i % COLS, r = Math.floor(i / COLS); c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1); } });
+  if (c1 <= c0) { c0 = 0; c1 = 3; r0 = 0; r1 = 3; }
+  return { u0: c0 + 0.3, u1: Math.min(COLS, c1 + 0.8) - 0.3, v0: r0 + 0.3, v1: Math.min(ROWS, r1 + 0.8) - 0.3 };
+}
+function drawAvatarWalk(sc, t) {
+  const a = avatarArea(sc);
+  let w = avWalk[sc];
+  if (!w || w.dono !== view.kind + (view.id || view.uid || '')) {
+    const u = a.u0 + Math.random() * (a.u1 - a.u0), v = a.v0 + Math.random() * (a.v1 - a.v0);
+    w = avWalk[sc] = { dono: view.kind + (view.id || view.uid || ''), fu: u, fv: v, tu: u, tv: v, t0: t, dur: 0, wait: 1500, dir: 1 };
+  }
+  let k = w.dur ? Math.min(1, (t - w.t0) / w.dur) : 1;
+  if (k >= 1 && t - w.t0 > w.dur + w.wait) {
+    w.fu = w.tu; w.fv = w.tv;
+    w.tu = clamp(w.fu + (Math.random() - 0.5) * 4, a.u0, a.u1); w.tv = clamp(w.fv + (Math.random() - 0.5) * 4, a.v0, a.v1);
+    const dist = Math.hypot(w.tu - w.fu, w.tv - w.fv), sx = (w.tu - w.fu) - (w.tv - w.fv);
+    if (Math.abs(sx) > 0.01) w.dir = sx > 0 ? 1 : -1;
+    w.t0 = t; w.dur = dist / 0.7 * 1000; w.wait = 1200 + Math.random() * 3500; k = 0;
+  }
+  const u = w.fu + (w.tu - w.fu) * k, v = w.fv + (w.tv - w.fv) * k, q = iso(u, v), W = L.W;
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.13, W * 0.045, 0, 0, 7); ctx.fill();
+  drawAvatar(ctx, q.x, q.y, W / 95 * (sc === 'animais' ? 1.25 : 1), state.avatar, t, k < 1, w.dir);
+}
+// Prévia nas Configurações.
+function renderAvatarCfg() {
+  const box = $('#avatarCfg'); if (!box || !state) return;
+  const av = state.avatar = avatarOk(state.avatar);
+  const linha = (k, nome) => `<div class="avrow"><span>${nome}</span><div class="seg small" role="radiogroup" aria-label="${nome}">${AV_OPC[k].map(([id, n]) => `<button type="button" role="radio" data-av="${k}:${id}" aria-checked="${av[k] === id}" aria-selected="${av[k] === id}">${n}</button>`).join('')}</div></div>`;
+  box.innerHTML = `<canvas id="avPrev" width="120" height="150" aria-label="Prévia do avatar"></canvas><div class="avopts">
+    ${linha('sexo', 'Sexo')}
+    <div class="avrow"><span>Pele</span><div class="peles" role="radiogroup" aria-label="Cor de pele">${AV_PELE.map((c, k) => `<button type="button" role="radio" class="pele" style="background:${c}" data-av="pele:${k}" aria-checked="${av.pele === k}" aria-label="Tom ${k + 1}"></button>`).join('')}</div></div>
+    ${linha('camisa', 'Camisa')}${linha('calca', 'Calça')}${linha('sapato', 'Sapato')}</div>`;
+  if (!avLoop) { avLoop = true; requestAnimationFrame(avPreview); }
+}
+let avLoop = false;
+function avPreview() {
+  const c = $('#avPrev'); if (!c || $('#settings').hidden) { avLoop = false; return; }
+  const g = c.getContext('2d'), t = performance.now();
+  g.clearRect(0, 0, c.width, c.height);
+  g.fillStyle = '#bfe08a'; g.beginPath(); g.ellipse(60, 138, 44, 10, 0, 0, 7); g.fill();
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(60, 138, 18, 5, 0, 0, 7); g.fill();
+  drawAvatar(g, 60, 138, 1.85, state.avatar, t, true, Math.sin(t / 1500) > 0 ? 1 : -1);
+  requestAnimationFrame(avPreview);
+}
+function avatarClick(e) {
+  const b = e.target.closest('#avatarCfg [data-av]'); if (!b) return false;
+  const [k, v] = b.dataset.av.split(':');
+  state.avatar = avatarOk(Object.assign({}, state.avatar, { [k]: k === 'pele' ? Number(v) : v }));
+  const run = document.querySelector('#avPrev') && true;
+  renderAvatarCfg(); done(); sfx('click');
+  return run;
+}
+
+// ---------- Viagem de carroça (tela de carregamento) ----------
+let viagem = null;
+function drawCarroca(g, x, y, s, t, andando) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  const trote = andando ? Math.sin(t / 90) : 0;
+  // cavalo (à direita, puxando)
+  g.save(); g.translate(46, 0);
+  g.strokeStyle = '#6b4220'; g.lineWidth = 3.2; g.lineCap = 'round';
+  for (const [lx, k] of [[-10, 1], [-5, -1], [8, -1], [12, 1]]) { g.beginPath(); g.moveTo(lx, -20); g.lineTo(lx + trote * k * 3, -2); g.stroke(); }
+  g.fillStyle = '#8a5a33'; g.beginPath(); g.ellipse(1, -24, 16, 8.5, 0, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(10, -28); g.lineTo(18, -44); g.lineTo(25, -42); g.lineTo(17, -24); g.fill();
+  g.beginPath(); g.ellipse(24, -43, 7, 4.2, 0.35, 0, 7); g.fill();
+  g.fillStyle = '#4a2c14'; g.beginPath(); g.moveTo(12, -30); g.lineTo(17, -46); g.lineTo(20, -45); g.lineTo(15, -28); g.fill();
+  g.beginPath(); g.moveTo(-15, -26); g.quadraticCurveTo(-24, -20 + trote * 2, -20, -8); g.lineTo(-17, -22); g.fill();
+  g.fillStyle = '#8a5a33'; g.beginPath(); g.moveTo(19, -47); g.lineTo(20, -52); g.lineTo(22, -46); g.fill();
+  g.fillStyle = '#111'; g.beginPath(); g.arc(25, -45, 1.1, 0, 7); g.fill();
+  g.restore();
+  // varas ligando ao cavalo
+  g.strokeStyle = '#7a4a24'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(18, -18); g.lineTo(44, -24); g.stroke();
+  // pessoa sentada (desenha inteira; a caixa da carroça cobre as pernas)
+  drawAvatar(g, 2, -6 + (andando ? Math.abs(trote) * -1 : 0), 0.62, state.avatar, t, false, 1);
+  // caixa da carroça
+  g.fillStyle = '#b07a44'; g.strokeStyle = '#6b3f1f'; g.lineWidth = 1.5;
+  g.beginPath(); g.roundRect(-22, -26, 42, 16, 2); g.fill(); g.stroke();
+  g.strokeStyle = 'rgba(107,63,31,.6)'; g.beginPath(); g.moveTo(-22, -18); g.lineTo(20, -18); g.stroke();
+  g.fillStyle = '#e8c65a'; g.beginPath(); g.ellipse(-12, -27, 8, 4, 0, Math.PI, 0); g.fill(); // feno
+  // rodas
+  for (const wx of [-12, 10]) {
+    g.save(); g.translate(wx, -8); g.rotate(andando ? t / 160 : 0);
+    g.strokeStyle = '#4a2c14'; g.lineWidth = 2.2; g.beginPath(); g.arc(0, 0, 8, 0, 7); g.stroke();
+    g.lineWidth = 1.2; for (let k = 0; k < 4; k++) { g.rotate(Math.PI / 4); g.beginPath(); g.moveTo(-7, 0); g.lineTo(7, 0); g.stroke(); }
+    g.restore();
+  }
+  g.restore();
+}
+function drawViagem() {
+  const c = $('#loadCv'); if (!c || !viagem || $('#loading').hidden) { viagem = null; return; }
+  const dpr = Math.min(2, window.devicePixelRatio || 1), cw = c.clientWidth, ch = c.clientHeight;
+  if (c.width !== Math.round(cw * dpr)) { c.width = Math.round(cw * dpr); c.height = Math.round(ch * dpr); }
+  const g = c.getContext('2d'), t = performance.now();
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, cw, ch);
+  const ceu = g.createLinearGradient(0, 0, 0, ch); ceu.addColorStop(0, '#8fd0f5'); ceu.addColorStop(1, '#d9f1ff');
+  g.fillStyle = ceu; g.fillRect(0, 0, cw, ch);
+  g.fillStyle = '#fff5b0'; g.beginPath(); g.arc(cw * 0.82, ch * 0.2, 16, 0, 7); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.9)';
+  for (let k = 0; k < 3; k++) { const x = ((t / 60 + k * 170) % (cw + 120)) - 60, y = 22 + k * 16; g.beginPath(); g.ellipse(x, y, 26, 9, 0, 0, 7); g.ellipse(x + 18, y - 5, 16, 9, 0, 0, 7); g.fill(); }
+  const chao = ch * 0.58;
+  g.fillStyle = '#9fd26a'; g.beginPath(); g.moveTo(0, chao); for (let x = 0; x <= cw; x += 20) g.lineTo(x, chao - 12 - Math.sin(x / 60) * 8); g.lineTo(cw, ch); g.lineTo(0, ch); g.fill();
+  g.fillStyle = '#7dbb48'; g.fillRect(0, chao, cw, ch - chao);
+  const estrada = ch * 0.78;
+  g.fillStyle = '#d8b67a'; g.fillRect(0, estrada - 10, cw, 22);
+  g.fillStyle = '#c29a5c'; for (let x = 8; x < cw; x += 34) g.fillRect(x, estrada, 14, 2.5);
+  // as duas roças, uma em cada ponta
+  const casa = (x, cor, telhado, nome) => {
+    g.fillStyle = cor; g.fillRect(x - 24, estrada - 44, 48, 30);
+    g.fillStyle = telhado; g.beginPath(); g.moveTo(x - 30, estrada - 42); g.lineTo(x, estrada - 64); g.lineTo(x + 30, estrada - 42); g.fill();
+    g.fillStyle = '#6b3f1f'; g.fillRect(x - 6, estrada - 30, 12, 16);
+    g.fillStyle = '#fff'; g.fillRect(x - 19, estrada - 38, 9, 8); g.fillRect(x + 10, estrada - 38, 9, 8);
+    g.font = '800 12px system-ui, sans-serif'; g.textAlign = 'center';
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.45)'; g.strokeText(nome, x, estrada - 70); g.fillStyle = '#fff'; g.fillText(nome, x, estrada - 70);
+  };
+  const xa = Math.max(46, cw * 0.1), xb = cw - xa;
+  casa(xa, '#c8402f', '#7a2a1e', 'Sua roça');
+  casa(xb, '#e3bf62', '#3f6fa8', viagem.nome);
+  // progresso: vai de uma casa até a outra (na volta, o caminho inverso)
+  const ms = viagem.fim - viagem.ini, k = clamp((t - viagem.ini) / ms, 0, viagem.espera ? 0.94 : 1);
+  const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+  const x0 = xa + 34, x1 = xb - 34, px = viagem.volta ? x1 - (x1 - x0) * e : x0 + (x1 - x0) * e, esc = clamp(cw / 400, 0.75, 1.5);
+  g.save(); g.translate(px, estrada + 8);
+  if (viagem.volta) g.scale(-1, 1);
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(10 * esc, 0, 50 * esc, 5, 0, 0, 7); g.fill();
+  // poeirinha atrás
+  g.fillStyle = 'rgba(200,170,120,.55)';
+  for (let j = 0; j < 3; j++) { const a = ((t / 300 + j / 3) % 1); g.beginPath(); g.arc((-30 - a * 22) * esc, -4 - a * 8, (3 + a * 5) * esc, 0, 7); g.fill(); }
+  drawCarroca(g, 0, 0, esc, t, k < 1);
+  g.restore();
+  requestAnimationFrame(drawViagem);
 }
 function drawCritters(t, tod) {
   const W = L.W, est = estacao(), chuva = raining(), cena = crittersOf(scene), s = W / 100 * (scene === 'animais' ? 1.5 : 1.1);
