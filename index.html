@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roça Feliz</title>
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="27">
-<script src="firebase-config.js?v=27"></script>
+<meta name="rf-version" content="29">
+<script src="firebase-config.js?v=29"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -288,6 +288,8 @@
   .btn.gold { background: #e9a800; box-shadow: 0 3px 0 #a87400; }
   .btn.ghost { background: transparent; color: var(--heading); box-shadow: none; border: 2px solid var(--wood-3); }
   .btn.danger { background: var(--red); box-shadow: 0 3px 0 #862516; }
+  /* desativado fica cinza em qualquer cor (ex.: "Entregar" do caminhão sem os itens) */
+  .btn:disabled, .btn.gold:disabled, .btn.danger:disabled { background: #b7b39c; color: #fff; box-shadow: 0 3px 0 #8f8a73; border: 0; cursor: not-allowed; }
   .penactions .btn.ghost { color: #fff; }
   .stack { display: grid; gap: 4px; }
   .total { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 800; }
@@ -546,6 +548,16 @@
   </div>
 </div>
 
+<div class="modal" id="nome" hidden role="dialog" aria-modal="true" aria-labelledby="nomeTitle">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="nomeTitle">Dê um nome</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <section>
+      <div style="display:flex;align-items:center;gap:12px"><img id="nomeImg" alt="" width="72" height="72"><p id="nomeTxt" style="margin:0;font-weight:700"></p></div>
+      <form class="addform" id="nomeForm"><input id="nomeInput" maxlength="18" aria-label="Nome do bicho" style="text-transform:none;letter-spacing:0"><button class="btn gold" type="submit">Salvar</button></form>
+    </section>
+  </div>
+</div>
+
 <div class="modal" id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="setTitle">
   <div class="modal-card">
     <div class="modal-head"><h2 id="setTitle">Configurações</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
@@ -582,8 +594,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=27"></script>
-<script src="js/cloud.js?v=27"></script>
-<script src="js/game.js?v=27"></script>
+<script src="js/audio.js?v=29"></script>
+<script src="js/cloud.js?v=29"></script>
+<script src="js/game.js?v=29"></script>
 </body>
 </html>

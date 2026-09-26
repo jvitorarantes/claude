@@ -43,6 +43,11 @@ Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no nav
 - **Banca**: coloque até 6 coisas do celeiro à venda, com preço entre metade e o dobro do valor. Os amigos compram quando visitam a sua roça (a banca deles aparece na Fábrica durante a visita), e os vizinhos da vila compram de vez em quando se o preço for justo. Tirar da banca avisa que o item e o dinheiro não voltam. *Comprar da banca de um amigo precisa das regras novas do `firestore.rules`.*
 - **Caminhão**: 5 pedidos novos a cada 4 horas, com colheitas, produtos dos animais e da fábrica. Paga bem mais que o celeiro.
 - **Celeiro** mostra no botão quantos itens estão guardados.
+- **Enfeites** (Loja › Enfeites): canteiro de flores, banco, espantalho, carrinho de mão, poço, fonte e cata-vento. Ficam em 6 lugares em volta da roça e 6 em volta do rancho, sem atrapalhar. Cada um dá conforto (+XP). Clique duas vezes num enfeite para guardar.
+- **Presente dos pioneiros**: quem jogar até 31/10/2026 ganha a Bandeira dos Pioneiros, um Bolo de boas-vindas e o celeiro e a casa azuis com detalhes dourados (dá para trocar em Loja › Temas).
+- **A casa aparece na roça**, atrás dos canteiros. Clicar nela entra na casa.
+- **Abrigos**: clicar num abrigo no rancho mostra quem mora lá, o botão de aumentar e os bichos que dá para comprar para ele.
+- **Nome dos animais**: ao comprar, abre uma janelinha para dar o nome (com uma sugestão). Dá para trocar depois na janela do abrigo.
 - **Ajuda de volta**: quem ajudou a sua roça (um amigo ou um vizinho da vila) fica marcado por 2 dias. Ajudar de volta dá 50 moedas.
 - **Livro de coleção**: cada planta e produto dos animais ganha carimbos de bronze (10 colheitas), prata (50) e ouro (200), com prêmios.
 - **Temas da roça**: clássico, cerca branca com roseiras, muro de pedra, tropical com coqueiros e lago dos patos.

@@ -162,6 +162,7 @@ function isHungry(a) {
   return false;
 }
 const seuSua = a => (a.f ? 'Sua ' : 'Seu ') + a.nome.toLowerCase();
+const nomeBicho = a => a.nome && a.nome !== ANIMAL[a.k].nome ? `${a.nome} (${ANIMAL[a.k].nome.toLowerCase()})` : ANIMAL[a.k].nome;
 
 // Cães de guarda: um vigia a plantação, outro os animais. Só protegem acordados (com comida).
 const DOGS = [
@@ -258,6 +259,7 @@ function newState() {
     v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0,
     tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
     animals: [], decor: {}, abrigos: { galinheiro: 1 }, racaoEsp: 0,
+    enfeites: {}, lugares: {}, skins: {}, skin: null,
     missions: null, gift: { i: 0, ciclo: 0, last: -1 }, owe: {}, col: {}, stamps: {}, temas: { classico: true }, tema: 'classico', helpDay: -1,
     friends: [], sent: {}, code: null, owner: null, log: {},
     fert: { basico: 2 }, fertSel: 'basico',
@@ -289,6 +291,9 @@ function migrate(s) {
   if (typeof s.helpDay !== 'number') s.helpDay = -1;
   s.changed = Number(s.changed) || 0;
   s.pocao = Math.max(0, Number(s.pocao) || 0);
+  s.enfeites = s.enfeites && typeof s.enfeites === 'object' ? s.enfeites : {};
+  s.lugares = s.lugares && typeof s.lugares === 'object' ? s.lugares : {};
+  s.skins = s.skins && typeof s.skins === 'object' ? s.skins : {};
   s.banca = Array.isArray(s.banca) ? s.banca.filter(x => x && item(x.item) && x.qtd > 0) : [];
   s.fab = s.fab && Array.isArray(s.fab.fila) ? { fila: s.fab.fila.filter(x => x && RECEITA[x.r]).slice(0, FILA_MAX) } : { fila: [] };
   if (s.truck && !Array.isArray(s.truck.pedidos)) s.truck = null;
@@ -455,7 +460,7 @@ const freeLots = () => Math.max(0, allowedLots() - state.owned);
 const canBuy = i => freeLots() > 0 && touches(i); // lote onde dá para colocar um canteiro agora
 let buyPending = null; // lote clicado uma vez, esperando o segundo clique para confirmar
 const sfx = name => { if (window.RFAudio) window.RFAudio.play(name); };
-const comfort = s => DECOR.reduce((t, d) => t + (s.decor[d.id] ? d.conforto : 0), 0);
+const comfort = s => DECOR.reduce((t, d) => t + (s.decor[d.id] ? d.conforto : 0), 0) + confortoEnfeites(s);
 const firstName = n => (n || '').split(' ')[0] || 'Você';
 
 function toast(msg, kind = '') {
@@ -833,9 +838,38 @@ function tickLife() {
   if (changed) done();
 }
 
+// Clicar num abrigo abre a janela dele: quem mora lá, aumentar o abrigo e comprar bichos.
+let abrigoSel = null;
 function actAbrigo(id) {
   if (!isHome()) return toast(`${ABRIGO[id].nome} de ${view.nome}.`);
-  openPanel('loja', 'abrigos', id);
+  abrigoSel = id;
+  openPanel('abrigo');
+}
+function abrigoHTML() {
+  const b = ABRIGO[abrigoSel], lv = abrigoLv(state, b.id);
+  if (!lv) return `<div class="row"><img alt="" src="${abrigoIcon(b.id)}"><div><div class="name">${b.nome}</div><div class="meta">Ainda não foi construíd${b.o}. Para: ${b.bichos.map(k => ANIMAL[k].nome.toLowerCase()).join(', ')}.</div></div>
+    ${state.level < b.nivel ? `<button class="btn" disabled>Nível ${b.nivel}</button>` : `<button class="btn gold" data-abrigo="${b.id}" ${state.coins < b.precos[0] ? 'disabled' : ''}>${b.precos[0] ? moeda(b.precos[0]) : 'Grátis'}</button>`}</div>`;
+  const moram = livesIn(state, b.id), cap = ABRIGO_CAP[lv], nivelUp = lv < 3 ? b.nivel + ABRIGO_NIVEL[lv + 1] : 0;
+  let html = `<div class="row sel"><img alt="" src="${abrigoIcon(b.id)}"><div><div class="name">${b.nome} · nível ${lv}</div><div class="meta">${moram.length} de ${cap} animais${lv < 3 ? ` · nível ${lv + 1} cabe ${ABRIGO_CAP[lv + 1]}` : ' · nível máximo'}</div></div>
+    ${lv >= 3 ? '<div></div>' : state.level < nivelUp ? `<button class="btn" disabled>Nível ${nivelUp}</button>` : `<button class="btn" data-abrigo="${b.id}" ${state.coins < b.precos[lv] ? 'disabled' : ''}>Aumentar<br><small>${b.precos[lv].toLocaleString('pt-BR')}</small></button>`}</div>`;
+  html += `<h3>Quem mora aqui</h3>`;
+  if (!moram.length) html += `<div class="empty">Ninguém ainda. Compre aqui embaixo!</div>`;
+  for (const a of moram) {
+    const d = ANIMAL[a.k];
+    const st = d.tipo === 'prod' ? (a.ready ? 'produto pronto!' : a.fed ? 'produzindo' : 'com fome') + ` · vive mais ${vida(lifeLeft(a))}`
+      : d.tipo === 'cria' ? (isAdult(a) ? 'adulto, pronto para vender' : `crescendo · falta ${fmt(d.tempo - a.g)}`) : 'companhia';
+    html += `<div class="row"><img alt="" src="${animalIcon(d.id)}"><div><div class="name">${esc(a.nome || d.nome)}</div><div class="meta">${d.nome} · ${st}</div></div>
+      <button class="btn ghost" data-renomear="${a.id}">Nome</button></div>`;
+  }
+  html += `<h3>Comprar para ${b.o === 'a' ? 'a' : 'o'} ${b.nome.toLowerCase()}</h3>`;
+  for (const k of b.bichos) {
+    const d = ANIMAL[k], locked = d.nivel > state.level, cheio = moram.length >= cap;
+    const info = d.tipo === 'prod' ? `ração ${d.racao} · ${PRODUCT[d.prod] ? PRODUCT[d.prod].nome.toLowerCase() : 'leitões'} a cada ${fmt(d.tempo)} · vive ${d.periodo} dias`
+      : d.tipo === 'cria' ? `cresce em ${fmt(d.tempo)} e vende por ${d.venda.toLocaleString('pt-BR')}` : 'companhia · carinho dá XP';
+    html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${animalIcon(k)}"><div><div class="name">${d.nome}</div><div class="meta">${info}</div></div>
+      ${locked ? `<button class="btn" disabled>Nível ${d.nivel}</button>` : cheio ? '<button class="btn ghost" disabled>Cheio</button>' : `<button class="btn" data-buy-animal="${k}" ${state.coins < d.custo ? 'disabled' : ''}>${moeda(d.custo)}</button>`}</div>`;
+  }
+  return html;
 }
 function actDecor(id) {
   const d = DECO[id];
@@ -854,12 +888,32 @@ function buyAnimal(k) {
   if (ab && vagas(state, ab.id) <= 0) return toast(`${ab.o === 'a' ? 'A' : 'O'} ${ab.nome.toLowerCase()} está ${ab.o === 'a' ? 'cheia' : 'cheio'}. Aumente na aba Abrigos.`, 'bad');
   if (state.coins < d.custo) return toast(`${d.nome} custa ${d.custo} moedas.`, 'bad');
   state.coins -= d.custo;
-  state.animals.push(newAnimal(k));
+  const novo = newAnimal(k);
+  state.animals.push(novo);
   sfx('buy');
   addXP(4, null);
   toast(d.lugar === 'casa' ? `${d.nome} chegou em casa!` : `${d.nome} chegou ${ab.o === 'a' ? 'na' : 'no'} ${ab.nome.toLowerCase()}!`, 'good');
   if (isHome()) setScene(d.lugar === 'casa' ? 'casa' : 'animais');
   done();
+  askName(novo);
+}
+// Janelinha para dar nome ao bicho que acabou de chegar.
+const NOMES = { f: ['Mimosa', 'Estrela', 'Pintada', 'Florzinha', 'Malhada', 'Belinha', 'Dona Chica', 'Pipoca', 'Jujuba', 'Violeta'],
+  m: ['Bidu', 'Tonico', 'Pingo', 'Faísca', 'Zé Pequeno', 'Chiquinho', 'Barão', 'Bolota', 'Paçoca', 'Trovão'] };
+let nomeDe = null;
+function askName(a) {
+  const d = ANIMAL[a.k], l = NOMES[d.f ? 'f' : 'm'];
+  nomeDe = a.id;
+  $('#nomeImg').src = animalIcon(d.id);
+  $('#nomeTxt').textContent = `${d.f ? 'Sua nova' : 'Seu novo'} ${d.nome.toLowerCase()} chegou! Como ${d.f ? 'ela' : 'ele'} vai se chamar?`;
+  $('#nomeInput').value = l[Math.floor(Math.random() * l.length)];
+  $('#nome').hidden = false; $('#nomeInput').select(); $('#nomeInput').focus();
+}
+function saveName(e) {
+  if (e) e.preventDefault();
+  const a = state.animals.find(x => x.id === nomeDe), v = $('#nomeInput').value.trim().slice(0, 18);
+  if (a && v) { a.nome = v; toast(`Bem-vind${ANIMAL[a.k].f ? 'a' : 'o'}, ${v}!`, 'good'); done(); }
+  $('#nome').hidden = true; nomeDe = null;
 }
 // Constrói um abrigo ou aumenta o nível dele.
 function buyAbrigo(id) {
@@ -1228,6 +1282,7 @@ function showGate(mode, msg) {
 function enterGame() {
   root.classList.remove('gated');
   resize(); setScene(scene);
+  presentePioneiro();
   setTimeout(() => { if (giftReady() && !isGated()) showGift(); }, 1500);
 }
 // Recado para o jogador: na tela de entrada, vai no status; no jogo, vira aviso.
@@ -1492,6 +1547,8 @@ function layout(sc) {
       c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1);
     });
     if (c0 > c1) { c0 = 0; c1 = COLS; r0 = 0; r1 = ROWS; }
+    // os enfeites colocados também entram no enquadramento
+    lugaresDe(S(), 'roca').forEach((id, k) => { if (!id) return; const [u, v] = LUGARES.roca[k]; c1 = Math.max(c1, Math.ceil(u)); r1 = Math.max(r1, Math.ceil(v)); });
     c0 = Math.max(0, c0 - 1); c1 = Math.min(COLS, c1 + 1); r0 = Math.max(0, r0 - 1); r1 = Math.min(ROWS, r1 + 1);
     const span = (c1 - c0) + (r1 - r0);
     // No celular os botões do lado ficam por cima da grama: a roça usa a largura toda.
@@ -1643,30 +1700,35 @@ function nightOverlay(tod) {
   ctx.fillRect(0, 0, L.cw, L.ch);
 }
 
-function drawBarn(x, y, s) {
-  const w = s * 1.0, h = s * 0.62;
+// skin 'pioneiro': celeiro azul com detalhes dourados (presente do primeiro mês).
+function drawBarn(x, y, s, skin) {
+  const w = s * 1.0, h = s * 0.62, pio = skin === 'pioneiro';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, w * 0.62, s * 0.08, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#c8402f'; ctx.fillRect(x - w / 2, y - h, w, h);
-  ctx.fillStyle = '#8f2a1e';
+  ctx.fillStyle = pio ? '#3f6fa8' : '#c8402f'; ctx.fillRect(x - w / 2, y - h, w, h);
+  ctx.fillStyle = pio ? '#2c5282' : '#8f2a1e';
   ctx.beginPath(); ctx.moveTo(x - w * 0.58, y - h); ctx.lineTo(x, y - h - s * 0.42); ctx.lineTo(x + w * 0.58, y - h); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = '#fff4e0'; ctx.lineWidth = Math.max(1.5, s * 0.03);
+  ctx.strokeStyle = pio ? '#ffd54a' : '#fff4e0'; ctx.lineWidth = Math.max(1.5, s * 0.03);
   ctx.strokeRect(x - w / 2, y - h, w, h);
   const dw = w * 0.42, dh = h * 0.7;
   ctx.strokeRect(x - dw / 2, y - dh, dw, dh);
   ctx.beginPath(); ctx.moveTo(x - dw / 2, y - dh); ctx.lineTo(x + dw / 2, y); ctx.moveTo(x + dw / 2, y - dh); ctx.lineTo(x - dw / 2, y); ctx.stroke();
   if (estacao().neve) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(x - w * 0.6, y - h - s * 0.02); ctx.lineTo(x, y - h - s * 0.44); ctx.lineTo(x + w * 0.6, y - h - s * 0.02); ctx.lineTo(x + w * 0.45, y - h - s * 0.06); ctx.lineTo(x, y - h - s * 0.34); ctx.lineTo(x - w * 0.45, y - h - s * 0.06); ctx.closePath(); ctx.fill(); }
-  ctx.fillStyle = '#fff4e0'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.08, 0, 7); ctx.fill();
-  ctx.fillStyle = '#6b3a1a'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.05, 0, 7); ctx.fill();
+  ctx.fillStyle = pio ? '#ffd54a' : '#fff4e0'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.08, 0, 7); ctx.fill();
+  if (pio) star(x, y - h - s * 0.14, s * 0.06);
+  else { ctx.fillStyle = '#6b3a1a'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.05, 0, 7); ctx.fill(); }
 }
-function drawHouse(x, y, s, cor) {
-  const w = s * 0.95, h = s * 0.55;
+function drawHouse(x, y, s, cor, skin) {
+  const w = s * 0.95, h = s * 0.55, pio = skin === 'pioneiro';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, w * 0.62, s * 0.08, 0, 0, 7); ctx.fill();
   ctx.fillStyle = cor; ctx.fillRect(x - w / 2, y - h, w, h);
-  ctx.fillStyle = '#b5532f';
+  if (pio) { ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = Math.max(1.5, s * 0.025); ctx.strokeRect(x - w / 2, y - h, w, h); }
+  ctx.fillStyle = pio ? '#2c5282' : '#b5532f';
   ctx.beginPath(); ctx.moveTo(x - w * 0.62, y - h); ctx.lineTo(x - w * 0.3, y - h - s * 0.35); ctx.lineTo(x + w * 0.3, y - h - s * 0.35); ctx.lineTo(x + w * 0.62, y - h); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#6b3a1a'; ctx.fillRect(x - w * 0.1, y - h * 0.62, w * 0.2, h * 0.62);
   ctx.fillStyle = '#ffe9a8';
   ctx.fillRect(x - w * 0.38, y - h * 0.7, w * 0.18, h * 0.3); ctx.fillRect(x + w * 0.2, y - h * 0.7, w * 0.18, h * 0.3);
+  if (estacao().neve) { ctx.fillStyle = '#fff'; ctx.fillRect(x - w * 0.3, y - h - s * 0.36, w * 0.6, s * 0.05); }
+  if (pio) star(x, y - h - s * 0.2, s * 0.06);
 }
 function drawCoop(x, y, s) {
   const w = s * 0.8, h = s * 0.45;
@@ -2638,13 +2700,19 @@ function drawLake(x, y, W, t) {
 function drawRoca(s, t, home) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
-  if (home) drawBarn(L.ox - W * 1.55, L.oy + W * 0.3, W * 1.15);
-  else drawHouse(L.ox - W * 1.55, L.oy + W * 0.3, W * 1.15, view.casa);
+  // a casa fica atrás da roça, do lado das árvores; o celeiro, à esquerda
+  const hx = L.ox + W * 1.35, hy = L.oy - W * 0.05, skin = s.skin;
+  drawHouse(hx, hy, W * 0.95, home ? '#f1dcae' : view.casa, skin);
+  const hovCasa = hover && hover.kind === 'casa';
+  if (hovCasa) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(hx, hy, W * 0.6, W * 0.16, 0, 0, 7); ctx.stroke(); }
+  hits.push({ kind: 'casa', x: hx, y: hy - W * 0.35, r: W * 0.45 });
+  drawBarn(L.ox - W * 1.55, L.oy + W * 0.3, W * 1.15, skin);
   const tm = temaDe(s);
   if (tm.lago) { drawLake(L.ox + W * 2.75, L.oy + W * 0.4, W * 0.72, t); drawTree(L.ox + W * 4.0, L.oy + W * 1.4, W * 0.9, t); }
   else { drawTree(L.ox + W * 2.6, L.oy + W * 0.5, W * 1.0, t, tm.coqueiro); drawTree(L.ox + W * 3.6, L.oy + W * 1.1, W * 0.8, t, tm.coqueiro); }
   if (view.kind === 'npc') { const q = DOG_AT(); drawDog(q.x, q.y, W * 0.7, t); }
   else drawKennelSpot('roca', s, home);
+  drawLugares(s, 'roca', t, home);
   drawFence(COLS, ROWS, 'back');
   if (view.kind !== 'npc') drawDogSpot('roca', s, t, home);
   if (home) drawLandSign();
@@ -2805,6 +2873,7 @@ function drawPen(s, t, home, dt) {
   const bubbles = [];
   const order = ABRIGOS.slice().sort((a, b) => { const p = yardOf(a.id), q = yardOf(b.id); return (p.u0 + p.v0) - (q.u0 + q.v0); });
   for (const b of order) drawYard(b, s, t, home, dt, bubbles);
+  drawLugares(s, 'animais', t, home);
   drawCritters(t, tod);
   nightOverlay(tod);
   drawWeather(t);
@@ -3260,14 +3329,15 @@ function focusRow(id) {
 function renderPane() {
   const open = !$('#panel').hidden;
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(open && b.dataset.tab === tab)));
-  $('#panelTitle').textContent = TAB_NAMES[tab];
+  $('#panelTitle').textContent = tab === 'abrigo' && abrigoSel ? ABRIGO[abrigoSel].nome : TAB_NAMES[tab];
   if (!open) return;
   const pane = $('#pane');
   let html = '';
-  if (tab === 'missoes') html = missoesHTML();
+  if (tab === 'abrigo') html = abrigoHTML();
+  else if (tab === 'missoes') html = missoesHTML();
   else if (tab === 'fabrica') html = fabricaHTML();
   else if (tab === 'loja') {
-    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['temas', 'Temas']];
+    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['enfeites', 'Enfeites'], ['temas', 'Temas']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
     if (shopSeg === 'sementes' || shopSeg === 'mudas') {
       const trees = shopSeg === 'mudas';
@@ -3388,8 +3458,23 @@ function renderPane() {
           <div class="meta">${b.custo} moedas · vive ${b.vida} dias<br>espanta ${Math.round(b.protege * 100)}% dos ladrões · morde ${Math.round(b.morde * 100)}% deles<br>+${b.xpDia} XP por dia · +${b.xpPega} XP por ladrão</div></div>
           <div class="actions">${locked ? `<button class="btn" disabled>Nível ${b.nivel}</button>` : btn('roca') + btn('animais')}</div></div>`;
       }
+    } else if (shopSeg === 'enfeites') {
+      const livre = sc => lugaresDe(state, sc).includes(null);
+      html += `<p class="hint">Enfeites ficam em volta da roça e do rancho, sem atrapalhar os canteiros e os cercados. Cada um dá conforto (+XP). Para guardar, clique duas vezes nele.</p>`;
+      for (const e of ENFEITES) {
+        const tem = state.enfeites[e.id] || 0, postos = ['roca', 'animais'].reduce((t, sc) => t + lugaresDe(state, sc).filter(x => x === e.id).length, 0);
+        if (e.especial && !tem && !postos) continue;
+        const locked = !e.especial && e.nivel > state.level;
+        html += `<div class="row wide ${locked ? 'locked' : ''} ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}">
+          <div><div class="name">${e.nome}${e.especial ? ' <span class="tag">⭐ pioneiros</span>' : ''}</div>
+          <div class="meta">${e.especial ? 'Presente de quem jogou no primeiro mês' : `${e.custo.toLocaleString('pt-BR')} moedas`} · +${e.conforto}% de XP${tem ? ` · guardados: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
+          <div class="actions">${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `${e.especial ? '' : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}
+            ${tem ? `<button class="btn gold" data-enfeite-por="${e.id}" data-sc="roca" ${livre('roca') ? '' : 'disabled'}>Pôr na roça</button><button class="btn gold" data-enfeite-por="${e.id}" data-sc="animais" ${livre('animais') ? '' : 'disabled'}>Pôr no rancho</button>` : ''}`}</div></div>`;
+      }
     } else if (shopSeg === 'temas') {
       html += `<p class="hint">Os temas mudam a cerca e o jeito da sua roça. Os amigos veem o seu tema quando visitam.</p>`;
+      if (state.skins.pioneiro) html += `<div class="row sel"><img alt="" src="${makeIcon('skin:pio', () => drawBarn(48, 84, 70, 'pioneiro'))}"><div><div class="name">Celeiro e casa dos Pioneiros <span class="tag">⭐ pioneiros</span></div><div class="meta">Azul com detalhes dourados</div></div>
+        <button class="btn ${state.skin === 'pioneiro' ? 'ghost' : ''}" data-skin="${state.skin === 'pioneiro' ? '' : 'pioneiro'}">${state.skin === 'pioneiro' ? 'Tirar' : 'Usar'}</button></div>`;
       for (const t of TEMAS) {
         const locked = t.nivel > state.level, owned = !!state.temas[t.id], using = state.tema === t.id;
         html += `<div class="row ${locked ? 'locked' : ''} ${using ? 'sel' : ''}"><img alt="" src="${temaIcon(t.id)}">
@@ -3521,6 +3606,7 @@ function renderPane() {
 $('#pane').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   const d = b.dataset;
+  if (d.renomear) { const a = state.animals.find(x => x.id === d.renomear); if (a) askName(a); return; }
   if (d.fseg) { fabSeg = d.fseg; renderPane(); $('#pane').scrollTop = 0; return; }
   if (d.fabricar) return fabricar(d.fabricar);
   if ('fabRecolher' in d) return recolherFab();
@@ -3530,6 +3616,9 @@ $('#pane').addEventListener('click', e => {
   if (d.mseg) { missSeg = d.mseg; renderPane(); $('#pane').scrollTop = 0; return; }
   if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
   if (d.temaRoca) return buyTema(d.temaRoca);
+  if ('skin' in d) { state.skin = d.skin || null; toast(d.skin ? 'Celeiro e casa dos Pioneiros!' : 'Celeiro e casa clássicos.', 'good'); if (isHome()) setScene('roca'); return done(); }
+  if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar);
+  if (d.enfeitePor) return colocarEnfeite(d.enfeitePor, d.sc);
   if (d.pocao) {
     const n = Number(d.pocao) || 1;
     if (state.coins < POCAO.custo * n) return toast(`Faltam moedas: ${n} ${n > 1 ? 'poções custam' : 'poção custa'} ${POCAO.custo * n}.`, 'bad');
@@ -3685,7 +3774,7 @@ function tipAnimal(id) {
   const a = S().animals.find(x => x.id === id); if (!a) return null;
   const d = ANIMAL[a.k], home = isHome();
   if (d.tipo === 'pet') return `<b>${esc(a.nome || d.nome)}</b> · ${d.nome.toLowerCase()}<br>Clique para fazer carinho.`;
-  let h = `<b>${d.nome}</b><br>`;
+  let h = `<b>${esc(a.nome || d.nome)}</b>${a.nome && a.nome !== d.nome ? ` · ${d.nome.toLowerCase()}` : ''}<br>`;
   if (d.tipo === 'cria') {
     if (isAdult(a)) return h + `Adulto! ${home ? `Clique para vender por ${d.venda.toLocaleString('pt-BR')} moedas.` : ''}`;
     h += `Crescendo: falta ${fmt(d.tempo - a.g)}<div class="bar"><i style="width:${a.g / d.tempo * 100}%"></i></div>`;
@@ -3714,12 +3803,17 @@ function tipAbrigo(id) {
   const quem = b.bichos.map(k => ANIMAL[k].nome.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' e $1');
   if (!lv) return `<b>${b.nome}</b><br>Para ${quem}.<br>${state.level < b.nivel ? `Libera no nível ${b.nivel}.` : `Construir por ${b.precos[0].toLocaleString('pt-BR')} moedas. Clique para ver.`}`;
   let h = `<b>${b.nome}</b> · nível ${lv}<br>${livesIn(s, id).length} de ${ABRIGO_CAP[lv]} animais · ${quem}`;
-  if (isHome()) h += lv < 3 ? `<br>Clique para aumentar ou comprar animais.` : `<br>Clique para comprar animais.`;
+  if (isHome()) h += '<br>Clique para ver quem mora aqui e comprar bichos.';
   return h;
 }
 function tipBicho(i) {
   const c = crittersOf(scene).list[i];
   return c ? `<b>${BICHO[c.tipo].nome}</b><br>Clique para ouvir.` : null;
+}
+function tipEnfeite(sc, k) {
+  const id = lugaresDe(S(), sc)[k]; if (!id) return null;
+  const e = ENFEITE[id];
+  return `<b>${e.nome}</b><br>+${e.conforto}% de XP${e.especial ? '<br>Especial dos pioneiros' : ''}${isHome() ? '<br>Clique duas vezes para guardar.' : ''}`;
 }
 function tipLand() {
   const next = EXPANSOES[state.exp + 1];
@@ -3735,7 +3829,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'enfeite' ? tipEnfeite(hover.sc, hover.k) : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -3812,6 +3906,8 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'abrigo') actAbrigo(target.id);
   else if (target.kind === 'land') openPanel('terreno');
   else if (target.kind === 'bicho') actBicho(target.i);
+  else if (target.kind === 'enfeite') actEnfeite(target.sc, target.k);
+  else if (target.kind === 'casa') setScene('casa');
 });
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input, textarea')) return;
@@ -3885,6 +3981,8 @@ function openSettings() { if ($('#verTxt')) $('#verTxt').textContent = `Versão 
 function closeSettings() { $('#settings').hidden = true; $('#openSettings').focus(); }
 $('#openSettings').addEventListener('click', openSettings);
 $('#giftBtn').addEventListener('click', showGift);
+$('#nomeForm').addEventListener('submit', saveName);
+$('#nome').addEventListener('click', e => { if (e.target === $('#nome') || e.target.closest('[data-close]')) { $('#nome').hidden = true; nomeDe = null; } });
 $('#giftOpen').addEventListener('click', openGift);
 $('#gift').addEventListener('click', e => { if (e.target === $('#gift') || e.target.closest('[data-close]')) closeGift(); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gift').hidden) closeGift(); });
@@ -4669,6 +4767,157 @@ function drawGood(id, x, y, s) {
 }
 
 // ============================================================
+// Enfeites da roça e do rancho, e o presente dos pioneiros
+// ============================================================
+// Enfeites ficam em lugares fixos, fora dos canteiros e dos cercados. Cada um dá conforto (+XP).
+const ENFEITES = [
+  { id: 'flores',     nome: 'Canteiro de flores',     nivel: 1,  custo: 300,  conforto: 1 },
+  { id: 'banco',      nome: 'Banco de madeira',       nivel: 2,  custo: 500,  conforto: 1 },
+  { id: 'espantalho', nome: 'Espantalho',             nivel: 3,  custo: 800,  conforto: 1 },
+  { id: 'carrinho',   nome: 'Carrinho de mão',        nivel: 4,  custo: 600,  conforto: 1 },
+  { id: 'poco',       nome: 'Poço',                   nivel: 6,  custo: 1500, conforto: 2 },
+  { id: 'fonte',      nome: 'Fonte',                  nivel: 10, custo: 3000, conforto: 2 },
+  { id: 'moinho',     nome: 'Cata-vento',             nivel: 14, custo: 5000, conforto: 3 },
+  { id: 'bandeira',   nome: 'Bandeira dos Pioneiros', especial: true, conforto: 2 },
+  { id: 'bolo',       nome: 'Bolo de boas-vindas',    especial: true, conforto: 2 },
+];
+const ENFEITE = Object.fromEntries(ENFEITES.map(e => [e.id, e]));
+// Lugares (coordenadas da grade) em cada cena.
+const LUGARES = {
+  roca: [[2.5, -0.75], [-0.75, 5.9], [5.4, -0.75], [-0.75, 7.1], [6.6, -0.75], [-0.75, 8.3]],
+  animais: [[2, RANCH_R + 0.8], [6, RANCH_R + 0.8], [10, RANCH_R + 0.8], [14, RANCH_R + 0.8], [-1.1, 6.2], [RANCH_C + 0.9, 3.2]],
+};
+const lugaresDe = (s, sc) => {
+  const l = s.lugares && Array.isArray(s.lugares[sc]) ? s.lugares[sc] : [];
+  return LUGARES[sc].map((_, k) => ENFEITE[l[k]] ? l[k] : null);
+};
+const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + lugaresDe(s, sc).reduce((u, id) => u + (id ? ENFEITE[id].conforto : 0), 0), 0);
+function comprarEnfeite(id) {
+  const e = ENFEITE[id];
+  if (e.especial) return;
+  if (state.level < e.nivel) return toast(`${e.nome} libera no nível ${e.nivel}.`);
+  if (state.coins < e.custo) return toast(`${e.nome} custa ${e.custo.toLocaleString('pt-BR')} moedas.`, 'bad');
+  state.coins -= e.custo; state.enfeites[id] = (state.enfeites[id] || 0) + 1;
+  sfx('buy'); addXP(3, null);
+  toast(`${e.nome} comprado! Coloque na roça ou no rancho.`, 'good');
+  done();
+}
+function colocarEnfeite(id, sc) {
+  if (!(state.enfeites[id] > 0)) return;
+  const l = state.lugares[sc] = lugaresDe(state, sc), k = l.indexOf(null);
+  if (k < 0) return toast(`Não tem lugar livre ${sc === 'roca' ? 'na roça' : 'no rancho'}. Guarde algum enfeite antes.`);
+  l[k] = id; state.enfeites[id]--;
+  sfx('buy');
+  toast(`${ENFEITE[id].nome} ${sc === 'roca' ? 'na roça' : 'no rancho'}!`, 'good');
+  setScene(sc); closePanel();
+  done();
+}
+function actEnfeite(sc, k) {
+  const id = lugaresDe(S(), sc)[k]; if (!id) return;
+  const e = ENFEITE[id];
+  if (!isHome()) return toast(`${e.nome} de ${view.nome}.`);
+  confirmTwice('guardar' + sc + k, `${e.nome}: +${e.conforto}% de XP. Clique de novo para guardar.`, () => {
+    state.lugares[sc][k] = null; state.enfeites[id] = (state.enfeites[id] || 0) + 1;
+    toast(`${e.nome} guardado. Coloque de novo pela Loja › Enfeites.`); done();
+  });
+}
+function drawLugares(s, sc, t, home) {
+  const W = L.W, l = lugaresDe(s, sc);
+  LUGARES[sc].forEach(([u, v], k) => {
+    const id = l[k]; if (!id) return;
+    const q = iso(u, v);
+    const hov = hover && hover.kind === 'enfeite' && hover.sc === sc && hover.k === k;
+    if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.35, W * 0.12, 0, 0, 7); ctx.stroke(); }
+    drawEnfeite(id, q.x, q.y, W / 100, t);
+    hits.push({ kind: 'enfeite', sc, k, x: q.x, y: q.y - W * 0.25, r: W * 0.32 });
+  });
+}
+// Desenho dos enfeites, com a base em (x, y). s = escala (1 = casa de 100px).
+function drawEnfeite(id, x, y, s, t) {
+  ctx.lineWidth = Math.max(1, 1.2 * s); ctx.strokeStyle = 'rgba(60,30,10,.5)';
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, 26 * s, 8 * s, 0, 0, 7); ctx.fill();
+  if (id === 'flores') {
+    ctx.fillStyle = '#8b5a33'; ctx.beginPath(); ctx.ellipse(x, y - 3 * s, 24 * s, 8 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#4f9a2f'; ctx.beginPath(); ctx.ellipse(x, y - 7 * s, 21 * s, 7 * s, 0, 0, 7); ctx.fill();
+    const cores = ['#e53b2f', '#ffd54a', '#f06292', '#ffffff', '#ba68c8'];
+    for (let k = 0; k < 11; k++) { const a = k * 2.3, r = 6 + (k % 3) * 5; ctx.fillStyle = cores[k % 5]; ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 1.5 * s, y - 9 * s + Math.sin(a) * r * 0.45 * s, 3 * s, 0, 7); ctx.fill(); }
+  } else if (id === 'banco') {
+    ctx.fillStyle = '#6e4424'; ctx.fillRect(x - 20 * s, y - 12 * s, 3 * s, 12 * s); ctx.fillRect(x + 17 * s, y - 12 * s, 3 * s, 12 * s);
+    ctx.fillStyle = '#b07a44'; ctx.fillRect(x - 24 * s, y - 16 * s, 48 * s, 5 * s); ctx.strokeRect(x - 24 * s, y - 16 * s, 48 * s, 5 * s);
+    ctx.fillRect(x - 24 * s, y - 30 * s, 48 * s, 4 * s); ctx.fillRect(x - 24 * s, y - 24 * s, 48 * s, 4 * s);
+    ctx.fillStyle = '#6e4424'; ctx.fillRect(x - 22 * s, y - 30 * s, 3 * s, 14 * s); ctx.fillRect(x + 19 * s, y - 30 * s, 3 * s, 14 * s);
+  } else if (id === 'espantalho') {
+    ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - 2 * s, y - 50 * s, 4 * s, 50 * s); ctx.fillRect(x - 20 * s, y - 36 * s, 40 * s, 4 * s);
+    ctx.fillStyle = '#3f6fa8'; ctx.fillRect(x - 11 * s, y - 38 * s, 22 * s, 20 * s);
+    ctx.fillStyle = '#e8c35a'; for (const dx of [-20, 18]) ctx.fillRect(x + dx * s, y - 35 * s, 3 * s, 7 * s);
+    ctx.fillStyle = '#f1dcae'; ctx.beginPath(); ctx.arc(x, y - 46 * s, 8 * s, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#222'; ctx.fillRect(x - 4 * s, y - 48 * s, 2 * s, 2 * s); ctx.fillRect(x + 2 * s, y - 48 * s, 2 * s, 2 * s);
+    ctx.fillStyle = '#d9a441'; ctx.beginPath(); ctx.ellipse(x, y - 53 * s, 14 * s, 3 * s, 0, 0, 7); ctx.fill(); ctx.fillRect(x - 7 * s, y - 60 * s, 14 * s, 7 * s);
+  } else if (id === 'carrinho') {
+    ctx.fillStyle = '#c8402f'; ctx.beginPath(); ctx.moveTo(x - 18 * s, y - 20 * s); ctx.lineTo(x + 14 * s, y - 20 * s); ctx.lineTo(x + 8 * s, y - 8 * s); ctx.lineTo(x - 14 * s, y - 8 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e8c35a'; ctx.beginPath(); ctx.ellipse(x - 2 * s, y - 21 * s, 15 * s, 5 * s, 0, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = '#6e4424'; ctx.lineWidth = 2.5 * s; ctx.beginPath(); ctx.moveTo(x - 14 * s, y - 14 * s); ctx.lineTo(x - 28 * s, y - 20 * s); ctx.moveTo(x - 12 * s, y - 9 * s); ctx.lineTo(x - 14 * s, y); ctx.stroke();
+    ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(x + 10 * s, y - 5 * s, 5 * s, 0, 7); ctx.fill();
+  } else if (id === 'poco') {
+    ctx.fillStyle = '#a8a294'; ctx.fillRect(x - 16 * s, y - 18 * s, 32 * s, 16 * s);
+    ctx.fillStyle = '#c7c1b3'; ctx.beginPath(); ctx.ellipse(x, y - 18 * s, 16 * s, 6 * s, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2f5d7a'; ctx.beginPath(); ctx.ellipse(x, y - 18 * s, 12 * s, 4 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#6e4424'; ctx.fillRect(x - 15 * s, y - 42 * s, 3 * s, 24 * s); ctx.fillRect(x + 12 * s, y - 42 * s, 3 * s, 24 * s);
+    ctx.fillStyle = '#b5532f'; ctx.beginPath(); ctx.moveTo(x - 22 * s, y - 40 * s); ctx.lineTo(x, y - 54 * s); ctx.lineTo(x + 22 * s, y - 40 * s); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#8a5a33'; ctx.fillRect(x - 4 * s, y - 34 * s, 8 * s, 7 * s);
+  } else if (id === 'fonte') {
+    ctx.fillStyle = '#bdb6a8'; ctx.beginPath(); ctx.ellipse(x, y - 6 * s, 24 * s, 8 * s, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5aa9e6'; ctx.beginPath(); ctx.ellipse(x, y - 8 * s, 19 * s, 5.5 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#bdb6a8'; ctx.fillRect(x - 3 * s, y - 28 * s, 6 * s, 20 * s); ctx.beginPath(); ctx.ellipse(x, y - 28 * s, 9 * s, 3 * s, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(140,200,255,.9)'; ctx.lineWidth = 1.5 * s;
+    for (const d of [-1, 1]) { const w = Math.sin(t / 200) * s; ctx.beginPath(); ctx.moveTo(x, y - 32 * s); ctx.quadraticCurveTo(x + d * 10 * s, y - 40 * s + w, x + d * 13 * s, y - 10 * s); ctx.stroke(); }
+  } else if (id === 'moinho') {
+    ctx.fillStyle = '#e6d6b8'; ctx.beginPath(); ctx.moveTo(x - 10 * s, y); ctx.lineTo(x - 5 * s, y - 50 * s); ctx.lineTo(x + 5 * s, y - 50 * s); ctx.lineTo(x + 10 * s, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#b5532f'; ctx.beginPath(); ctx.moveTo(x - 8 * s, y - 50 * s); ctx.lineTo(x, y - 58 * s); ctx.lineTo(x + 8 * s, y - 50 * s); ctx.fill();
+    ctx.save(); ctx.translate(x, y - 50 * s); ctx.rotate(t / 700);
+    ctx.fillStyle = '#fff4e0'; for (let k = 0; k < 4; k++) { ctx.rotate(Math.PI / 2); ctx.fillRect(-2 * s, 2 * s, 5 * s, 20 * s); ctx.strokeRect(-2 * s, 2 * s, 5 * s, 20 * s); }
+    ctx.restore(); ctx.fillStyle = '#6b3a1a'; ctx.beginPath(); ctx.arc(x, y - 50 * s, 2.5 * s, 0, 7); ctx.fill();
+  } else if (id === 'bandeira') {
+    ctx.fillStyle = '#8a8f96'; ctx.fillRect(x - 1.5 * s, y - 70 * s, 3 * s, 70 * s);
+    ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(x, y - 71 * s, 3 * s, 0, 7); ctx.fill();
+    const w = k => Math.sin(t / 250 + k) * 3 * s;
+    ctx.fillStyle = '#2e8b3e'; ctx.beginPath(); ctx.moveTo(x + 1.5 * s, y - 68 * s);
+    for (let k = 0; k <= 6; k++) ctx.lineTo(x + (1.5 + k * 6) * s, y - 68 * s + w(k));
+    for (let k = 6; k >= 0; k--) ctx.lineTo(x + (1.5 + k * 6) * s, y - 44 * s + w(k));
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.moveTo(x + 19 * s, y - 66 * s + w(3)); ctx.lineTo(x + 34 * s, y - 56 * s + w(5)); ctx.lineTo(x + 19 * s, y - 46 * s + w(3)); ctx.lineTo(x + 4 * s, y - 56 * s + w(1)); ctx.closePath(); ctx.fill();
+    star(x + 19 * s, y - 56 * s + w(3), 5 * s);
+  } else if (id === 'bolo') {
+    ctx.fillStyle = '#b07a44'; ctx.fillRect(x - 18 * s, y - 16 * s, 3 * s, 16 * s); ctx.fillRect(x + 15 * s, y - 16 * s, 3 * s, 16 * s);
+    ctx.fillStyle = '#fff4e0'; ctx.fillRect(x - 22 * s, y - 20 * s, 44 * s, 5 * s); ctx.fillStyle = '#e0463a'; for (let k = 0; k < 6; k++) ctx.fillRect(x - 22 * s + k * 8 * s, y - 20 * s, 4 * s, 5 * s);
+    ctx.fillStyle = '#f8bbd0'; ctx.fillRect(x - 14 * s, y - 32 * s, 28 * s, 12 * s); ctx.strokeRect(x - 14 * s, y - 32 * s, 28 * s, 12 * s);
+    ctx.fillStyle = '#fff'; ctx.fillRect(x - 9 * s, y - 42 * s, 18 * s, 10 * s); ctx.strokeRect(x - 9 * s, y - 42 * s, 18 * s, 10 * s);
+    ctx.fillStyle = '#e53b2f'; for (const dx of [-6, 0, 6]) { ctx.beginPath(); ctx.arc(x + dx * s, y - 43 * s, 2 * s, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#4aa3df'; ctx.fillRect(x - 1 * s, y - 52 * s, 2 * s, 8 * s);
+    ctx.fillStyle = '#ffb300'; ctx.beginPath(); ctx.ellipse(x, y - 54 * s + Math.sin(t / 120) * 0.5 * s, 2 * s, 3.5 * s, 0, 0, 7); ctx.fill();
+  }
+}
+const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, id === 'bandeira' ? 1.15 : id === 'espantalho' || id === 'moinho' ? 1.3 : 1.6, 0));
+
+// ---------- Presente dos pioneiros: quem joga no primeiro mês ganha itens especiais ----------
+const PIONEIRO_ATE = new Date(2026, 9, 31, 23, 59, 59).getTime(); // até 31 de outubro de 2026
+function presentePioneiro() {
+  if (!state || state.pioneiro || Date.now() > PIONEIRO_ATE) return;
+  state.pioneiro = Date.now();
+  state.enfeites.bandeira = (state.enfeites.bandeira || 0) + 1;
+  state.enfeites.bolo = (state.enfeites.bolo || 0) + 1;
+  state.skins.pioneiro = true; state.skin = 'pioneiro';
+  // já coloca a bandeira e o bolo na roça, nos primeiros lugares livres
+  for (const id of ['bandeira', 'bolo']) {
+    const l = state.lugares.roca = lugaresDe(state, 'roca'), k = l.indexOf(null);
+    if (k >= 0) { l[k] = id; state.enfeites[id]--; }
+  }
+  const msg = 'Presente de pioneiro! Por jogar no primeiro mês da Roça Feliz você ganhou a Bandeira dos Pioneiros, um Bolo de boas-vindas e o tema azul e dourado para o celeiro e a casa.';
+  addNews(msg);
+  setTimeout(() => toast(msg, 'good'), 2500);
+  done();
+}
+
+// ============================================================
 // Laço principal
 // ============================================================
 let last = performance.now(), lastSave = 0, lastUI = 0, lastInfo = 0, lastSentCheck = 0;
@@ -4690,7 +4939,7 @@ function frame(now) {
 function start(data) {
   state = (data && data.state && migrate(data.state)) || load() || newState();
   applySettings();
-  rollPeriods();
+  rollPeriods(); presentePioneiro();
   resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons(); afterUpdate(); renderTabs();
   if (!Cloud.available) setTimeout(() => { if (giftReady()) showGift(); }, 1500);
   requestAnimationFrame(t => { last = t; frame(t); });
