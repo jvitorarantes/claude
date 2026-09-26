@@ -3523,7 +3523,42 @@ function renderSettings() {
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.tema === settings.tema)));
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tema === settings.tema)));
 }
-function openSettings() { renderSettings(); $('#settings').hidden = false; $('#settings [data-close]').focus(); }
+// ---------- Atualizações ----------
+// Busca o index.html do site sem cache e compara a versão com a que está rodando.
+// Se tiver versão nova (ou não der para conferir), salva a roça, limpa os caches e recarrega.
+const VERSION = document.querySelector('meta[name="rf-version"]')?.content || '?';
+async function checkUpdate() {
+  const st = $('#updStatus'), btn = $('#checkUpdate');
+  btn.disabled = true; st.textContent = 'Procurando versão nova…';
+  let remote = null;
+  try {
+    const r = await fetch(`${location.pathname.replace(/[^/]*$/, '')}index.html?t=${Date.now()}`, { cache: 'no-store' });
+    if (r.ok) remote = ((await r.text()).match(/name="rf-version" content="([^"]+)"/) || [])[1] || null;
+  } catch (e) { /* sem internet ou página sem site (versão do Claude) */ }
+  if (remote && remote === VERSION) {
+    btn.disabled = false;
+    st.textContent = `Você já está na versão mais nova (${VERSION}).`;
+    return;
+  }
+  st.textContent = remote ? `Versão ${remote} encontrada! Atualizando…` : 'Recarregando o jogo com os arquivos mais novos…';
+  save();
+  try { if (user && dirty) await cloudSave(); } catch (e) { /* a roça já está salva no aparelho */ }
+  try { if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch (e) { /* sem cache */ }
+  try { if (navigator.serviceWorker) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch (e) { /* sem service worker */ }
+  try { sessionStorage.setItem('rf-updated', VERSION); } catch (e) { /* sem armazenamento */ }
+  // Um endereço diferente obriga o navegador a baixar a página de novo.
+  // Sem o site para comparar (versão do Claude ou sem internet), só recarrega.
+  if (remote) location.replace(`${location.pathname}?atualizar=${Date.now()}${location.hash}`);
+  else location.reload();
+}
+function afterUpdate() {
+  if (!/[?&]atualizar=/.test(location.search)) return;
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* tanto faz */ }
+  let old = null; try { old = sessionStorage.getItem('rf-updated'); sessionStorage.removeItem('rf-updated'); } catch (e) { /* sem armazenamento */ }
+  setTimeout(() => toast(old && old !== VERSION ? `Jogo atualizado para a versão ${VERSION}!` : `Jogo recarregado (versão ${VERSION}).`, 'good'), 1200);
+}
+$('#checkUpdate')?.addEventListener('click', checkUpdate);
+function openSettings() { if ($('#verTxt')) $('#verTxt').textContent = `Versão ${VERSION}`; if ($('#updStatus')) $('#updStatus').textContent = ''; if ($('#checkUpdate')) $('#checkUpdate').disabled = false; renderSettings(); $('#settings').hidden = false; $('#settings [data-close]').focus(); }
 function closeSettings() { $('#settings').hidden = true; $('#openSettings').focus(); }
 $('#openSettings').addEventListener('click', openSettings);
 $('#settings').addEventListener('click', e => {
@@ -3566,7 +3601,7 @@ function frame(now) {
 function start(data) {
   state = (data && data.state && migrate(data.state)) || load() || newState();
   applySettings();
-  resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons();
+  resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons(); afterUpdate();
   requestAnimationFrame(t => { last = t; frame(t); });
   if (Cloud.available) {
     showGate('loading');
