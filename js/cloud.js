@@ -48,6 +48,9 @@
     return d.exists ? d.data() : null;
   }
   const saveFarm = (uid, data) => farm(uid).set(data);
+  // Sessão: qual aparelho está jogando agora. Entrar num aparelho novo tira o anterior.
+  const claimSession = (uid, session) => farm(uid).set({ session }, { merge: true });
+  const watchFarm = (uid, cb) => farm(uid).onSnapshot(d => cb(d.exists ? d.data() : null), e => console.warn('roça:', e));
 
   // Código de amigo: 6 letras/números, fácil de ditar (sem 0/O, 1/I/L).
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -92,7 +95,7 @@
   }
 
   window.RFCloud = {
-    available, init, signIn, signOut, loadFarm, saveFarm, claimCode, findCode, normalizeCode,
+    available, init, signIn, signOut, loadFarm, saveFarm, claimSession, watchFarm, claimCode, findCode, normalizeCode,
     sendVisit, watchVisits, deleteVisit, sendRequest, deleteRequest, requestExists, watchRequests,
   };
 })();

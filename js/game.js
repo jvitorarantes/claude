@@ -286,6 +286,7 @@ function migrate(s) {
   if (!s.temas[s.tema]) s.tema = 'classico';
   if (!s.missions || !Array.isArray(s.missions.dia) || !Array.isArray(s.missions.semana)) s.missions = null;
   if (typeof s.helpDay !== 'number') s.helpDay = -1;
+  s.changed = Number(s.changed) || 0;
   const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
   s.dogs = {};
   for (const slot of ['roca', 'animais']) { const d = dogs[slot]; s.dogs[slot] = d && DOG[d.raca] ? d : null; }
@@ -360,8 +361,13 @@ function load() {
   } catch (e) { return null; }
 }
 function save() {
+  if (kicked) return; // outro aparelho assumiu: este não grava mais nada
   try { state.t = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* sem armazenamento */ }
 }
+// Só um aparelho joga por vez. Cada aba aberta ganha uma sessão; a mais nova vale.
+const isPhone = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+const SESSION = { id: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2), at: 0, device: isPhone ? 'celular' : 'computador' };
+let kicked = null, unsubFarm = null, staleLocal = false;
 
 // ============================================================
 // Estado da tela
@@ -474,7 +480,9 @@ function gain(id, qty, pos) {
   state.barn[id] = (state.barn[id] || 0) + qty;
   popupAt(pos, `+${qty} ${item(id).nome}`, '#ffffff');
 }
-function done() { save(); dirty = true; renderHUD(); renderPane(); renderSceneInfo(); }
+// state.changed marca a última mudança de verdade (não o último salvamento): é o que decide
+// se a roça deste aparelho é mais nova que a da nuvem.
+function done() { if (state) state.changed = Date.now(); save(); dirty = true; renderHUD(); renderPane(); renderSceneInfo(); }
 
 // ============================================================
 // Ações na sua roça
@@ -1085,7 +1093,7 @@ function applyVisits(list) {
 // Nuvem: login com Google, salvamento e amigos
 // ============================================================
 async function cloudSave() {
-  if (!user) return;
+  if (!user || kicked) return;
   dirty = false; lastCloud = performance.now();
   syncStatus = 'Salvando…'; renderAccount();
   try {
@@ -1094,7 +1102,7 @@ async function cloudSave() {
     await Cloud.saveFarm(user.uid, {
       stateJson: JSON.stringify(state), name: user.name || '', photo: user.photo || '',
       level: state.level, code: state.code || '', updatedAt: Date.now(),
-      friends: state.friends.slice(), sent: Object.keys(state.sent),
+      friends: state.friends.slice(), sent: Object.keys(state.sent), session: SESSION,
     });
     syncStatus = 'Salvo na nuvem';
   } catch (e) {
@@ -1103,35 +1111,56 @@ async function cloudSave() {
   renderAccount();
 }
 
+// Outro aparelho entrou na mesma conta: este para, sem gravar por cima, e sai.
+function kick(sess) {
+  if (kicked) return;
+  kicked = `Você entrou no ${sess.device || 'outro aparelho'} e por isso saiu daqui. Para jogar neste aparelho, entre de novo: a roça continua de onde parou.`;
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* sem armazenamento */ }
+  state.changed = 0; staleLocal = true;
+  Cloud.signOut().catch(() => {});
+  showGate('login', kicked);
+}
 async function onUser(u) {
   if (unsubVisits) { unsubVisits(); unsubVisits = null; }
   if (unsubRequests) { unsubRequests(); unsubRequests = null; }
+  if (unsubFarm) { unsubFarm(); unsubFarm = null; }
   user = u; requests = [];
   for (const k of Object.keys(friendInfo)) delete friendInfo[k];
   if (!u) {
     cloudStatus = 'out'; syncStatus = '';
     if (view.kind === 'friend') goHome();
     renderAccount(); renderPane(); renderTabs();
-    showGate('login');
+    showGate('login', kicked || undefined);
     return;
   }
   cloudStatus = 'loading'; renderAccount();
   showGate('entering');
   try {
+    // Avisa o outro aparelho que agora é a vez deste, espera ele parar e só então carrega a roça.
+    kicked = null;
+    SESSION.at = Date.now();
+    await Cloud.claimSession(u.uid, SESSION);
+    await new Promise(r => setTimeout(r, 1500));
     const remote = await Cloud.loadFarm(u.uid);
     const rs = remote && remote.stateJson ? migrate(JSON.parse(remote.stateJson)) : null;
     if (rs) {
-      const localIsNewer = state.owner === u.uid && state.t > (remote.updatedAt || 0);
+      // Este aparelho só ganha da nuvem se tiver mudanças que ainda não subiram.
+      const localIsNewer = !staleLocal && state.owner === u.uid && (state.changed || 0) > (remote.updatedAt || 0);
       if (!localIsNewer) { catchUp(rs, (Date.now() - (remote.updatedAt || Date.now())) / 1000); state = rs; }
     } else if (state.owner && state.owner !== u.uid) {
       state = newState(); // a roça deste navegador é de outra conta
     }
+    staleLocal = false;
     state.owner = u.uid;
     if (!state.code) state.code = await Cloud.claimCode(u.uid);
     view = { kind: 'home' }; $('#banner').hidden = true;
     save();
     cloudStatus = 'ready';
     await cloudSave();
+    unsubFarm = Cloud.watchFarm(u.uid, data => {
+      const sess = data && data.session;
+      if (sess && sess.id !== SESSION.id && sess.at > SESSION.at) kick(sess);
+    });
     unsubVisits = Cloud.watchVisits(u.uid, applyVisits);
     unsubRequests = Cloud.watchRequests(u.uid, onRequests);
     checkSent();
@@ -4084,7 +4113,7 @@ function frame(now) {
   if (now - lastUI > 250) { updateTip(); lastUI = now; }
   if (now - lastInfo > 2000) { tickLife(); rollPeriods(); weatherTick(); renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
   if (now - lastSave > 5000) { save(); lastSave = now; }
-  if (user && dirty && now - lastCloud > 15000) cloudSave();
+  if (user && dirty && now - lastCloud > 3000) cloudSave(); // salva na nuvem poucos segundos depois de cada mudança
   if (user && now - lastSentCheck > 60000) { lastSentCheck = now; checkSent(); }
   requestAnimationFrame(frame);
 }
@@ -4106,6 +4135,16 @@ function start(data) {
   }
 }
 window.addEventListener('pagehide', () => { save(); if (user && dirty) cloudSave(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && state) { save(); if (user && dirty) cloudSave(); } });
+// Botão de salvar na hora
+async function saveNow() {
+  if (!state || kicked) return;
+  save();
+  if (!user) return toast('Salvo neste aparelho!', 'good');
+  dirty = true; await cloudSave();
+  toast(syncStatus === 'Salvo na nuvem' ? 'Salvo na nuvem!' : 'Não consegui salvar na nuvem agora. Ficou salvo neste aparelho.', syncStatus === 'Salvo na nuvem' ? 'good' : 'bad');
+}
+$('#saveBtn')?.addEventListener('click', saveNow);
 window.claude?.hot?.snapshot?.(() => ({ state }));
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();

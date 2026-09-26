@@ -28,6 +28,8 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
   - Só amigos veem e visitam a sua roça. Quem recebe um pedido pode espiar a roça de quem pediu antes de aceitar.
   - Na roça de um amigo você pode tirar pragas, regar, alimentar os animais ou pegar um pouquinho: até 3 itens da plantação e 3 dos animais por roça, em no máximo 5 roças por dia (se o cachorro deixar!). Os limites voltam à meia-noite. O dono recebe um aviso em "Novidades da sua roça", na aba Amigos.
 
+- **Um aparelho por vez**: entrar no celular tira o computador (e vice-versa), com um aviso. A roça continua de onde parou em qualquer aparelho. O jogo salva na nuvem poucos segundos depois de cada mudança e quando você sai da página, e o botão de disquete no topo salva na hora.
+
 Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no navegador e não tem amigos de verdade.
 
 - **Missões**: 3 diárias (trocam à meia-noite) e 3 semanais (trocam na segunda-feira à meia-noite), com prêmio em moedas e XP.
