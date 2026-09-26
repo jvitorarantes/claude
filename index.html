@@ -23,12 +23,32 @@
     --gold: #f2b705;
     --red: #c8402f;
     --xp: #4aa3df;
+    --card: #ffffff;
+    --sel: #fff9df;
+    --heading: #7a4a22;
+    --bg1: #bfe6f7;
+    --bg2: #d7efc0;
+    --bg3: #cfe6b0;
+  }
+  /* Tema noite (escolhido nas configurações ou pelo relógio) */
+  :root[data-tema="noite"] {
+    color-scheme: dark;
+    --panel: #243049;
+    --panel-2: #34425f;
+    --card: #2d3a57;
+    --sel: #3d4560;
+    --ink: #eef1f8;
+    --muted: #aab4ca;
+    --heading: #ffd98a;
+    --bg1: #0e1834;
+    --bg2: #1b2a50;
+    --bg3: #223458;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; }
   body {
-    background: linear-gradient(#bfe6f7, #d7efc0 260px, #cfe6b0);
+    background: linear-gradient(var(--bg1), var(--bg2) 260px, var(--bg3));
     color: var(--ink);
     font-family: 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
     font-size: 15px;
@@ -92,7 +112,7 @@
   .banner {
     display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between;
     background: #fff3c4; border: 3px solid var(--wood-3); border-radius: 12px; padding: 6px 12px;
-    font-weight: 600;
+    font-weight: 600; color: #2f2a1f;
   }
   .scenebar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
   .seg { display: inline-flex; background: var(--wood-2); border-radius: 12px; padding: 3px; gap: 3px; }
@@ -100,9 +120,9 @@
     border: 0; border-radius: 9px; padding: 4px 14px; font-weight: 800;
     background: transparent; color: #fff1d6;
   }
-  .seg button[aria-selected="true"] { background: var(--panel); color: var(--wood); }
+  .seg button[aria-selected="true"] { background: var(--panel); color: var(--heading); }
   .seg.small button { padding: 3px 10px; font-size: 13px; }
-  .sceneinfo { font-weight: 700; color: var(--wood); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .sceneinfo { font-weight: 700; color: var(--heading); font-size: 14px; font-variant-numeric: tabular-nums; }
 
   .stage {
     position: relative; border: 5px solid var(--wood); border-radius: 16px; overflow: hidden;
@@ -123,7 +143,7 @@
   .tip .warn { color: #ffb4a4; }
   .toasts { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; z-index: 4; pointer-events: none; width: max-content; max-width: 90%; }
   .toast {
-    background: #fffbe8; color: var(--ink); border: 3px solid var(--wood-2);
+    background: #fffbe8; color: #2f2a1f; border: 3px solid var(--wood-2);
     border-radius: 12px; padding: 4px 12px; font-weight: 700; text-align: center;
     box-shadow: 0 3px 0 rgba(0,0,0,.15); animation: pop .25s ease-out;
   }
@@ -143,7 +163,7 @@
   .tool:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--wood); }
   .tool svg, .tool img { width: 28px; height: 28px; flex: none; }
   .tool kbd { font: 600 11px/1 'Baloo 2', monospace; color: var(--muted); border: 1px solid #c9c3a8; border-radius: 4px; padding: 2px 4px; }
-  .tool[aria-pressed="true"] { background: #ffe08a; border-color: var(--wood); }
+  .tool[aria-pressed="true"] { background: #ffe08a; border-color: var(--wood); color: #2f2a1f; }
   .hintline { color: var(--muted); font-size: 13px; }
 
   /* Painel */
@@ -153,16 +173,16 @@
     border: 0; border-radius: 10px 10px 0 0; padding: 6px 2px;
     background: var(--wood-3); color: #4a2a10; font-weight: 800; font-size: 14px;
   }
-  .tab[aria-selected="true"] { background: var(--panel); }
+  .tab[aria-selected="true"] { background: var(--panel); color: var(--heading); }
   .badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; padding: 0 4px; border-radius: 9px; background: var(--red); color: #fff; font-size: 11px; line-height: 1; vertical-align: 1px; }
   .pane { padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; max-height: 640px; overflow-y: auto; overflow-x: hidden; }
-  .pane h3 { margin: 4px 0 0; font-family: 'Chewy', cursive; font-weight: 400; font-size: 22px; color: var(--wood); letter-spacing: .3px; }
+  .pane h3 { margin: 4px 0 0; font-family: 'Chewy', cursive; font-weight: 400; font-size: 22px; color: var(--heading); letter-spacing: .3px; }
   .pane p.hint { margin: 0; color: var(--muted); font-size: 13px; }
   .row {
     display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; align-items: center;
-    background: #fff; border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px 8px;
+    background: var(--card); border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px 8px;
   }
-  .row.sel { border-color: var(--gold); background: #fff9df; }
+  .row.sel { border-color: var(--gold); background: var(--sel); }
   .row.locked { opacity: .55; }
   .row > img, .row .avatar { width: 48px; height: 48px; }
   .row .avatar { border-radius: 12px; object-fit: cover; display: grid; place-items: center; color: #fff; font: 400 24px Chewy, cursive; }
@@ -175,7 +195,7 @@
   .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--leaf-d); }
   .btn:disabled { background: #b7b39c; box-shadow: 0 3px 0 #8f8a73; cursor: not-allowed; }
   .btn.gold { background: #e9a800; box-shadow: 0 3px 0 #a87400; }
-  .btn.ghost { background: transparent; color: var(--wood); box-shadow: none; border: 2px solid var(--wood-3); }
+  .btn.ghost { background: transparent; color: var(--heading); box-shadow: none; border: 2px solid var(--wood-3); }
   .btn.danger { background: var(--red); box-shadow: 0 3px 0 #862516; }
   .stack { display: grid; gap: 4px; }
   .total { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 800; }
@@ -184,15 +204,55 @@
   .empty { text-align: center; color: var(--muted); padding: 14px 8px; }
   .codebox {
     display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
-    background: #fff9df; border: 2px dashed var(--gold); border-radius: 12px; padding: 8px 12px;
+    background: var(--sel); border: 2px dashed var(--gold); border-radius: 12px; padding: 8px 12px;
   }
-  .codebox strong { font: 400 26px/1 Chewy, cursive; letter-spacing: 3px; color: var(--wood); user-select: all; }
+  .codebox strong { font: 400 26px/1 Chewy, cursive; letter-spacing: 3px; color: var(--heading); user-select: all; }
   .addform { display: flex; gap: 8px; }
   .addform input {
     flex: 1; min-width: 0; border: 2px solid var(--wood-3); border-radius: 10px; padding: 4px 10px;
-    background: #fff; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;
+    background: var(--card); text-transform: uppercase; letter-spacing: 2px; font-weight: 700;
   }
   .foot { text-align: center; color: var(--muted); font-size: 12px; }
+  /* Configurações */
+  .iconbtn {
+    width: 38px; height: 38px; border-radius: 50%; border: 0; display: grid; place-items: center;
+    background: rgba(255,255,255,.15); color: #ffe08a;
+  }
+  .iconbtn:hover { background: rgba(255,255,255,.25); }
+  .iconbtn svg { width: 24px; height: 24px; }
+  .modal {
+    position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+    background: rgba(20, 14, 6, .55); padding: 16px;
+  }
+  .modal-card {
+    width: min(100%, 420px); max-height: calc(100vh - 32px); overflow-y: auto;
+    background: var(--panel); color: var(--ink); border: 5px solid var(--wood); border-radius: 20px;
+    box-shadow: 0 8px 0 rgba(0,0,0,.2);
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; background: var(--wood); padding: 8px 10px 8px 18px; }
+  .modal-head h2 { margin: 0; font: 400 26px/1.1 Chewy, cursive; color: #ffe08a; letter-spacing: .5px; }
+  .modal section { padding: 12px 18px; display: grid; gap: 10px; border-bottom: 2px solid var(--panel-2); }
+  .modal section:last-child { border-bottom: 0; }
+  .modal h3 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .setrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 700; }
+  .setrow input[type=range] { flex: 1; max-width: 200px; accent-color: var(--leaf); }
+  .setrow output { width: 3ch; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
+  .switch { appearance: none; -webkit-appearance: none; width: 46px; height: 26px; border-radius: 13px; background: #b7b39c; position: relative; cursor: pointer; transition: background .15s; flex: none; margin: 0; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .15s; }
+  .switch:checked { background: var(--leaf); }
+  .switch:checked::after { transform: translateX(20px); }
+  .tracks { display: grid; gap: 6px; }
+  .track {
+    display: flex; align-items: center; gap: 10px; text-align: left; width: 100%;
+    background: var(--card); border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px 10px; font-weight: 700;
+  }
+  .track small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .track[aria-checked="true"] { border-color: var(--gold); background: var(--sel); }
+  .track .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--wood-3); flex: none; }
+  .track[aria-checked="true"] .dot { background: var(--gold); border-color: var(--wood); }
+  .tema { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .tema button { padding: 6px 4px; }
+
   /* Tela de entrada */
   .gate { display: none; min-height: calc(100vh - 40px); min-height: calc(100dvh - 40px); place-items: center; }
   .gated .gate { display: grid; }
@@ -207,7 +267,7 @@
   .gate-card canvas { display: block; width: 100%; height: auto; aspect-ratio: 480 / 280; border-bottom: 5px solid var(--wood); background: #9ad35e; }
   .gate-body { display: grid; gap: 12px; justify-items: center; padding: 18px 20px 22px; }
   .gate-lead { margin: 0; font-size: 17px; font-weight: 600; max-width: 30ch; text-wrap: balance; }
-  .gate-status { min-height: 1.4em; font-weight: 700; color: var(--wood); }
+  .gate-status { min-height: 1.4em; font-weight: 700; color: var(--heading); }
   .gate-status:empty { display: none; }
   .gate-status.bad { color: var(--red); }
   .gbtn.big { font-size: 17px; padding: 10px 22px 10px 14px; border: 2px solid #dadce0; box-shadow: 0 3px 0 rgba(0,0,0,.12); }
@@ -253,6 +313,7 @@
     <div class="stat coins"><div class="coin" aria-hidden="true"></div><span id="coins">0</span></div>
     <div class="spacer"></div>
     <div class="acct" id="account"></div>
+    <button class="iconbtn" id="openSettings" type="button" aria-label="Configurações" title="Configurações"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </header>
 
   <div class="main">
@@ -288,9 +349,36 @@
       <div class="pane" id="pane"></div>
     </aside>
   </div>
-  <div class="foot">Atalhos na roça: 1–6 trocam de ferramenta.</div>
+  <div class="foot">Atalhos na roça: 1–7 trocam de ferramenta. A engrenagem no topo tem música, sons e tema.</div>
 </div>
 
+<div class="modal" id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="setTitle">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="setTitle">Configurações</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <section>
+      <h3>Música</h3>
+      <div class="setrow"><label for="optMusic">Tocar música</label><input type="checkbox" class="switch" id="optMusic"></div>
+      <div class="setrow"><label for="volMusic">Volume</label><input type="range" id="volMusic" min="0" max="100" step="5"><output id="volMusicOut" for="volMusic"></output></div>
+      <div class="tracks" id="tracks" role="radiogroup" aria-label="Escolha a música"></div>
+    </section>
+    <section>
+      <h3>Sons</h3>
+      <div class="setrow"><label for="optSfx">Sons de cliques e ações</label><input type="checkbox" class="switch" id="optSfx"></div>
+      <div class="setrow"><label for="volSfx">Volume</label><input type="range" id="volSfx" min="0" max="100" step="5"><output id="volSfxOut" for="volSfx"></output></div>
+    </section>
+    <section>
+      <h3>Tema</h3>
+      <div class="seg tema" id="temaSeg" role="radiogroup" aria-label="Tema">
+        <button type="button" data-tema="auto">Automático</button>
+        <button type="button" data-tema="dia">Dia</button>
+        <button type="button" data-tema="noite">Noite</button>
+      </div>
+      <p class="hint" style="margin:0;color:var(--muted);font-size:13px">Automático segue o relógio: de noite, a roça escurece.</p>
+    </section>
+  </div>
+</div>
+
+<script src="js/audio.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/game.js"></script>
 </body>

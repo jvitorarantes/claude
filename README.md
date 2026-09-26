@@ -6,8 +6,11 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 
 ## O que tem no jogo
 
-- **Roça com 40 lotes.** Você começa com 6 e compra mais conforme sobe de nível. A câmera se afasta sozinha à medida que a roça cresce.
-- **8 sementes**, de nabo a melancia. Mato, pragas e terra seca atrapalham, e tomate e morango dão 2 safras.
+- **Roça com 40 lotes.** Você começa com 6 e escolhe onde crescer: qualquer lote encostado na sua terra pode ser comprado (clique duas vezes para confirmar). A câmera se afasta sozinha à medida que a roça cresce.
+- **8 sementes**, de nabo a melancia. Cada uma mostra quantas colheitas dá antes de secar (o morango dá 4). Mato e terra seca atrapalham, e insetos aparecem de vez em quando.
+- **3 adubos**: básico (corta 25% do tempo que falta), premium (50%) e pro (deixa pronto na hora). Um por safra.
+- **Música e sons**: 3 músicas calmas de roça e sons para cliques, regar, enxada, colher e mais. Tudo é sintetizado no navegador (`js/audio.js`), sem arquivos de áudio.
+- **Configurações** (engrenagem no topo): liga e desliga música e sons, volume de cada um, escolha da música e tema (automático, dia ou noite).
 - **Animais**: galinha (ovo), vaca (leite), ovelha (lã) e porco (trufa). Eles comem 1 Milho do celeiro ou ração comprada na hora e produzem enquanto estão alimentados. Cabem 12 no cercado.
 - **Casa com 6 decorações**: tapete, vaso de planta, quadro, abajur, sofá e televisão. Cada uma dá conforto, e cada ponto de conforto vale +1% de XP.
 - **Celeiro** para vender colheitas e produtos.
@@ -25,6 +28,7 @@ Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no nav
 | --- | --- |
 | `index.html` | Página e estilos |
 | `js/game.js` | O jogo: dados, simulação, desenho e interface |
+| `js/audio.js` | Músicas e efeitos sonoros, sintetizados com Web Audio |
 | `js/cloud.js` | Login com Google e Firestore (só liga com o Firebase configurado) |
 | `firebase-config.js` | Onde você cola a configuração do seu projeto Firebase |
 | `firestore.rules` | Regras de segurança do banco de dados |
