@@ -1071,6 +1071,9 @@ function applyVisits(list) {
       p.dmg = Math.min(CROP[p.c].rend - 1, p.dmg + qty);
       if (!p.th.includes(v.from)) p.th.push(v.from);
       note(`pegou ${qty} ${CROP[p.c].prodNome} da sua plantação`, true);
+    } else if (v.t === 'gift' && PRESENTE_AMIGO.some(g => g.id === v.gift)) {
+      const g = PRESENTE_AMIGO.find(x => x.id === v.gift);
+      g.dar(state); note(`mandou um presente para você: ${g.nome}`);
     } else if (v.t === 'feed' && a && ANIMAL[a.k].tipo === 'prod' && isHungry(a)) {
       a.fed = true; note('alimentou seus animais'); helpedBy(v.from, who);
     } else if (v.t === 'stealA' && a && ANIMAL[a.k].tipo === 'prod' && a.ready) {
@@ -1437,6 +1440,8 @@ function renderZoom() {
 }
 // Espaço da tela que os botões por cima do jogo cobrem.
 function insets() {
+  if (L.cw < 700 && L.ch > L.cw) return { t: 144, b: 150, l: 6, r: 6 };   // celular em pé
+  if (L.ch < 520) return { t: 50, b: 60, l: 58, r: 60 };                 // celular deitado
   return L.cw < 700 ? { t: 70, b: 92, l: 44, r: 52 } : { t: 76, b: 104, l: 96, r: 104 };
 }
 function layout(sc) {
@@ -3126,6 +3131,18 @@ function renderTabs() {
   const mb = document.querySelector('.tab[data-tab="missoes"]'), mn = missoesProntas();
   if (mb) { const o = mb.querySelector('.badge'); if (o) o.remove(); if (mn) mb.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${mn} prêmios">${mn}</span>`); }
   renderGiftBtn();
+  // Avisos nos botões Roça e Rancho: quantas coisas estão prontas para colher ou recolher.
+  if (state) {
+    const prontos = { roca: state.plots.filter(p => ripe(p)).length,
+      animais: state.animals.filter(a => (ANIMAL[a.k].tipo === 'prod' && a.ready) || isAdult(a)).length };
+    for (const [sc, n] of Object.entries(prontos)) {
+      const b = document.querySelector(`#scenes [data-scene="${sc}"]`); if (!b) continue;
+      const k = String(n), o = b.querySelector('.badge');
+      if (o && o.textContent === k) continue;
+      if (o) o.remove();
+      if (n) b.insertAdjacentHTML('beforeend', `<span class="badge ready" aria-label="${n} ${sc === 'roca' ? 'para colher' : 'para recolher ou vender'}">${n}</span>`);
+    }
+  }
 }
 // Preço nos botões da loja: ícone de moeda + valor (e a quantidade, quando tem).
 const moeda = (n, q) => `${q ? `<span class="qtd">×${q}</span>` : ''}<span class="coin" aria-hidden="true"></span>${n.toLocaleString('pt-BR')}`;
@@ -3355,6 +3372,11 @@ function renderPane() {
         }
       }
       html += `<h3>Seus amigos</h3>`;
+      if (state.friends.length) {
+        const g = giftsToday(), pick = state.giftPick || PRESENTE_AMIGO[0].id;
+        html += `<p class="hint">Mande um presente por dia para até ${PRESENTE_MAX} amigos (hoje: ${g.to.length} de ${PRESENTE_MAX}). Não custa nada! Escolha o presente:</p>
+          <div class="seg small" role="radiogroup" aria-label="Presente">${PRESENTE_AMIGO.map(p => `<button type="button" data-gift-pick="${p.id}" aria-selected="${pick === p.id}">${p.nome}</button>`).join('')}</div>`;
+      }
       if (!state.friends.length) html += `<div class="empty">Mande seu código para um amigo e peça o dele. A amizade começa quando um aceitar o pedido do outro.</div>`;
       for (const uid of state.friends) {
         fetchFriendInfo(uid);
@@ -3366,6 +3388,7 @@ function renderPane() {
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
           <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f ? `Nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`}
+          ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
           <button class="btn ${armed ? 'danger' : 'ghost'}" data-unfriend="${esc(uid)}">${armed ? 'Confirmar' : 'Desfazer'}</button></div></div>`;
       }
       const sent = Object.entries(state.sent);
@@ -3396,6 +3419,8 @@ $('#pane').addEventListener('click', e => {
   if (d.mseg) { missSeg = d.mseg; renderPane(); $('#pane').scrollTop = 0; return; }
   if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
   if (d.temaRoca) return buyTema(d.temaRoca);
+  if (d.giftPick) { state.giftPick = d.giftPick; save(); return renderPane(); }
+  if (d.sendGift) return sendFriendGift(d.sendGift);
   if (d.sellAnimal) {
     const a = state.animals.find(x => x.id === d.sellAnimal); if (!a) return;
     const key = 'venda' + a.id;
@@ -3790,6 +3815,7 @@ const MISSOES_DIA = [
   { ev: 'ajudar', txt: 'Ajude os vizinhos {n} vezes', alvo: [3, 5, 8] },
   { ev: 'pegar', txt: 'Pegue {n} itens nas roças dos vizinhos', alvo: [2, 4, 6] },
   { ev: 'adubar', txt: 'Use {n} fertilizantes', alvo: [2, 3, 5] },
+  { ev: 'presentear', txt: 'Mande presente para {n} amigos', alvo: [1, 2, 3], need: () => state.friends.length > 0 },
 ];
 const MISSOES_SEMANA = [
   { ev: 'colher', txt: 'Colha {n} vezes', alvo: [100, 200, 350] },
@@ -3905,6 +3931,38 @@ const giftIcon = g => g.fert && !g.moedas ? fertIcon(g.fert) : g.racao ? bowlIco
 });
 function showGift() { renderGift(); $('#gift').hidden = false; $('#giftOpen').focus(); }
 function closeGift() { $('#gift').hidden = true; }
+
+// ---------- Presentes para os amigos ----------
+// Um presente por amigo por dia, para até 5 amigos. Não custa nada para quem manda.
+const PRESENTE_AMIGO = [
+  { id: 'moedas', nome: '100 moedas', dar: s => { s.coins += 100; } },
+  { id: 'basico', nome: '1 fertilizante básico', dar: s => { s.fert.basico = (s.fert.basico || 0) + 1; } },
+  { id: 'racao', nome: '1 ração especial', dar: s => { s.racaoEsp += 1; } },
+  { id: 'racaoCao', nome: '2 rações de cachorro', dar: s => { s.dogFood += 2; } },
+];
+const PRESENTE_MAX = 5;
+function giftsToday() {
+  if (!state.sentGifts || state.sentGifts.d !== localDay()) state.sentGifts = { d: localDay(), to: [] };
+  return state.sentGifts;
+}
+async function sendFriendGift(uid) {
+  if (!user) return;
+  const g = giftsToday(), pick = PRESENTE_AMIGO.find(p => p.id === state.giftPick) || PRESENTE_AMIGO[0];
+  if (g.to.includes(uid)) return toast('Você já mandou um presente para essa pessoa hoje.');
+  if (g.to.length >= PRESENTE_MAX) return toast(`Você já mandou ${PRESENTE_MAX} presentes hoje. À meia-noite libera de novo!`);
+  g.to.push(uid); renderPane();
+  try {
+    await Cloud.sendVisit(uid, { t: 'gift', gift: pick.id, from: user.uid, fromName: user.name || 'Um amigo', at: Date.now() });
+    sfx('buy'); addXP(2, null); track('presentear');
+    const f = friendInfo[uid];
+    toast(`Presente enviado para ${firstName(f && f.name ? f.name : 'seu amigo')}: ${pick.nome}!`, 'good');
+    done();
+  } catch (e) {
+    console.warn(e);
+    g.to = g.to.filter(x => x !== uid); renderPane();
+    toast('Não consegui mandar o presente agora. Tente de novo.', 'bad');
+  }
+}
 
 // ---------- Ajuda de volta ----------
 // Quem ajudou a sua roça fica marcado por 2 dias. Ajudar essa pessoa de volta dá um bônus.

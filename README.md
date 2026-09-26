@@ -34,6 +34,8 @@ Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no nav
 
 - **Missões**: 3 diárias (trocam à meia-noite) e 3 semanais (trocam na segunda-feira à meia-noite), com prêmio em moedas e XP.
 - **Presente diário**: 7 dias de presentes (o 7º é um baú). Depois vem uma leva nova.
+- **Presente para os amigos**: na aba Amigos, mande um presente por dia para até 5 amigos (100 moedas, fertilizante, ração especial ou ração de cachorro). Não custa nada para quem manda. *Precisa das regras novas do `firestore.rules` publicadas no Firebase.*
+- **Avisos nos botões**: Roça e Rancho mostram um número verde quando tem coisa pronta para colher, recolher ou vender.
 - **Ajuda de volta**: quem ajudou a sua roça (um amigo ou um vizinho da vila) fica marcado por 2 dias. Ajudar de volta dá 50 moedas.
 - **Livro de coleção**: cada planta e produto dos animais ganha carimbos de bronze (10 colheitas), prata (50) e ouro (200), com prêmios.
 - **Temas da roça**: clássico, cerca branca com roseiras, muro de pedra, tropical com coqueiros e lago dos patos.

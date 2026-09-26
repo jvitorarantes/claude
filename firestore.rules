@@ -18,12 +18,12 @@ service cloud.firestore {
       allow write: if signedIn() && me() == uid
                    && request.resource.size() < 900000;
 
-      // Visitas: o que um amigo fez na sua roça. Só amigos criam, sempre em
+      // Visitas: o que um amigo fez na sua roça (ou um presente que mandou). Só amigos criam, sempre em
       // seu próprio nome. O dono lê e apaga ao aplicar.
       match /visits/{visitId} {
         allow create: if signedIn() && me() != uid
                       && request.resource.data.from == me()
-                      && request.resource.data.t in ['help', 'steal', 'feed', 'stealA']
+                      && request.resource.data.t in ['help', 'steal', 'feed', 'stealA', 'gift']
                       && request.resource.size() < 2000
                       && me() in get(/databases/$(database)/documents/farms/$(uid)).data.get('friends', []);
         allow read, delete: if signedIn() && me() == uid;
