@@ -398,7 +398,14 @@ function stageOf(p) {
   return k >= 1 ? 4 : k < 0.12 ? 0 : k < 0.4 ? 1 : k < 0.7 ? 2 : 3;
 }
 const ripe = p => p.s === 'growing' && !p.poda && p.g >= phaseTempo(p);
+// Cada colheita rende um número sorteado numa faixa em volta da média (nabo: 3 a 5).
+const yieldRange = c => [Math.max(1, Math.round(c.rend * 0.75)), Math.max(1, Math.round(c.rend * 1.25))];
 const expectedYield = p => Math.max(1, Math.round(CROP[p.c].rend - p.dmg));
+function rollYield(p) {
+  const [lo, hi] = yieldRange(CROP[p.c]);
+  return Math.max(1, lo + Math.floor(Math.random() * (hi - lo + 1)) - Math.round(p.dmg));
+}
+const faixa = c => { const [lo, hi] = yieldRange(c); return lo === hi ? `${lo}` : `${lo} a ${hi}`; };
 // Dá para comprar qualquer lote encostado (lado com lado) na terra que você já tem.
 function neighbors(i) {
   const c = i % COLS, r = Math.floor(i / COLS), out = [];
@@ -459,16 +466,16 @@ function actPlot(i) {
   if (p.s === 'locked') return clickLot(i);
   if (tool === 'fert') return fertilize(p, pos);
   const has = t => tool === 'hand' || tool === t;
-  if (p.s === 'growing' && p.b > 0 && has('pest')) { p.b--; sfx('pest'); addXP(2, pos); addCoins(1, pos); return done(); }
+  if (p.s === 'growing' && p.b > 0 && has('pest')) { p.b--; sfx('pest'); useFx('pest', pos); addXP(2, pos); addCoins(1, pos); return done(); }
   if (p.s === 'growing' && p.w > 0 && has('weed')) { p.w--; sfx('weed'); addXP(2, pos); addCoins(1, pos); return done(); }
-  if (p.s === 'growing' && p.dry && has('water')) { p.dry = false; sfx('water'); addXP(1, pos); return done(); }
+  if (p.s === 'growing' && p.dry && has('water')) { p.dry = false; sfx('water'); useFx('water', pos); addXP(1, pos); return done(); }
   if (ripe(p) && tool === 'hand') return harvest(p, pos);
   if (p.s === 'growing' && p.poda && tool === 'hand') return prune(p, pos);
-  if (p.s === 'withered' && has('hoe')) { Object.assign(p, emptyPlot('plowed')); sfx('hoe'); addXP(1, pos); return done(); }
+  if (p.s === 'withered' && has('hoe')) { Object.assign(p, emptyPlot('plowed')); sfx('hoe'); useFx('hoe', pos); addXP(1, pos); return done(); }
   if (p.s === 'growing' && tool === 'hoe') {
     // A enxada arranca qualquer plantação (ou árvore). Pede um segundo clique.
     if (buyPending && buyPending.i === 'hoe' + i && performance.now() < buyPending.until) {
-      buyPending = null; Object.assign(p, emptyPlot('plowed')); sfx('hoe');
+      buyPending = null; Object.assign(p, emptyPlot('plowed')); sfx('hoe'); useFx('hoe', pos);
       return done();
     }
     buyPending = { i: 'hoe' + i, until: performance.now() + 4000 };
@@ -488,7 +495,7 @@ function plant(p, pos) {
   if (state.coins < crop.custo) return toast(`Faltam moedas para ${crop.arvore ? 'a muda de ' : ''}${crop.nome} (${crop.custo}).`, 'bad');
   addCoins(-crop.custo, pos);
   Object.assign(p, emptyPlot('growing'), { c: crop.id, id: newId() });
-  sfx('plant');
+  sfx('plant'); useFx('seed', pos);
   if (xpAllowed(crop.id)) addXP(1, pos);
   done();
 }
@@ -521,7 +528,7 @@ function fertilize(p, pos) {
   state.fert[f.id] = have - 1;
   p.g += corte;
   p.fert = true;
-  sfx('fert');
+  sfx('fert'); useFx('fert', pos);
   popupAt(pos, `−${fmt(corte)}`, '#9be36a');
   addXP(1, pos);
   renderTools();
@@ -572,7 +579,7 @@ function buyExpansion() {
 }
 
 function harvest(p, pos) {
-  const crop = CROP[p.c], qty = expectedYield(p);
+  const crop = CROP[p.c], qty = rollYield(p);
   sfx('harvest');
   gain(crop.prod, qty, pos);
   state.stats.colheitas++;
@@ -1367,6 +1374,7 @@ function setZoom(z, sc = scene) {
 }
 function renderZoom() {
   const z = zoomOf(scene);
+  if (!$('#zoomIn')) return;
   $('#zoomIn').disabled = z >= ZOOM_MAX; $('#zoomOut').disabled = z <= ZOOM_MIN;
   $('#zoomReset').textContent = `${Math.round(z * 100)}%`;
 }
@@ -1390,11 +1398,16 @@ function layout(sc) {
     if (c0 > c1) { c0 = 0; c1 = COLS; r0 = 0; r1 = ROWS; }
     c0 = Math.max(0, c0 - 1); c1 = Math.min(COLS, c1 + 1); r0 = Math.max(0, r0 - 1); r1 = Math.min(ROWS, r1 + 1);
     const span = (c1 - c0) + (r1 - r0);
-    const full = Math.min(aw / 7.4, ah / 4.9);
-    L.W = Math.max(full, Math.min(aw * 1.8 / span, ah * 0.86 / (span / 4 + 0.9), aw / 5, ah / 3.6));
+    // No celular os botões do lado ficam por cima da grama: a roça usa a largura toda.
+    const rw = cw < 700 ? cw - 12 : aw;
+    const full = Math.min(rw / 7.4, ah / 4.9);
+    L.W = Math.max(full, Math.min(rw * 1.8 / span, ah * 0.86 / (span / 4 + 0.9), rw / 5, ah / 3.6));
     const cc = (c0 + c1) / 2, rc = (r0 + r1) / 2;
     L.ox = cx - (cc - rc) * L.W / 2;
     L.oy = Math.min(I.t + ah * 0.6 - (cc + rc) * L.W / 4, I.t + ah - (c1 + r1) * L.W / 4 - 0.25 * L.W);
+    // Se sobrar espaço à direita, empurra a roça para a casinha do cachorro caber na tela.
+    const falta = (cw < 700 ? 6 : I.l) + 2.95 * L.W - L.ox, sobra = I.l + aw - (L.ox + (c1 - r0) * L.W / 2);
+    if (falta > 0 && (sobra > 0 || cw < 700)) L.ox += cw < 700 ? falta : Math.min(falta, sobra);
   } else if (sc === 'animais') {
     // O rancho inteiro cabe na tela; no celular fica maior e dá para arrastar.
     const bw = (RANCH_C + RANCH_R) / 2 + 0.8, bh = (RANCH_C + RANCH_R) / 4 + 1.6;
@@ -1622,8 +1635,9 @@ function drawKennel(x, y, s) {
   ctx.fillStyle = '#7d8c9a'; ctx.beginPath(); ctx.ellipse(x + w * 0.62, y, s * 0.08, s * 0.035, 0, 0, 7); ctx.fill();
 }
 // Onde fica o cachorro de cada lugar (na cena atual).
-const KENNEL_AT = () => ({ x: L.ox - L.W * 0.8, y: L.oy + L.W * 0.22 });
-const DOG_AT = () => ({ x: L.ox - L.W * 1.35, y: L.oy + L.W * 0.55 });
+// A casinha fica à esquerda do celeiro, com o cachorro na frente dela.
+const KENNEL_AT = () => ({ x: L.ox - L.W * 2.65, y: L.oy + L.W * 0.5 });
+const DOG_AT = () => ({ x: L.ox - L.W * 2.4, y: L.oy + L.W * 0.95 });
 function dogPos(slot) {
   if (scene !== (slot === 'roca' ? 'roca' : 'animais')) return null;
   const p = DOG_AT(); return { x: p.x, y: p.y - L.W * 0.25 };
@@ -2392,20 +2406,21 @@ function landSignText() {
 }
 function drawLandSign() {
   const txt = landSignText(); if (!txt) return;
-  const W = L.W, x = L.ox - W * 2.35, y = L.oy + W * 1.15;
+  const W = L.W, x = L.ox - W * 0.6, y = L.oy + W * 0.26;
   const hov = hover && hover.kind === 'land';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, W * 0.18, W * 0.05, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - W * 0.035, y - W * 0.5, W * 0.07, W * 0.5);
   const fs = Math.round(clamp(W * 0.13, 11, 16));
   ctx.font = `800 ${fs}px 'Baloo 2', sans-serif`;
   const bw = Math.max(ctx.measureText(txt[0]).width, ctx.measureText(txt[1]).width) + fs * 1.6, bh = fs * 2.9, top = y - W * 0.5 - bh * 0.7;
+  const bx = x + Math.max(0, bw / 2 - W * 0.3); // a tábua fica para a direita, longe do celeiro
   ctx.fillStyle = hov ? '#e8b273' : '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.roundRect(x - bw / 2, top, bw, bh, 7); ctx.fill(); ctx.stroke();
-  line({ x: x - bw / 2 + 5, y: top + bh / 2 }, { x: x + bw / 2 - 5, y: top + bh / 2 }, 'rgba(122,74,34,.35)', 1);
+  ctx.beginPath(); ctx.roundRect(bx - bw / 2, top, bw, bh, 7); ctx.fill(); ctx.stroke();
+  line({ x: bx - bw / 2 + 5, y: top + bh / 2 }, { x: bx + bw / 2 - 5, y: top + bh / 2 }, 'rgba(122,74,34,.35)', 1);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#4a2a10'; ctx.fillText(txt[0], x, top + bh * 0.3);
-  ctx.fillStyle = txt[2]; ctx.fillText(txt[1], x, top + bh * 0.72);
-  hits.push({ kind: 'land', x, y: top + bh / 2, r: Math.max(bw / 2, 30) });
+  ctx.fillStyle = '#4a2a10'; ctx.fillText(txt[0], bx, top + bh * 0.3);
+  ctx.fillStyle = txt[2]; ctx.fillText(txt[1], bx, top + bh * 0.72);
+  hits.push({ kind: 'land', x: bx, y: top + bh / 2, r: Math.max(bw / 2, 30) });
 }
 function plotBubble(p, home) {
   if (p.s === 'withered') return home ? 'hoe' : null;
@@ -2421,11 +2436,11 @@ function plotBubble(p, home) {
 function drawRoca(s, t, home) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
-  if (home) drawBarn(L.ox - W * 1.9, L.oy + W * 0.3, W * 1.15);
-  else drawHouse(L.ox - W * 1.9, L.oy + W * 0.3, W * 1.15, view.casa);
+  if (home) drawBarn(L.ox - W * 1.55, L.oy + W * 0.3, W * 1.15);
+  else drawHouse(L.ox - W * 1.55, L.oy + W * 0.3, W * 1.15, view.casa);
   drawTree(L.ox + W * 2.6, L.oy + W * 0.5, W * 1.0, t);
   drawTree(L.ox + W * 3.6, L.oy + W * 1.1, W * 0.8, t);
-  if (view.kind === 'npc') { const q = iso(-0.55, 1.6); drawDog(q.x, q.y, W * 0.7, t); }
+  if (view.kind === 'npc') { const q = DOG_AT(); drawDog(q.x, q.y, W * 0.7, t); }
   else drawKennelSpot('roca', s, home);
   drawFence(COLS, ROWS, 'back');
   if (view.kind !== 'npc') drawDogSpot('roca', s, t, home);
@@ -2714,6 +2729,52 @@ function drawRoom(s, t, home) {
   if (hv) { ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(hv.x, hv.y, W * 0.42, 0, 7); ctx.stroke(); }
 }
 
+// ---------- A ferramenta na mão ----------
+// O item escolhido acompanha o cursor e, ao usar, aparece em cima da planta (regando, borrifando…).
+const toolImgs = {};
+function toolImg(kind) {
+  const src = kind === 'seed' ? cropIcon(state.seed) : kind === 'fert' ? fertIcon(state.fertSel)
+    : TOOL_ICONS[kind] && 'data:image/svg+xml,' + encodeURIComponent(TOOL_ICONS[kind].replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" '));
+  if (!src) return null;
+  if (!toolImgs[src]) { const im = new Image(); im.src = src; toolImgs[src] = im; }
+  const im = toolImgs[src];
+  return im.complete && im.naturalWidth ? im : null;
+}
+const fxs = [];
+function useFx(kind, pos) { if (pos) fxs.push({ kind, x: pos.x, y: pos.y, t0: performance.now() }); }
+const FX_COLOR = { water: '#3aa0e8', pest: 'rgba(210,225,235,.9)', fert: '#ffd54a', seed: '#8a5a2b', hoe: '#6b3f1d' };
+function drawFx(t) {
+  const W = L.W, S = clamp(W * 0.42, 30, 60);
+  for (let k = fxs.length - 1; k >= 0; k--) {
+    const f = fxs[k], age = (t - f.t0) / 900;
+    if (age > 1) { fxs.splice(k, 1); continue; }
+    const im = toolImg(f.kind), x = f.x + S * 0.35, y = f.y - W * 0.45;
+    // partículas caindo na terra
+    ctx.fillStyle = FX_COLOR[f.kind];
+    for (let n = 0; n < 7; n++) {
+      const a = (age * 1.6 + n / 7) % 1, px = f.x - S * 0.3 + ((n * 37) % 11) / 11 * S * 0.6, py = y + S * 0.2 + a * (f.y - y);
+      if (age > 0.15) { ctx.globalAlpha = 1 - age; ctx.beginPath(); ctx.ellipse(px, py, S * 0.05, S * (f.kind === 'water' ? 0.09 : 0.05), 0, 0, 7); ctx.fill(); }
+    }
+    ctx.globalAlpha = Math.min(1, (1 - age) * 3);
+    if (im) {
+      ctx.save(); ctx.translate(x, y);
+      ctx.rotate(-0.15 - Math.sin(Math.min(1, age * 2.2) * Math.PI) * (f.kind === 'hoe' ? 0.9 : 0.6));
+      ctx.drawImage(im, -S / 2, -S / 2, S, S); ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+// Com o mouse sobre a roça, o item escolhido aparece no lugar da setinha.
+function drawCursorTool() {
+  const show = scene === 'roca' && isHome() && state.tool !== 'hand' && pointer.inside && !pointer.touch && !(drag && drag.moved);
+  cv.style.cursor = show ? 'none' : '';
+  if (!show) return;
+  const im = toolImg(state.tool); if (!im) { cv.style.cursor = ''; return; }
+  const S = clamp(L.W * 0.4, 30, 52);
+  ctx.save(); ctx.translate(pointer.x, pointer.y); ctx.rotate(-0.25);
+  ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3;
+  ctx.drawImage(im, -S * 0.2, -S * 0.8, S, S); ctx.restore();
+}
 function drawPopups(t) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `800 ${Math.round(clamp(L.W * 0.16, 12, 20))}px 'Baloo 2', sans-serif`;
@@ -2736,7 +2797,9 @@ function draw(t, dt) {
   if (scene === 'roca') drawRoca(s, t, home);
   else if (scene === 'animais') drawPen(s, t, home, dt);
   else drawRoom(s, t, home);
+  drawFx(t);
   drawPopups(t);
+  drawCursorTool();
 }
 
 // ============================================================
@@ -2974,8 +3037,8 @@ function renderPane() {
         const locked = c.nivel > state.level, sel = state.seed === c.id && state.tool === 'seed';
         const total = c.rend * c.preco;
         const meta = trees
-          ? `Muda ${c.custo.toLocaleString('pt-BR')} · 1ª colheita em ${fmt(c.tempo)}, depois a cada ${fmt(c.tempo2)}<br>${c.rend} ${c.prodNome.toLowerCase()} × ${c.preco} = ${total} por colheita · ${c.xp} XP`
-          : `Semente ${c.custo.toLocaleString('pt-BR')} · ${fmt(c.tempo)}<br>${c.rend} × ${c.preco} = ${total.toLocaleString('pt-BR')} · lucro ${(total - c.custo).toLocaleString('pt-BR')} · ${c.xp} XP`;
+          ? `Muda ${c.custo.toLocaleString('pt-BR')} · 1ª colheita em ${fmt(c.tempo)}, depois a cada ${fmt(c.tempo2)}<br>${faixa(c)} ${c.prodNome.toLowerCase()} × ${c.preco} (média ${total}) por colheita · ${c.xp} XP`
+          : `Semente ${c.custo.toLocaleString('pt-BR')} · ${fmt(c.tempo)}<br>rende ${faixa(c)} × ${c.preco} · lucro médio ${(total - c.custo).toLocaleString('pt-BR')} · ${c.xp} XP`;
         html += `<div class="row ${locked ? 'locked' : ''} ${sel ? 'sel' : ''}">
           <img alt="" src="${cropIcon(c.id)}">
           <div><div class="name">${c.nome}</div><div class="meta">${meta}</div></div>
@@ -3294,7 +3357,10 @@ function tipPlot(i) {
   if (probs.length) h += `<div class="warn">${probs.join(' · ')}</div>`;
   if (crop.arvore) h += `Colheita ${p.h + 1} de ${TREE_HARVESTS} até a poda`;
   if (p.fert) h += `${crop.arvore ? ' · ' : ''}adubada`;
-  if (home) h += `<br>Vai render ${expectedYield(p)} ${crop.prodNome.toLowerCase()} (de ${crop.rend})`;
+  if (home) {
+    const [lo, hi] = yieldRange(crop), d = Math.round(p.dmg), a = Math.max(1, lo - d), z = Math.max(1, hi - d);
+    h += `<br>Vai render ${a === z ? a : `${a} a ${z}`} ${crop.prodNome.toLowerCase()}${d ? ` (as pragas comeram ${d})` : ''}`;
+  }
   return h;
 }
 function tipAnimal(id) {
@@ -3384,9 +3450,9 @@ function pinch(e) {
 }
 const endTouch = e => { fingers.delete(e.pointerId); if (drag && drag.pinch && fingers.size < 2) drag = { x: 0, y: 0, moved: true, dead: true }; };
 cv.addEventListener('pointercancel', endTouch);
-$('#zoomIn').addEventListener('click', () => setZoom(zoomOf(scene) * 1.25));
-$('#zoomOut').addEventListener('click', () => setZoom(zoomOf(scene) / 1.25));
-$('#zoomReset').addEventListener('click', () => { setZoom(1); L.pan = { x: 0, y: 0 }; });
+$('#zoomIn')?.addEventListener('click', () => setZoom(zoomOf(scene) * 1.25));
+$('#zoomOut')?.addEventListener('click', () => setZoom(zoomOf(scene) / 1.25));
+$('#zoomReset')?.addEventListener('click', () => { setZoom(1); L.pan = { x: 0, y: 0 }; });
 cv.addEventListener('pointermove', e => {
   const q = localPos(e); pointer.x = q.x; pointer.y = q.y; pointer.inside = true; pointer.touch = e.pointerType === 'touch';
   if (pinch(e)) { hover = null; return; }

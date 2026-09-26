@@ -9,7 +9,7 @@ Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, ab
 ## O que tem no jogo
 
 - **Roça de até 100 canteiros.** Você começa no nível 1 com 2.000 moedas e 6 canteiros. As expansões (nível 5, 10, 15, 20, 30, 40 e 50) liberam mais canteiros, e você escolhe onde colocar cada um, encostado na sua terra.
-- **19 plantações** (do nabo de 2 minutos ao maracujá de 36 horas) e **8 árvores frutíferas** (morangueiro, videira, macieira, laranjeira, bananeira, coqueiro, mangueira e goiabeira). A árvore é plantada uma vez, dá 15 colheitas e depois pede uma poda. A terra seca atrapalha, e insetos aparecem de vez em quando, nunca os dois ao mesmo tempo. XP para o próximo nível: 100 + 50 × (nível − 1). Cada planta dá XP em até 50 colheitas por dia.
+- **19 plantações** (do nabo de 2 minutos ao maracujá de 36 horas) e **8 árvores frutíferas** (morangueiro, videira, macieira, laranjeira, bananeira, coqueiro, mangueira e goiabeira). A árvore é plantada uma vez, dá 15 colheitas e depois pede uma poda. Cada colheita rende um número sorteado numa faixa (o nabo dá de 3 a 5, por exemplo). A ferramenta escolhida acompanha o cursor e aparece em cima da planta quando é usada, com som. A terra seca atrapalha, e insetos aparecem de vez em quando, nunca os dois ao mesmo tempo. XP para o próximo nível: 100 + 50 × (nível − 1). Cada planta dá XP em até 50 colheitas por dia.
 - **Enxada** (100 moedas) para arrancar plantações e árvores.
 - **3 fertilizantes**: básico (corta 10% do tempo, 50 moedas), rápido (25%, 200) e premium (50%, 1.000). Um por colheita.
 - **Música e sons**: 3 músicas calmas de roça e sons para cliques, regar, enxada, colher e mais. Tudo é sintetizado no navegador (`js/audio.js`), sem arquivos de áudio.
