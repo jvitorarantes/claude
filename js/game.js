@@ -3889,14 +3889,18 @@ cv.addEventListener('pointermove', e => {
   hover = pick(q.x, q.y);
 });
 cv.addEventListener('pointerleave', () => { pointer.inside = false; if (!pointer.touch) hover = null; });
-// Segurar em cima de uma casa, árvore ou enfeite abre um menu (mover / guardar). No mouse, o botão direito também.
+// Menu de uma casa, árvore ou enfeite (mover / guardar): no celular, segurando o dedo; no computador, botão direito.
 let holdTimer = null, holdFired = false;
 function objAt(x, y) {
   if (!isHome() || scene === 'casa') return null;
+  // a área de clique cobre o desenho inteiro (largura para cada lado e altura, em casas da grade)
+  const CAIXA = { casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05] };
   let best = null, bd = Infinity;
   for (const o of objList(state, scene)) {
-    const q = iso(o.u, o.v), r = L.W * Math.max(0.4, o.r * 0.55), d = Math.hypot(x - q.x, y - (q.y - L.W * 0.3));
-    if (d < r && d < bd) { best = o; bd = d; }
+    const q = iso(o.u, o.v), [w, h] = o.id ? [0.32, 0.7] : CAIXA[o.key];
+    if (Math.abs(x - q.x) > w * L.W || y > q.y + 0.12 * L.W || y < q.y - h * L.W) continue;
+    const d = Math.hypot(x - q.x, y - (q.y - h * L.W / 2));
+    if (d < bd) { best = o; bd = d; }
   }
   return best;
 }
@@ -3931,7 +3935,7 @@ cv.addEventListener('pointerdown', e => {
   drag = { x: e.clientX, y: e.clientY, px: L.pan.x, py: L.pan.y, moved: false };
   fecharMenuObj();
   clearTimeout(holdTimer); holdFired = false;
-  if (e.button === 0 && !moving) {
+  if (e.pointerType !== 'mouse' && !moving) { // segurar o dedo (no computador é o botão direito)
     const q = localPos(e), o = objAt(q.x, q.y);
     if (o) holdTimer = setTimeout(() => { if (drag && !drag.moved) { holdFired = true; abrirMenuObj(o, q.x, q.y); } }, 550);
   }
