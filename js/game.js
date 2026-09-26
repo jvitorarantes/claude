@@ -203,10 +203,10 @@ const FERT = Object.fromEntries(FERTS.map(f => [f.id, f]));
 const item = id => PRODUCE[id] || PRODUCT[id];
 const STAGE_NAMES = ['Semente', 'Broto', 'Crescendo', 'Quase lá', 'Maduro'];
 
+// Vizinhos da vila (não são amigos de verdade). "acima": quantos níveis a roça deles tem a mais que a sua.
 const NEIGHBORS = [
-  { id: 'cida',  nome: 'Tia Cida',   cao: 'Totó',   casa: '#5a8fc7', pega: 0.10 },
-  { id: 'juca',  nome: 'Seu Juca',   cao: 'Rex',    casa: '#d9a441', pega: 0.18 },
-  { id: 'neide', nome: 'Dona Neide', cao: 'Pipoca', casa: '#c7658f', pega: 0.06 },
+  { id: 'ze',    nome: 'Seu Zé',     cao: 'Rex',    casa: '#d9a441', pega: 0.16, acima: 2 },
+  { id: 'maria', nome: 'Dona Maria', cao: 'Pipoca', casa: '#c7658f', pega: 0.08, acima: 5 },
 ];
 
 // Ordem em que os lotes são liberados: do centro para as bordas.
@@ -920,7 +920,7 @@ function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
   const cur = state.nb[id];
   if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry))) state.nb[id] = genNeighbor();
-  view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id] };
+  view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima };
   afterVisit();
   save();
 }
@@ -933,7 +933,7 @@ async function visitFriend(uid) {
     const data = f && f.stateJson ? migrate(JSON.parse(f.stateJson)) : null;
     if (!data) return toast('Essa roça ainda não existe na nuvem.', 'bad');
     catchUp(data, (Date.now() - (f.updatedAt || Date.now())) / 1000);
-    view = { kind: 'friend', uid, nome: firstName(f.name) === 'Você' ? 'Amigo' : f.name, cao: 'Bidu', pega: 0.12, casa: '#7aa35a', data };
+    view = { kind: 'friend', uid, nome: firstName(f.name) === 'Você' ? 'Amigo' : f.name, cao: 'Bidu', pega: 0.12, casa: '#7aa35a', data, nivel: data.level || f.level || 1 };
     afterVisit();
   } catch (e) {
     console.warn(e);
@@ -944,7 +944,7 @@ async function visitFriend(uid) {
 function afterVisit() {
   hover = null; setScene('roca');
   if (['seed', 'hoe', 'fert'].includes(state.tool)) state.tool = 'hand';
-  $('#bannerTxt').textContent = `Você está na roça de ${view.nome}. Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
+  $('#bannerTxt').textContent = `Você está na roça de ${view.nome} (nível ${view.nivel}). Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
   $('#banner').hidden = false;
   cv.setAttribute('aria-label', `Roça de ${view.nome}`);
   renderTools(); renderPane(); renderSceneInfo();
@@ -3080,7 +3080,7 @@ function renderPenActions() {
 function renderSceneInfo() {
   renderPenActions();
   const s = S(), el = $('#sceneInfo');
-  const est = estacao(), owner = `${est.icone} ${est.nome}${raining() ? (est.neve ? ' · nevando' : ' · chovendo') : ''} · ` + (isHome() ? '' : `${view.nome} · `);
+  const est = estacao(), owner = `${est.icone} ${est.nome}${raining() ? (est.neve ? ' · nevando' : ' · chovendo') : ''} · ` + (isHome() ? '' : `${view.nome} (nível ${view.nivel}) · `);
   if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length}${isHome() ? ` de ${allowedLots()}` : ''} canteiros`;
   else if (scene === 'animais') {
     const cap = ABRIGOS.reduce((t, b) => t + ABRIGO_CAP[abrigoLv(s, b.id)], 0);
@@ -3130,12 +3130,18 @@ async function logout() {
 
 let resetArmed = false, unfriendArmed = null;
 function renderTabs() {
-  const b = document.querySelector('.tab[data-tab="amigos"]');
-  const unread = state ? state.news.filter(n => n.at > state.newsSeen).length : 0, n = requests.length + unread;
-  const old = b.querySelector('.badge'); if (old) old.remove();
-  if (n) b.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${n} novidades">${n}</span>`);
+  const setBadge = (el, n, label) => {
+    if (!el) return;
+    const o = el.querySelector('.badge');
+    if (o && o.textContent === String(n)) return;
+    if (o) o.remove();
+    if (n) el.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${n} ${label}">${n}</span>`);
+  };
+  const unread = state ? state.news.filter(n => n.at > state.newsSeen).length : 0;
+  setBadge(document.querySelector('.tab[data-tab="amigos"]'), requests.length, 'pedidos de amizade');
+  setBadge(document.querySelector('.tab[data-tab="correio"]'), unread, 'cartas novas');
   const mb = document.querySelector('.tab[data-tab="missoes"]'), mn = missoesProntas();
-  if (mb) { const o = mb.querySelector('.badge'); if (o) o.remove(); if (mn) mb.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${mn} prêmios">${mn}</span>`); }
+  setBadge(mb, mn, 'prêmios');
   renderGiftBtn();
   // Avisos nos botões Roça e Rancho: quantas coisas estão prontas para colher ou recolher.
   if (state) {
@@ -3152,7 +3158,7 @@ function renderTabs() {
 }
 // Preço nos botões da loja: ícone de moeda + valor (e a quantidade, quando tem).
 const moeda = (n, q) => `${q ? `<span class="qtd">×${q}</span>` : ''}<span class="coin" aria-hidden="true"></span>${n.toLocaleString('pt-BR')}`;
-const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões' };
+const TAB_NAMES = { loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões', correio: 'Correio' };
 // A janela abre por cima do jogo. Clicar de novo no mesmo botão fecha.
 function openPanel(t, seg, focus) {
   tab = t; if (seg) shopSeg = seg;
@@ -3350,12 +3356,16 @@ function renderPane() {
     });
     html += `<p class="hint">Pragas comem parte da colheita enquanto ficam lá. Terra seca faz a planta crescer mais devagar. Nunca acontecem os dois juntos. Cada planta dá XP em até ${XP_CAP} colheitas por dia.</p>
       <button class="btn danger" data-reset>${resetArmed ? 'Clique de novo para apagar tudo' : 'Recomeçar do zero'}</button>`;
-  } else if (tab === 'amigos') {
-    if (state.news.length) {
-      html += `<h3>Novidades da sua roça</h3><div class="news">${state.news.slice(0, 8).map(n =>
+  } else if (tab === 'correio') {
+    // Caixa de correio: as novidades da sua roça (visitas, presentes, cachorro, animais…)
+    html += `<p class="hint">Tudo o que aconteceu na sua roça: visitas dos amigos, presentes, o que o cachorro fez e recados da vila.</p>`;
+    if (!state.news.length) html += `<div class="empty">A caixa de correio está vazia.</div>`;
+    else {
+      html += `<div class="news">${state.news.slice(0, 30).map(n =>
         `<div class="${n.at > state.newsSeen ? 'new' : ''}"><time>${quando(n.at)}</time>${esc(n.msg)}</div>`).join('')}</div>`;
       if (state.news[0].at > state.newsSeen) { state.newsSeen = state.news[0].at; setTimeout(renderTabs, 0); save(); }
     }
+  } else if (tab === 'amigos') {
     html += `<h3>Amigos</h3>`;
     if (!Cloud.available) {
       html += `<p class="hint">Login com Google e amigos de verdade funcionam quando o jogo está publicado com o Firebase ligado (o passo a passo está no README). Nesta versão, a roça fica salva só neste navegador.</p>`;
@@ -3392,7 +3402,7 @@ function renderPane() {
         const name = f ? f.name : 'Amigo';
         const armed = unfriendArmed === uid;
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
-          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f ? `Nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
+          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f ? `Roça nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`}
           ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
           <button class="btn ${armed ? 'danger' : 'ghost'}" data-unfriend="${esc(uid)}">${armed ? 'Confirmar' : 'Desfazer'}</button></div></div>`;
@@ -3412,7 +3422,7 @@ function renderPane() {
     for (const n of NEIGHBORS) {
       const here = view.kind === 'npc' && view.id === n.id;
       html += `<div class="row ${here ? 'sel' : ''}"><div class="avatar" style="background:${n.casa}">${n.nome.split(' ').pop()[0]}</div>
-        <div><div class="name">${n.nome}${owes(n.id) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${owes(n.id) ? `Ajude de volta: +${AJUDA_BONUS.moedas} moedas · ` : ''}Cachorro: ${n.cao} · ${n.pega >= .15 ? 'bravo' : n.pega >= .09 ? 'atento' : 'dorminhoco'}</div></div>
+        <div><div class="name">${n.nome}${owes(n.id) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">Nível ${state.level + n.acima} · ${owes(n.id) ? `Ajude de volta: +${AJUDA_BONUS.moedas} moedas · ` : ''}Cachorro: ${n.cao} · ${n.pega >= .15 ? 'bravo' : n.pega >= .09 ? 'atento' : 'dorminhoco'}</div></div>
         ${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit="${n.id}">Visitar</button>`}</div>`;
     }
   }
@@ -3518,6 +3528,7 @@ const MENU_ICONS = {
   terreno: '<svg viewBox="0 0 32 32"><path d="M16 9 29 17 16 25 3 17z" fill="#8b5a33" stroke="#4a2c14" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 17l7-4.3M12 19l7-4.3M15 21l7-4.3" stroke="#5e3a1c" stroke-width="1.2"/><circle cx="24" cy="8" r="6" fill="#4f9a2f" stroke="#2f6e1e" stroke-width="1.4"/><path d="M24 5v6M21 8h6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>',
   amigos: '<svg viewBox="0 0 32 32"><circle cx="11" cy="12" r="5" fill="#ffd9b0" stroke="#6b4220" stroke-width="1.5"/><path d="M3 27c0-5 3.5-8 8-8s8 3 8 8z" fill="#4aa3df" stroke="#1d5f8f" stroke-width="1.5"/><circle cx="22" cy="13" r="4.5" fill="#f3c08e" stroke="#6b4220" stroke-width="1.5"/><path d="M15 27c0-4.5 3-7.5 7-7.5s7 3 7 7.5z" fill="#e9a800" stroke="#a87400" stroke-width="1.5"/></svg>',
   missoes: '<svg viewBox="0 0 32 32"><path d="M8 4h16a2 2 0 0 1 2 2v22l-4-2-3 2-3-2-3 2-3-2-4 2V6a2 2 0 0 1 2-2z" fill="#fff4e0" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 11l2 2 3-4M10 18l2 2 3-4" fill="none" stroke="#4f9a2f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 11h5M18 18h5" stroke="#a86b38" stroke-width="2" stroke-linecap="round"/></svg>',
+  correio: '<svg viewBox="0 0 32 32"><path d="M15 28V17" stroke="#7a4a22" stroke-width="3"/><path d="M5 10a6 6 0 0 1 12 0v8H5z" fill="#4a86c7" stroke="#2c5a8f" stroke-width="1.5" stroke-linejoin="round"/><path d="M11 4h12a6 6 0 0 1 6 6v8H17v-8a6 6 0 0 0-6-6z" fill="#5a9ae0" stroke="#2c5a8f" stroke-width="1.5" stroke-linejoin="round"/><path d="M23 18v-6h4v3h-4" fill="#e0463a" stroke="#8f2a1e" stroke-width="1.2"/><path d="M8 11h6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>',
   presente: '<svg viewBox="0 0 32 32"><rect x="5" y="13" width="22" height="15" rx="2" fill="#e0463a" stroke="#8f2a1e" stroke-width="1.6"/><rect x="3" y="9" width="26" height="6" rx="1.5" fill="#f25a4a" stroke="#8f2a1e" stroke-width="1.6"/><path d="M14 9h4v19h-4z" fill="#ffd54a"/><path d="M16 9c-2-5-8-6-8-2s6 2 8 2zM16 9c2-5 8-6 8-2s-6 2-8 2z" fill="#ffd54a" stroke="#a87400" stroke-width="1.4"/></svg>',
   casa: '<svg viewBox="0 0 32 32"><path d="M5 15 16 6l11 9v13H5z" fill="#f1dcae" stroke="#7a4a22" stroke-width="1.6" stroke-linejoin="round"/><path d="M2 16 16 4l14 12" fill="none" stroke="#b5532f" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 28v-8h6v8" fill="#8a5a33"/><path d="M20 15h5v4h-5z" fill="#9fd4f5" stroke="#7a4a22" stroke-width="1.2"/></svg>',
 };
