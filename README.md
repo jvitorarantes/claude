@@ -113,6 +113,13 @@ O Firebase é gratuito para um jogo desse tamanho (plano Spark).
 
 No repositório do GitHub: **Settings > Pages > Build and deployment**, escolha **Deploy from a branch**, a branch do jogo e a pasta `/ (root)`. Em um ou dois minutos o jogo fica em `https://seu-usuario.github.io/nome-do-repositorio/`. Lembre de adicionar `seu-usuario.github.io` nos domínios autorizados (passo 7).
 
+### Aplicativo (Android, celular e tablet)
+
+O jogo é um app instalável (PWA): tem ícone, abre em tela cheia e funciona sem internet (salvando no aparelho).
+No Chrome do celular, use **Instalar app**. Para gerar o app de Android (APK para instalar direto ou AAB para
+a Play Store), siga o passo a passo em [`android/COMO-GERAR-O-APP.md`](android/COMO-GERAR-O-APP.md).
+O endereço do jogo é https://jvitorarantes.github.io/roca-feliz/.
+
 ## Como os dados ficam guardados
 
 - `farms/{uid}`: a roça de cada jogador (o estado do jogo em JSON, mais nome, foto, nível, código e as listas `friends` e `sent`). Podem ler o dono, os amigos e quem recebeu um pedido de amizade dele. Só o dono escreve.

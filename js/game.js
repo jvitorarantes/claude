@@ -5794,6 +5794,8 @@ function start(data) {
   rollPeriods(); presentePioneiro();
   resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons(); afterUpdate(); renderTabs();
   ultimaChecagem = Date.now(); autoUpdate();
+  // app instalável (celular, tablet e o app de Android): abre mesmo sem internet
+  if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (!Cloud.available) setTimeout(() => { if (giftReady()) showGift(); }, 1500);
   requestAnimationFrame(t => { last = t; frame(t); });
   if (Cloud.available) {
