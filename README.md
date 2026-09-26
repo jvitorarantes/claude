@@ -2,7 +2,7 @@
 
 Um jogo de fazenda no navegador, inspirado no clássico *Colheita Feliz* do Orkut.
 
-A fazenda ocupa a tela toda, como no original. O cartão do jogador (foto, nível, experiência e moedas) fica no canto de cima. Os lugares (Roça, Rancho e Casa) ficam à esquerda, e o menu (Loja, Celeiro, Terreno e Amigos) à direita, abrindo uma janela por cima do jogo. As ferramentas são botões redondos embaixo.
+A fazenda ocupa a tela toda, como no original. O cartão do jogador (foto, nível, experiência e moedas) fica no canto de cima. Os lugares (Roça, Rancho e Casa) ficam à esquerda, e o menu (Loja, Celeiro, Terreno e Amigos) à direita, abrindo uma janela por cima do jogo. As ferramentas são botões redondos embaixo. Os botões + e − do lado direito (ou a roda do mouse, ou a pinça no celular) dão zoom, e arrastando dá para andar pela cena. Uma placa ao lado do celeiro mostra em que nível sai a próxima leva de canteiros.
 
 Não tem build nem dependências: é HTML, CSS e JavaScript puro. Para jogar, abra o `index.html` num servidor qualquer (veja abaixo) ou publique no GitHub Pages.
 

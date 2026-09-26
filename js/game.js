@@ -1354,13 +1354,28 @@ function resize() {
   cv.width = Math.round(cw * L.dpr); cv.height = Math.round(ch * L.dpr);
   L.cw = cw; L.ch = ch;
 }
+const ZOOM_MIN = 0.6, ZOOM_MAX = 2.5;
+const zoomOf = sc => clamp(Number(settings.zoom && settings.zoom[sc]) || 1, ZOOM_MIN, ZOOM_MAX);
+function setZoom(z, sc = scene) {
+  const old = zoomOf(sc), nz = clamp(Math.round(z * 100) / 100, ZOOM_MIN, ZOOM_MAX);
+  settings.zoom = Object.assign({}, settings.zoom, { [sc]: nz });
+  L.pan.x *= nz / old; L.pan.y *= nz / old;
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* sem armazenamento */ }
+  renderZoom();
+}
+function renderZoom() {
+  const z = zoomOf(scene);
+  $('#zoomIn').disabled = z >= ZOOM_MAX; $('#zoomOut').disabled = z <= ZOOM_MIN;
+  $('#zoomReset').textContent = `${Math.round(z * 100)}%`;
+}
 // Espaço da tela que os botões por cima do jogo cobrem.
 function insets() {
   return L.cw < 700 ? { t: 70, b: 92, l: 44, r: 52 } : { t: 76, b: 104, l: 96, r: 104 };
 }
 function layout(sc) {
   const { cw, ch } = L, I = insets();
-  const aw = Math.max(80, cw - I.l - I.r), ah = Math.max(80, ch - I.t - I.b), cx = I.l + aw / 2;
+  const aw = Math.max(80, cw - I.l - I.r), ah = Math.max(80, ch - I.t - I.b), cx = I.l + aw / 2, cy = I.t + ah / 2;
+  let box = { w: aw, h: ah }; // tamanho do que precisa aparecer, no zoom normal
   if (sc === 'roca') {
     // A câmera enquadra só a terra em uso (mais o lote à venda) e se afasta conforme a roça cresce.
     const plots = S().plots, home = isHome();
@@ -1382,17 +1397,21 @@ function layout(sc) {
     // O rancho inteiro cabe na tela; no celular fica maior e dá para arrastar.
     const bw = (RANCH_C + RANCH_R) / 2 + 0.8, bh = (RANCH_C + RANCH_R) / 4 + 1.6;
     L.W = Math.max(Math.min(aw / bw, ah / bh), cw < 700 ? 66 : 0);
-    const ovx = Math.max(0, (bw * L.W - aw) / 2), ovy = Math.max(0, (bh * L.W - ah) / 2);
-    L.pan.x = clamp(L.pan.x, -ovx, ovx); L.pan.y = clamp(L.pan.y, -ovy, ovy);
-    L.ox = cx - (RANCH_C - RANCH_R) * L.W / 4 + 0.1 * L.W + L.pan.x;
-    L.oy = I.t + ah / 2 - ((RANCH_C + RANCH_R) / 8 - 0.55) * L.W + L.pan.y;
-    L.canPan = ovx > 0 || ovy > 0;
+    L.ox = cx - (RANCH_C - RANCH_R) * L.W / 4 + 0.1 * L.W;
+    L.oy = I.t + ah / 2 - ((RANCH_C + RANCH_R) / 8 - 0.55) * L.W;
+    box = { w: bw * L.W, h: bh * L.W };
   } else {
     L.W = Math.min(aw / 5.9, ah / 4.35);
     L.ox = cx;
     L.oy = I.t + ah - ROOM / 2 * L.W - 0.3 * L.W;
   }
-  if (sc !== 'animais') L.canPan = false;
+  // Zoom em volta do meio da tela; arrastar anda pela parte que ficou de fora.
+  const z = zoomOf(sc);
+  L.W *= z; L.ox = cx + (L.ox - cx) * z; L.oy = cy + (L.oy - cy) * z;
+  const ovx = Math.max(0, (box.w * z - aw) / 2), ovy = Math.max(0, (box.h * z - ah) / 2);
+  L.pan.x = clamp(L.pan.x, -ovx, ovx); L.pan.y = clamp(L.pan.y, -ovy, ovy);
+  L.ox += L.pan.x; L.oy += L.pan.y;
+  L.canPan = ovx > 0 || ovy > 0;
   L.horizon = Math.max(ch * 0.08, L.oy - L.W * 0.9);
 }
 function iso(c, r) { return { x: L.ox + (c - r) * L.W / 2, y: L.oy + (c + r) * L.W / 4 }; }
@@ -1631,6 +1650,7 @@ function drawDogSpot(slot, s, t, home) {
     ctx.beginPath(); ctx.arc(m.x, m.y, R, 0, 7); ctx.fill(); ctx.stroke();
     line({ x: m.x - R * 0.5, y: m.y }, { x: m.x + R * 0.5, y: m.y }, '#4f9a2f', 2.5);
     line({ x: m.x, y: m.y - R * 0.5 }, { x: m.x, y: m.y + R * 0.5 }, '#4f9a2f', 2.5);
+    hits.push({ kind: 'dog', slot, x: m.x, y: m.y, r: Math.max(R * 1.8, 22) }); // o + também abre a loja de cães
   }
   hits.push({ kind: 'dog', slot, x: (k.x + p.x) / 2, y: p.y - W * 0.2, r: W * 0.4 });
 }
@@ -2359,6 +2379,32 @@ function drawPlot(i, p, t, home) {
   }
 }
 
+// Placa do terreno: avisa quando sai a próxima expansão (ou que ela já pode ser comprada).
+function landSignText() {
+  if (freeLots()) return [`${freeLots()} ${freeLots() > 1 ? 'canteiros' : 'canteiro'}`, 'para colocar no +', '#2f5e14'];
+  const next = EXPANSOES[state.exp + 1];
+  if (!next) return null;
+  const extra = next.total - EXPANSOES[state.exp].total;
+  if (state.level < next.nivel) return [`+${extra} canteiros`, `no nível ${next.nivel}`, '#7a1d10'];
+  return [`+${extra} canteiros`, `comprar · ${next.preco.toLocaleString('pt-BR')}`, '#2f5e14'];
+}
+function drawLandSign() {
+  const txt = landSignText(); if (!txt) return;
+  const W = L.W, x = L.ox - W * 2.35, y = L.oy + W * 1.15;
+  const hov = hover && hover.kind === 'land';
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, W * 0.18, W * 0.05, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - W * 0.035, y - W * 0.5, W * 0.07, W * 0.5);
+  const fs = Math.round(clamp(W * 0.13, 11, 16));
+  ctx.font = `800 ${fs}px 'Baloo 2', sans-serif`;
+  const bw = Math.max(ctx.measureText(txt[0]).width, ctx.measureText(txt[1]).width) + fs * 1.6, bh = fs * 2.9, top = y - W * 0.5 - bh * 0.7;
+  ctx.fillStyle = hov ? '#e8b273' : '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.roundRect(x - bw / 2, top, bw, bh, 7); ctx.fill(); ctx.stroke();
+  line({ x: x - bw / 2 + 5, y: top + bh / 2 }, { x: x + bw / 2 - 5, y: top + bh / 2 }, 'rgba(122,74,34,.35)', 1);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#4a2a10'; ctx.fillText(txt[0], x, top + bh * 0.3);
+  ctx.fillStyle = txt[2]; ctx.fillText(txt[1], x, top + bh * 0.72);
+  hits.push({ kind: 'land', x, y: top + bh / 2, r: Math.max(bw / 2, 30) });
+}
 function plotBubble(p, home) {
   if (p.s === 'withered') return home ? 'hoe' : null;
   if (p.s !== 'growing') return null;
@@ -2381,6 +2427,7 @@ function drawRoca(s, t, home) {
   else drawKennelSpot('roca', s, home);
   drawFence(COLS, ROWS, 'back');
   if (view.kind !== 'npc') drawDogSpot('roca', s, t, home);
+  if (home) drawLandSign();
   for (let sum = 0; sum <= COLS + ROWS - 2; sum++)
     for (let c = 0; c < COLS; c++) { const r = sum - c; if (r >= 0 && r < ROWS) drawPlot(r * COLS + c, s.plots[r * COLS + c], t, home); }
   nightOverlay(tod);
@@ -2800,7 +2847,7 @@ function setTool(id) {
 }
 function setScene(sc) {
   if (sc !== scene) L.pan = { x: 0, y: 0 };
-  scene = sc; hover = null;
+  scene = sc; hover = null; renderZoom();
   document.querySelectorAll('#scenes button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.scene === sc)));
   renderTools(); renderSceneInfo();
 }
@@ -3284,6 +3331,12 @@ function tipAbrigo(id) {
   if (isHome()) h += lv < 3 ? `<br>Clique para aumentar ou comprar animais.` : `<br>Clique para comprar animais.`;
   return h;
 }
+function tipLand() {
+  const next = EXPANSOES[state.exp + 1];
+  if (freeLots()) return `<b>Terra para colocar</b><br>Clique duas vezes num + encostado na sua terra.`;
+  if (!next) return null;
+  return `<b>Próxima expansão</b><br>+${next.total - EXPANSOES[state.exp].total} canteiros · ${next.preco.toLocaleString('pt-BR')} moedas · nível ${next.nivel}<br>Clique para ver todas.`;
+}
 function tipDecor(id) {
   const d = DECO[id];
   if (S().decor[id]) return `<b>${d.nome}</b><br>+${d.conforto} de conforto`;
@@ -3292,7 +3345,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -3314,10 +3367,28 @@ function pick(x, y) {
   return null;
 }
 function localPos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-// Arrastar move a câmera quando o rancho não cabe na tela (celular).
+// Arrastar move a câmera quando a cena não cabe na tela. Roda do mouse e pinça dão zoom.
 let drag = null;
+const fingers = new Map();
+cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(zoomOf(scene) * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive: false });
+function pinch(e) {
+  if (!fingers.has(e.pointerId)) return false;
+  fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (fingers.size < 2) return false;
+  const [a, b] = [...fingers.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+  if (!drag || !drag.pinch) drag = { pinch: d, z: zoomOf(scene), moved: true };
+  else setZoom(drag.z * d / drag.pinch);
+  return true;
+}
+const endTouch = e => { fingers.delete(e.pointerId); if (drag && drag.pinch && fingers.size < 2) drag = { x: 0, y: 0, moved: true, dead: true }; };
+cv.addEventListener('pointercancel', endTouch);
+$('#zoomIn').addEventListener('click', () => setZoom(zoomOf(scene) * 1.25));
+$('#zoomOut').addEventListener('click', () => setZoom(zoomOf(scene) / 1.25));
+$('#zoomReset').addEventListener('click', () => { setZoom(1); L.pan = { x: 0, y: 0 }; });
 cv.addEventListener('pointermove', e => {
   const q = localPos(e); pointer.x = q.x; pointer.y = q.y; pointer.inside = true; pointer.touch = e.pointerType === 'touch';
+  if (pinch(e)) { hover = null; return; }
+  if (drag && drag.dead) return;
   if (drag && L.canPan) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) > 8) { drag.moved = true; try { cv.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ } }
@@ -3328,11 +3399,17 @@ cv.addEventListener('pointermove', e => {
 cv.addEventListener('pointerleave', () => { pointer.inside = false; if (!pointer.touch) hover = null; });
 cv.addEventListener('pointerdown', e => {
   pointer.touch = e.pointerType === 'touch';
+  if (e.pointerType === 'touch') fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (fingers.size >= 2) return;
   drag = { x: e.clientX, y: e.clientY, px: L.pan.x, py: L.pan.y, moved: false };
 });
-cv.addEventListener('pointerup', () => { if (drag && !drag.moved) drag = null; });
+cv.addEventListener('pointerup', e => {
+  endTouch(e);
+  if (drag && !drag.moved) drag = null;
+  else if (drag && drag.dead && !fingers.size) setTimeout(() => { if (drag && drag.dead) drag = null; }, 0);
+});
 cv.addEventListener('click', e => {
-  if (drag && drag.moved) { drag = null; return; }
+  if (drag && (drag.moved || drag.dead)) { drag = null; return; }
   drag = null;
   const q = localPos(e); pointer.x = q.x; pointer.y = q.y;
   const target = pick(q.x, q.y); hover = target;
@@ -3343,6 +3420,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'decor') actDecor(target.id);
   else if (target.kind === 'dog') actDog(target.slot);
   else if (target.kind === 'abrigo') actAbrigo(target.id);
+  else if (target.kind === 'land') openPanel('terreno');
 });
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input, textarea')) return;
@@ -3382,9 +3460,10 @@ function closeSettings() { $('#settings').hidden = true; $('#openSettings').focu
 $('#openSettings').addEventListener('click', openSettings);
 $('#settings').addEventListener('click', e => {
   if (e.target === $('#settings') || e.target.closest('[data-close]')) return closeSettings();
-  const tr = e.target.closest('[data-track]');
+  // Só os botões de dentro da janela (a página inteira também tem data-tema).
+  const tr = e.target.closest('#tracks [data-track]');
   if (tr) { settings.track = Number(tr.dataset.track); settings.music = true; saveSettings(); renderSettings(); }
-  const tm = e.target.closest('[data-tema]');
+  const tm = e.target.closest('#temaSeg [data-tema]');
   if (tm) { settings.tema = tm.dataset.tema; saveSettings(); renderSettings(); }
 });
 $('#optMusic').addEventListener('change', e => { settings.music = e.target.checked; saveSettings(); });

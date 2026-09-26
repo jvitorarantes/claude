@@ -134,6 +134,17 @@
   }
   .roundbtn .badge { position: absolute; top: -2px; right: 6px; margin: 0; }
   .scenes { left: 10px; top: 92px; display: grid; gap: 6px; }
+  .zoom {
+    right: 18px; top: 382px; display: grid; gap: 4px; justify-items: center;
+    background: rgba(74,42,16,.55); border: 2px solid rgba(255,235,190,.45); border-radius: 24px; padding: 5px;
+  }
+  .zbtn {
+    width: 40px; height: 40px; border-radius: 50%; border: 2px solid #8a5a2b; padding: 0;
+    background: radial-gradient(circle at 50% 35%, #fffdf2, #f1ddb0); color: #5a3614;
+    font: 800 24px/1 'Baloo 2', sans-serif; box-shadow: 0 2px 0 #5a3614;
+  }
+  .zbtn.small { width: 44px; height: 24px; border-radius: 12px; font-size: 11px; background: #fff3c4; }
+  .zbtn:disabled { opacity: .45; cursor: default; }
   .menu { right: 10px; top: 70px; display: grid; gap: 6px; }
 
   .bottombar {
@@ -328,6 +339,9 @@
     .roundbtn .ic svg, .roundbtn .ic img { width: 26px; height: 26px; }
     .roundbtn .lb { font-size: 10px; max-width: 50px; }
     .scenes { left: 2px; top: 80px; gap: 4px; }
+    .zoom { right: 4px; top: 300px; padding: 3px; }
+    .zbtn { width: 34px; height: 34px; font-size: 20px; }
+    .zbtn.small { width: 38px; height: 20px; font-size: 10px; }
     .menu { right: 2px; top: 60px; gap: 4px; }
     .tool { width: 50px; }
     .tool .ic { width: 42px; height: 42px; }
@@ -398,6 +412,11 @@
       <button class="roundbtn tab" type="button" data-tab="amigos" aria-selected="false"><span class="ic"></span><span class="lb">Amigos</span></button>
     </nav>
 
+    <div class="zoom over" role="group" aria-label="Zoom">
+      <button class="zbtn" type="button" id="zoomIn" aria-label="Aproximar" title="Aproximar">+</button>
+      <button class="zbtn small" type="button" id="zoomReset" title="Voltar ao tamanho normal">100%</button>
+      <button class="zbtn" type="button" id="zoomOut" aria-label="Afastar" title="Afastar">−</button>
+    </div>
     <div class="bottombar over">
       <div class="hintline" id="sceneHint" hidden></div>
       <div class="tools outline" id="tools" role="toolbar" aria-label="Ferramentas"></div>
