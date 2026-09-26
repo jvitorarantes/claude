@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Regras do Firestore da Roça Feliz.
+// Cole este arquivo em Firebase Console > Firestore Database > Regras e clique em Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Cada jogador tem uma roça. Qualquer jogador logado pode ver (para visitar),
+    // mas só o dono pode salvar.
+    match /farms/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid
+                   && request.resource.size() < 900000;
+
+      // Visitas: o que um amigo fez na sua roça. Quem visita só pode criar,
+      // sempre em seu próprio nome. O dono lê e apaga ao aplicar.
+      match /visits/{visitId} {
+        allow create: if request.auth != null
+                      && request.auth.uid != uid
+                      && request.resource.data.from == request.auth.uid
+                      && request.resource.data.t in ['friend', 'help', 'steal', 'feed', 'stealA']
+                      && request.resource.size() < 2000;
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // Códigos de amigo (6 letras) apontando para o jogador. Não podem ser trocados depois.
+    match /codes/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid
+                    && code.size() == 6;
+    }
+  }
+}
