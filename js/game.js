@@ -332,7 +332,7 @@ function migrate(s) {
   delete s.lugares;
   s.invNovos = Math.max(0, Number(s.invNovos) || 0);
   s.banca = Array.isArray(s.banca) ? s.banca.filter(x => x && item(x.item) && x.qtd > 0) : [];
-  s.fab = s.fab && Array.isArray(s.fab.fila) ? { fila: s.fab.fila.filter(x => x && RECEITA[x.r]).slice(0, FILA_MAX) } : { fila: [] };
+  s.fab = s.fab && Array.isArray(s.fab.fila) ? { fila: s.fab.fila.filter(x => x && RECEITA[x.r]).slice(0, FILA_TOPO) } : { fila: [] };
   if (s.truck && !Array.isArray(s.truck.pedidos)) s.truck = null;
   const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
   s.dogs = {};
@@ -443,6 +443,7 @@ const L = { W: 60, ox: 0, oy: 0, cw: 0, ch: 0, horizon: 0, dpr: 1, pan: { x: 0, 
 
 // Nuvem
 let user = null, cloudStatus = Cloud.available ? 'loading' : 'off', syncStatus = '', dirty = false, lastCloud = 0;
+const CLOUD_MS = 30 * 1000; // intervalo mínimo entre salvamentos automáticos na nuvem
 let unsubVisits = null, unsubRequests = null;
 let requests = [];                  // pedidos de amizade recebidos (ao vivo)
 const friendInfo = {};
@@ -527,6 +528,7 @@ function addXP(n, pos) {
     sfx('level');
     const bonus = state.level * 50; state.coins += bonus;
     const novas = [...CROPS, ...ANIMALS, ...DECOR].filter(c => c.nivel === state.level).map(c => c.nome);
+    if (filaMax(state.level) > filaMax(state.level - 1)) novas.push('1 espaço a mais na fábrica');
     toast(`Nível ${state.level}! +${bonus} moedas` + (novas.length ? ` · novidades: ${novas.join(', ')}` : ''), 'good');
   }
 }
@@ -1105,7 +1107,7 @@ function renderVisita() {
   const fora = !isHome();
   document.body.classList.toggle('visitando', fora);
   if (fora && !$('#panel').hidden && !TABS_VISITA.includes(tab)) closePanel();
-  renderMoveBtn();
+  renderMoveBtn(); pedirFitHud();
 }
 function goHome() {
   if (!isHome()) telaCarregando('Voltando para a sua roça…', CARREGA_MS, (view.kind === 'npc' ? view.nome : firstName(view.nome)) || 'Vizinho', true);
@@ -1661,7 +1663,8 @@ function layout(sc) {
   // Zoom em volta do meio da tela; arrastar anda pela parte que ficou de fora.
   const z = zoomOf(sc);
   L.W *= z; L.ox = cx + (L.ox - cx) * z; L.oy = cy + (L.oy - cy) * z;
-  const ovx = Math.max(0, (box.w * z - aw) / 2), ovy = Math.max(0, (box.h * z - ah) / 2);
+  // sempre dá para arrastar um pouco para os lados (e mais, se a cena não couber)
+  const ovx = Math.max(aw * 0.35, (box.w * z - aw) / 2 + aw * 0.1), ovy = Math.max(ah * 0.25, (box.h * z - ah) / 2 + ah * 0.1);
   L.pan.x = clamp(L.pan.x, -ovx, ovx); L.pan.y = clamp(L.pan.y, -ovy, ovy);
   L.ox += L.pan.x; L.oy += L.pan.y;
   L.canPan = ovx > 0 || ovy > 0;
@@ -3310,6 +3313,56 @@ const TOOLS = [
 const HOME_ONLY = ['seed', 'hoe', 'fert'];
 const availTools = () => TOOLS.filter(t => (isHome() || !HOME_ONLY.includes(t.id)) && (t.id !== 'hoe' || state.tools.enxada));
 
+// ---------- Botões da tela sem se sobrepor ----------
+// Depois de o CSS montar a tela, confere o espaço de verdade: cada coluna de botões começa abaixo
+// do que está em cima dela e, se não couber até o que está embaixo, encolhe por inteiro.
+let fitPedido = 0;
+function pedirFitHud() { if (!fitPedido) fitPedido = requestAnimationFrame(() => { fitPedido = 0; fitHud(); }); }
+function fitHud() {
+  const q = sel => document.querySelector(sel);
+  const player = q('.player'), topo = q('.topright'), menu = q('.menu'), cenas = q('#scenes'), gift = q('.giftwrap'), zoom = q('.zoom');
+  const baixo = [q('#tools'), q('#penActions')];
+  if (!menu || !cenas || !zoom) return;
+  for (const el of [menu, cenas, gift, zoom]) if (el) { el.style.transform = ''; el.style.top = ''; el.style.bottom = ''; el.style.left = ''; el.style.transformOrigin = ''; }
+  const vis = el => el && !el.hidden && el.offsetParent !== null && el.getBoundingClientRect().width > 0;
+  const R = el => el.getBoundingClientRect();
+  const cruza = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+  const cruzaX = (a, b) => a.left < b.right - 1 && b.left < a.right - 1;
+  const H = innerHeight, M = 4;
+  // zoom encostado na barra de ferramentas: sobe para cima dela
+  for (const b of baixo) if (vis(b) && vis(zoom) && cruza(R(zoom), R(b))) { zoom.style.top = 'auto'; zoom.style.bottom = `${H - R(b).top + M}px`; }
+  const coluna = el => getComputedStyle(el).display === 'grid';
+  // limite de baixo de uma coluna: o primeiro obstáculo abaixo dela que ocupa a mesma faixa
+  const limite = (x, topo, obst) => obst.filter(vis).map(R).filter(r => cruzaX(r, x) && r.top > topo).reduce((m, r) => Math.min(m, r.top - M), H - M);
+  const encaixa = (els, origem, obst) => {
+    els = els.filter(vis); if (!els.length) return;
+    const top0 = R(els[0]).top, faixa = els.map(R).reduce((a, r) => ({ left: Math.min(a.left, r.left), right: Math.max(a.right, r.right) }), { left: 1e9, right: -1e9 });
+    const fundo = limite(faixa, top0, obst), alto = R(els[els.length - 1]).bottom - top0;
+    const k = Math.max(0.45, Math.min(1, (fundo - top0) / alto));
+    if (k >= 1) return;
+    let y = top0;
+    for (const el of els) {
+      const h = R(el).height;
+      el.style.transformOrigin = origem; el.style.transform = `scale(${k})`;
+      el.style.top = `${y}px`; y += h * k + 6 * k;
+    }
+  };
+  // coluna da esquerda (lugares + presente/mover) começa abaixo do cartão do jogador
+  if (coluna(cenas)) {
+    if (vis(player) && cruzaX(R(player), R(cenas)) && R(cenas).top < R(player).bottom + M) cenas.style.top = `${R(player).bottom + M}px`;
+    if (vis(gift)) gift.style.top = `${R(cenas).bottom + 6}px`;
+    encaixa([cenas, gift], 'top left', [zoom, ...baixo]);
+  } else if (vis(gift)) {
+    // celular em pé: lugares e presente lado a lado embaixo
+    gift.style.left = `${R(cenas).right + M}px`;
+  }
+  // menu da direita começa abaixo dos botões de salvar e configurações
+  if (coluna(menu)) {
+    if (vis(topo) && cruzaX(R(topo), R(menu)) && R(menu).top < R(topo).bottom + M) menu.style.top = `${R(topo).bottom + M}px`;
+    encaixa([menu], 'top right', [zoom, ...baixo]);
+  } else if (vis(topo) && R(menu).top < R(topo).bottom + M) menu.style.top = `${R(topo).bottom + M}px`;
+}
+addEventListener('resize', pedirFitHud);
 function renderTools() {
   const box = $('#tools'), hint = $('#sceneHint');
   box.hidden = scene !== 'roca';
@@ -3342,7 +3395,7 @@ function setScene(sc) {
   if (sc === 'casa' && moveMode) { moveMode = false; moving = null; }
   renderMoveBtn();
   document.querySelectorAll('#scenes button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.scene === sc)));
-  renderTools(); renderSceneInfo();
+  renderTools(); renderSceneInfo(); pedirFitHud();
 }
 
 function renderHUD() {
@@ -3615,7 +3668,7 @@ function renderPane() {
       }
     } else if (shopSeg === 'temas') {
       html += `<p class="hint">Os temas mudam a cerca e o jeito da sua roça. Os amigos veem o seu tema quando visitam.</p>`;
-      if (state.skins.pioneiro) html += `<div class="row sel"><img alt="" src="${makeIcon('skin:pio', () => drawBarn(48, 84, 70, 'pioneiro'))}"><div><div class="name">Celeiro e casa dos Pioneiros <span class="tag">⭐ pioneiros</span></div><div class="meta">Azul com detalhes dourados</div></div>
+      if (state.skins.pioneiro) html += `<div class="row sel"><img alt="" src="${makeIcon('skin:pio', () => drawBarn(48, 84, 70, 'pioneiro'))}"><div><div class="name">Celeiro e casa dos Pioneiros <span class="tag">⭐ pioneiros</span></div><div class="meta">Azul com detalhes dourados · ${obtidoEm(state)}</div></div>
         <button class="btn ${state.skin === 'pioneiro' ? 'ghost' : ''}" data-skin="${state.skin === 'pioneiro' ? '' : 'pioneiro'}">${state.skin === 'pioneiro' ? 'Tirar' : 'Usar'}</button></div>`;
       for (const t of TEMAS) {
         const locked = t.nivel > state.level, owned = !!state.temas[t.id], using = state.tema === t.id;
@@ -3958,7 +4011,7 @@ function tipBicho(i) {
 }
 function tipEnfeite(id) {
   const e = ENFEITE[id]; if (!e) return null;
-  return `<b>${e.nome}</b><br>+${e.conforto}% de XP${e.especial ? '<br>Especial dos pioneiros' : ''}${isHome() ? '<br>Mude de lugar com o botão Mover.' : ''}`;
+  return `<b>${e.nome}</b><br>+${e.conforto}% de XP${e.especial ? `<br>Especial dos pioneiros · ${obtidoEm(S())}` : ''}${isHome() ? '<br>Mude de lugar com o botão Mover.' : ''}`;
 }
 function tipLand() {
   const next = EXPANSOES[state.exp + 1];
@@ -4026,6 +4079,12 @@ cv.addEventListener('pointermove', e => {
   const q = localPos(e); pointer.x = q.x; pointer.y = q.y; pointer.inside = true; pointer.touch = e.pointerType === 'touch';
   if (pinch(e)) { hover = null; return; }
   if (drag && drag.dead) return;
+  if (drag && drag.item) {
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) > 4) { drag.moved = true; try { cv.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ } }
+    if (drag.moved) { const [u, v] = screenToWorld(q.x, q.y); moving.u = Math.round((u + drag.item.du) * 20) / 20; moving.v = Math.round((v + drag.item.dv) * 20) / 20; hover = null; }
+    return;
+  }
   if (drag && L.canPan) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) > 8) { drag.moved = true; try { cv.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ } }
@@ -4063,9 +4122,9 @@ $('#ctxMenu').addEventListener('click', e => {
   const b = e.target.closest('[data-ctx]'); if (!b) return;
   const key = $('#ctxMenu').dataset.key; fecharMenuObj();
   if (b.dataset.ctx === 'mover') {
-    moveMode = true; moving = { key, uma: true }; renderMoveBtn(); renderTools();
     const o = objList(state, scene).find(x => x.key === key);
-    toast(`${o && o.id ? ENFEITE[o.id].nome : OBJ_INFO[key] ? OBJ_INFO[key].nome : 'Pronto'}: clique no lugar novo. Esc cancela.`);
+    moveMode = true; moving = { key, uma: true, u: o ? o.u : 0, v: o ? o.v : 0 }; renderMoveBtn(); renderTools();
+    toast(moveDica(o && o.id ? ENFEITE[o.id].nome : OBJ_INFO[key] ? OBJ_INFO[key].nome : 'Pronto'));
   } else if (b.dataset.ctx === 'guardar' && key.startsWith('enf:')) invGuardar(scene, Number(key.slice(4)));
 });
 cv.addEventListener('contextmenu', e => {
@@ -4079,6 +4138,14 @@ cv.addEventListener('pointerdown', e => {
   if (fingers.size >= 2) return;
   drag = { x: e.clientX, y: e.clientY, px: L.pan.x, py: L.pan.y, moved: false };
   fecharMenuObj();
+  if (moveMode && moving && e.pointerType !== 'mouse' && isHome()) {
+    // pegou o item que está sendo movido? então o dedo arrasta ele (e não a tela)
+    const q = localPos(e), g = iso(moving.u, moving.v), W = L.W;
+    if (Math.abs(q.x - g.x) < W * 0.7 && q.y < g.y + W * 0.35 && q.y > g.y - W * 1.2) {
+      const [u, v] = screenToWorld(q.x, q.y);
+      drag.item = { du: moving.u - u, dv: moving.v - v };
+    }
+  }
   clearTimeout(holdTimer); holdFired = false;
   if (e.pointerType !== 'mouse' && !moving) { // segurar o dedo (no computador é o botão direito)
     const q = localPos(e), o = objAt(q.x, q.y);
@@ -4088,6 +4155,8 @@ cv.addEventListener('pointerdown', e => {
 cv.addEventListener('pointerup', () => clearTimeout(holdTimer));
 cv.addEventListener('pointerup', e => {
   endTouch(e);
+  // soltou o item num lugar ruim? encaixa no lugar livre mais perto (se tiver um bem pertinho)
+  if (drag && drag.item && drag.moved && moving) [moving.u, moving.v] = pontoLivre(scene, moving.u, moving.v, moving.key, raioMov(), 1.5);
   if (drag && !drag.moved) drag = null;
   else if (drag && drag.dead && !fingers.size) setTimeout(() => { if (drag && drag.dead) drag = null; }, 0);
 });
@@ -4180,6 +4249,25 @@ function afterUpdate() {
   setTimeout(() => toast(old && old !== VERSION ? `Jogo atualizado para a versão ${VERSION}!` : `Jogo recarregado (versão ${VERSION}).`, 'good'), 1200);
 }
 $('#checkUpdate')?.addEventListener('click', checkUpdate);
+// Toda vez que o jogo abre (ou volta a aparecer depois de muito tempo), confere em silêncio se há versão nova.
+// Se tiver, salva e recarrega sozinho. Só tenta uma vez por versão, para nunca ficar recarregando sem parar.
+async function autoUpdate() {
+  if (!/^https?:/.test(location.protocol)) return; // versão do Claude / arquivo local: não tem site para comparar
+  let remote = null;
+  try {
+    const r = await fetch(`${location.pathname.replace(/[^/]*$/, '')}index.html?t=${Date.now()}`, { cache: 'no-store' });
+    if (r.ok) remote = ((await r.text()).match(/name="rf-version" content="([^"]+)"/) || [])[1] || null;
+  } catch (e) { return; } // sem internet: joga com o que tem
+  if (!remote || remote === VERSION) return;
+  try { if (sessionStorage.getItem('rf-auto') === remote) return; sessionStorage.setItem('rf-auto', remote); } catch (e) { return; }
+  if (state) save();
+  try { if (user && dirty) await cloudSave(); } catch (e) { /* já está salvo no aparelho */ }
+  try { if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch (e) { /* sem cache */ }
+  try { sessionStorage.setItem('rf-updated', VERSION); } catch (e) { /* sem armazenamento */ }
+  location.replace(`${location.pathname}?atualizar=${Date.now()}${location.hash}`);
+}
+let ultimaChecagem = 0;
+document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - ultimaChecagem > 30 * 60 * 1000) { ultimaChecagem = Date.now(); autoUpdate(); } });
 function openSettings() { if ($('#verTxt')) $('#verTxt').textContent = `Versão ${VERSION}`; if ($('#updStatus')) $('#updStatus').textContent = ''; if ($('#checkUpdate')) $('#checkUpdate').disabled = false; renderSettings(); $('#settings').hidden = false; $('#settings [data-close]').focus(); }
 function closeSettings() { $('#settings').hidden = true; $('#openSettings').focus(); }
 $('#openSettings').addEventListener('click', openSettings);
@@ -4187,7 +4275,7 @@ $('#giftBtn').addEventListener('click', showGift);
 $('#bancaModal').addEventListener('click', bancaModalClick);
 $('#bmPreco').addEventListener('change', e => { bm.preco = Math.round(Number(e.target.value) || 0); renderBancaModal(); });
 $('#moveBtn').addEventListener('click', () => setMoveMode(!moveMode));
-window.addEventListener('keydown', e => { if (e.key === 'Escape' && moveMode) { if (moving) { moving = null; toast('Cancelado.'); } else setMoveMode(false); } });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && moveMode) { if (moving) { cancelarMove(); toast('Cancelado.'); } else setMoveMode(false); } });
 $('#presente').addEventListener('click', e => {
   const o = e.target.closest('[data-pres]');
   if (o) { $('#presente').hidden = true; return sendFriendGift(presenteParaUid, o.dataset.pres); }
@@ -4629,21 +4717,65 @@ function drawCricket(x, y, s, dir, t) {
 // Avatar: a pessoa do jogador. Anda pela roça e pelo rancho e vai junto nas visitas.
 // ============================================================
 const AV_PELE = ['#f6d3b3', '#e8b48a', '#c98b5e', '#9a6440', '#6b4128'];
-const AV_CABELO = { m: '#4a2e17', f: '#6b3a1e' };
+const AV_CORES_CABELO = ['#2a1a10', '#5a3614', '#a8481e', '#e0b44a', '#b9b4ac'];
 const AV_OPC = {
   sexo: [['m', 'Menino'], ['f', 'Menina']],
+  cabelo: [['curto', 'Curto'], ['cacheado', 'Cacheado'], ['comprido', 'Comprido'], ['rabo', 'Rabo de cavalo']],
+  chapeu: [['sem', 'Sem'], ['palha', 'Palha'], ['bone', 'Boné'], ['cowboy', 'Cowboy']],
+  mao: [['nada', 'Nada'], ['vara', 'Vara de pesca'], ['espingarda', 'Espingarda'], ['enxada', 'Enxada']],
   camisa: [['camiseta', 'Camiseta'], ['xadrez', 'Xadrez'], ['regata', 'Regata']],
   calca: [['jeans', 'Jeans'], ['bermuda', 'Bermuda'], ['macacao', 'Macacão']],
   sapato: [['bota', 'Bota'], ['tenis', 'Tênis'], ['chinelo', 'Chinelo']],
 };
-const AV_PADRAO = { sexo: 'm', pele: 1, camisa: 'xadrez', calca: 'jeans', sapato: 'bota' };
+const AV_PADRAO = { sexo: 'm', pele: 1, camisa: 'xadrez', calca: 'jeans', sapato: 'bota', cabelo: 'curto', corCabelo: 1, chapeu: 'sem', mao: 'nada' };
 function avatarOk(a) {
   const r = Object.assign({}, AV_PADRAO);
   if (a && typeof a === 'object') {
     for (const k of Object.keys(AV_OPC)) if (AV_OPC[k].some(([id]) => id === a[k])) r[k] = a[k];
     if (Number.isInteger(a.pele) && a.pele >= 0 && a.pele < AV_PELE.length) r.pele = a.pele;
+    if (Number.isInteger(a.corCabelo) && a.corCabelo >= 0 && a.corCabelo < AV_CORES_CABELO.length) r.corCabelo = a.corCabelo;
+    if (!a.cabelo && r.sexo === 'f') r.cabelo = 'comprido'; // avatar antigo: menina de cabelo comprido
   }
   return r;
+}
+// Chapéu por cima do cabelo.
+function drawChapeu(g, tipo) {
+  if (tipo === 'palha') {
+    g.fillStyle = '#e8c65a'; g.beginPath(); g.ellipse(0, -63, 17, 4.5, 0, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(0, -67, 9.5, 7, 0, Math.PI, 0); g.fill(); g.fillRect(-9.5, -67, 19, 4);
+    g.fillStyle = '#c8402f'; g.fillRect(-9.5, -66, 19, 2.4);
+    g.strokeStyle = 'rgba(140,100,30,.5)'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(0, -63, 13, 3, 0, 0, 7); g.stroke();
+  } else if (tipo === 'bone') {
+    g.fillStyle = '#3f6fa8'; g.beginPath(); g.ellipse(0, -63, 11, 8.5, 0, Math.PI, 0); g.fill(); g.fillRect(-11, -63.5, 22, 2.5);
+    g.fillStyle = '#2c5282'; g.beginPath(); g.ellipse(6, -61.5, 9, 2.6, 0.05, 0, 7); g.fill();
+    g.fillStyle = '#f4f1ea'; g.beginPath(); g.arc(0, -67, 2.3, 0, 7); g.fill();
+  } else if (tipo === 'cowboy') {
+    g.fillStyle = '#8a5a33'; g.beginPath(); g.moveTo(-19, -64); g.quadraticCurveTo(0, -58, 19, -64); g.quadraticCurveTo(0, -61.5, -19, -64); g.fill();
+    g.beginPath(); g.ellipse(0, -62.5, 16, 3.4, 0, 0, 7); g.fill();
+    g.fillStyle = '#9a6a3d'; g.beginPath(); g.moveTo(-9, -63); g.lineTo(-8, -72); g.quadraticCurveTo(0, -69, 8, -72); g.lineTo(9, -63); g.fill();
+    g.fillStyle = '#4a2c14'; g.fillRect(-9, -66, 18, 2.2);
+  }
+}
+// O que o avatar leva na mão direita (desenhado a partir da mão, que fica em (0, 17) do braço).
+function drawNaMao(g, tipo, t) {
+  if (tipo === 'vara') {
+    g.strokeStyle = '#7a4a24'; g.lineWidth = 1.8; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(0, 18); g.lineTo(16, -26); g.stroke();
+    g.strokeStyle = 'rgba(60,60,60,.7)'; g.lineWidth = 0.6; const bal = Math.sin(t / 500) * 2;
+    g.beginPath(); g.moveTo(16, -26); g.quadraticCurveTo(20 + bal, -8, 19 + bal, 6); g.stroke();
+    g.fillStyle = '#d8402f'; g.beginPath(); g.arc(19 + bal, 7, 1.8, Math.PI, 0); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(19 + bal, 7, 1.8, 0, Math.PI); g.fill();
+    g.fillStyle = '#4a2c14'; g.beginPath(); g.arc(3, 11, 1.6, 0, 7); g.fill();
+  } else if (tipo === 'espingarda') {
+    g.save(); g.translate(0, 17); g.rotate(0.5);
+    g.fillStyle = '#7a4a24'; g.beginPath(); g.moveTo(-2, 0); g.lineTo(2, 0); g.lineTo(3.5, 10); g.lineTo(-1.5, 11); g.fill();
+    g.fillStyle = '#5e646b'; g.fillRect(-1.8, -30, 1.6, 31); g.fillRect(0.2, -30, 1.6, 31);
+    g.fillStyle = '#3a3e43'; g.fillRect(-2, -2, 4, 3);
+    g.restore();
+  } else if (tipo === 'enxada') {
+    g.strokeStyle = '#a4703f'; g.lineWidth = 2; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-1, 26); g.lineTo(3, -18); g.stroke();
+    g.fillStyle = '#8f9aa3'; g.beginPath(); g.moveTo(2, -18); g.lineTo(12, -15); g.lineTo(12, -9); g.lineTo(3, -14); g.fill();
+  }
 }
 // Desenha o avatar de frente, com os pés em (x, y). "passo" balança pernas e braços.
 function drawAvatar(g, x, y, s, av, t, andando, dir = 1) {
@@ -4654,7 +4786,9 @@ function drawAvatar(g, x, y, s, av, t, andando, dir = 1) {
   g.save(); g.translate(x, y); g.scale(s, s); g.translate(0, andando ? -Math.abs(Math.cos(t / 110)) * 1.2 : 0);
   const rr = (x0, y0, w, h, r, c) => { g.fillStyle = c; g.beginPath(); g.roundRect(x0, y0, w, h, r); g.fill(); };
   // cabelo comprido fica atrás de tudo
-  if (f) { g.fillStyle = AV_CABELO.f; g.beginPath(); g.roundRect(-11.5, -60, 23, 26, 8); g.fill(); }
+  const corCab = AV_CORES_CABELO[av.corCabelo];
+  if (av.cabelo === 'comprido') { g.fillStyle = corCab; g.beginPath(); g.roundRect(-11.5, -60, 23, 26, 8); g.fill(); }
+  if (av.cabelo === 'rabo') { g.fillStyle = corCab; g.beginPath(); g.ellipse(-dir * 9, -52, 4, 10, dir * 0.35 + (andando ? ph * 0.15 : 0), 0, 7); g.fill(); }
   // pernas e calça
   for (const [k, lx] of [[0, -6.5], [1, 1.5]]) {
     const up = pe[k];
@@ -4669,8 +4803,9 @@ function drawAvatar(g, x, y, s, av, t, andando, dir = 1) {
   }
   // braços (balançam ao contrário das pernas)
   const manga = { camiseta: 8, xadrez: 16, regata: 0 }[av.camisa], corCamisa = { camiseta: '#d8402f', xadrez: '#c8402f', regata: '#f2c14e' }[av.camisa];
+  const angMao = 0.12 + (andando ? -ph * 0.35 : 0) * (av.mao === 'nada' ? 1 : 0.3);
   for (const [sx, k] of [[-1, 1], [1, 0]]) {
-    g.save(); g.translate(sx * 10.5, -41); g.rotate(sx * 0.12 + (andando ? (k ? ph : -ph) * 0.35 : 0));
+    g.save(); g.translate(sx * 10.5, -41); g.rotate(sx === 1 ? angMao : sx * 0.12 + (andando ? (k ? ph : -ph) * 0.35 : 0));
     rr(-2.5, 0, 5, 17, 2.5, pele);
     if (manga) rr(-3, -0.5, 6, manga, 2.5, av.camisa === 'xadrez' ? '#a53325' : corCamisa);
     g.restore();
@@ -4694,16 +4829,29 @@ function drawAvatar(g, x, y, s, av, t, andando, dir = 1) {
   g.fillStyle = pele; g.beginPath(); g.arc(0, -56, 10.5, 0, 7); g.fill();
   g.fillStyle = pele; g.beginPath(); g.arc(-10.2, -55, 2.4, 0, 7); g.arc(10.2, -55, 2.4, 0, 7); g.fill();
   // cabelo
-  g.fillStyle = AV_CABELO[av.sexo];
-  g.beginPath(); g.arc(0, -57, 11, Math.PI * 1.02, Math.PI * 1.98); g.fill();
-  g.beginPath(); g.moveTo(-10.5, -59); g.quadraticCurveTo(-3, -54 + (f ? 0 : 1), 4, -60); g.quadraticCurveTo(8, -56, 10.5, -59); g.lineTo(10, -63); g.lineTo(-10, -63); g.fill();
-  if (f) { g.fillStyle = '#e25b8f'; g.beginPath(); g.ellipse(7.5, -65, 3.2, 2, 0.5, 0, 7); g.ellipse(11, -63, 3.2, 2, -0.3, 0, 7); g.fill(); g.fillStyle = '#b83a6b'; g.beginPath(); g.arc(9.2, -64, 1.3, 0, 7); g.fill(); }
+  g.fillStyle = corCab;
+  if (av.cabelo === 'cacheado') {
+    for (let k = 0; k < 9; k++) { const a = Math.PI * (1.0 + k / 8); g.beginPath(); g.arc(Math.cos(a) * 10, -57 + Math.sin(a) * 10, 4.2, 0, 7); g.fill(); }
+    g.beginPath(); g.arc(-11, -52, 3.4, 0, 7); g.arc(11, -52, 3.4, 0, 7); g.fill();
+  } else {
+    g.beginPath(); g.arc(0, -57, 11, Math.PI * 1.02, Math.PI * 1.98); g.fill();
+    g.beginPath(); g.moveTo(-10.5, -59); g.quadraticCurveTo(-3, -54, 4, -60); g.quadraticCurveTo(8, -56, 10.5, -59); g.lineTo(10, -63); g.lineTo(-10, -63); g.fill();
+    if (av.cabelo === 'comprido') { g.fillRect(-11.5, -58, 3, 12); g.fillRect(8.5, -58, 3, 12); }
+    if (av.cabelo === 'rabo') { g.fillStyle = '#e25b8f'; g.beginPath(); g.arc(-dir * 9, -60, 1.8, 0, 7); g.fill(); }
+  }
+  drawChapeu(g, av.chapeu);
   // rosto (olha um pouquinho para onde anda)
   const o = dir * 1.2;
   g.fillStyle = '#2a1a10'; g.beginPath(); g.ellipse(-3.8 + o, -55, 1.3, 1.8, 0, 0, 7); g.ellipse(3.8 + o, -55, 1.3, 1.8, 0, 0, 7); g.fill();
   if (f) { g.strokeStyle = '#2a1a10'; g.lineWidth = 0.9; g.beginPath(); g.moveTo(-5.5 + o, -56.5); g.lineTo(-6.3 + o, -57.5); g.moveTo(5.5 + o, -56.5); g.lineTo(6.3 + o, -57.5); g.stroke(); }
   g.fillStyle = 'rgba(230,110,110,.45)'; g.beginPath(); g.ellipse(-6.5 + o, -51.5, 2.3, 1.4, 0, 0, 7); g.ellipse(6.5 + o, -51.5, 2.3, 1.4, 0, 0, 7); g.fill();
   g.strokeStyle = '#7a3a22'; g.lineWidth = 1.1; g.lineCap = 'round'; g.beginPath(); g.arc(o, -51.5, 2.6, 0.25, Math.PI - 0.25); g.stroke();
+  if (av.mao !== 'nada') {
+    g.save(); g.translate(10.5, -41); g.rotate(angMao);
+    drawNaMao(g, av.mao, t);
+    g.fillStyle = pele; g.beginPath(); g.arc(0, 16.5, 2.8, 0, 7); g.fill(); // a mão segurando
+    g.restore();
+  }
   g.restore();
 }
 // Passeio pela cena: escolhe um ponto, anda até lá, espera um pouco e repete.
@@ -4742,7 +4890,9 @@ function renderAvatarCfg() {
   box.innerHTML = `<canvas id="avPrev" width="120" height="150" aria-label="Prévia do avatar"></canvas><div class="avopts">
     ${linha('sexo', 'Sexo')}
     <div class="avrow"><span>Pele</span><div class="peles" role="radiogroup" aria-label="Cor de pele">${AV_PELE.map((c, k) => `<button type="button" role="radio" class="pele" style="background:${c}" data-av="pele:${k}" aria-checked="${av.pele === k}" aria-label="Tom ${k + 1}"></button>`).join('')}</div></div>
-    ${linha('camisa', 'Camisa')}${linha('calca', 'Calça')}${linha('sapato', 'Sapato')}</div>`;
+    ${linha('cabelo', 'Cabelo')}
+    <div class="avrow"><span>Cor</span><div class="peles" role="radiogroup" aria-label="Cor do cabelo">${AV_CORES_CABELO.map((c, k) => `<button type="button" role="radio" class="pele" style="background:${c}" data-av="corCabelo:${k}" aria-checked="${av.corCabelo === k}" aria-label="${['Preto', 'Castanho', 'Ruivo', 'Loiro', 'Grisalho'][k]}"></button>`).join('')}</div></div>
+    ${linha('chapeu', 'Chapéu')}${linha('camisa', 'Camisa')}${linha('calca', 'Calça')}${linha('sapato', 'Sapato')}${linha('mao', 'Na mão')}</div>`;
   if (!avLoop) { avLoop = true; requestAnimationFrame(avPreview); }
 }
 let avLoop = false;
@@ -4758,7 +4908,7 @@ function avPreview() {
 function avatarClick(e) {
   const b = e.target.closest('#avatarCfg [data-av]'); if (!b) return false;
   const [k, v] = b.dataset.av.split(':');
-  state.avatar = avatarOk(Object.assign({}, state.avatar, { [k]: k === 'pele' ? Number(v) : v }));
+  state.avatar = avatarOk(Object.assign({}, state.avatar, { [k]: k === 'pele' || k === 'corCabelo' ? Number(v) : v }));
   const run = document.querySelector('#avPrev') && true;
   renderAvatarCfg(); done(); sfx('click');
   return run;
@@ -4972,17 +5122,20 @@ for (const r of RECEITAS) {
   r.preco = Math.round(base * 1.5 + r.tempo / 60);
   PRODUCT[r.id] = { id: r.id, nome: r.nome, preco: r.preco, fabrica: true };
 }
-const FILA_MAX = 3;
+// Espaços da fábrica: 3 no começo e mais 1 a cada 10 níveis (até 8). Todos produzem ao mesmo tempo.
+const FILA_BASE = 3, FILA_TOPO = 8, FILA_CADA = 10;
+const filaMax = (lv = state.level) => Math.min(FILA_TOPO, FILA_BASE + Math.floor(lv / FILA_CADA));
+const nivelDaVaga = k => (k - FILA_BASE + 1) * FILA_CADA;
 const fab = () => state.fab || (state.fab = { fila: [] });
 const temIngredientes = (r, n = 1) => Object.entries(r.in).every(([id, q]) => (state.barn[id] || 0) >= q * n);
 function fabricar(id) {
   const r = RECEITA[id], f = fab();
   if (state.level < r.nivel) return toast(`${r.nome} libera no nível ${r.nivel}.`);
-  if (f.fila.length >= FILA_MAX) return toast(`A fábrica faz ${FILA_MAX} coisas de cada vez. Recolha o que ficou pronto.`);
+  if (f.fila.length >= filaMax()) return toast(`Os ${filaMax()} espaços da fábrica estão ocupados. Recolha o que ficou pronto${filaMax() < FILA_TOPO ? ` (no nível ${nivelDaVaga(filaMax())} ganha mais um espaço)` : ''}.`);
   if (!temIngredientes(r)) return toast(`Faltam ingredientes para ${r.nome.toLowerCase()}.`, 'bad');
   for (const [iid, q] of Object.entries(r.in)) { state.barn[iid] -= q; if (!state.barn[iid]) delete state.barn[iid]; }
-  // um de cada vez: começa quando o anterior termina
-  const ini = Math.max(Date.now(), ...f.fila.map(x => x.fim));
+  // cada espaço trabalha sozinho: começa na hora
+  const ini = Date.now();
   f.fila.push({ r: id, fim: ini + r.tempo * 1000 });
   sfx('buy'); toast(`${r.nome} na fábrica! Fica pronto em ${fmt((ini + r.tempo * 1000 - Date.now()) / 1000)}.`, 'good');
   done();
@@ -5043,7 +5196,8 @@ function renderBancaModal() {
   $('#bmPreco').value = bm.preco;
   $('#bmFaixa').textContent = `mín. ${min.toLocaleString('pt-BR')} · máx. ${max.toLocaleString('pt-BR')} · vale ${valorDe(bm.item).toLocaleString('pt-BR')} cada no celeiro`;
   $('#bmQmenos').disabled = bm.qtd <= 1; $('#bmQmais').disabled = bm.qtd >= maxQ;
-  $('#bmPmenos').disabled = bm.preco <= min; $('#bmPmais').disabled = bm.preco >= max;
+  // o preço dá a volta: no máximo, + vai para o mínimo; no mínimo, − vai para o máximo
+  $('#bmPmenos').disabled = $('#bmPmais').disabled = min >= max;
 }
 function bancaModalClick(e) {
   const t = e.target;
@@ -5053,8 +5207,9 @@ function bancaModalClick(e) {
   const un = valorDe(bm.item) * 1.2;
   if (t.closest('#bmQmenos')) { bm.qtd--; bm.preco = Math.round(un * bm.qtd); return renderBancaModal(); }
   if (t.closest('#bmQmais')) { bm.qtd++; bm.preco = Math.round(un * bm.qtd); return renderBancaModal(); }
-  if (t.closest('#bmPmenos')) { bm.preco -= passo; return renderBancaModal(); }
-  if (t.closest('#bmPmais')) { bm.preco += passo; return renderBancaModal(); }
+  const [pmin, pmax] = faixaPreco(bm.item, bm.qtd);
+  if (t.closest('#bmPmenos')) { bm.preco = bm.preco <= pmin ? pmax : Math.max(pmin, bm.preco - passo); return renderBancaModal(); }
+  if (t.closest('#bmPmais')) { bm.preco = bm.preco >= pmax ? pmin : Math.min(pmax, bm.preco + passo); return renderBancaModal(); }
   if (t.closest('#bmOk')) { $('#bancaModal').hidden = true; return bancaAdd(bm.item, bm.qtd, bm.preco); }
 }
 let bancaRemArmed = null;
@@ -5155,8 +5310,9 @@ function fabricaHTML() {
   let html = `<div class="seg small" role="tablist">${segs.map(([id, n, c]) => `<button type="button" role="tab" data-fseg="${id}" aria-selected="${fabSeg === id}">${n}${c ? `<span class="badge ready">${c}</span>` : ''}</button>`).join('')}</div>`;
   if (fabSeg === 'fabrica') {
     const f = fab(), agora = Date.now();
-    html += `<p class="hint">Transforme colheitas e produtos dos animais em coisas que valem mais. A fábrica faz ${FILA_MAX} de cada vez, uma depois da outra.</p>`;
-    html += `<div class="fila">${Array.from({ length: FILA_MAX }, (_, k) => {
+    html += `<p class="hint">Transforme colheitas e produtos dos animais em coisas que valem mais. Todos os espaços produzem ao mesmo tempo. Você tem ${filaMax()}${filaMax() < FILA_TOPO ? ` e ganha mais um no nível ${nivelDaVaga(filaMax())}` : ''}.</p>`;
+    html += `<div class="fila">${Array.from({ length: Math.min(FILA_TOPO, filaMax() + 1) }, (_, k) => {
+      if (k >= filaMax()) return `<div class="fslot vazio trancado">🔒 nível ${nivelDaVaga(k)}</div>`;
       const x = f.fila[k];
       if (!x) return '<div class="fslot vazio">vazio</div>';
       const r = RECEITA[x.r], pronto = x.fim <= agora;
@@ -5166,7 +5322,7 @@ function fabricaHTML() {
     html += `<h3>Receitas</h3>`;
     const vis = RECEITAS.filter(r => r.nivel <= state.level), prox = RECEITAS.filter(r => r.nivel > state.level).slice(0, 2);
     for (const r of [...vis, ...prox]) {
-      const locked = r.nivel > state.level, ok = !locked && temIngredientes(r) && f.fila.length < FILA_MAX;
+      const locked = r.nivel > state.level, ok = !locked && temIngredientes(r) && f.fila.length < filaMax();
       const ing = Object.entries(r.in).map(([id, q]) => `<span class="${(state.barn[id] || 0) >= q ? '' : 'falta'}">${q} ${item(id) ? item(id).nome.toLowerCase() : id} (${state.barn[id] || 0})</span>`).join(' + ');
       html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${productIcon(r.id)}"><div><div class="name">${r.nome}${state.barn[r.id] ? ` <span class="meta">(${state.barn[r.id]} no celeiro)</span>` : ''}</div>
         <div class="meta">${ing}<br>${fmt(r.tempo)} · vende por ${r.preco.toLocaleString('pt-BR')}</div></div>
@@ -5307,24 +5463,46 @@ function screenToWorld(x, y) {
 let moveMode = false, moving = null; // moving: { key } para mover, { novo: id } para pôr um enfeite do inventário
 function setMoveMode(on) {
   moveMode = on; moving = null;
-  renderMoveBtn(); renderTools();
-  if (on) toast('Modo Mover: clique numa casa, árvore ou enfeite e depois no lugar novo.');
+  renderMoveBtn(); renderTools(); renderMoveBar();
+  if (on) toast(pointer.touch ? 'Modo Mover: toque numa casa, árvore ou enfeite, arraste até o lugar novo e toque em "Salvar aqui".' : 'Modo Mover: clique numa casa, árvore ou enfeite e depois no lugar novo.');
 }
 function renderMoveBtn() {
+  renderMoveBar();
   const b = $('#moveBtn'); if (!b) return;
   b.hidden = !isHome() || scene === 'casa';
   b.setAttribute('aria-pressed', String(moveMode));
 }
+// No computador o item segue o mouse e um clique solta. No celular (ou tocando), o item fica
+// parado: arraste com o dedo (ou toque no lugar novo) e confirme com "Salvar aqui".
+const raioMov = () => moving && moving.key && OBJ_INFO[moving.key] ? OBJ_INFO[moving.key].r : 0.55;
+const moveDica = nome => pointer.touch ? `${nome}: arraste com o dedo até o lugar novo e toque em "Salvar aqui".` : `${nome}: clique no lugar novo. Esc cancela.`;
+// Procura o lugar livre mais perto (em volta do ponto pedido).
+function pontoLivre(sc, u, v, key, raio, max = 6) {
+  if (validSpot(sc, u, v, key, raio)) return [u, v];
+  for (let d = 0.25; d <= max; d += 0.25) for (let a = 0; a < 16; a++) {
+    const uu = Math.round((u + Math.cos(a / 8 * Math.PI) * d) * 20) / 20, vv = Math.round((v + Math.sin(a / 8 * Math.PI) * d) * 20) / 20;
+    if (validSpot(sc, uu, vv, key, raio)) return [uu, vv];
+  }
+  return [u, v];
+}
 function moveClick(x, y) {
   if (!moving) {
     const alvo = pick(x, y);
-    if (!alvo || alvo.kind !== 'obj') return toast('Clique numa casa, árvore ou enfeite para mudar de lugar.');
-    moving = { key: alvo.key };
-    return toast(`${alvo.nome || 'Pronto'}: agora clique no lugar novo. Esc cancela.`);
+    if (!alvo || alvo.kind !== 'obj') return toast(pointer.touch ? 'Toque numa casa, árvore ou enfeite para mudar de lugar.' : 'Clique numa casa, árvore ou enfeite para mudar de lugar.');
+    const o = objList(state, scene).find(k => k.key === alvo.key);
+    moving = { key: alvo.key, u: o ? o.u : 0, v: o ? o.v : 0 };
+    renderMoveBar();
+    return toast(moveDica(alvo.nome || 'Pronto'));
   }
   const [u, v] = screenToWorld(x, y);
-  const raio = moving.key && OBJ_INFO[moving.key] ? OBJ_INFO[moving.key].r : 0.55;
-  if (!validSpot(scene, u, v, moving.key, raio)) return toast('Aqui não dá: tem que ser fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
+  if (pointer.touch) { moving.u = u; moving.v = v; return renderMoveBar(); } // toque só leva o item até lá
+  moving.u = u; moving.v = v;
+  salvarMove();
+}
+function salvarMove() {
+  if (!moving) return;
+  const { u, v } = moving;
+  if (!validSpot(scene, u, v, moving.key, raioMov())) return toast('Aqui não dá: tem que ser fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
   if (moving.novo) {
     if (!(state.enfeites[moving.novo] > 0)) { moving = null; return; }
     (state.objetos[scene] = objetosDe(state, scene)).push({ id: moving.novo, u, v });
@@ -5337,8 +5515,29 @@ function moveClick(x, y) {
     state.pos = state.pos || {}; (state.pos[scene] = state.pos[scene] || {})[moving.key] = [u, v];
   }
   if (moving.uma) { moveMode = false; renderMoveBtn(); }
-  moving = null; sfx('buy'); done();
+  moving = null; sfx('buy'); done(); renderMoveBar();
+  if (!moveMode) toast('Lugar novo salvo!', 'good');
 }
+function cancelarMove() {
+  if (moving && !moving.uma && !moving.novo) moving = null; else { moveMode = false; moving = null; renderMoveBtn(); renderTools(); }
+  renderMoveBar();
+}
+// Barrinha de baixo enquanto está movendo: Salvar aqui (fica cinza se o lugar não serve) e Cancelar.
+let moveBarOk = null;
+function renderMoveBar() {
+  const bar = $('#moveBar'); if (!bar) return;
+  const on = moveMode && isHome() && scene !== 'casa';
+  bar.hidden = !on; document.body.classList.toggle('movendo', on); if (!on) return;
+  const ok = !!moving && validSpot(scene, moving.u, moving.v, moving.key, raioMov());
+  const txt = !moving ? (pointer.touch ? 'Toque no item que quer mudar de lugar' : 'Clique no item que quer mudar de lugar')
+    : !ok ? 'Aqui não dá: fora dos canteiros e cercados' : pointer.touch ? 'Arraste o item e salve' : 'Clique para soltar aqui';
+  if (bar.dataset.txt !== txt) { bar.dataset.txt = txt; $('#moveMsg').textContent = txt; }
+  $('#moveOk').hidden = !moving; $('#moveOk').disabled = !ok;
+  $('#moveCancel').textContent = moving ? 'Cancelar' : 'Concluir';
+  moveBarOk = ok;
+}
+$('#moveOk')?.addEventListener('click', salvarMove);
+$('#moveCancel')?.addEventListener('click', cancelarMove);
 // Desenha os objetos da cena. "tras": os que ficam atrás da cerca (u ou v negativos); "frente": o resto.
 function drawObjetos(s, sc, t, home, stage) {
   const W = L.W, tm = temaDe(s);
@@ -5382,9 +5581,17 @@ function drawObjetos(s, sc, t, home, stage) {
 }
 // O objeto que está sendo movido acompanha o dedo/mouse, com uma sombra verde (pode) ou vermelha (não pode).
 function drawMoving(sc, t) {
+  renderMoveBar();
   if (!moveMode || !moving || !isHome()) return;
-  const W = L.W, [u, v] = screenToWorld(pointer.x, pointer.y), q = iso(u, v);
-  const raio = moving.key && OBJ_INFO[moving.key] ? OBJ_INFO[moving.key].r : 0.55, ok = validSpot(sc, u, v, moving.key, raio);
+  // com o mouse em cima da cena, o item segue o mouse; no toque, fica onde foi arrastado
+  if (!pointer.touch && pointer.inside) [moving.u, moving.v] = screenToWorld(pointer.x, pointer.y);
+  const W = L.W, u = moving.u, v = moving.v, q = iso(u, v);
+  const raio = raioMov(), ok = validSpot(sc, u, v, moving.key, raio);
+  // setinhas em volta mostram que dá para arrastar
+  if (pointer.touch) {
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 3; ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.ellipse(q.x, q.y, W * raio * 0.75, W * raio * 0.32, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  }
   ctx.fillStyle = ok ? 'rgba(80,200,80,.35)' : 'rgba(220,60,50,.35)';
   ctx.beginPath(); ctx.ellipse(q.x, q.y, W * raio * 0.6, W * raio * 0.25, 0, 0, 7); ctx.fill();
   ctx.globalAlpha = 0.75;
@@ -5447,7 +5654,7 @@ function inventarioHTML() {
   html += `<h3>Guardados</h3>`;
   if (!guardados.length) html += `<div class="empty">Nada guardado. Compre enfeites na Loja › Enfeites.</div>`;
   for (const e of guardados) {
-    html += `<div class="row wide ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome} × ${state.enfeites[e.id]}${e.especial ? ' <span class="tag">⭐ pioneiros</span>' : ''}</div><div class="meta">+${e.conforto}% de XP quando está na roça ou no rancho</div></div>
+    html += `<div class="row wide ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome} × ${state.enfeites[e.id]}${e.especial ? ' <span class="tag">⭐ pioneiros</span>' : ''}</div><div class="meta">+${e.conforto}% de XP quando está na roça ou no rancho${e.especial ? `<br>${obtidoEm(state)}` : ''}</div></div>
       <div class="actions"><button class="btn gold" data-inv-por="${e.id}" data-sc="roca">Pôr na roça</button><button class="btn gold" data-inv-por="${e.id}" data-sc="animais">Pôr no rancho</button>
       ${e.especial ? '' : venderBtn('enf:' + e.id, Math.floor(e.custo / 2))}</div></div>`;
   }
@@ -5457,7 +5664,7 @@ function inventarioHTML() {
     html += `<h3>${sc === 'roca' ? 'Na roça' : 'No rancho'}</h3>`;
     l.forEach((o, i) => {
       const e = ENFEITE[o.id];
-      html += `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP</div></div><button class="btn ghost" data-inv-guardar="${sc}:${i}">Guardar</button></div>`;
+      html += `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${e.especial ? ` · ${obtidoEm(state)}` : ''}</div></div><button class="btn ghost" data-inv-guardar="${sc}:${i}">Guardar</button></div>`;
     });
   }
   return html;
@@ -5465,8 +5672,9 @@ function inventarioHTML() {
 function invPor(id, sc) {
   if (!(state.enfeites[id] > 0)) return;
   closePanel(); if (!isHome()) goHome(); setScene(sc);
-  moveMode = true; moving = { novo: id }; renderMoveBtn(); renderTools();
-  toast(`Clique onde quer pôr ${ENFEITE[id].nome.toLowerCase()} (fora dos canteiros e cercados). Esc cancela.`);
+  const [u0, v0] = screenToWorld(L.cw / 2, L.ch * 0.55), [u, v] = pontoLivre(sc, u0, v0, null, 0.55);
+  moveMode = true; moving = { novo: id, u, v }; renderMoveBtn(); renderTools();
+  toast(moveDica(ENFEITE[id].nome));
 }
 function invGuardar(sc, i) {
   const l = objetosDe(state, sc), o = l[i]; if (!o) return;
@@ -5541,6 +5749,12 @@ function drawEnfeite(id, x, y, s, t) {
 const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, id === 'bandeira' ? 1.15 : id === 'espantalho' || id === 'moinho' ? 1.3 : 1.6, 0));
 
 // ---------- Presente dos pioneiros: quem joga no primeiro mês ganha itens especiais ----------
+// Mês e ano em que os itens de evento chegaram (aparece no mouse e no inventário).
+function obtidoEm(s) {
+  const t = s && s.pioneiro; if (!t) return '';
+  const d = new Date(t > 1 ? t : Math.min(Date.now(), PIONEIRO_ATE));
+  return 'Obtido em ' + d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+}
 const PIONEIRO_ATE = new Date(2026, 9, 31, 23, 59, 59).getTime(); // até 31 de outubro de 2026
 function presentePioneiro() {
   if (!state || state.pioneiro || Date.now() > PIONEIRO_ATE) return;
@@ -5569,7 +5783,7 @@ function frame(now) {
     // a fábrica e o caminhão têm relógio: atualiza a janela (menos a banca, que tem formulário)
     if (!$('#panel').hidden && tab === 'fabrica' && fabSeg !== 'banca' && isHome()) { const y = $('#pane').scrollTop; renderPane(); $('#pane').scrollTop = y; } renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
   if (now - lastSave > 5000) { save(); lastSave = now; }
-  if (user && dirty && now - lastCloud > 3000) cloudSave(); // salva na nuvem poucos segundos depois de cada mudança
+  if (user && dirty && now - lastCloud > CLOUD_MS) cloudSave(); // salva na nuvem no máximo a cada 30 segundos (poupa o limite grátis do Firebase)
   if (user && now - lastSentCheck > 60000) { lastSentCheck = now; checkSent(); }
   requestAnimationFrame(frame);
 }
@@ -5579,6 +5793,7 @@ function start(data) {
   applySettings();
   rollPeriods(); presentePioneiro();
   resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons(); afterUpdate(); renderTabs();
+  ultimaChecagem = Date.now(); autoUpdate();
   if (!Cloud.available) setTimeout(() => { if (giftReady()) showGift(); }, 1500);
   requestAnimationFrame(t => { last = t; frame(t); });
   if (Cloud.available) {

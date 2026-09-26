@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roça Feliz</title>
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="41">
-<script src="firebase-config.js?v=41"></script>
+<meta name="rf-version" content="42">
+<script src="firebase-config.js?v=42"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -185,7 +185,8 @@
   .presopt { display: grid; justify-items: center; gap: 4px; background: var(--card); border: 2px solid var(--panel-2); border-radius: 14px; padding: 10px 6px; font-weight: 800; }
   .presopt:hover, .presopt:focus-visible { border-color: var(--gold); background: var(--sel); }
   .presopt img { width: 52px; height: 52px; }
-  .fila { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .fila { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+  .fslot.trancado { font-weight: 700; font-size: 12px; background: transparent; opacity: .7; }
   .fslot { display: grid; justify-items: center; gap: 2px; background: var(--card); border: 2px solid var(--panel-2); border-radius: 12px; padding: 6px; font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; }
   .fslot img { width: 44px; height: 44px; }
   .fslot.vazio { color: var(--muted); place-items: center; min-height: 72px; border-style: dashed; font-weight: 400; }
@@ -208,6 +209,13 @@
   .pedido img { width: 26px; height: 26px; }
   .stamps i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid #b7a78a; }
 
+  .movebar { left: 50%; transform: translateX(-50%); bottom: 10px; z-index: 7; display: grid; justify-items: center; gap: 6px; padding: 8px 12px; border-radius: 16px; background: rgba(255,250,235,.96); border: 3px solid #8a5a33; box-shadow: 0 6px 16px rgba(0,0,0,.25); max-width: calc(100% - 24px); }
+  .movebar[hidden] { display: none; }
+  .movebar #moveMsg { font-weight: 800; font-size: 14px; color: #5a3614; text-align: center; }
+  .movebar .mvbtns { display: flex; gap: 8px; }
+  .movebar .btn { min-height: 40px; padding: 6px 16px; font-size: 15px; white-space: nowrap; }
+  /* enquanto move um item, a barra de mover fica no lugar das ferramentas e dos lugares */
+  .movendo .bottombar, .movendo #scenes, .movendo .giftwrap { display: none !important; }
   .bottombar {
     bottom: 10px; left: 8px; right: 8px; pointer-events: none;
     display: grid; justify-items: center; gap: 4px;
@@ -380,7 +388,8 @@
   .avcfg { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .avcfg canvas { cursor: default;  width: 120px; height: 150px; border-radius: 14px; background: linear-gradient(#d9f1ff, #eaf7d6); flex: none; }
   .avopts { display: grid; gap: 6px; flex: 1; min-width: 220px; }
-  .avrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .avrow { display: grid; grid-template-columns: 58px 1fr; align-items: center; gap: 8px; }
+  .avrow .seg { justify-self: start; }
   .avrow > span { width: 58px; font-weight: 700; font-size: 13px; }
   .peles { display: flex; gap: 6px; }
   .pele { width: 28px; height: 28px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25); cursor: pointer; padding: 0; }
@@ -601,6 +610,10 @@
       <button class="zbtn small" type="button" id="zoomReset" title="Voltar ao tamanho normal">100%</button>
       <button class="zbtn" type="button" id="zoomOut" aria-label="Afastar" title="Afastar">−</button>
     </div>
+    <div class="movebar over" id="moveBar" hidden>
+      <span id="moveMsg"></span>
+      <div class="mvbtns"><button class="btn" type="button" id="moveCancel">Cancelar</button><button class="btn gold" type="button" id="moveOk">✔ Salvar aqui</button></div>
+    </div>
     <div class="bottombar over">
       <div class="hintline" id="sceneHint" hidden></div>
       <div class="tools outline" id="tools" role="toolbar" aria-label="Ferramentas"></div>
@@ -703,8 +716,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=41"></script>
-<script src="js/cloud.js?v=41"></script>
-<script src="js/game.js?v=41"></script>
+<script src="js/audio.js?v=42"></script>
+<script src="js/cloud.js?v=42"></script>
+<script src="js/game.js?v=42"></script>
 </body>
 </html>
