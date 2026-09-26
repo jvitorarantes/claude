@@ -144,11 +144,19 @@ function ensureAbrigos(s) {
   return s;
 }
 const drawKind = a => ANIMAL[a.k].desenho || a.k;
-const isTired = a => ANIMAL[a.k].tipo === 'prod' && Date.now() - a.born > ANIMAL[a.k].periodo * DAY;
+// Animais de produção vivem "periodo" dias. Depois vão embora e é preciso comprar outro.
+const lifeLeft = a => ANIMAL[a.k].tipo === 'prod' ? a.born + ANIMAL[a.k].periodo * DAY - Date.now() : Infinity;
+const isTired = () => false;
+// Vender um animal vale bem menos que a compra, e cai um pouco a cada dia que passa.
+const sellPrice = a => { const d = ANIMAL[a.k]; return Math.max(1, Math.round(d.custo * 0.4 * clamp(lifeLeft(a) / (d.periodo * DAY), 0, 1))); };
+function vida(ms) {
+  if (ms >= DAY) { const n = Math.floor(ms / DAY); return `${n} ${n > 1 ? 'dias' : 'dia'}`; }
+  return fmt(Math.max(60, ms / 1000));
+}
 const isAdult = a => ANIMAL[a.k].tipo === 'cria' && a.g >= ANIMAL[a.k].tempo;
 function isHungry(a) {
   const d = ANIMAL[a.k];
-  if (d.tipo === 'prod') return !a.fed && !a.ready && !isTired(a);
+  if (d.tipo === 'prod') return !a.fed && !a.ready;
   if (d.tipo === 'cria') return !isAdult(a) && (a.food || 0) <= 0;
   return false;
 }
@@ -625,7 +633,6 @@ function actAnimal(id) {
     return toast(`${d.nome} está crescendo: falta ${fmt(d.tempo - a.g)}. Comida por mais ${fmt(a.food)}.`);
   }
   if (a.ready) { collectAnimal(a, pos); return done(); }
-  if (!a.fed && isTired(a)) return confirmTwice('vet' + a.id, `${seuSua(d)} precisa do veterinário para voltar a produzir (${vetCost(d)} moedas). Clique de novo para chamar.`, () => callVet(a, pos));
   if (!a.fed) return feedAnimal(a, pos, true) && done();
   toast(`${d.nome} está produzindo ${PRODUCT[d.prod].nome.toLowerCase()}: falta ${fmt(d.tempo - a.g)}.`);
 }
@@ -659,15 +666,6 @@ function feedAnimal(a, pos, allowSpecial) {
   } else a.food = Math.min(24 * HOUR, d.tempo - a.g);
   sfx('feed'); addXP(1, pos); track('alimentar');
   return true;
-}
-function callVet(a, pos) {
-  const d = ANIMAL[a.k], cost = vetCost(d);
-  if (state.coins < cost) return toast(`O veterinário cobra ${cost} moedas.`, 'bad');
-  addCoins(-cost, pos);
-  a.born = Date.now(); a.tiredNews = false;
-  sfx('level');
-  toast(`${seuSua(d)} está novinha em folha: mais ${d.periodo} dias produzindo!`.replace('novinha', d.f ? 'novinha' : 'novinho'), 'good');
-  done();
 }
 function sellAdult(a, pos) {
   const d = ANIMAL[a.k];
@@ -775,11 +773,12 @@ function addNews(msg) {
 function tickLife() {
   const now = Date.now();
   let changed = false;
-  for (const a of state.animals) {
-    if (!isTired(a) || a.tiredNews) continue;
+  for (const a of state.animals.slice()) {
+    if (lifeLeft(a) > 0) continue;
     const d = ANIMAL[a.k];
-    a.tiredNews = true;
-    addNews(`${seuSua(d)} terminou o período produtivo. Chame o veterinário (${vetCost(d)} moedas) para voltar a produzir.`);
+    state.animals = state.animals.filter(x => x !== a); delete amb[a.id];
+    const msg = `${seuSua(d)} viveu ${d.periodo} dias e foi embora. Compre ${d.f ? 'outra' : 'outro'} na loja.`;
+    addNews(msg); toast(msg);
     changed = true;
   }
   for (const slot of ['roca', 'animais']) {
@@ -1015,7 +1014,7 @@ function awayAnimal(a, def, prod, pos) {
   if (def.tipo === 'pet') return petAnimal(a, pos);
   if (def.tipo === 'cria') return toast(`${def.nome} de ${view.nome} ainda está crescendo.`);
   if (def.prod === 'leitao' && a.ready) return toast('Leitão não dá para levar!');
-  if (!a.fed && !a.ready && !isTired(a)) { a.fed = true; sfx('feed'); help(pos); sendVisit({ t: 'feed', animal: a.id }); return done(); }
+  if (!a.fed && !a.ready) { a.fed = true; sfx('feed'); help(pos); sendVisit({ t: 'feed', animal: a.id }); return done(); }
   if (a.ready) {
     const key = visitKey(a.id + ':' + a.n), lim = stealLimit();
     if (alreadyTook(a, key)) return toast('Você já pegou deste bicho. Não exagere!');
@@ -1379,7 +1378,6 @@ function animalBubble(a, home) {
   if (d.tipo === 'cria') return home ? (isAdult(a) ? 'sell' : isHungry(a) ? 'feed' : null) : null;
   const took = !home && (a.stolen || state.log[visitKey(a.id + ':' + a.n)]);
   if (a.ready) return took ? null : 'prod';
-  if (!a.fed && isTired(a)) return home ? 'vet' : null;
   return !a.fed ? 'feed' : null;
 }
 
@@ -3170,7 +3168,7 @@ function renderPane() {
         </div>`;
       }
     } else if (shopSeg === 'animais') {
-      html += `<p class="hint">Cada bicho mora no seu abrigo, que você constrói e aumenta na aba Abrigos. Nenhum animal morre: sem comida ele só para, e quem termina o período produtivo precisa do veterinário.</p>`;
+      html += `<p class="hint">Cada bicho mora no seu abrigo, que você constrói e aumenta na aba Abrigos. Sem comida o animal só para de produzir. Animais de produção vivem alguns dias; depois vão embora e é preciso comprar outro.</p>`;
       const row = (d, meta, btn) => `<div class="row ${d.nivel > state.level ? 'locked' : ''}"><img alt="" src="${animalIcon(d.id)}">
         <div><div class="name">${d.nome}${state.animals.some(x => x.k === d.id) ? ` <span class="meta">(${state.animals.filter(x => x.k === d.id).length})</span>` : ''}</div><div class="meta">${meta}</div></div>${btn}</div>`;
       const buyBtn = d => {
@@ -3184,7 +3182,7 @@ function renderPane() {
       html += `<h3>Produção</h3>`;
       for (const d of visible('prod')) {
         const prodTxt = d.prod === 'leitao' ? 'leitões (viram porquinhos no chiqueiro)' : `${PRODUCT[d.prod].nome.toLowerCase()} (vende por ${PRODUCT[d.prod].preco})`;
-        html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · ração ${d.racao} por produção<br>${prodTxt} a cada ${fmt(d.tempo)}<br>produz por ${d.periodo} dias · ${d.xp} XP por coleta`, buyBtn(d));
+        html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · ração ${d.racao} por produção<br>${prodTxt} a cada ${fmt(d.tempo)}<br>vive ${d.periodo} dias · ${d.xp} XP por coleta`, buyBtn(d));
       }
       html += `<h3>Para criar e vender</h3>`;
       for (const d of visible('cria')) {
@@ -3196,6 +3194,16 @@ function renderPane() {
       if (pets.length) {
         html += `<h3>Nomes dos seus bichos</h3>`;
         for (const a of pets) html += `<form class="addform" data-rename="${a.id}"><input id="pet-${a.id}" maxlength="18" value="${esc(a.nome || ANIMAL[a.k].nome)}" aria-label="Nome do ${esc(ANIMAL[a.k].nome.toLowerCase())}" style="text-transform:none;letter-spacing:0"><button class="btn" type="submit">Salvar</button></form>`;
+      }
+      const meus = state.animals.filter(a => ANIMAL[a.k].tipo === 'prod').sort((x, y) => lifeLeft(x) - lifeLeft(y));
+      if (meus.length) {
+        html += `<h3>Seus animais de produção</h3><p class="hint">Vender dá bem menos que a compra, e o valor cai a cada dia de vida que passa.</p>`;
+        for (const a of meus) {
+          const d = ANIMAL[a.k], left = lifeLeft(a), armed = buyPending && buyPending.i === 'venda' + a.id && performance.now() < buyPending.until;
+          html += `<div class="row"><img alt="" src="${animalIcon(d.id)}"><div><div class="name">${d.nome}</div>
+            <div class="meta">vive mais ${vida(left)}</div><div class="mbar"><i style="width:${clamp(left / (d.periodo * DAY), 0, 1) * 100}%"></i></div></div>
+            <button class="btn ${armed ? 'danger' : 'ghost'}" data-sell-animal="${a.id}">${armed ? 'Confirmar' : moeda(sellPrice(a))}</button></div>`;
+        }
       }
     } else if (shopSeg === 'abrigos') {
       html += `<p class="hint">Cada abrigo tem o seu cercado no rancho. Nível 1 cabe ${ABRIGO_CAP[1]} animais, nível 2 cabe ${ABRIGO_CAP[2]} e nível 3 cabe ${ABRIGO_CAP[3]}.</p>`;
@@ -3359,6 +3367,21 @@ $('#pane').addEventListener('click', e => {
   if (d.mseg) { missSeg = d.mseg; renderPane(); $('#pane').scrollTop = 0; return; }
   if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
   if (d.temaRoca) return buyTema(d.temaRoca);
+  if (d.sellAnimal) {
+    const a = state.animals.find(x => x.id === d.sellAnimal); if (!a) return;
+    const key = 'venda' + a.id;
+    if (!(buyPending && buyPending.i === key && performance.now() < buyPending.until)) {
+      buyPending = { i: key, until: performance.now() + 4000 }; renderPane();
+      setTimeout(() => { if (buyPending && buyPending.i === key) { buyPending = null; renderPane(); } }, 4000);
+      return;
+    }
+    buyPending = null;
+    const price = sellPrice(a), nome = ANIMAL[a.k].nome.toLowerCase();
+    state.animals = state.animals.filter(x => x !== a); delete amb[a.id];
+    state.coins += price; sfx('coin'); track('vender', price);
+    toast(`Vendeu ${ANIMAL[a.k].f ? 'a' : 'o'} ${nome} por ${price.toLocaleString('pt-BR')} moedas.`, 'good');
+    return done();
+  }
   if (d.seg) { shopSeg = d.seg; renderPane(); $('#pane').scrollTop = 0; if (d.focus) focusRow('abrigo-' + d.focus); }
   else if (d.abrigo) buyAbrigo(d.abrigo);
   else if (d.seed) { state.seed = d.seed; state.tool = 'seed'; if (!isHome()) goHome(); setScene('roca'); closePanel(); save(); toast(`${CROP[d.seed].nome} na mão: clique na terra arada para plantar.`); }
@@ -3492,10 +3515,10 @@ function tipAnimal(id) {
   }
   const prod = PRODUCT[d.prod];
   if (a.ready) h += `${prod.nome} pronto${a.dobro ? ' (em dobro!)' : ''}! Clique para recolher.`;
-  else if (!a.fed && isTired(a)) h += `<span class="warn">Terminou o período produtivo.</span>${home ? ` Clique para chamar o veterinário (${vetCost(d)} moedas).` : ''}`;
   else if (!a.fed) h += `Com fome. ${home ? `Clique para dar ração (${d.racao} moedas${state.racaoEsp ? ', usa 1 ração especial' : ''}).` : 'Clique para dar comida e ajudar.'}`;
   else h += `Produzindo ${prod.nome.toLowerCase()}${a.dobro ? ' em dobro' : ''}: falta ${fmt(d.tempo - a.g)}<div class="bar"><i style="width:${a.g / d.tempo * 100}%"></i></div>`;
-  if (!isTired(a)) { const dias = Math.max(1, Math.ceil((a.born + d.periodo * DAY - Date.now()) / DAY)); h += `<br>Produz por mais ${dias} ${dias > 1 ? 'dias' : 'dia'}`; }
+  h += `<br>Vive mais ${vida(lifeLeft(a))}`;
+  if (home) h += ` · vende por ${sellPrice(a).toLocaleString('pt-BR')} (na Loja › Animais)`;
   return h;
 }
 function tipDog(slot) {
