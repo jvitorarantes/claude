@@ -1614,18 +1614,18 @@ function drawGround() {
     if (n % (est.neve ? 5 : 3)) return;
     const q0 = tuftAt(x, y); if (!visivel(q0)) return;
     const px = q0.x, py = q0.y;
-    ctx.fillStyle = est.neve ? 'rgba(255,255,255,.8)' : ['#d9822b', '#c8502a', '#e8b04a'][n % 3];
+    ctx.fillStyle = est.neve ? 'rgba(140,175,130,.45)' : ['#d9822b', '#c8502a', '#e8b04a'][n % 3];
     ctx.beginPath(); ctx.ellipse(px, py, est.neve ? W * (0.08 + k * 0.1) : W * 0.035, est.neve ? W * (0.025 + k * 0.03) : W * 0.018, est.neve ? 0 : k * 3, 0, 7); ctx.fill();
   });
   const FL = ['#ffffff', '#ffd54a', '#f06292', '#ffffff', '#ba68c8'];
   TUFTS.forEach(([x, y, k], n) => {
-    if (!est.flores || n % Math.round(27 / est.flores)) return;
+    if (!est.flores || n % Math.max(2, Math.round(27 / est.flores))) return;
     const q0 = tuftAt(x, y); if (!visivel(q0)) return;
     const px = q0.x, py = q0.y, r = Math.max(1.8, W * 0.025);
     for (let f = 0; f < 3; f++) { ctx.fillStyle = FL[(n + f) % FL.length]; ctx.beginPath(); ctx.arc(px + f * r * 2.4 - r * 2.4, py + (f % 2) * r * 1.5, r, 0, 7); ctx.fill(); }
     ctx.fillStyle = '#f2b705'; ctx.beginPath(); ctx.arc(px, py, r * 0.45, 0, 7); ctx.fill();
   });
-  ctx.strokeStyle = est.neve ? 'rgba(80,120,70,.35)' : est.folhas ? 'rgba(110,100,30,.45)' : 'rgba(46,110,30,.45)'; ctx.lineWidth = 1.2;
+  ctx.strokeStyle = est.neve ? 'rgba(110,140,120,.3)' : est.folhas ? 'rgba(110,100,30,.45)' : 'rgba(46,110,30,.45)'; ctx.lineWidth = 1.2;
   for (const [x, y, k] of TUFTS) {
     const q0 = tuftAt(x, y); if (!visivel(q0)) continue;
     const px = q0.x, py = q0.y, s = W * (0.04 + k * 0.04);
@@ -1654,6 +1654,7 @@ function drawBarn(x, y, s) {
   const dw = w * 0.42, dh = h * 0.7;
   ctx.strokeRect(x - dw / 2, y - dh, dw, dh);
   ctx.beginPath(); ctx.moveTo(x - dw / 2, y - dh); ctx.lineTo(x + dw / 2, y); ctx.moveTo(x + dw / 2, y - dh); ctx.lineTo(x - dw / 2, y); ctx.stroke();
+  if (estacao().neve) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(x - w * 0.6, y - h - s * 0.02); ctx.lineTo(x, y - h - s * 0.44); ctx.lineTo(x + w * 0.6, y - h - s * 0.02); ctx.lineTo(x + w * 0.45, y - h - s * 0.06); ctx.lineTo(x, y - h - s * 0.34); ctx.lineTo(x - w * 0.45, y - h - s * 0.06); ctx.closePath(); ctx.fill(); }
   ctx.fillStyle = '#fff4e0'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.08, 0, 7); ctx.fill();
   ctx.fillStyle = '#6b3a1a'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.05, 0, 7); ctx.fill();
 }
@@ -1693,10 +1694,30 @@ function drawTree(x, y, s, t, coqueiro) {
     return;
   }
   ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - s * 0.06, y - s * 0.5, s * 0.12, s * 0.5);
+  if (est.pelada) {
+    // outono e inverno: só os galhos (no inverno, com neve em cima)
+    const galhos = [[-0.34, -0.9, -0.2, -0.62], [0.32, -0.95, 0.18, -0.6], [-0.05, -1.05, 0, -0.6], [-0.3, -0.62, -0.1, -0.52], [0.3, -0.66, 0.1, -0.55]];
+    ctx.strokeStyle = '#6b4220'; ctx.lineCap = 'round';
+    for (const [x1, y1, x0, y0] of galhos) { ctx.lineWidth = s * 0.045; ctx.beginPath(); ctx.moveTo(x + x0 * s * 0.3, y + y0 * s); ctx.quadraticCurveTo(x + (x0 + x1) * s / 2 + sw, y + (y0 + y1) * s / 2, x + x1 * s + sw, y + y1 * s); ctx.stroke(); }
+    ctx.lineWidth = s * 0.07; ctx.beginPath(); ctx.moveTo(x, y - s * 0.5); ctx.lineTo(x + sw, y - s * 0.75); ctx.stroke();
+    if (est.neve) {
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s * 0.035;
+      for (const [x1, y1, x0, y0] of galhos) { ctx.beginPath(); ctx.moveTo(x + (x0 + x1) * s / 2 + sw, y + (y0 + y1) * s / 2 - s * 0.03); ctx.lineTo(x + x1 * s + sw, y + y1 * s - s * 0.03); ctx.stroke(); }
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.3, s * 0.07, 0, 0, 7); ctx.fill();
+    } else {
+      ctx.fillStyle = '#d9822b'; for (const [dx, dy] of [[-0.3, -0.88], [0.28, -0.9]]) { ctx.beginPath(); ctx.ellipse(x + dx * s + sw, y + dy * s, s * 0.035, s * 0.02, 0.5, 0, 7); ctx.fill(); }
+    }
+    ctx.lineCap = 'butt';
+    return;
+  }
   ctx.fillStyle = est.folha;
   ctx.beginPath(); ctx.arc(x + sw, y - s * 0.72, s * 0.32, 0, 7); ctx.arc(x - s * 0.22 + sw, y - s * 0.55, s * 0.24, 0, 7); ctx.arc(x + s * 0.22 + sw, y - s * 0.56, s * 0.25, 0, 7); ctx.fill();
-  if (est.neve) { ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.ellipse(x + sw, y - s * 0.98, s * 0.2, s * 0.07, 0, 0, 7); ctx.ellipse(x - s * 0.25 + sw, y - s * 0.74, s * 0.13, s * 0.05, 0, 0, 7); ctx.fill(); return; }
-  ctx.fillStyle = est.folhas ? '#f2b705' : '#e53b2f';
+  if (est.flor) {
+    // primavera: árvore florida
+    for (let k = 0; k < 14; k++) { const a = k * 2.4, r = s * (0.08 + (k % 5) * 0.05); ctx.fillStyle = k % 3 ? '#f8bbd0' : '#ffffff'; ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 1.3 + sw, y - s * 0.66 + Math.sin(a) * r * 0.9, s * 0.03, 0, 7); ctx.fill(); }
+    return;
+  }
+  ctx.fillStyle = '#e53b2f';
   for (const [dx, dy] of [[-.15, -.7], [.12, -.8], [.2, -.55], [-.25, -.5]]) { ctx.beginPath(); ctx.arc(x + dx * s + sw, y + dy * s, s * 0.035, 0, 7); ctx.fill(); }
 }
 // Cachorro virado para a esquerda. raca muda as cores; sleeping = deitado dormindo.
@@ -1812,7 +1833,7 @@ function fenceRun(a, b, steps, skipFirst, tm) {
   }
   const post = p => {
     ctx.fillStyle = tm.poste; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.2);
-    ctx.fillStyle = tm.topo; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2, W * 0.05, W * 0.03);
+    ctx.fillStyle = estacao().neve ? '#ffffff' : tm.topo; ctx.fillRect(p.x - W * 0.025, p.y - W * 0.2 - (estacao().neve ? W * 0.015 : 0), W * 0.05, W * 0.03 + (estacao().neve ? W * 0.015 : 0));
     if (tm.bambu) for (const h of [0.07, 0.14]) { ctx.fillStyle = 'rgba(60,80,20,.5)'; ctx.fillRect(p.x - W * 0.025, p.y - W * h, W * 0.05, 1.5); }
     if (tm.rosas) { ctx.fillStyle = '#3f8a2a'; ctx.beginPath(); ctx.arc(p.x, p.y - W * 0.03, W * 0.05, 0, 7); ctx.fill(); ctx.fillStyle = '#e53b2f'; ctx.beginPath(); ctx.arc(p.x + W * 0.02, p.y - W * 0.06, W * 0.022, 0, 7); ctx.fill(); }
   };
@@ -3898,13 +3919,13 @@ const thisWeek = () => weekOf(localDay());
 // ---------- Estações: mudam toda segunda-feira ----------
 const ESTACOES = [
   { id: 'primavera', nome: 'Primavera', icone: '🌸', plantas: ['alface', 'cenoura', 'morangueiro', 'tomate', 'cebola'],
-    grama: ['#86c450', '#9ad35e'], morro: '#6fae43', folha: '#3f8a2a', flores: 3 },
+    grama: ['#86c450', '#9ad35e'], morro: '#6fae43', folha: '#4f9a34', flores: 9, borboletas: 10, flor: true },
   { id: 'verao', nome: 'Verão', icone: '☀️', plantas: ['melancia', 'milho', 'abacaxi', 'maracuja', 'pepino'],
-    grama: ['#94c24a', '#a8cf55'], morro: '#79a83f', folha: '#4a8f2a', flores: 1 },
+    grama: ['#94c24a', '#a8cf55'], morro: '#79a83f', folha: '#4a8f2a', flores: 2, borboletas: 5 },
   { id: 'outono', nome: 'Outono', icone: '🍂', plantas: ['abobora', 'batata', 'macieira', 'videira', 'pera'],
-    grama: ['#a7b64c', '#b9c05a'], morro: '#8f9c3e', folha: '#d9822b', flores: 0, folhas: true },
+    grama: ['#a7b64c', '#b9c05a'], morro: '#8f9c3e', folha: '#d9822b', flores: 0, folhas: true, pelada: true, borboletas: 2 },
   { id: 'inverno', nome: 'Inverno', icone: '❄️', plantas: ['nabo', 'trigo', 'laranjeira', 'limao', 'cafe'],
-    grama: ['#a9cf92', '#c4e0b2'], morro: '#8fb87e', folha: '#2f6e3a', flores: 0, neve: true },
+    grama: ['#e3ecf1', '#f3f7fa'], morro: '#d2dfe7', folha: '#2f6e3a', flores: 0, neve: true, pelada: true, borboletas: 0 },
 ];
 const ESTACAO_BONUS = 0.3; // plantas da estação rendem 30% a mais
 const estacao = () => ESTACOES[thisWeek() % 4];
@@ -4212,7 +4233,7 @@ function crittersOf(sc) {
     const [u, v] = critterHome(sc);
     return { tipo, u, v, hu: u, hv: v, fu: u, fv: v, tu: u, tv: v, t0: 0, dur: 1, wait: Math.random() * 3, dir: Math.random() < 0.5 ? 1 : -1, cor: CRIT_CORES[k % 3] };
   });
-  const flies = Array.from({ length: 5 }, (_, k) => ({ u: Math.random() * 6, v: Math.random() * 6, s: Math.random() * 10, cor: ['#ffd54a', '#ffffff', '#ff9a3c', '#6fb6ff', '#f48fb1'][k] }));
+  const flies = Array.from({ length: 10 }, (_, k) => ({ u: Math.random() * 7 - 1, v: Math.random() * 7 - 1, s: Math.random() * 10, cor: ['#ffd54a', '#ffffff', '#ff9a3c', '#6fb6ff', '#f48fb1', '#b388ff', '#ffffff', '#ffd54a', '#80deea', '#ff8a65'][k] }));
   return (critters[sc] = { list, flies });
 }
 function moveCritter(c, t) {
@@ -4307,10 +4328,21 @@ function drawCritters(t, tod) {
     else if (c.tipo === 'preá') drawCavy(q.x, q.y, s * 0.95, c.dir, t, c.cor, k > 0 && k < 1);
     else drawCricket(q.x, q.y, s * 0.8, c.dir, t);
   });
+  // outono: folhas caindo; inverno: neve fininha o tempo todo
+  if (est.folhas && !chuva) for (let k = 0; k < 10; k++) {
+    const f = cena.flies[k], ciclo = (t / 7000 + k * 0.137) % 1, h = 2.2 * (1 - ciclo);
+    const q = P(f.u + Math.sin(t / 1200 + k) * 0.4 + ciclo * 0.8, f.v + ciclo * 0.5, h);
+    ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(t / 500 + k); ctx.fillStyle = ['#d9822b', '#c8502a', '#e8b04a'][k % 3];
+    ctx.beginPath(); ctx.ellipse(0, 0, W * 0.035, W * 0.018, 0, 0, 7); ctx.fill(); ctx.restore();
+  }
+  if (est.neve && !chuva) {
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    for (let k = 0; k < 40; k++) { const x = (hash01(k) * L.cw + Math.sin(t / 1500 + k) * 15) % L.cw, y = (hash01(k + 9) * L.ch + t * 0.02 * (0.5 + hash01(k + 3))) % L.ch; ctx.beginPath(); ctx.arc(x, y, 1.5, 0, 7); ctx.fill(); }
+  }
   if (tod === 'noite' || chuva) return;
-  // borboletas (não aparecem no inverno)
+  // borboletas: muitas na primavera, poucas no outono, nenhuma no inverno
   const sz = clamp(W * 0.07, 4, 12);
-  if (!est.neve) for (const b of cena.flies) {
+  for (const b of cena.flies.slice(0, est.borboletas)) {
     const u = b.u + Math.sin(t / 5000 + b.s) * 2.5, v = b.v + Math.cos(t / 6200 + b.s * 2) * 2.5;
     const q = P(u, v, 0.6 + 0.25 * Math.sin(t / 600 + b.s * 3));
     const x = q.x, y = q.y, flap = Math.abs(Math.sin(t / 90 + b.s));

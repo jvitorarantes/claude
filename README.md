@@ -46,7 +46,7 @@ Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no nav
 - **Ajuda de volta**: quem ajudou a sua roça (um amigo ou um vizinho da vila) fica marcado por 2 dias. Ajudar de volta dá 50 moedas.
 - **Livro de coleção**: cada planta e produto dos animais ganha carimbos de bronze (10 colheitas), prata (50) e ouro (200), com prêmios.
 - **Temas da roça**: clássico, cerca branca com roseiras, muro de pedra, tropical com coqueiros e lago dos patos.
-- **Estações do ano**: mudam toda segunda-feira (primavera, verão, outono e inverno). A grama e as árvores mudam, e 5 plantas da estação rendem 30% a mais.
+- **Estações do ano**: mudam toda segunda-feira. Primavera: muitas flores, árvores floridas e o dobro de borboletas. Verão: árvores com frutas. Outono: árvores peladas, folhas no chão e caindo. Inverno: chão coberto de neve, árvores e telhado com neve e neve fininha caindo. 5 plantas da estação rendem 30% a mais.
 - **Colheita dourada**: rara (3%), a planta brilha e rende 5 vezes mais.
 - **Chuva** (neve no inverno): de vez em quando chove por 5 minutos e rega a roça toda, com som de chuva.
 - **Borboletas, sapos, porquinhos-da-índia e grilos** pela grama, um bando de passarinhos no céu e, de noite, **vaga-lumes**. Eles ficam presos ao chão e acompanham o zoom.
