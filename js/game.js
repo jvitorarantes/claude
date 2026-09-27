@@ -918,6 +918,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
+  { v: 87, txt: 'Casa e celeiro de cara nova 🏡: desenho novo, com telhado, chaminé, floreiras e celeiro de telhado quebrado. Clique na sua casa para entrar ou trocar o tema: Chalé de madeira, Casarão colonial, Casa Girassol, Casa da Vovó e Casa de pedra.' },
   { v: 85, txt: 'Pescaria mais prática 🎣: depois de fisgar, é só tocar quando o anel em volta do peixe ficar VERDE. Peixe comum precisa de 2 puxadas certas, raro de 3 e lendário de 4. Errou? Perde um pouquinho, e o peixe só escapa com 3 erros seguidos.' },
   { v: 79, txt: 'Novo ponto de pesca: 🔄 Pesque e Solte (libera no nível 5, de graça)! Fica sempre aberto e não gasta isca: pesque quanto quiser. Mas é pesque e solte: cada peixe volta para o rio e dá só 10 moedas e 1 XP. Ele NÃO vai para o celeiro, o livro de peixes, as conquistas, as missões nem o domínio de pesca.' },
   { v: 78, txt: 'Peixes de Goiás 🐟: chegaram 15 espécies novas, como cará, piau, mandi, curimbatá, cascudo, piranha, corvina, matrinxã, peixe-cachorra, aruanã, barbado, tambaqui, pirarara, jaú e piraíba. Alguns só aparecem nos rios grandes: veja no 📖 Livro de peixes onde cada um morde.' },
@@ -2051,35 +2052,120 @@ function nightOverlay(tod) {
   ctx.fillRect(0, 0, L.cw, L.ch);
 }
 
-// skin 'pioneiro': celeiro azul com detalhes dourados (presente do primeiro mês).
-function drawBarn(x, y, s, skin) {
-  const w = s * 1.0, h = s * 0.62, pio = skin === 'pioneiro';
-  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, w * 0.62, s * 0.08, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = pio ? '#3f6fa8' : '#c8402f'; ctx.fillRect(x - w / 2, y - h, w, h);
-  ctx.fillStyle = pio ? '#2c5282' : '#8f2a1e';
-  ctx.beginPath(); ctx.moveTo(x - w * 0.58, y - h); ctx.lineTo(x, y - h - s * 0.42); ctx.lineTo(x + w * 0.58, y - h); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = pio ? '#ffd54a' : '#fff4e0'; ctx.lineWidth = Math.max(1.5, s * 0.03);
-  ctx.strokeRect(x - w / 2, y - h, w, h);
-  const dw = w * 0.42, dh = h * 0.7;
-  ctx.strokeRect(x - dw / 2, y - dh, dw, dh);
-  ctx.beginPath(); ctx.moveTo(x - dw / 2, y - dh); ctx.lineTo(x + dw / 2, y); ctx.moveTo(x + dw / 2, y - dh); ctx.lineTo(x - dw / 2, y); ctx.stroke();
-  if (estacao().neve) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(x - w * 0.6, y - h - s * 0.02); ctx.lineTo(x, y - h - s * 0.44); ctx.lineTo(x + w * 0.6, y - h - s * 0.02); ctx.lineTo(x + w * 0.45, y - h - s * 0.06); ctx.lineTo(x, y - h - s * 0.34); ctx.lineTo(x - w * 0.45, y - h - s * 0.06); ctx.closePath(); ctx.fill(); }
-  ctx.fillStyle = pio ? '#ffd54a' : '#fff4e0'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.08, 0, 7); ctx.fill();
-  if (pio) star(x, y - h - s * 0.14, s * 0.06);
-  else { ctx.fillStyle = '#6b3a1a'; ctx.beginPath(); ctx.arc(x, y - h - s * 0.14, s * 0.05, 0, 7); ctx.fill(); }
+// ---------- Casa e celeiro (com temas) ----------
+// Desenho em "2,5D": frente + lateral mais escura + telhado com beiral. Leve: poucos caminhos.
+// Os temas mudam as cores da casa e do celeiro juntos (a Casa dos Pioneiros é presente do 1º mês).
+const TEMAS_CASA = [
+  { id: 'classico', nome: 'Clássica',          desc: 'Casinha creme de telhado de barro e celeiro vermelho.', nivel: 1,  custo: 0,
+    parede: '#f1dcae', telhado: '#c0562f', porta: '#7a4a22', moldura: '#fff7e6', celeiro: '#c8402f', celTelhado: '#6e3b2a', friso: '#fff4e0' },
+  { id: 'pioneiro', nome: 'Casa dos Pioneiros', desc: 'Azul com detalhes dourados. Presente de quem jogou no primeiro mês.', especial: true,
+    parede: '#f3e9cf', telhado: '#2c5282', porta: '#2c5282', moldura: '#ffd54a', celeiro: '#3f6fa8', celTelhado: '#2c5282', friso: '#ffd54a', estrela: true },
+  { id: 'chale',    nome: 'Chalé de madeira',   desc: 'Tábuas de madeira e telhado verde-musgo.', nivel: 5,  custo: 2500,
+    parede: '#c08a55', telhado: '#4f7a3a', porta: '#6b3f1f', moldura: '#f3e3c0', celeiro: '#8a5a33', celTelhado: '#4f7a3a', friso: '#f3e3c0', tabuas: true },
+  { id: 'colonial', nome: 'Casarão colonial',   desc: 'Paredes brancas, janelas azuis e telhas de barro, como nas cidades históricas de Goiás.', nivel: 8,  custo: 4000,
+    parede: '#fbf7ee', telhado: '#c86a3a', porta: '#2f6fb0', moldura: '#2f6fb0', celeiro: '#ece4d2', celTelhado: '#c86a3a', friso: '#2f6fb0' },
+  { id: 'girassol', nome: 'Casa Girassol',      desc: 'Amarelinha e alegre, com telhado vermelho.', nivel: 12, custo: 6000,
+    parede: '#f2c94c', telhado: '#a8432f', porta: '#7a4a22', moldura: '#ffffff', celeiro: '#e39a2c', celTelhado: '#8a3a2a', friso: '#ffffff' },
+  { id: 'vovo',     nome: 'Casa da Vovó',       desc: 'Rosinha, com janelas brancas e telhado cor de vinho.', nivel: 15, custo: 8000,
+    parede: '#f4b8c8', telhado: '#7a3f63', porta: '#7a3f63', moldura: '#ffffff', celeiro: '#d97a9a', celTelhado: '#6a3a5a', friso: '#ffffff' },
+  { id: 'pedra',    nome: 'Casa de pedra',      desc: 'Paredes de pedra e telhado escuro, bem de fazenda antiga.', nivel: 20, custo: 12000,
+    parede: '#a3a7ab', telhado: '#3f4a55', porta: '#5a3a1f', moldura: '#e8e2d0', celeiro: '#7f858c', celTelhado: '#3f4a55', friso: '#e8e2d0', pedra: true },
+];
+const TEMA_CASA = Object.fromEntries(TEMAS_CASA.map(t => [t.id, t]));
+// Escurece (k < 0) ou clareia (k > 0) uma cor #rrggbb.
+function tomCor(hex, k) {
+  const n = parseInt(hex.slice(1), 16), f = c => Math.round(k < 0 ? c * (1 + k) : c + (255 - c) * k);
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
+function forma(pts, fill, stroke, lw) {
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]); ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1; ctx.stroke(); }
+}
+// textura da parede (tábuas ou pedras) dentro de um retângulo
+function texturaParede(tm, x0, y0, w, h, s) {
+  if (tm.tabuas) { ctx.strokeStyle = 'rgba(90,50,20,.25)'; ctx.lineWidth = 1; for (let k = 1; k < 6; k++) { const yy = y0 + h * k / 6; ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x0 + w, yy); ctx.stroke(); } }
+  if (tm.pedra) { ctx.fillStyle = 'rgba(60,60,60,.18)'; for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { const px = x0 + w * (c + (r % 2) * 0.5) / 4 + 2, py = y0 + h * r / 4 + 2; if (px + w / 5 < x0 + w) { ctx.beginPath(); ctx.roundRect(px, py, w / 5, h / 5.2, 2); ctx.fill(); } } }
+}
+function janelaCasa(x, y, w, h, tm) {
+  ctx.fillStyle = tm.moldura; ctx.beginPath(); ctx.roundRect(x - 1.5, y - 1.5, w + 3, h + 3, 2); ctx.fill();
+  ctx.fillStyle = '#ffe9a8'; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(x + 1, y + 1, w * 0.35, h * 0.4);
+  ctx.strokeStyle = tm.moldura; ctx.lineWidth = Math.max(1, w * 0.1); ctx.beginPath(); ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke();
+}
+function temaCasa(skin, cor) {
+  const tm = TEMA_CASA[skin] && skin !== 'classico' ? TEMA_CASA[skin] : TEMA_CASA.classico;
+  return cor && !TEMA_CASA[skin] ? Object.assign({}, tm, { parede: cor }) : tm;
 }
 function drawHouse(x, y, s, cor, skin) {
-  const w = s * 0.95, h = s * 0.55, pio = skin === 'pioneiro';
-  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, w * 0.62, s * 0.08, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = cor; ctx.fillRect(x - w / 2, y - h, w, h);
-  if (pio) { ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = Math.max(1.5, s * 0.025); ctx.strokeRect(x - w / 2, y - h, w, h); }
-  ctx.fillStyle = pio ? '#2c5282' : '#b5532f';
-  ctx.beginPath(); ctx.moveTo(x - w * 0.62, y - h); ctx.lineTo(x - w * 0.3, y - h - s * 0.35); ctx.lineTo(x + w * 0.3, y - h - s * 0.35); ctx.lineTo(x + w * 0.62, y - h); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#6b3a1a'; ctx.fillRect(x - w * 0.1, y - h * 0.62, w * 0.2, h * 0.62);
-  ctx.fillStyle = '#ffe9a8';
-  ctx.fillRect(x - w * 0.38, y - h * 0.7, w * 0.18, h * 0.3); ctx.fillRect(x + w * 0.2, y - h * 0.7, w * 0.18, h * 0.3);
-  if (estacao().neve) { ctx.fillStyle = '#fff'; ctx.fillRect(x - w * 0.3, y - h - s * 0.36, w * 0.6, s * 0.05); }
-  if (pio) star(x, y - h - s * 0.2, s * 0.06);
+  const tm = temaCasa(skin, cor), fw = s * 0.66, fh = s * 0.4, rh = s * 0.3, dx = s * 0.34, dy = -s * 0.17, ov = s * 0.05;
+  const X0 = x - (fw + dx) / 2, Y = y - dy / 2;
+  ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.62, s * 0.12, 0, 0, 7); ctx.fill();
+  // lateral (mais escura)
+  forma([[X0 + fw, Y], [X0 + fw + dx, Y + dy], [X0 + fw + dx, Y + dy - fh], [X0 + fw, Y - fh]], tomCor(tm.parede, -0.18));
+  // frente com a empena
+  forma([[X0, Y], [X0 + fw, Y], [X0 + fw, Y - fh], [X0 + fw / 2, Y - fh - rh], [X0, Y - fh]], tm.parede);
+  ctx.save(); ctx.beginPath(); ctx.rect(X0, Y - fh, fw, fh); ctx.clip(); texturaParede(tm, X0, Y - fh, fw, fh, s); ctx.restore();
+  // chaminé (atrás do telhado) e fumacinha
+  const cx = X0 + fw * 0.5 + dx * 0.7, cy = Y - fh - rh * 0.55 + dy * 0.7;
+  ctx.fillStyle = tomCor(tm.parede, -0.3); ctx.fillRect(cx - s * 0.035, cy - s * 0.2, s * 0.07, s * 0.2);
+  ctx.fillStyle = tomCor(tm.telhado, -0.2); ctx.fillRect(cx - s * 0.045, cy - s * 0.22, s * 0.09, s * 0.03);
+  const tt = performance.now() / 1000;
+  for (let k = 0; k < 3; k++) { const f = (tt * 0.35 + k / 3) % 1; ctx.fillStyle = `rgba(235,235,235,${0.55 * (1 - f)})`; ctx.beginPath(); ctx.arc(cx + Math.sin(f * 4 + k) * s * 0.03, cy - s * 0.24 - f * s * 0.3, s * (0.03 + f * 0.04), 0, 7); ctx.fill(); }
+  // telhado: a água da direita (vista de cima) e a borda da frente
+  const cume = [X0 + fw / 2, Y - fh - rh], beiralD = [X0 + fw + ov, Y - fh + ov * 0.9];
+  forma([cume, beiralD, [beiralD[0] + dx, beiralD[1] + dy], [cume[0] + dx, cume[1] + dy]], tm.telhado);
+  ctx.strokeStyle = tomCor(tm.telhado, -0.25); ctx.lineWidth = 1;
+  for (let k = 1; k < 4; k++) { const a = k / 4, p = [cume[0] + (beiralD[0] - cume[0]) * a, cume[1] + (beiralD[1] - cume[1]) * a]; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] + dx, p[1] + dy); ctx.stroke(); }
+  if (estacao().neve) forma([cume, [cume[0] + (beiralD[0] - cume[0]) * 0.45, cume[1] + (beiralD[1] - cume[1]) * 0.45], [cume[0] + (beiralD[0] - cume[0]) * 0.45 + dx, cume[1] + (beiralD[1] - cume[1]) * 0.45 + dy], [cume[0] + dx, cume[1] + dy]], '#ffffff');
+  ctx.strokeStyle = tomCor(tm.telhado, -0.3); ctx.lineWidth = Math.max(2, s * 0.045); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(X0 - ov, Y - fh + ov * 0.9); ctx.lineTo(cume[0], cume[1]); ctx.lineTo(beiralD[0], beiralD[1]); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cume[0], cume[1]); ctx.lineTo(cume[0] + dx, cume[1] + dy); ctx.stroke(); ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+  // janelinha redonda na empena
+  ctx.fillStyle = tm.moldura; ctx.beginPath(); ctx.arc(cume[0], Y - fh - rh * 0.4, s * 0.045, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffe9a8'; ctx.beginPath(); ctx.arc(cume[0], Y - fh - rh * 0.4, s * 0.03, 0, 7); ctx.fill();
+  // porta com arco, degrau e maçaneta
+  const pw = fw * 0.24, ph = fh * 0.66, px = X0 + fw * 0.5 - pw / 2;
+  ctx.fillStyle = tomCor(tm.parede, -0.35); ctx.fillRect(px - s * 0.02, Y - s * 0.02, pw + s * 0.04, s * 0.03);
+  ctx.fillStyle = tm.porta; ctx.beginPath(); ctx.moveTo(px, Y); ctx.lineTo(px, Y - ph + pw / 2); ctx.arc(px + pw / 2, Y - ph + pw / 2, pw / 2, Math.PI, 0); ctx.lineTo(px + pw, Y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e8c35a'; ctx.beginPath(); ctx.arc(px + pw * 0.78, Y - ph * 0.45, s * 0.012, 0, 7); ctx.fill();
+  // janelas da frente e da lateral
+  const jw = fw * 0.18, jh = fh * 0.3;
+  janelaCasa(X0 + fw * 0.08, Y - fh * 0.72, jw, jh, tm); janelaCasa(X0 + fw * 0.74, Y - fh * 0.72, jw, jh, tm);
+  // floreira embaixo das janelas
+  for (const jx of [X0 + fw * 0.08, X0 + fw * 0.74]) { ctx.fillStyle = '#8a5a33'; ctx.fillRect(jx - 1, Y - fh * 0.72 + jh + 2, jw + 2, s * 0.025); for (let k = 0; k < 3; k++) { ctx.fillStyle = ['#e0503a', '#f2c14e', '#e86aa0'][k]; ctx.beginPath(); ctx.arc(jx + jw * (0.2 + k * 0.3), Y - fh * 0.72 + jh + 1, s * 0.014, 0, 7); ctx.fill(); } }
+  ctx.save(); ctx.transform(1, dy / dx, 0, 1, 0, 0);
+  const lx = X0 + fw + dx * 0.35, ly = (Y - fh * 0.72) - (dy / dx) * (X0 + fw + dx * 0.35) + dy * 0.35;
+  janelaCasa(lx, ly, dx * 0.32, jh, tm); ctx.restore();
+  if (tm.estrela) star(cume[0], Y - fh - rh * 0.4, s * 0.04);
+}
+function drawBarn(x, y, s, skin) {
+  const tm = temaCasa(skin), fw = s * 0.72, fh = s * 0.44, rh = s * 0.34, dx = s * 0.36, dy = -s * 0.18, ov = s * 0.05;
+  const X0 = x - (fw + dx) / 2, Y = y - dy / 2;
+  ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.64, s * 0.12, 0, 0, 7); ctx.fill();
+  forma([[X0 + fw, Y], [X0 + fw + dx, Y + dy], [X0 + fw + dx, Y + dy - fh], [X0 + fw, Y - fh]], tomCor(tm.celeiro, -0.22));
+  // frente com telhado "quebrado" (gambrel), o jeito clássico de celeiro
+  const q1 = [X0 + fw * 0.1, Y - fh - rh * 0.62], cume = [X0 + fw / 2, Y - fh - rh], q2 = [X0 + fw * 0.9, Y - fh - rh * 0.62];
+  forma([[X0, Y], [X0 + fw, Y], [X0 + fw, Y - fh], q2, cume, q1, [X0, Y - fh]], tm.celeiro);
+  ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 1; for (let k = 1; k < 7; k++) { const xx = X0 + fw * k / 7; ctx.beginPath(); ctx.moveTo(xx, Y); ctx.lineTo(xx, Y - fh); ctx.stroke(); }
+  // telhado lateral em duas águas
+  const bD = [X0 + fw + ov, Y - fh + ov * 0.9];
+  forma([q2, bD, [bD[0] + dx, bD[1] + dy], [q2[0] + dx, q2[1] + dy]], tm.celTelhado);
+  forma([cume, q2, [q2[0] + dx, q2[1] + dy], [cume[0] + dx, cume[1] + dy]], tomCor(tm.celTelhado, 0.12));
+  if (estacao().neve) forma([cume, q2, [q2[0] + dx, q2[1] + dy], [cume[0] + dx, cume[1] + dy]], '#ffffff');
+  ctx.strokeStyle = tm.friso; ctx.lineWidth = Math.max(2, s * 0.035); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(X0 - ov, Y - fh + ov); ctx.lineTo(q1[0], q1[1]); ctx.lineTo(cume[0], cume[1]); ctx.lineTo(q2[0], q2[1]); ctx.lineTo(bD[0], bD[1]); ctx.stroke();
+  ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
+  // porta grande com X e a janela do feno
+  ctx.lineWidth = Math.max(1.5, s * 0.025);
+  const dw = fw * 0.44, dh = fh * 0.72, dxp = X0 + fw / 2 - dw / 2;
+  ctx.fillStyle = tomCor(tm.celeiro, -0.3); ctx.fillRect(dxp, Y - dh, dw, dh);
+  ctx.strokeRect(dxp, Y - dh, dw, dh);
+  ctx.beginPath(); ctx.moveTo(dxp, Y - dh); ctx.lineTo(dxp + dw, Y); ctx.moveTo(dxp + dw, Y - dh); ctx.lineTo(dxp, Y); ctx.moveTo(dxp + dw / 2, Y - dh); ctx.lineTo(dxp + dw / 2, Y); ctx.stroke();
+  const hw = fw * 0.2, hh = rh * 0.34, hy = Y - fh - rh * 0.5;
+  ctx.fillStyle = '#5a3a1f'; ctx.fillRect(cume[0] - hw / 2, hy, hw, hh); ctx.strokeRect(cume[0] - hw / 2, hy, hw, hh);
+  ctx.fillStyle = '#e8c35a'; ctx.fillRect(cume[0] - hw / 2 + 2, hy + hh * 0.55, hw - 4, hh * 0.4); // feno
+  ctx.strokeRect(X0, Y - fh, fw, fh);
+  if (tm.estrela) star(cume[0], Y - fh - rh * 0.78, s * 0.045);
 }
 function drawCoop(x, y, s) {
   const w = s * 0.8, h = s * 0.45;
@@ -3864,7 +3950,36 @@ function caesHTML(naLoja) {
     <button class="btn ghost" data-dog-food="3" ${state.coins < DOG_FOOD.custo * 3 ? 'disabled' : ''}>${moeda(DOG_FOOD.custo * 3, 3)}</button></div></div>`;
   return html;
 }
-const TAB_NAMES = { canil: 'Casinha do cachorro',  loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões', correio: 'Correio', fabrica: 'Negócios', inventario: 'Inventário' };
+// Temas da casa e do celeiro: os que você tem (Usar) e os da loja (Comprar). Aparece ao clicar na casa e na Loja › Temas.
+const casaTemaIcon = id => makeIcon('casatema:' + id, () => { ctx.save(); drawBarn(62, 86, 50, id); drawHouse(34, 90, 52, null, id); ctx.restore(); });
+function casaTemasHTML() {
+  const atual = TEMA_CASA[state.skin] ? state.skin : 'classico';
+  return TEMAS_CASA.filter(t => !t.especial || state.skins[t.id]).map(t => {
+    const tem = t.id === 'classico' || state.skins[t.id], usando = atual === t.id, trava = !tem && t.nivel > state.level;
+    const btn = usando ? '<button class="btn ghost" disabled>Em uso</button>'
+      : tem ? `<button class="btn" data-casa-tema="${t.id}">Usar</button>`
+      : trava ? `<button class="btn" disabled>Nível ${t.nivel}</button>`
+      : `<button class="btn gold" data-casa-tema="${t.id}" ${state.coins < t.custo ? 'disabled' : ''}>${moeda(t.custo)}</button>`;
+    return `<div class="row ${usando ? 'sel' : ''} ${trava ? 'locked' : ''}"><img alt="" src="${casaTemaIcon(t.id)}">
+      <div><div class="name">${t.nome}${t.especial ? ' <span class="tag">⭐ pioneiros</span>' : ''}</div><div class="meta">${t.desc}${tem && !usando ? ' · <b>já é seu</b>' : ''}</div></div>${btn}</div>`;
+  }).join('');
+}
+function usarCasaTema(id) {
+  const t = TEMA_CASA[id]; if (!t) return;
+  const tem = id === 'classico' || state.skins[id];
+  if (!tem) {
+    if (t.especial) return;
+    if (state.level < t.nivel) return toast(`${t.nome} libera no nível ${t.nivel}.`, 'bad');
+    if (state.coins < t.custo) { sfx('error'); return toast(`${t.nome} custa ${t.custo.toLocaleString('pt-BR')} moedas.`, 'bad'); }
+    return confirmTwice('casatema' + id, `Comprar o tema ${t.nome} por ${t.custo.toLocaleString('pt-BR')} moedas? Toque de novo para confirmar.`, () => {
+      state.coins -= t.custo; state.skins[id] = true; state.skin = id; sfx('buy');
+      toast(`🏡 ${t.nome}: sua casa e seu celeiro ficaram de cara nova!`, 'good'); done(); renderPane();
+    });
+  }
+  state.skin = id === 'classico' ? null : id; sfx('click');
+  toast(`🏡 Tema ${t.nome} na casa e no celeiro!`, 'good'); done(); renderPane();
+}
+const TAB_NAMES = { casaTemas: 'Sua casa', canil: 'Casinha do cachorro',  loja: 'Loja', celeiro: 'Celeiro', terreno: 'Terreno', amigos: 'Amigos', missoes: 'Missões', correio: 'Correio', fabrica: 'Negócios', inventario: 'Inventário' };
 // A janela abre por cima do jogo. Clicar de novo no mesmo botão fecha.
 function openPanel(t, seg, focus) {
   tab = t; if (seg) shopSeg = seg;
@@ -3886,6 +4001,8 @@ function renderPane() {
   const pane = $('#pane');
   let html = '';
   if (tab === 'abrigo') html = abrigoHTML();
+  else if (tab === 'casaTemas') html = `<div class="row"><img alt="" src="${casaTemaIcon(TEMA_CASA[state.skin] ? state.skin : 'classico')}"><div><div class="name">Entrar na casa</div><div class="meta">Decore a sala e faça carinho nos bichinhos.</div></div><button class="btn gold" data-entrar-casa="1">Entrar 🏠</button></div>
+    <h3>Temas da casa e do celeiro</h3><p class="hint">O tema muda a casa e o celeiro juntos. Os amigos veem quando visitam.</p>` + casaTemasHTML();
   else if (tab === 'canil') html = `<p class="hint">Seus cachorros vigiam a roça e o rancho. Aqui você vê a raça, o nome e a ração de cada um, e pode trocar o nome.</p>` + caesHTML(false);
   else if (tab === 'inventario') html = inventarioHTML();
   else if (tab === 'missoes') html = missoesHTML();
@@ -3939,8 +4056,7 @@ function renderPane() {
       }
     } else if (shopSeg === 'temas') {
       html += `<p class="hint">Os temas mudam a cerca e o jeito da sua roça. Os amigos veem o seu tema quando visitam.</p>`;
-      if (state.skins.pioneiro) html += `<div class="row sel"><img alt="" src="${makeIcon('skin:pio', () => drawBarn(48, 84, 70, 'pioneiro'))}"><div><div class="name">Celeiro e casa dos Pioneiros <span class="tag">⭐ pioneiros</span></div><div class="meta">Azul com detalhes dourados · ${obtidoEm(state)}</div></div>
-        <button class="btn ${state.skin === 'pioneiro' ? 'ghost' : ''}" data-skin="${state.skin === 'pioneiro' ? '' : 'pioneiro'}">${state.skin === 'pioneiro' ? 'Tirar' : 'Usar'}</button></div>`;
+      html += `<h3>Casa e celeiro</h3>` + casaTemasHTML() + `<h3>Cerca e roça</h3>`;
       for (const t of TEMAS) {
         const locked = t.nivel > state.level, owned = !!state.temas[t.id], using = state.tema === t.id;
         html += `<div class="row ${locked ? 'locked' : ''} ${using ? 'sel' : ''}"><img alt="" src="${temaIcon(t.id)}">
@@ -4088,6 +4204,8 @@ $('#pane').addEventListener('click', e => {
   if (d.vila) { const [npc, id] = d.vila.split(':'); return entregarVila(npc, id); }
   if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
   if (d.temaRoca) return buyTema(d.temaRoca);
+  if (d.casaTema) return usarCasaTema(d.casaTema);
+  if (d.entrarCasa) { closePanel(); return setScene('casa'); }
   if ('skin' in d) { state.skin = d.skin || null; toast(d.skin ? 'Celeiro e casa dos Pioneiros!' : 'Celeiro e casa clássicos.', 'good'); if (isHome()) setScene('roca'); return done(); }
   if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar);
   if (d.invPor) return invPor(d.invPor, d.sc);
@@ -4300,7 +4418,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4465,7 +4583,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'avatar' && target.quem === 'dono') { falar('avatar:dono', view.nome, sorteia(FALAS_DONO.concat(FALAS_AVATAR))); sfx('fala'); }
   else if (target.kind === 'avatar') { falar('avatar', meuApelido(), sorteia(FALAS_AVATAR)); sfx('fala'); }
   else if (target.kind === 'enfeite') actEnfeite(target.id);
-  else if (target.kind === 'casa') setScene('casa');
+  else if (target.kind === 'casa') { if (isHome()) openPanel('casaTemas'); else setScene('casa'); }
   else if (target.kind === 'celeiro') { if (isHome()) openPanel('celeiro'); else toast(`Celeiro de ${view.nome}.`); }
 });
 window.addEventListener('keydown', e => {
@@ -5671,8 +5789,9 @@ function avatarArea(sc) {
   S().plots.forEach((p, i) => { if (p.s !== 'locked') { const c = i % COLS, r = Math.floor(i / COLS); c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1); } });
   if (c1 <= c0) { c0 = 0; c1 = 3; r0 = 0; r1 = 3; }
   // o avatar passeia numa faixa de grama fora das terras (na frente; se não couber, do lado; senão, fora da cerca)
-  if (ROWS - r1 >= 0.9) return { u0: c0 + 0.2, u1: Math.max(c0 + 0.6, c1 - 0.2), v0: r1 + 0.4, v1: Math.min(ROWS - 0.25, r1 + 1.2) };
-  if (COLS - c1 >= 0.9) return { u0: c1 + 0.4, u1: Math.min(COLS - 0.25, c1 + 1.2), v0: r0 + 0.2, v1: Math.max(r0 + 0.6, r1 - 0.2) };
+  // (longe o bastante para o corpo dele não ficar na frente das terras)
+  if (ROWS - r1 >= 2.8) return { u0: c0 + 0.8, u1: Math.min(COLS - 0.3, Math.max(c0 + 1.2, c1 + 0.8)), v0: r1 + 1.8, v1: Math.min(ROWS - 0.25, r1 + 2.6) };
+  if (COLS - c1 >= 2.8) return { u0: c1 + 1.8, u1: Math.min(COLS - 0.25, c1 + 2.6), v0: r0 + 0.6, v1: Math.min(ROWS - 0.3, Math.max(r0 + 1, r1 + 0.6)) };
   return { u0: 0.5, u1: COLS - 0.5, v0: ROWS + 0.5, v1: ROWS + 1.1 };
 }
 // quem: 'eu' (o seu avatar, que vai junto nas visitas) ou 'dono' (o avatar do dono da roça visitada).
