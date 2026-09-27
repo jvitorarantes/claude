@@ -138,7 +138,22 @@
   // Aviso para outra pessoa (visita, presente, pedido de amizade). O programinha entrega e apaga.
   const mandarAviso = data => db.collection('avisos').add(data);
 
+  // Chat entre amigos: cada um tem a sua caixa farms/{uid}/chat com as mensagens que mandou e recebeu.
+  // Mandar grava nas duas caixas de uma vez (a do amigo e a sua).
+  function enviarMsg(de, para, data) {
+    const lote = db.batch(), msg = Object.assign({}, data, { de, para });
+    lote.set(farm(para).collection('chat').doc(), msg);
+    lote.set(farm(de).collection('chat').doc(), msg);
+    return lote.commit();
+  }
+  function watchChat(uid, cb) {
+    return farm(uid).collection('chat').orderBy('at').limitToLast(300).onSnapshot(
+      qs => cb(qs.docs.map(d => Object.assign({ id: d.id }, d.data()))), e => console.warn('chat:', e));
+  }
+  const apagarMsg = (uid, id) => farm(uid).collection('chat').doc(id).delete();
+
   window.RFCloud = {
+    enviarMsg, watchChat, apagarMsg,
     ativarPush, desativarPush, salvarPush, mandarAviso, saveFarmSeguro, salvarBackup, listarBackups, apagarBackup,
     available, init, signIn, signOut, loadFarm, saveFarm, claimSession, watchFarm, claimCode, findCode, normalizeCode,
     sendVisit, watchVisits, deleteVisit, sendRequest, deleteRequest, requestExists, watchRequests,

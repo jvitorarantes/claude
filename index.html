@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="54">
-<script src="firebase-config.js?v=54"></script>
+<meta name="rf-version" content="55">
+<script src="firebase-config.js?v=55"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -387,6 +387,18 @@
     background: var(--panel); color: var(--ink); border: 5px solid var(--wood); border-radius: 20px;
     box-shadow: 0 8px 0 rgba(0,0,0,.2);
   }
+  .chatcard { display: flex; flex-direction: column; height: min(640px, calc(100dvh - 32px)); overflow: hidden; }
+  .chatlista { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; background: #eaf3dc; overscroll-behavior: contain; }
+  .chatlista .vazio { margin: auto; color: #6a6a52; text-align: center; font-size: 14px; }
+  .bolha { color: #2f2a1f; max-width: 78%; padding: 7px 11px; border-radius: 14px; font-size: 15px; line-height: 1.3; word-wrap: break-word; box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+  .bolha small { display: block; font-size: 10.5px; opacity: .65; margin-top: 2px; text-align: right; }
+  .bolha.eu { align-self: flex-end; background: #c9ecae; border-bottom-right-radius: 4px; }
+  .bolha.ele { align-self: flex-start; background: #fff; border-bottom-left-radius: 4px; }
+  .chatdia { align-self: center; font-size: 11px; color: #6a6a52; background: rgba(255,255,255,.7); padding: 2px 10px; border-radius: 10px; }
+  .chatrapidas { display: flex; gap: 6px; overflow-x: auto; padding: 8px 10px 0; scrollbar-width: none; touch-action: pan-x; }
+  .chatrapidas button { flex: none; border: 2px solid var(--wood-3); background: var(--card); border-radius: 14px; padding: 4px 10px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .chatform { display: flex; gap: 8px; padding: 8px 10px 10px; }
+  .chatform input { flex: 1; min-width: 0; border: 2px solid var(--wood-3); border-radius: 12px; padding: 8px 12px; font: inherit; font-size: 15px; background: var(--card); color: var(--ink); }
   .modal-head { display: flex; align-items: center; justify-content: space-between; background: var(--wood); padding: 8px 10px 8px 18px; }
   .modal-head h2 { margin: 0; font: 400 26px/1.1 Chewy, cursive; color: #ffe08a; letter-spacing: .5px; }
   .modal section { padding: 12px 18px; display: grid; gap: 10px; border-bottom: 2px solid var(--panel-2); }
@@ -673,6 +685,15 @@
   </div>
 </div>
 
+<div class="modal" id="chat" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
+  <div class="modal-card chatcard">
+    <div class="modal-head"><h2 id="chatTitle">Conversa</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="chatlista" id="chatLista" role="log" aria-live="polite"></div>
+    <div class="chatrapidas" id="chatRapidas"></div>
+    <form class="chatform" id="chatForm"><input id="chatTxt" maxlength="300" placeholder="Escreva uma mensagem…" autocomplete="off" aria-label="Mensagem"><button class="btn gold" type="submit">Enviar</button></form>
+  </div>
+</div>
+
 <div class="modal" id="bancaModal" hidden role="dialog" aria-modal="true" aria-labelledby="bmTitle">
   <div class="modal-card bm-card">
     <div class="modal-head"><h2 id="bmTitle">Colocar à venda</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
@@ -747,8 +768,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=54"></script>
-<script src="js/cloud.js?v=54"></script>
-<script src="js/game.js?v=54"></script>
+<script src="js/audio.js?v=55"></script>
+<script src="js/cloud.js?v=55"></script>
+<script src="js/game.js?v=55"></script>
 </body>
 </html>

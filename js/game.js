@@ -453,7 +453,7 @@ const L = { W: 60, ox: 0, oy: 0, cw: 0, ch: 0, horizon: 0, dpr: 1, pan: { x: 0, 
 // Nuvem
 let user = null, cloudStatus = Cloud.available ? 'loading' : 'off', syncStatus = '', dirty = false, lastCloud = 0;
 const CLOUD_MS = 30 * 1000; // intervalo mínimo entre salvamentos automáticos na nuvem
-let unsubVisits = null, unsubRequests = null;
+let unsubVisits = null, unsubRequests = null, unsubChat = null;
 let requests = [];                  // pedidos de amizade recebidos (ao vivo)
 const friendInfo = {};
 
@@ -1342,6 +1342,7 @@ function kick(sess) {
 }
 async function onUser(u) {
   if (unsubVisits) { unsubVisits(); unsubVisits = null; }
+  if (unsubChat) { unsubChat(); unsubChat = null; } chatMsgs = [];
   if (unsubRequests) { unsubRequests(); unsubRequests = null; }
   if (unsubFarm) { unsubFarm(); unsubFarm = null; }
   user = u; requests = [];
@@ -1404,6 +1405,7 @@ async function onUser(u) {
       if (sess && sess.id !== SESSION.id && sess.at > SESSION.at) kick(sess);
     });
     unsubVisits = Cloud.watchVisits(u.uid, applyVisits);
+    if (Cloud.watchChat) unsubChat = Cloud.watchChat(u.uid, onChat);
     unsubRequests = Cloud.watchRequests(u.uid, onRequests);
     checkSent(); recuperarAmigos();
     enterGame();
@@ -3611,7 +3613,7 @@ function renderTabs() {
     if (n) el.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${n} ${label}">${n}</span>`);
   };
   const unread = state ? state.news.filter(n => n.at > state.newsSeen).length : 0;
-  setBadge(document.querySelector('.tab[data-tab="amigos"]'), requests.length, 'pedidos de amizade');
+  setBadge(document.querySelector('.tab[data-tab="amigos"]'), requests.length + naoLidas(), 'pedidos de amizade e mensagens');
   setBadge(document.querySelector('.tab[data-tab="correio"]'), unread, 'cartas novas');
   if (state) {
     setBadge(document.querySelector('.tab[data-tab="celeiro"]'), Object.values(state.barn).reduce((t, q) => t + (q > 0 ? q : 0), 0), 'itens no celeiro');
@@ -3898,6 +3900,7 @@ function renderPane() {
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
           <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `${esc(f.fazenda || 'Roça Feliz')} · nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : (f && f.erro ? `<button class="btn" data-reatar="${esc(uid)}">Reatar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`)}
+          <button class="btn" data-chat="${esc(uid)}" ${f && !f.erro ? '' : 'disabled'}>💬 Conversar${naoLidas(uid) ? ` <span class="badge" aria-label="${naoLidas(uid)} mensagens novas">${naoLidas(uid)}</span>` : ''}</button>
           ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && !f.erro && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
           ${armed ? `<span class="meta">Excluir ${esc(firstName(name))}?</span><button class="btn ghost" data-unfriend-cancel>Cancelar</button><button class="btn danger" data-unfriend="${esc(uid)}">Confirmar</button>`
             : `<button class="btn ghost" data-unfriend="${esc(uid)}">Excluir</button>`}</div></div>`;
@@ -3993,6 +3996,7 @@ $('#pane').addEventListener('click', e => {
   else if (d.visit) { visitNpc(d.visit); closePanel(); }
   else if (d.visitFriend) { visitFriend(d.visitFriend); closePanel(); }
   else if (d.reatar) reatarAmizade(d.reatar);
+  else if (d.chat) abrirChat(d.chat);
   else if (d.accept) acceptRequest(d.accept);
   else if (d.refuse) refuseRequest(d.refuse);
   else if (d.cancelRequest) cancelRequest(d.cancelRequest);
@@ -4482,6 +4486,7 @@ function avisarAmigo(para, tipo, txt) {
   if (!user || !Cloud.mandarAviso || !para) return;
   const k = para + ':' + tipo;
   if (tipo === 'visita' && avisoFeito[k] && Date.now() - avisoFeito[k] < 30 * 60e3) return;
+  if (tipo === 'chat' && avisoFeito[k] && Date.now() - avisoFeito[k] < 2 * 60e3) return;
   avisoFeito[k] = Date.now();
   Cloud.mandarAviso({ para, de: user.uid, tipo, txt, at: Date.now() }).catch(e => console.warn('aviso:', e));
 }
@@ -4838,6 +4843,81 @@ async function sendFriendGift(uid, escolha) {
     else toast('Não consegui mandar o presente agora. Tente de novo.', 'bad');
   }
 }
+
+// ---------- Chat com amigos ----------
+let chatMsgs = [], chatCom = null, chatUltimoEnvio = 0, chatPrimeira = true;
+const CHAT_RAPIDAS = ['Oi! 👋', 'Obrigado pela ajuda! 🙏', 'Me visita? 🏡', 'Te mandei um presente! 🎁', 'Suas plantas estão lindas! 🌽', 'Boa colheita! 🍀', '😂', '❤️'];
+const lidoAte = uid => (state && state.chatLido && state.chatLido[uid]) || 0;
+function naoLidas(uid) {
+  if (!user || !state) return 0;
+  return chatMsgs.filter(m => m.de !== user.uid && (!uid || m.de === uid) && state.friends.includes(m.de) && (m.at || 0) > lidoAte(m.de)).length;
+}
+function onChat(lista) {
+  const antes = new Set(chatMsgs.map(m => m.id));
+  chatMsgs = lista.filter(m => m && typeof m.txt === 'string' && typeof m.de === 'string');
+  if (!chatPrimeira) for (const m of chatMsgs) if (!antes.has(m.id) && m.de !== user.uid && m.de !== chatCom && state.friends.includes(m.de)) {
+    const f = friendInfo[m.de]; fetchFriendInfo(m.de);
+    toast(`💬 ${f && f.name && !f.erro ? f.name : 'Amigo'}: ${m.txt.slice(0, 80)}`, 'good'); sfx('click');
+  }
+  chatPrimeira = false;
+  if (chatCom) { renderChat(); marcarLido(chatCom); }
+  renderTabs(); if (tab === 'amigos') renderPane();
+  // limpeza: mensagens com mais de 30 dias saem da sua caixa
+  const velho = Date.now() - 30 * DAY;
+  for (const m of chatMsgs) if ((m.at || 0) < velho) Cloud.apagarMsg(user.uid, m.id).catch(() => {});
+}
+function marcarLido(uid) {
+  const ult = chatMsgs.filter(m => m.de === uid).reduce((t, m) => Math.max(t, m.at || 0), 0);
+  if (ult > lidoAte(uid)) { (state.chatLido ||= {})[uid] = ult; save(); renderTabs(); if (tab === 'amigos') renderPane(); }
+}
+function abrirChat(uid) {
+  if (!user) return toast('Entre com a conta Google para conversar.');
+  chatCom = uid; fetchFriendInfo(uid);
+  const f = friendInfo[uid];
+  $('#chatTitle').textContent = f && f.name && !f.erro ? f.name : 'Conversa';
+  $('#chatRapidas').innerHTML = CHAT_RAPIDAS.map(t => `<button type="button" data-rapida="${esc(t)}">${esc(t)}</button>`).join('');
+  $('#chat').hidden = false; renderChat(); marcarLido(uid);
+  setTimeout(() => { if (!pointer.touch) $('#chatTxt').focus(); }, 50);
+}
+function fecharChat() { $('#chat').hidden = true; chatCom = null; }
+function renderChat() {
+  const box = $('#chatLista'); if (!box || !chatCom) return;
+  const conversa = chatMsgs.filter(m => (m.de === user.uid && m.para === chatCom) || (m.de === chatCom && m.para === user.uid));
+  const f = friendInfo[chatCom], nome = f && f.name && !f.erro ? f.name : 'seu amigo';
+  if (!conversa.length) { box.innerHTML = `<div class="vazio">Nenhuma mensagem ainda.<br>Diga oi para ${esc(nome)}! 👋</div>`; return; }
+  let dia = '', html = '';
+  for (const m of conversa) {
+    const d = new Date(m.at || Date.now()), dd = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    if (dd !== dia) { dia = dd; html += `<div class="chatdia">${dd === new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) ? 'Hoje' : dd}</div>`; }
+    html += `<div class="bolha ${m.de === user.uid ? 'eu' : 'ele'}">${esc(m.txt)}<small>${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small></div>`;
+  }
+  const noFim = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  box.innerHTML = html;
+  if (noFim || box.dataset.com !== chatCom) box.scrollTop = box.scrollHeight;
+  box.dataset.com = chatCom;
+}
+async function enviarChat(txt) {
+  txt = String(txt || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!txt || !chatCom || !user) return;
+  if (Date.now() - chatUltimoEnvio < 800) return; // sem enxurrada
+  chatUltimoEnvio = Date.now();
+  const para = chatCom;
+  try {
+    await Cloud.enviarMsg(user.uid, para, { txt, at: Date.now(), nome: meuApelido() });
+    $('#chatTxt').value = '';
+    avisarAmigo(para, 'chat', `💬 ${meuApelido()}: ${txt.slice(0, 90)}`);
+  } catch (e) {
+    console.warn(e);
+    if (e && e.code === 'permission-denied') toast('Não deu para mandar: publique as regras novas do firestore.rules, ou a amizade sumiu do lado do seu amigo (toque em Reatar).', 'bad');
+    else toast('Não consegui mandar a mensagem agora. Tente de novo.', 'bad');
+  }
+}
+$('#chatForm').addEventListener('submit', e => { e.preventDefault(); enviarChat($('#chatTxt').value); });
+$('#chat').addEventListener('click', e => {
+  if (e.target === $('#chat') || e.target.closest('[data-close]')) return fecharChat();
+  const r = e.target.closest('[data-rapida]'); if (r) enviarChat(r.dataset.rapida);
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#chat').hidden) fecharChat(); });
 
 // ---------- Ajuda de volta ----------
 // Quem ajudou a sua roça fica marcado por 2 dias. Ajudar essa pessoa de volta dá um bônus.

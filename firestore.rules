@@ -32,6 +32,19 @@ service cloud.firestore {
         allow read, delete: if signedIn() && me() == uid;
       }
 
+      // Chat: caixa de mensagens de cada um. O dono lê e apaga; quem manda grava na caixa do amigo
+      // (só se forem amigos) e na própria. Texto curto, sempre no próprio nome.
+      match /chat/{msgId} {
+        allow read, delete: if signedIn() && me() == uid;
+        allow create: if signedIn() && request.resource.data.de == me()
+                      && request.resource.data.txt is string
+                      && request.resource.data.txt.size() > 0 && request.resource.data.txt.size() <= 300
+                      && request.resource.data.size() < 8
+                      && (me() == uid
+                          || me() in get(/databases/$(database)/documents/farms/$(uid)).data.get('friends', [])
+                          || amigoDe(uid));
+      }
+
       // Cópias de segurança da roça (uma por dia). Só o dono.
       match /backups/{dia} {
         allow read, delete: if signedIn() && me() == uid;
