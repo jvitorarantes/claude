@@ -921,6 +921,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
+  { v: 91, txt: 'Loja do Trevo 🍀 cheia de novidades: chapéu de cangaceiro, boina, panamá, gorro, sanfona, buquê, regador dourado, ipê-amarelo, fogueira de São João, balanço, carro de boi, as casas Lavanda, do Cerrado e Estrelada, a música Seresta ao Luar e itens úteis (iscas, ração especial, tarrafa e pontos de pesca prontos na hora).' },
   { v: 90, txt: 'Chegaram os Trevos 🍀, a moeda verde da roça! Ganhe resgatando cada peixe novo no 📖 Livro de peixes, os níveis do domínio de pesca e as conquistas (Missões › 🍀 Trevos). O que você já fez também vale: é só resgatar! Troque na Loja do Trevo por itens exclusivos: chapéus, lampião, músicas, enfeites e temas de casa.' },
   { v: 88, txt: 'Visual caprichado: abrigos, casinha do cachorro e enfeites com mais detalhes; animais maiores e mais fáceis de clicar; e a roça aparece mais perto na tela.' },
   { v: 87, txt: 'Casa e celeiro de cara nova 🏡: desenho novo, com telhado, chaminé, floreiras e celeiro de telhado quebrado. Clique na sua casa para entrar ou trocar o tema: Chalé de madeira, Casarão colonial, Casa Girassol, Casa da Vovó e Casa de pedra.' },
@@ -2085,6 +2086,12 @@ const TEMAS_CASA = [
     parede: '#a3a7ab', telhado: '#3f4a55', porta: '#5a3a1f', moldura: '#e8e2d0', celeiro: '#7f858c', celTelhado: '#3f4a55', friso: '#e8e2d0', pedra: true },
   { id: 'trevo',    nome: 'Casa do Trevo',      desc: 'Verde-menta com trevo na fachada. Exclusiva da Loja do Trevo 🍀.', trevo: 40,
     parede: '#d8f0c8', telhado: '#3f8a3a', porta: '#2f6a2a', moldura: '#ffffff', celeiro: '#5aa04a', celTelhado: '#2f6a2a', friso: '#ffffff', icone: 'trevo' },
+  { id: 'lavanda',  nome: 'Casa Lavanda',       desc: 'Lilás clarinho com telhado roxo. Exclusiva da Loja do Trevo 🍀.', trevo: 40,
+    parede: '#e6dcf5', telhado: '#6a4a9a', porta: '#6a4a9a', moldura: '#ffffff', celeiro: '#b89ad8', celTelhado: '#4a3a7a', friso: '#ffffff' },
+  { id: 'cerrado',  nome: 'Casa do Cerrado',    desc: 'Cor de terra do cerrado, com telhado cor de ferrugem. Exclusiva da Loja do Trevo 🍀.', trevo: 45,
+    parede: '#e8b878', telhado: '#9a4a24', porta: '#5a3a1f', moldura: '#f6e7c8', celeiro: '#c8702f', celTelhado: '#6a3a18', friso: '#f6e7c8' },
+  { id: 'estrelada', nome: 'Casa Estrelada',    desc: 'Azul da noite com detalhes dourados. Exclusiva da Loja do Trevo 🍀.', trevo: 50,
+    parede: '#34487a', telhado: '#1a2440', porta: '#e0b030', moldura: '#ffd54a', celeiro: '#3f5690', celTelhado: '#1a2440', friso: '#ffd54a', estrela: true },
   { id: 'real',     nome: 'Rancho Real',        desc: 'Vinho e dourado, de fazenda de novela. Exclusiva da Loja do Trevo 🍀.', trevo: 60,
     parede: '#f6e7c8', telhado: '#8a1f2a', porta: '#8a1f2a', moldura: '#e0b030', celeiro: '#9a2530', celTelhado: '#5a1018', friso: '#e0b030', estrela: true },
 ];
@@ -4668,7 +4675,7 @@ function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* sem armazenamento */ }
   applySettings();
 }
-const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde', 'Rock rural: guitarra, bateria e viola', 'Viola de raiz em terças', 'Sanfona, zabumba e triângulo'];
+const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde', 'Rock rural: guitarra, bateria e viola', 'Viola de raiz em terças', 'Sanfona, zabumba e triângulo', 'Valsa de flauta e violão ao luar'];
 // Nomes: dar o primeiro nome é de graça; trocar um nome que já existe custa 100 moedas (cada um).
 const CUSTO_NOME = 100;
 function custoNomes() {
@@ -5597,8 +5604,8 @@ const AV_CORES_CABELO = ['#2a1a10', '#5a3614', '#a8481e', '#e0b44a', '#b9b4ac'];
 const AV_OPC = {
   sexo: [['m', 'Menino'], ['f', 'Menina']],
   cabelo: [['curto', 'Curto'], ['cacheado', 'Cacheado'], ['comprido', 'Comprido'], ['rabo', 'Rabo de cavalo']],
-  chapeu: [['sem', 'Sem'], ['palha', 'Palha'], ['bone', 'Boné'], ['cowboy', 'Cowboy'], ['couro', 'Couro'], ['flores', 'Coroa de flores']],
-  mao: [['nada', 'Nada'], ['vara', 'Vara de pesca'], ['espingarda', 'Espingarda'], ['enxada', 'Enxada'], ['facao', 'Facão'], ['foice', 'Foice'], ['laco', 'Laço'], ['viola', 'Viola'], ['machado', 'Machado'], ['lampiao', 'Lampião']],
+  chapeu: [['sem', 'Sem'], ['palha', 'Palha'], ['bone', 'Boné'], ['cowboy', 'Cowboy'], ['couro', 'Couro'], ['flores', 'Coroa de flores'], ['cangaceiro', 'Cangaceiro'], ['boina', 'Boina'], ['panama', 'Panamá'], ['gorro', 'Gorro de lã']],
+  mao: [['nada', 'Nada'], ['vara', 'Vara de pesca'], ['espingarda', 'Espingarda'], ['enxada', 'Enxada'], ['facao', 'Facão'], ['foice', 'Foice'], ['laco', 'Laço'], ['viola', 'Viola'], ['machado', 'Machado'], ['lampiao', 'Lampião'], ['sanfona', 'Sanfona'], ['buque', 'Buquê'], ['regador', 'Regador dourado']],
 };
 // Roupas: cada um tem as suas (menino e menina têm peças e cores diferentes).
 const AV_ROUPAS = {
@@ -5616,7 +5623,7 @@ const AV_ROUPAS = {
 // Itens de avatar que liberam ao subir de nível (os outros já vêm liberados).
 const AV_NIVEL = { facao: 5, foice: 10, laco: 15, viola: 20, machado: 25 };
 // Itens exclusivos da Loja do Trevo (só depois de comprar com 🍀).
-const AV_TREVO = { couro: 'chapeu:couro', flores: 'chapeu:flores', lampiao: 'mao:lampiao' };
+const AV_TREVO = { couro: 'chapeu:couro', flores: 'chapeu:flores', lampiao: 'mao:lampiao', cangaceiro: 'chapeu:cangaceiro', boina: 'chapeu:boina', panama: 'chapeu:panama', gorro: 'chapeu:gorro', sanfona: 'mao:sanfona', buque: 'mao:buque', regador: 'mao:regador' };
 const avTravado = (k, id) => (k === 'mao' && AV_NIVEL[id] > (state ? state.level : 1)) || (!!AV_TREVO[id] && !temTrevoItem(AV_TREVO[id]));
 const ROUPA_PADRAO = { m: { camisa: 'xadrez', calca: 'jeans', sapato: 'bota' }, f: { camisa: 'blusa', calca: 'saia', sapato: 'sapatilha' } };
 const opcoesAvatar = (av, k) => AV_OPC[k] || AV_ROUPAS[av.sexo === 'f' ? 'f' : 'm'][k];
@@ -5644,6 +5651,24 @@ function drawChapeu(g, tipo) {
     g.fillStyle = '#3f6fa8'; g.beginPath(); g.ellipse(0, -63, 11, 8.5, 0, Math.PI, 0); g.fill(); g.fillRect(-11, -63.5, 22, 2.5);
     g.fillStyle = '#2c5282'; g.beginPath(); g.ellipse(6, -61.5, 9, 2.6, 0.05, 0, 7); g.fill();
     g.fillStyle = '#f4f1ea'; g.beginPath(); g.arc(0, -67, 2.3, 0, 7); g.fill();
+  } else if (tipo === 'cangaceiro') {
+    // chapéu de couro em meia-lua, com estrelas douradas
+    g.fillStyle = '#7a4a24'; g.beginPath(); g.moveTo(-17, -62); g.quadraticCurveTo(-12, -80, 0, -79); g.quadraticCurveTo(12, -80, 17, -62); g.quadraticCurveTo(0, -66, -17, -62); g.fill();
+    g.strokeStyle = '#4a2c14'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = '#ffd54a'; for (const [x, y] of [[0, -72], [-7, -68], [7, -68]]) { g.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 1 : 2.4; g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } g.closePath(); g.fill(); }
+  } else if (tipo === 'boina') {
+    g.fillStyle = '#8a1f2a'; g.beginPath(); g.ellipse(-2, -67, 12, 5.5, -0.15, 0, 7); g.fill();
+    g.fillStyle = '#6a1520'; g.fillRect(-9, -64.5, 18, 2);
+    g.fillStyle = '#8a1f2a'; g.beginPath(); g.arc(-2, -72.5, 1.4, 0, 7); g.fill();
+  } else if (tipo === 'panama') {
+    g.fillStyle = '#f4ecd8'; g.beginPath(); g.ellipse(0, -63, 16, 3.8, 0, 0, 7); g.fill();
+    g.beginPath(); g.roundRect(-9, -73, 18, 10, 4); g.fill();
+    g.fillStyle = '#2a2a2a'; g.fillRect(-9, -66.5, 18, 2.6);
+    g.strokeStyle = 'rgba(120,100,60,.4)'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(0, -73); g.lineTo(0, -68); g.stroke();
+  } else if (tipo === 'gorro') {
+    g.fillStyle = '#3f8ac8'; g.beginPath(); g.ellipse(0, -64, 10.5, 9, 0, Math.PI, 0); g.fill();
+    g.fillStyle = '#f4f1ea'; g.fillRect(-10.5, -65.5, 21, 3.5); g.fillRect(-10, -70, 20, 1.6);
+    g.beginPath(); g.arc(0, -74, 3, 0, 7); g.fill();
   } else if (tipo === 'couro') {
     // chapéu de couro de vaqueiro, aba larga e cordão trançado
     g.fillStyle = '#6b3f1f'; g.beginPath(); g.ellipse(0, -63, 19, 4.5, 0, 0, 7); g.fill();
@@ -5704,6 +5729,24 @@ function drawNaMao(g, tipo, t) {
     g.strokeStyle = '#7a4a1e'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(0, 9, 5, 4.2, 0, 0, 7); g.ellipse(0, 15.5, 6.4, 5.4, 0, 0, 7); g.stroke();
     g.fillStyle = '#3a2410'; g.beginPath(); g.arc(0, 11.5, 1.8, 0, 7); g.fill();
     g.strokeStyle = 'rgba(240,240,220,.8)'; g.lineWidth = 0.35; for (const x of [-0.7, 0, 0.7]) { g.beginPath(); g.moveTo(x, -13); g.lineTo(x, 18); g.stroke(); }
+    g.restore();
+  } else if (tipo === 'sanfona') {
+    // sanfona pendurada no braço
+    g.save(); g.translate(1, 20); g.rotate(-0.15);
+    g.fillStyle = '#b8203a'; g.fillRect(-9, -6, 5, 14); g.fillRect(4, -6, 5, 14);
+    g.fillStyle = '#2a2a2a'; for (let k = 0; k < 4; k++) g.fillRect(-4 + k * 2, -6, 1.2, 14);
+    g.fillStyle = '#f4f1ea'; for (let k = 0; k < 4; k++) g.fillRect(-8.5, -4.5 + k * 3.2, 3.8, 1.6);
+    g.fillStyle = '#e0b030'; g.fillRect(-9, -6.5, 18, 1); g.fillRect(-9, 7.5, 18, 1);
+    g.restore();
+  } else if (tipo === 'buque') {
+    g.fillStyle = '#4f9a2f'; g.beginPath(); g.moveTo(-2, 18); g.lineTo(2, 18); g.lineTo(5, 8); g.lineTo(-5, 8); g.closePath(); g.fill();
+    g.fillStyle = '#f4f1ea'; g.beginPath(); g.moveTo(-3, 19); g.lineTo(3, 19); g.lineTo(6, 12); g.lineTo(-6, 12); g.closePath(); g.fill();
+    for (const [x, y, c] of [[-4, 6, '#e53b2f'], [0, 4, '#ffd54a'], [4, 6, '#f06292'], [-2, 9, '#ba68c8'], [2.5, 9, '#ffffff']]) { g.fillStyle = c; g.beginPath(); g.arc(x, y, 2.4, 0, 7); g.fill(); }
+  } else if (tipo === 'regador') {
+    g.save(); g.translate(0, 22);
+    g.fillStyle = '#e0b030'; g.beginPath(); g.roundRect(-5, -6, 10, 9, 2); g.fill();
+    g.strokeStyle = '#e0b030'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(5, -2); g.lineTo(11, -7); g.stroke(); g.beginPath(); g.arc(0, -7, 3.5, Math.PI, 0); g.stroke();
+    g.fillStyle = '#fff4c0'; g.fillRect(-3.5, -4.5, 2, 5);
     g.restore();
   } else if (tipo === 'lampiao') {
     // lampião aceso pendurado na mão, com brilho que pulsa
@@ -7370,6 +7413,10 @@ const ENFEITES = [
   { id: 'roseira',    nome: 'Roseira da Dona Maria',         especial: true, vila: true, conforto: 3 },
   { id: 'peixedourado', nome: 'Estátua do Peixe Dourado', especial: true, trevo: true, conforto: 3 },
   { id: 'arcoflores',   nome: 'Arco de flores',            especial: true, trevo: true, conforto: 2 },
+  { id: 'ipe',          nome: 'Ipê-amarelo',               especial: true, trevo: true, conforto: 3 },
+  { id: 'fogueira',     nome: 'Fogueira de São João',      especial: true, trevo: true, conforto: 2 },
+  { id: 'balanco',      nome: 'Balanço de madeira',        especial: true, trevo: true, conforto: 2 },
+  { id: 'carrodeboi',   nome: 'Carro de boi',              especial: true, trevo: true, conforto: 3 },
 ];
 // Etiqueta de onde veio um item especial.
 const origemEnfeite = (e, s) => e.trevo ? 'Exclusivo da Loja do Trevo 🍀' : e.vila ? 'Presente da vila' : `Especial dos pioneiros · ${obtidoEm(s)}`;
@@ -7761,6 +7808,31 @@ function drawEnfeite(id, x, y, s, t) {
     ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.moveTo(x + 19 * s, y - 66 * s + w(3)); ctx.lineTo(x + 34 * s, y - 56 * s + w(5)); ctx.lineTo(x + 19 * s, y - 46 * s + w(3)); ctx.lineTo(x + 4 * s, y - 56 * s + w(1)); ctx.closePath(); ctx.fill();
     star(x + 19 * s, y - 56 * s + w(3), 5 * s);
+  } else if (id === 'ipe') {
+    // ipê-amarelo, a flor do cerrado, soltando pétalas
+    ctx.fillStyle = '#6b4a2a'; ctx.beginPath(); ctx.moveTo(x - 3 * s, y); ctx.lineTo(x - 1.5 * s, y - 36 * s); ctx.lineTo(x + 1.5 * s, y - 36 * s); ctx.lineTo(x + 3 * s, y); ctx.fill();
+    ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 2 * s; ctx.beginPath(); ctx.moveTo(x, y - 28 * s); ctx.lineTo(x - 12 * s, y - 40 * s); ctx.moveTo(x, y - 30 * s); ctx.lineTo(x + 13 * s, y - 42 * s); ctx.stroke();
+    for (const [dx, dy, r, c] of [[-14, -44, 11, '#f2c14e'], [13, -46, 12, '#f2c14e'], [0, -52, 13, '#ffd54a'], [-6, -40, 9, '#e8b020'], [7, -41, 9, '#ffd54a']]) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#fff4a0'; for (let k = 0; k < 8; k++) { ctx.beginPath(); ctx.arc(x + ((k * 13) % 26 - 13) * s, y - (40 + (k * 7) % 16) * s, 1.4 * s, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#ffd54a'; for (let k = 0; k < 3; k++) { const f = ((t / 3000) + k / 3) % 1; ctx.globalAlpha = 1 - f; ctx.beginPath(); ctx.ellipse(x + (k * 9 - 9 + Math.sin(f * 6 + k) * 4) * s, y - (40 - f * 38) * s, 1.8 * s, 1 * s, f * 3, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+  } else if (id === 'fogueira') {
+    ctx.fillStyle = '#9a9488'; for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2; ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 14 * s, y - 4 * s + Math.sin(a) * 4.5 * s, 3.5 * s, 2.4 * s, 0, 0, 7); ctx.fill(); }
+    ctx.strokeStyle = '#6b3f1f'; ctx.lineWidth = 3.5 * s; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - 11 * s, y - 2 * s); ctx.lineTo(x + 8 * s, y - 18 * s); ctx.moveTo(x + 11 * s, y - 2 * s); ctx.lineTo(x - 8 * s, y - 18 * s); ctx.moveTo(x, y); ctx.lineTo(x, y - 20 * s); ctx.stroke(); ctx.lineCap = 'butt';
+    for (const [c, k] of [['#e0502a', 1], ['#f2a12a', 0.72], ['#ffe08a', 0.42]]) { const f = Math.sin(t / 90 + k * 5) * 1.5; ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - 10 * k * s, y - 8 * s); ctx.quadraticCurveTo(x - 9 * k * s, y - (22 + f) * k * s - 8 * s, x + f * s, y - 36 * k * s - 6 * s); ctx.quadraticCurveTo(x + 9 * k * s, y - (22 - f) * k * s - 8 * s, x + 10 * k * s, y - 8 * s); ctx.fill(); }
+    ctx.fillStyle = '#ffd54a'; for (let k = 0; k < 4; k++) { const f = ((t / 900) + k / 4) % 1; ctx.globalAlpha = 1 - f; ctx.beginPath(); ctx.arc(x + Math.sin(k * 3 + f * 5) * 8 * s, y - (30 + f * 30) * s, 1.3 * s, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+  } else if (id === 'balanco') {
+    ctx.strokeStyle = '#8a5a33'; ctx.lineWidth = 3 * s; ctx.beginPath(); ctx.moveTo(x - 22 * s, y); ctx.lineTo(x - 15 * s, y - 44 * s); ctx.lineTo(x - 8 * s, y); ctx.moveTo(x + 8 * s, y); ctx.lineTo(x + 15 * s, y - 44 * s); ctx.lineTo(x + 22 * s, y); ctx.moveTo(x - 17 * s, y - 44 * s); ctx.lineTo(x + 17 * s, y - 44 * s); ctx.stroke();
+    const bal = Math.sin(t / 700) * 0.18; ctx.save(); ctx.translate(x, y - 44 * s); ctx.rotate(bal);
+    ctx.strokeStyle = '#c9a15a'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.moveTo(-7 * s, 0); ctx.lineTo(-7 * s, 32 * s); ctx.moveTo(7 * s, 0); ctx.lineTo(7 * s, 32 * s); ctx.stroke();
+    ctx.fillStyle = '#b07a44'; ctx.beginPath(); ctx.roundRect(-10 * s, 31 * s, 20 * s, 4 * s, 1.5 * s); ctx.fill(); ctx.restore();
+  } else if (id === 'carrodeboi') {
+    ctx.fillStyle = '#9a6a3a'; ctx.beginPath(); ctx.moveTo(x - 20 * s, y - 24 * s); ctx.lineTo(x + 14 * s, y - 24 * s); ctx.lineTo(x + 12 * s, y - 13 * s); ctx.lineTo(x - 18 * s, y - 13 * s); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#6b3f1f'; ctx.lineWidth = 1.2 * s; for (const dx of [-14, -6, 2, 10]) { ctx.beginPath(); ctx.moveTo(x + dx * s, y - 24 * s); ctx.lineTo(x + dx * s, y - 32 * s); ctx.stroke(); } ctx.beginPath(); ctx.moveTo(x - 16 * s, y - 31 * s); ctx.lineTo(x + 12 * s, y - 31 * s); ctx.stroke();
+    ctx.strokeStyle = '#6b3f1f'; ctx.lineWidth = 2.5 * s; ctx.beginPath(); ctx.moveTo(x + 13 * s, y - 16 * s); ctx.lineTo(x + 32 * s, y - 12 * s); ctx.stroke();
+    ctx.fillStyle = '#6b3f1f'; ctx.beginPath(); ctx.arc(x - 3 * s, y - 10 * s, 10 * s, 0, 7); ctx.fill(); ctx.fillStyle = '#b88350'; ctx.beginPath(); ctx.arc(x - 3 * s, y - 10 * s, 7.5 * s, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#6b3f1f'; ctx.lineWidth = 1.4 * s; for (let k = 0; k < 4; k++) { const a = k * Math.PI / 4; ctx.beginPath(); ctx.moveTo(x - 3 * s - Math.cos(a) * 7.5 * s, y - 10 * s - Math.sin(a) * 7.5 * s); ctx.lineTo(x - 3 * s + Math.cos(a) * 7.5 * s, y - 10 * s + Math.sin(a) * 7.5 * s); ctx.stroke(); }
+    ctx.fillStyle = '#6b3f1f'; ctx.beginPath(); ctx.arc(x - 3 * s, y - 10 * s, 2 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e8c35a'; ctx.beginPath(); ctx.ellipse(x - 3 * s, y - 27 * s, 15 * s, 5 * s, 0, Math.PI, 0); ctx.fill();
   } else if (id === 'peixedourado') {
     // pedestal de pedra com um dourado saltando, brilhando
     ctx.fillStyle = '#a8a294'; ctx.fillRect(x - 13 * s, y - 14 * s, 26 * s, 12 * s); ctx.fillStyle = '#c7c1b3'; ctx.fillRect(x - 15 * s, y - 17 * s, 30 * s, 4 * s); ctx.fillRect(x - 15 * s, y - 4 * s, 30 * s, 3 * s);
@@ -7782,7 +7854,7 @@ function drawEnfeite(id, x, y, s, t) {
     ctx.fillStyle = '#ffb300'; ctx.beginPath(); ctx.ellipse(x, y - 54 * s + Math.sin(t / 120) * 0.5 * s, 2 * s, 3.5 * s, 0, 0, 7); ctx.fill();
   }
 }
-const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, id === 'bandeira' ? 1.15 : id === 'espantalho' || id === 'moinho' ? 1.3 : 1.6, 0));
+const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, { bandeira: 1.15, espantalho: 1.3, moinho: 1.3, ipe: 1.2, fogueira: 1.5, balanco: 1.4, arcoflores: 1.4, peixedourado: 1.5, carrodeboi: 1.4 }[id] || 1.6, 0));
 
 // ============================================================
 // Trevos 🍀: a moeda verde. Não se compra: ganha resgatando peixes novos (no Livro de peixes),
@@ -7854,24 +7926,50 @@ const TREVO_LOJA = [
   { id: 'enfeite:peixedourado', nome: 'Estátua do Peixe Dourado',   tipo: 'Enfeite', preco: 30, desc: 'Um dourado de ouro saltando (+3% XP).' },
   { id: 'casa:trevo',           nome: 'Tema Casa do Trevo',         tipo: 'Tema',    preco: 40, desc: 'Casa e celeiro verde-menta, com trevo na fachada.' },
   { id: 'casa:real',            nome: 'Tema Rancho Real',           tipo: 'Tema',    preco: 60, desc: 'Casa e celeiro vinho com dourado.' },
+  { id: 'chapeu:cangaceiro',    nome: 'Chapéu de cangaceiro',       tipo: 'Avatar',  preco: 20, desc: 'Meia-lua de couro com estrelas douradas.' },
+  { id: 'chapeu:boina',         nome: 'Boina',                      tipo: 'Avatar',  preco: 12, desc: 'Boina vinho, charmosa.' },
+  { id: 'chapeu:panama',        nome: 'Chapéu-panamá',              tipo: 'Avatar',  preco: 15, desc: 'Branquinho, com fita preta.' },
+  { id: 'chapeu:gorro',         nome: 'Gorro de lã',                tipo: 'Avatar',  preco: 12, desc: 'Para as manhãs frias do inverno.' },
+  { id: 'mao:sanfona',          nome: 'Sanfona',                    tipo: 'Avatar',  preco: 25, desc: 'Uma sanfona pendurada no braço.' },
+  { id: 'mao:buque',            nome: 'Buquê de flores',            tipo: 'Avatar',  preco: 15, desc: 'Flores do campo na mão.' },
+  { id: 'mao:regador',          nome: 'Regador dourado',            tipo: 'Avatar',  preco: 20, desc: 'O regador de quem cuida bem da roça.' },
+  { id: 'musica:6',             nome: 'Música "Seresta ao Luar"',   tipo: 'Música',  preco: 25, desc: 'Valsa de flauta e violão, para a noite.' },
+  { id: 'enfeite:ipe',          nome: 'Ipê-amarelo',                tipo: 'Enfeite', preco: 25, desc: 'A árvore do cerrado, soltando pétalas (+3% XP).' },
+  { id: 'enfeite:fogueira',     nome: 'Fogueira de São João',       tipo: 'Enfeite', preco: 25, desc: 'Fogueira acesa com faíscas (+2% XP).' },
+  { id: 'enfeite:balanco',      nome: 'Balanço de madeira',         tipo: 'Enfeite', preco: 20, desc: 'Um balanço que vai e vem (+2% XP).' },
+  { id: 'enfeite:carrodeboi',   nome: 'Carro de boi',               tipo: 'Enfeite', preco: 35, desc: 'O carro de boi com rodas de madeira (+3% XP).' },
+  { id: 'casa:lavanda',         nome: 'Tema Casa Lavanda',          tipo: 'Tema',    preco: 40, desc: 'Casa e celeiro lilás com telhado roxo.' },
+  { id: 'casa:cerrado',         nome: 'Tema Casa do Cerrado',       tipo: 'Tema',    preco: 45, desc: 'Cor de terra, com telhado cor de ferrugem.' },
+  { id: 'casa:estrelada',       nome: 'Tema Casa Estrelada',        tipo: 'Tema',    preco: 50, desc: 'Azul da noite com detalhes dourados.' },
+  // úteis (dá para trocar quantas vezes quiser)
+  { id: 'util:camarao',   nome: '10 camarões',              tipo: 'Útil', preco: 4,  repete: true, desc: 'Isca de camarão para a pescaria.', usar: () => { iscasDe().camarao = (iscasDe().camarao || 0) + 10; } },
+  { id: 'util:artificial', nome: '5 iscas artificiais',     tipo: 'Útil', preco: 6,  repete: true, desc: 'Para tucunaré, dourado e pirarucu.', usar: () => { iscasDe().artificial = (iscasDe().artificial || 0) + 5; } },
+  { id: 'util:tarrafa',   nome: 'Tarrafa pronta agora',     tipo: 'Útil', preco: 8,  repete: true, desc: 'Seca a tarrafa na hora: pode jogar de novo.', pode: () => faltaTarrafa() > 0, naoPode: 'A tarrafa já está pronta!', usar: () => { state.tarrafaEm = 0; } },
+  { id: 'util:racao',     nome: '3 rações especiais',       tipo: 'Útil', preco: 6,  repete: true, desc: 'Cada uma faz um animal produzir em dobro.', usar: () => { state.racaoEsp = (state.racaoEsp || 0) + 3; } },
+  { id: 'util:pontos',    nome: 'Pontos de pesca descansados', tipo: 'Útil', preco: 10, repete: true, desc: 'Todos os seus pontos de pesca voltam a ter 3 pescarias.', pode: () => PONTOS.some(p => faltaPonto(p.id) > 0), naoPode: 'Seus pontos de pesca já estão prontos!', usar: () => { const pp = pontosDe(); pp.prox = {}; pp.usos = {}; } },
 ];
+const TREVO_TIPOS = ['Útil', 'Avatar', 'Enfeite', 'Tema', 'Música'];
 const musicaLiberada = k => !(window.RFAudio && window.RFAudio.exclusivas && window.RFAudio.exclusivas[k]) || temTrevoItem('musica:' + k);
 function iconeTrevoItem(it) {
   const [tipo, id] = it.id.split(':');
   if (tipo === 'casa') return casaTemaIcon(id);
   if (tipo === 'enfeite') return enfeiteIcon(id);
   return makeIcon('trevoitem:' + it.id, () => {
-    if (tipo === 'musica') { ctx.fillStyle = '#2f8a2f'; ctx.font = '56px system-ui'; ctx.textAlign = 'center'; ctx.fillText(id === '4' ? '🪕' : '🪗', 48, 70); return; }
+    if (tipo === 'musica') { ctx.fillStyle = '#2f8a2f'; ctx.font = '56px system-ui'; ctx.textAlign = 'center'; ctx.fillText({ 4: '🪕', 5: '🪗', 6: '🌙' }[id] || '🎵', 48, 70); return; }
+    if (tipo === 'util') { ctx.font = '54px system-ui'; ctx.textAlign = 'center'; ctx.fillText({ camarao: '🦐', artificial: '🎏', tarrafa: '🕸️', racao: '🌾', pontos: '🎣' }[id] || '🧺', 48, 70); return; }
     const av = Object.assign({}, avatarOk(state.avatar), tipo === 'chapeu' ? { chapeu: id } : { mao: id });
     drawAvatar(ctx, 48, 92, 1.2, av, 0, false, 1);
   });
 }
 function comprarTrevoItem(id) {
-  const it = TREVO_LOJA.find(x => x.id === id), t = trevosDe(); if (!it || t.itens[id]) return;
+  const it = TREVO_LOJA.find(x => x.id === id), t = trevosDe(); if (!it || (t.itens[id] && !it.repete)) return;
+  if (it.pode && !it.pode()) return toast(it.naoPode || 'Não precisa agora.');
   if (t.saldo < it.preco) { sfx('error'); return toast(`Faltam ${it.preco - t.saldo} 🍀 para ${it.nome}. Resgate peixes, domínio e conquistas!`, 'bad'); }
   return confirmTwice('trevo' + id, `Trocar ${it.preco} 🍀 por ${it.nome}? Toque de novo para confirmar.`, () => {
-    t.saldo -= it.preco; t.itens[id] = true;
+    t.saldo -= it.preco;
     const [tipo, x] = id.split(':');
+    if (it.repete) { it.usar(); sfx('buy'); toast(`🍀 ${it.nome}: pronto!`, 'good'); done(); renderPane(); renderTabs(); renderHUD(); return; }
+    t.itens[id] = true;
     if (tipo === 'casa') state.skins[x] = true;
     if (tipo === 'enfeite') { state.enfeites[x] = (state.enfeites[x] || 0) + 1; state.invNovos = (state.invNovos || 0) + 1; }
     sfx('buy');
@@ -7893,9 +7991,10 @@ function trevosHTML() {
       <div><div class="name">${c.nome}</div><div class="meta">${c.desc} · ${v.toLocaleString('pt-BR')}/${alvo.toLocaleString('pt-BR')}</div><div class="mbar"><i style="width:${Math.round(v / alvo * 100)}%"></i></div></div>
       ${feita ? '<button class="btn ghost" disabled>Resgatado</button>' : pronta ? `<button class="btn gold" data-trevo-conq="${c.id}">Resgatar 🍀${c.trevos}</button>` : `<button class="btn ghost" disabled>🍀 ${c.trevos}</button>`}</div>`;
   }
-  html += `<h3>Loja do Trevo 🍀</h3><p class="hint">Itens exclusivos: só se conseguem com trevos.</p>`;
-  for (const it of TREVO_LOJA) {
-    const tem = t.itens[it.id];
+  html += `<h3>Loja do Trevo 🍀</h3><p class="hint">Itens exclusivos: só se conseguem com trevos. Os úteis dá para trocar quantas vezes quiser.</p>`;
+  for (const it of TREVO_TIPOS.flatMap(tp => { const l = TREVO_LOJA.filter(x => x.tipo === tp); return l.length ? [{ cab: tp }, ...l] : []; })) {
+    if (it.cab) { html += `<p class="trevocab">${{ 'Útil': '🧺 Úteis', Avatar: '🧑‍🌾 Para o avatar', Enfeite: '🌼 Enfeites', Tema: '🏡 Temas da casa', 'Música': '🎵 Músicas' }[it.cab]}</p>`; continue; }
+    const tem = t.itens[it.id] && !it.repete;
     html += `<div class="row ${tem ? 'sel' : ''}"><img alt="" src="${iconeTrevoItem(it)}"><div><div class="name">${it.nome} <span class="tag">${it.tipo}</span></div><div class="meta">${it.desc}</div></div>
       ${tem ? '<button class="btn ghost" disabled>Já é seu</button>' : `<button class="btn gold" data-trevo-comprar="${it.id}" ${t.saldo < it.preco ? 'disabled' : ''}>🍀 ${it.preco}</button>`}</div>`;
   }

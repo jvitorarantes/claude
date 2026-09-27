@@ -237,6 +237,20 @@
         [[N.D5, 6], [0, 2]],
       ],
     },
+    { // Exclusiva da Loja do Trevo: valsa de flauta e violão, para a noite
+      nome: 'Seresta ao Luar', bpm: 74, steps: 6, lead: 'flute', waltz: true, trevo: true,
+      chords: [[48, 60, 64, 67], [45, 60, 64, 69], [41, 60, 65, 69], [43, 59, 62, 67], [48, 60, 64, 67], [40, 59, 64, 67], [41, 60, 65, 69], [43, 59, 62, 67]],
+      melody: [
+        [[N.E5, 2], [N.G5, 2], [N.C6, 2]],
+        [[N.A5, 4], [N.E5, 2]],
+        [[N.F5, 2], [N.A5, 2], [N.C6, 2]],
+        [[N.B5, 4], [N.G5, 2]],
+        [[N.E5, 2], [N.G5, 2], [N.C6, 2]],
+        [[N.B5, 3], [N.A5, 1], [N.G5, 2]],
+        [[N.A5, 2], [N.F5, 2], [N.D5, 2]],
+        [[N.C5, 6]],
+      ],
+    },
   ];
   // Terça abaixo dentro de ré maior (a "segunda voz" da viola).
   const D_MAJOR = [2, 4, 6, 7, 9, 11, 1];
