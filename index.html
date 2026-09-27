@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="88">
-<script src="firebase-config.js?v=88"></script>
+<meta name="rf-version" content="89">
+<script src="firebase-config.js?v=89"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -277,7 +277,7 @@
   @keyframes encher { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   /* Na roça de outra pessoa só ficam os botões que servem lá */
   .visitando .menu .tab:not([data-tab=amigos]):not([data-tab=fabrica]), .visitando #giftBtn, .visitando #moveBtn { display: none !important; }
-  .toasts { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; z-index: 8; pointer-events: none; width: max-content; max-width: 90%; }
+  .toasts { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; z-index: 40; pointer-events: none; width: max-content; max-width: 90%; }
   .toast {
     background: #fffbe8; color: #2f2a1f; border: 3px solid var(--wood-2);
     border-radius: 12px; padding: 4px 12px; font-weight: 700; text-align: center;
@@ -875,8 +875,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=88"></script>
-<script src="js/cloud.js?v=88"></script>
-<script src="js/game.js?v=88"></script>
+<script src="js/audio.js?v=89"></script>
+<script src="js/cloud.js?v=89"></script>
+<script src="js/game.js?v=89"></script>
 </body>
 </html>

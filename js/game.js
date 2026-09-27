@@ -523,6 +523,8 @@ const sfx = name => { if (window.RFAudio) window.RFAudio.play(name); };
 const comfort = s => DECOR.reduce((t, d) => t + (emUso(s, d.id) ? emUso(s, d.id).conforto : 0), 0) + confortoEnfeites(s);
 const firstName = n => (n || '').split(' ')[0] || 'Você';
 
+// A caixa de avisos fica no topo da página (por cima das janelas abertas, como a pescaria).
+(() => { const t = document.getElementById('toasts'); if (t && t.parentElement !== document.body) document.body.appendChild(t); })();
 function toast(msg, kind = '') {
   const el = document.createElement('div');
   el.className = 'toast ' + kind; el.textContent = msg;
@@ -6412,7 +6414,13 @@ function lancar() {
     pesca = { fase: 'esperando', t0: agora, isca, ponto: pt.id, mordida: agora + 1800 + Math.random() * 3800, beliscos: [agora + 700 + Math.random() * 900] };
     sfx('water'); return renderPesca();
   }
-  if (qtdIsca(isca) <= 0) return toast(def.doCeleiro ? 'Sem milho no celeiro! Colha milho para usar de isca.' : `Acabou a isca de ${def.nome.toLowerCase()}! Compre mais aqui embaixo${isca === 'minhoca' ? ' (ou ganhe 5 grátis amanhã)' : ''}.`, 'bad');
+  if (qtdIsca(isca) <= 0) {
+    // o aviso aparece dentro da própria janela da pescaria (antes ia para um aviso escondido atrás dela)
+    const temOutra = ISCAS.find(i => i.id !== isca && i.nivel <= state.level && qtdIsca(i.id) > 0);
+    pesca = { fase: 'pronto', t0: performance.now(), aviso: (def.doCeleiro ? '🌽 Sem milho no celeiro! Colha milho para usar de isca.' : `🪱 Acabou a isca de ${def.nome.toLowerCase()}!${isca === 'minhoca' ? ' Amanhã chegam 5 minhocas grátis.' : ''} Compre mais aqui embaixo.`)
+      + (temOutra ? ` Ou use ${temOutra.emoji} ${temOutra.nome.toLowerCase()} (você tem ${qtdIsca(temOutra.id)}).` : '') + (temPonto('solte') ? ' No 🔄 Pesque e Solte dá para pescar sem isca.' : '') };
+    sfx('error'); return renderPesca();
+  }
   if (def.doCeleiro) { state.barn[def.doCeleiro]--; if (!state.barn[def.doCeleiro]) delete state.barn[def.doCeleiro]; } else iscasDe()[isca]--;
   save();
   const agora = performance.now();
@@ -6518,7 +6526,7 @@ function renderPesca() {
   const btn = $('#pescaBtn'), msg = $('#pescaMsg');
   const pt = PONTO[pontoSel()], descansa = faltaPonto(pt.id), livre = pesca.fase === 'pronto' || pesca.fase === 'resultado';
   btn.textContent = pesca.fase === 'esperando' ? 'Esperando…' : pesca.fase === 'fisgou' ? 'PUXA! 🎣' : pesca.fase === 'brigando' ? `PUXA no verde! 🟢 ${pesca.acertos}/${pesca.precisa}` : pesca.fase === 'tarrafa' ? 'Puxando a rede…'
-    : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : `${pesca.fase === 'resultado' ? 'Lançar de novo' : 'Lançar a linha'}${pt.solte ? '' : ` (${restamVara(pt.id)}/${VARA_POR_VEZ})`}`;
+    : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : !pt.solte && qtdIsca(iscaSel()) <= 0 ? `Sem isca ${ISCA[iscaSel()].emoji}` : `${pesca.fase === 'resultado' ? 'Lançar de novo' : 'Lançar a linha'}${pt.solte ? '' : ` (${restamVara(pt.id)}/${VARA_POR_VEZ})`}`;
   btn.disabled = livre && !!descansa;
   const tb = $('#pescaTarrafa'), ft = faltaTarrafa();
   setHtml(tb, ft ? `🕸️ Tarrafa<br><small>em ${fmt(ft / 1000)}</small>` : `🕸️ Tarrafa<br><small>pega ${TARRAFA_N} peixes</small>`);
@@ -6538,6 +6546,7 @@ function renderPesca() {
   btn.classList.toggle('gold', pesca.fase === 'fisgou' || pesca.fase === 'pronto' || pesca.fase === 'resultado' || pesca.fase === 'brigando');
   msg.textContent = pesca.fase === 'tarrafa' ? 'Lá vai a tarrafa… 🕸️'
     : pesca.fase === 'brigando' ? `Fisgou! 🐟 Toque quando o anel ficar VERDE. Faltam ${pesca.precisa - pesca.acertos} puxada${pesca.precisa - pesca.acertos > 1 ? 's' : ''}.${pesca.erros ? ` (${pesca.erros} erro${pesca.erros > 1 ? 's' : ''} seguido${pesca.erros > 1 ? 's' : ''}: com 3, ele escapa)` : ''}`
+    : pesca.fase === 'pronto' && pesca.aviso ? pesca.aviso
     : pesca.fase === 'pronto' && descansa ? `${pt.nome} está descansando. Escolha outro ponto ou jogue a tarrafa!`
     : pesca.fase === 'pronto' && pt.solte ? `🔄 Pesque e Solte: pesque quanto quiser, sem gastar isca! Cada peixe é solto de volta no rio e dá só ${SOLTE_MOEDAS} moedas e ${SOLTE_XP} XP — não vai para o celeiro, o livro, as conquistas nem as missões.`
     : pesca.fase === 'pronto' ? `${pt.emoji} ${pt.nome}: ${VARA_POR_VEZ} pescarias por vez. Toque em "Lançar a linha" e espere a boia afundar. Aí, puxe rápido!`
