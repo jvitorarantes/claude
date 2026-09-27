@@ -4282,6 +4282,8 @@ $('#pane').addEventListener('click', e => {
   if (d.temaRoca) return buyTema(d.temaRoca);
   if (d.casaTema) return usarCasaTema(d.casaTema);
   if (d.trevoConq) { resgatarConquista(d.trevoConq); return renderPane(); }
+  if (d.trevoTodos) { resgatarTodosPeixes(); return renderPane(); }
+  if (d.trevoDominio) { resgatarDominio(); return renderPane(); }
   if (d.trevoComprar) return comprarTrevoItem(d.trevoComprar);
   if (d.abrirTrevos) { missSeg = 'trevos'; return openPanel('missoes'); }
   if (d.irLojaTrevo) return openPanel('loja', 'trevo');
@@ -7929,7 +7931,8 @@ function trevosDoPeixe(p) {
 }
 const peixesAResgatar = () => PEIXES_REAIS().filter(p => trevosDoPeixe(p) > 0);
 const dominioAResgatar = () => { const nv = dominio().nv, r = []; for (let n = 2; n <= nv; n++) if (!trevosDe().dominio[n]) r.push(n); return r; };
-const trevosPendentes = () => !state ? 0 : peixesAResgatar().length + dominioAResgatar().length + CONQUISTAS.filter(conqPronta).length;
+// conta as linhas de "Para resgatar" (todos os peixes juntos são uma linha, o domínio é outra, e cada conquista)
+const trevosPendentes = () => !state ? 0 : (peixesAResgatar().length ? 1 : 0) + (dominioAResgatar().length ? 1 : 0) + CONQUISTAS.filter(conqPronta).length;
 function ganharTrevos(n, motivo) {
   if (!n) { done(); renderTabs(); return; }
   trevosDe().saldo += n; sfx('level');
@@ -8019,19 +8022,34 @@ function comprarTrevoItem(id) {
   });
 }
 function trevosHTML() {
-  const t = trevosDe(), pp = peixesAResgatar(), dd = dominioAResgatar();
+  const t = trevosDe(), pp = peixesAResgatar(), dd = dominioAResgatar(), prontas = CONQUISTAS.filter(conqPronta);
   let html = `<div class="row sel"><div class="avatar" style="background:#2f8a2f;font-size:26px">🍀</div><div><div class="name">Você tem ${t.saldo} trevo${t.saldo === 1 ? '' : 's'}</div>
-    <div class="meta">A moeda verde da roça. Ganhe resgatando peixes novos no 📖 Livro de peixes, os níveis do domínio de pesca e as conquistas abaixo. Troque por itens exclusivos.</div></div><div></div></div>`;
-  if (pp.length || dd.length) html += `<div class="row"><div class="avatar" style="background:#3f8ac8;font-size:24px">🎣</div><div><div class="name">Para resgatar na pescaria</div>
-    <div class="meta">${pp.length ? `${pp.length} peixe${pp.length > 1 ? 's' : ''} no livro` : ''}${pp.length && dd.length ? ' · ' : ''}${dd.length ? `domínio de pesca (${dd.length} nível${dd.length > 1 ? 'is' : ''})` : ''}</div></div>
-    <button class="btn gold" data-abrir-livro="1">Abrir o livro</button></div>`;
-  html += `<h3>Conquistas</h3>`;
-  for (const c of CONQUISTAS) {
+    <div class="meta">A moeda verde da roça. Ganhe resgatando peixes no 📖 Livro de peixes, o domínio de pesca, as conquistas e completando as missões. Troque por itens exclusivos na Loja › 🍀 Trevo.</div></div><div></div></div>`;
+  // o que tem para resgatar vem sempre primeiro, com o botão ali mesmo
+  const total = trevosPendentes();
+  html += `<h3>Para resgatar${total ? ` (${total})` : ''}</h3>`;
+  if (!total) html += `<div class="empty">Nada para resgatar agora. Continue pescando e jogando! 🌱</div>`;
+  if (pp.length) {
+    const soma = pp.reduce((n, p) => n + trevosDoPeixe(p), 0);
+    html += `<div class="row sel"><div class="avatar" style="background:#3f8ac8;font-size:24px">🐟</div><div><div class="name">Peixes do livro</div>
+      <div class="meta">${pp.map(p => `${esc(p.nome)}${estrelasDe(p) ? ' ' + '★'.repeat(estrelasDe(p)) : ''}`).join(', ')}</div></div>
+      <button class="btn gold" data-trevo-todos="1">Resgatar 🍀${soma}</button></div>`;
+  }
+  if (dd.length) html += `<div class="row sel"><div class="avatar" style="background:#e0a800;font-size:24px">🎖️</div><div><div class="name">Domínio de pesca</div>
+      <div class="meta">Nível ${dd.length > 1 ? `${dd[0]} a ${dd[dd.length - 1]}` : dd[0]}</div></div>
+      <button class="btn gold" data-trevo-dominio="1">Resgatar 🍀${dd.reduce((n, x) => n + (TREVO_DOMINIO[x] || 0), 0)}</button></div>`;
+  const linhaConq = c => {
     const alvo = alvoDe(c), v = Math.min(alvo, c.valor()), feita = trevosDe().conq[c.id], pronta = conqPronta(c);
-    html += `<div class="row ${pronta ? 'sel' : ''}"><div class="avatar" style="background:${feita ? '#b7b39c' : '#2f8a2f'};font-size:20px">${feita ? '✔' : '🏅'}</div>
+    return `<div class="row ${pronta ? 'sel' : ''}"><div class="avatar" style="background:${feita ? '#b7b39c' : '#2f8a2f'};font-size:20px">${feita ? '✔' : '🏅'}</div>
       <div><div class="name">${c.nome}</div><div class="meta">${c.desc} · ${v.toLocaleString('pt-BR')}/${alvo.toLocaleString('pt-BR')}</div><div class="mbar"><i style="width:${Math.round(v / alvo * 100)}%"></i></div></div>
       ${feita ? '<button class="btn ghost" disabled>Resgatado</button>' : pronta ? `<button class="btn gold" data-trevo-conq="${c.id}">Resgatar 🍀${c.trevos}</button>` : `<button class="btn ghost" disabled>🍀 ${c.trevos}</button>`}</div>`;
-  }
+  };
+  for (const c of prontas) html += linhaConq(c);
+  // as outras conquistas: primeiro as em andamento (mais perto do fim antes), depois as já resgatadas
+  const falta = CONQUISTAS.filter(c => !conqPronta(c) && !trevosDe().conq[c.id]).sort((a, b) => b.valor() / alvoDe(b) - a.valor() / alvoDe(a));
+  const feitas = CONQUISTAS.filter(c => trevosDe().conq[c.id]);
+  if (falta.length) html += `<h3>Conquistas em andamento</h3>` + falta.map(linhaConq).join('');
+  if (feitas.length) html += `<h3>Conquistas resgatadas</h3>` + feitas.map(linhaConq).join('');
   html += `<div class="row"><div class="avatar" style="background:#2f8a2f;font-size:24px">🛍️</div><div><div class="name">Loja do Trevo</div><div class="meta">Os itens exclusivos ficam na Loja, na aba 🍀 Trevo.</div></div><button class="btn gold" data-ir-loja-trevo="1">Abrir</button></div>`;
   return html;
 }
