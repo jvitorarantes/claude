@@ -5275,6 +5275,82 @@ function drawCarroca(g, x, y, s, t, andando) {
   }
   g.restore();
 }
+// ---------- Entrega do caminhão (3 s): o avatar leva a caixa até o caminhão e ele vai embora ----------
+const ENTREGA_MS = 3000;
+function mostrarEntrega(msg) {
+  const el = $('#loading'); if (!el) return toast(msg, 'good');
+  $('#loadingTxt').textContent = 'Carregando o caminhão…';
+  const bar = el.querySelector('.loadbar i'); bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
+  const ini = performance.now(), ativo = viagem;
+  viagem = { ini, fim: ini + ENTREGA_MS, cena: 'caminhao', nome: '', volta: false, espera: false };
+  el.hidden = false; clearTimeout(carregaTimer);
+  if (!ativo) requestAnimationFrame(drawViagem);
+  setTimeout(() => sfx('coin'), ENTREGA_MS * 0.55);
+  carregaTimer = setTimeout(() => { fecharCarregando(); toast(msg, 'good'); }, ENTREGA_MS);
+}
+function drawCaixa(g, x, y, s) {
+  g.fillStyle = '#c98a4b'; g.strokeStyle = '#6b3f1f'; g.lineWidth = 1.2 * s;
+  g.beginPath(); g.roundRect(x - 9 * s, y - 16 * s, 18 * s, 16 * s, 2 * s); g.fill(); g.stroke();
+  g.fillStyle = '#e8c65a'; g.fillRect(x - 2 * s, y - 16 * s, 4 * s, 16 * s);
+  g.strokeStyle = 'rgba(107,63,31,.5)'; g.beginPath(); g.moveTo(x - 9 * s, y - 8 * s); g.lineTo(x + 9 * s, y - 8 * s); g.stroke();
+}
+function drawCaminhaoLado(g, x, y, s, t, andando, carga) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  // carroceria (atrás, à esquerda) e cabine (à frente, à direita)
+  g.fillStyle = '#7a4a24'; g.fillRect(-58, -30, 62, 20);
+  g.fillStyle = '#a86b38'; g.fillRect(-58, -34, 62, 5); g.fillRect(-58, -30, 4, 20); g.fillRect(0, -30, 4, 20);
+  for (let k = 0; k < carga; k++) drawCaixa(g, -46 + (k % 3) * 18, -30 - Math.floor(k / 3) * 15, 0.9);
+  g.fillStyle = '#d8402f'; g.beginPath(); g.roundRect(4, -44, 30, 34, 5); g.fill();
+  g.fillStyle = '#bfe6ff'; g.beginPath(); g.roundRect(14, -40, 16, 12, 3); g.fill();
+  g.fillStyle = '#a53325'; g.fillRect(4, -18, 32, 6);
+  g.fillStyle = '#ffe08a'; g.beginPath(); g.arc(34, -16, 2.5, 0, 7); g.fill();
+  g.fillStyle = '#5a646b'; g.fillRect(-60, -12, 98, 4);
+  for (const wx of [-40, 22]) {
+    g.save(); g.translate(wx, -6); g.rotate(andando ? t / 90 : 0);
+    g.fillStyle = '#2a2a2a'; g.beginPath(); g.arc(0, 0, 8, 0, 7); g.fill();
+    g.fillStyle = '#9aa3aa'; g.beginPath(); g.arc(0, 0, 3.5, 0, 7); g.fill();
+    g.fillStyle = '#2a2a2a'; g.fillRect(-0.8, -3.5, 1.6, 7);
+    g.restore();
+  }
+  if (andando) { // fumacinha do escapamento
+    g.fillStyle = 'rgba(160,160,160,.5)';
+    for (let j = 0; j < 3; j++) { const a = (t / 250 + j / 3) % 1; g.beginPath(); g.arc(-64 - a * 18, -10 - a * 8, 3 + a * 5, 0, 7); g.fill(); }
+  }
+  g.restore();
+}
+function drawEntrega(g, cw, ch, estrada, t) {
+  const k = clamp((t - viagem.ini) / (viagem.fim - viagem.ini), 0, 1), esc = clamp(cw / 420, 0.75, 1.5);
+  const suave = v => v < 0.5 ? 2 * v * v : 1 - (-2 * v + 2) ** 2 / 2;
+  // celeiro de onde sai a caixa
+  const bx = Math.max(40, cw * 0.1);
+  g.fillStyle = '#c8402f'; g.fillRect(bx - 26, estrada - 50, 52, 36);
+  g.fillStyle = '#7a2a1e'; g.beginPath(); g.moveTo(bx - 32, estrada - 48); g.lineTo(bx, estrada - 72); g.lineTo(bx + 32, estrada - 48); g.fill();
+  g.strokeStyle = '#fff'; g.lineWidth = 2; g.strokeRect(bx - 10, estrada - 34, 20, 20);
+  g.beginPath(); g.moveTo(bx - 10, estrada - 34); g.lineTo(bx + 10, estrada - 14); g.moveTo(bx + 10, estrada - 34); g.lineTo(bx - 10, estrada - 14); g.stroke();
+  // caminhão: parado até 60% do tempo, depois acelera para a direita
+  const parado = cw * 0.64, saida = k < 0.6 ? 0 : suave((k - 0.6) / 0.4) * (cw * 0.75);
+  const tx = parado + saida, ty = estrada + 8;
+  const guardou = k >= 0.5;
+  drawCaminhaoLado(g, tx, ty, esc, t, k >= 0.6, 3 + (guardou ? 1 : 0));
+  // avatar: anda até a traseira do caminhão levando a caixa, põe a caixa e acena
+  const ax0 = bx + 34, ax1 = parado - 70 * esc;
+  const ak = clamp(k / 0.4, 0, 1), ax = ax0 + (ax1 - ax0) * suave(ak), andando = k < 0.4;
+  const as = 0.8 * esc, ay = estrada + 10;
+  g.fillStyle = 'rgba(0,0,0,.15)'; g.beginPath(); g.ellipse(ax, ay, 12 * esc, 3.5 * esc, 0, 0, 7); g.fill();
+  drawAvatar(g, ax, ay, as, state && state.avatar, t, andando, 1);
+  if (!guardou) {
+    // caixa nas mãos; entre 40% e 50% ela sobe até a carroceria
+    const lk = clamp((k - 0.4) / 0.1, 0, 1);
+    const cx0 = ax, cy0 = ay - 66 * as, cx1 = tx - 28 * esc, cy1 = ty - 30 * esc - 15 * esc;
+    drawCaixa(g, cx0 + (cx1 - cx0) * lk, cy0 + (cy1 - cy0) * lk - Math.sin(lk * Math.PI) * 14 * esc, esc);
+  } else if (k > 0.6) {
+    // acena para o caminhão
+    g.strokeStyle = AV_PELE[avatarOk(state && state.avatar).pele]; g.lineWidth = 3.5 * as; g.lineCap = 'round';
+    const w = Math.sin(t / 110) * 0.5;
+    g.beginPath(); g.moveTo(ax + 10 * as, ay - 40 * as); g.lineTo(ax + 18 * as + w * 6 * as, ay - 60 * as); g.stroke(); g.lineCap = 'butt';
+  }
+  if (k > 0.52 && k < 0.7) { g.font = `800 ${Math.round(14 * esc)}px system-ui, sans-serif`; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.4)'; g.strokeText('+ moedas!', tx - 20 * esc, ty - 70 * esc - (k - 0.52) * 60); g.fillStyle = '#ffe08a'; g.fillText('+ moedas!', tx - 20 * esc, ty - 70 * esc - (k - 0.52) * 60); }
+}
 function drawViagem() {
   const c = $('#loadCv'); if (!c || !viagem || $('#loading').hidden) { viagem = null; return; }
   const dpr = Math.min(2, window.devicePixelRatio || 1), cw = c.clientWidth, ch = c.clientHeight;
@@ -5292,6 +5368,7 @@ function drawViagem() {
   const estrada = ch * 0.78;
   g.fillStyle = '#d8b67a'; g.fillRect(0, estrada - 10, cw, 22);
   g.fillStyle = '#c29a5c'; for (let x = 8; x < cw; x += 34) g.fillRect(x, estrada, 14, 2.5);
+  if (viagem.cena === 'caminhao') { drawEntrega(g, cw, ch, estrada, t); requestAnimationFrame(drawViagem); return; }
   // as duas roças, uma em cada ponta
   const casa = (x, cor, telhado, nome) => {
     g.fillStyle = cor; g.fillRect(x - 24, estrada - 44, 48, 30);
@@ -5626,9 +5703,8 @@ function entregar(k) {
   for (const [id, q] of Object.entries(p.itens)) { state.barn[id] -= q; if (!state.barn[id]) delete state.barn[id]; }
   p.feito = true;
   state.coins += p.moedas; addXP(p.xp, null); track('entregar');
-  sfx('coin');
-  toast(`O caminhão levou o pedido! +${p.moedas.toLocaleString('pt-BR')} moedas e +${p.xp} XP.`, 'good');
   done();
+  mostrarEntrega(`O caminhão levou o pedido! +${p.moedas.toLocaleString('pt-BR')} moedas e +${p.xp} XP.`);
 }
 
 // ---------- Tela da fábrica (com a banca e o caminhão) ----------
