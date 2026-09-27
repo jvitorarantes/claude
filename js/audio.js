@@ -102,6 +102,49 @@
     s.start(t, Math.random() * 0.5); s.stop(t + 0.1);
   }
 
+  // ---------- Rock rural: guitarra com distorção, bateria e baixo ----------
+  let distIn = null;
+  function distorcao() {
+    if (distIn && distIn.context === ac) return distIn;
+    const ws = ac.createWaveShaper(), n = 1024, curva = new Float32Array(n), k = 28;
+    for (let i = 0; i < n; i++) { const x = i * 2 / n - 1; curva[i] = (1 + k) * x / (1 + k * Math.abs(x)); }
+    ws.curve = curva; ws.oversample = '2x';
+    const f = lowpass(2800, 0.9), g = ac.createGain(); g.gain.value = 0.3;
+    ws.connect(f); f.connect(g); g.connect(musicBus);
+    return (distIn = ws);
+  }
+  // Power chord (tônica, quinta e oitava); "abafado" é a palhetada com a mão na ponte.
+  function guitarra(t, m, dur, vel = 0.1, abafado = false) {
+    const g = ac.createGain(); g.connect(distorcao());
+    const end = t + dur;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(abafado ? 0.0001 : vel * 0.5, abafado ? t + 0.12 : end); g.gain.linearRampToValueAtTime(0.0001, end + 0.05);
+    for (const [iv, dt] of [[0, -6], [7, 5], [12, 0]]) osc('sawtooth', mtof(m + iv), t, end + 0.08, g, dt);
+  }
+  function solo(t, m, dur, vel = 0.07) {
+    const g = ac.createGain(); g.connect(distorcao());
+    const end = t + dur;
+    env(g, t, 0.01, vel, 0.1, 0.7, 0.08, end);
+    const o = osc('square', mtof(m), t, end + 0.12, g), o2 = osc('sawtooth', mtof(m), t, end + 0.12, g, 8);
+    const lfo = ac.createOscillator(), lg = ac.createGain();
+    lfo.frequency.value = 6; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(mtof(m) * 0.012, t + Math.min(0.3, dur));
+    lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency); lfo.start(t); lfo.stop(end + 0.12);
+  }
+  function bumbo(t, vel = 0.5) {
+    const g = ac.createGain(); g.connect(musicBus);
+    g.gain.setValueAtTime(vel, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    const o = osc('sine', 120, t, t + 0.3, g); o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.18);
+  }
+  function caixa(t, vel = 0.18) {
+    const s = ac.createBufferSource(); s.buffer = noiseBuf;
+    const b = ac.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = 1900; b.Q.value = 0.8;
+    const g = ac.createGain(); s.connect(b); b.connect(g); g.connect(musicBus);
+    g.gain.setValueAtTime(vel, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    s.start(t, Math.random() * 0.5); s.stop(t + 0.2);
+    const tg = ac.createGain(); tg.connect(musicBus); tg.gain.setValueAtTime(vel * 0.5, t); tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+    osc('triangle', 190, t, t + 0.1, tg);
+  }
+
   // ---------- As músicas ----------
   // Cada compasso: acorde (notas MIDI) + melodia [nota, duração em colcheias] (0 = pausa).
   const N = { C4: 60, D4: 62, E4: 64, F4: 65, Fs4: 66, G4: 67, A4: 69, B4: 71, C5: 72, Cs5: 73, D5: 74, E5: 76, F5: 77, Fs5: 78, G5: 79, A5: 81, B5: 83, C6: 84 };
@@ -150,6 +193,20 @@
         [[N.D5, 8]],
       ],
     },
+    { // Rock rural: guitarra, bateria, baixo e viola fazendo a segunda voz, 4/4
+      nome: 'Rock na Porteira', bpm: 132, steps: 8, lead: 'rock', rock: true,
+      chords: [[40], [36], [43], [38], [40], [36], [38], [40]],
+      melody: [
+        [[N.E5, 1], [N.G5, 1], [N.A5, 2], [N.G5, 1], [N.E5, 1], [N.D5, 2]],
+        [[N.E5, 3], [N.G5, 1], [N.E5, 2], [0, 2]],
+        [[N.D5, 1], [N.D5, 1], [N.G5, 2], [N.A5, 2], [N.B5, 2]],
+        [[N.A5, 4], [N.Fs5, 2], [N.D5, 2]],
+        [[N.B5, 2], [N.A5, 1], [N.G5, 1], [N.A5, 2], [N.B5, 2]],
+        [[N.G5, 2], [N.E5, 2], [N.G5, 2], [N.A5, 2]],
+        [[N.Fs5, 2], [N.A5, 2], [N.D5, 2], [N.E5, 2]],
+        [[N.E5, 6], [0, 2]],
+      ],
+    },
   ];
   // Terça abaixo dentro de ré maior (a "segunda voz" da viola).
   const D_MAJOR = [2, 4, 6, 7, 9, 11, 1];
@@ -178,6 +235,30 @@
       const ch = tr.chords[bar];
       // A melodia descansa de vez em quando (a cada 3ª volta) para a música respirar.
       const withMelody = loop % 3 !== 2;
+      if (tr.rock) {
+        // bateria: bumbo no 1, no "e" do 2 e no 3; caixa no 2 e no 4; chimbal em todas as colcheias
+        if (s === 0 || s === 3 || s === 4) bumbo(t);
+        if (s === 2 || s === 6) caixa(t);
+        shaker(musicBus, t, s % 2 ? 0.025 : 0.045);
+        bass(musicBus, t, ch[0] - 12, eighth * 0.9, 0.17);
+        // guitarra: acento no 1 e na síncope, o resto abafado
+        const acento = s === 0 || s === 3 || s === 6;
+        guitarra(t, ch[0] + 12, acento ? eighth * (s === 6 ? 2 : 1.5) : eighth * 0.9, acento ? 0.11 : 0.07, !acento);
+        if (withMelody) {
+          let pos = 0;
+          for (const [m, len] of tr.melody[bar]) {
+            if (pos === s && m) {
+              const d = len * eighth;
+              if (loop % 3 === 1) solo(t, m, d * 0.95);          // na 2ª volta, a guitarra sola
+              else { pluck(musicBus, t, m, d, 0.14, 4000); pluck(musicBus, t + 0.012, thirdBelow(m), d, 0.1, 3400); } // a viola em terças
+            }
+            pos += len;
+          }
+        }
+        nextTime += eighth; step++;
+        if (step >= total) { step = 0; loop++; }
+        continue;
+      }
       if (s === 0) bass(musicBus, t, ch[0] - 12 + (tr.waltz ? 12 : 0), eighth * (tr.waltz ? 2 : 3));
       if (!tr.waltz && s === 4) bass(musicBus, t, ch[0] - 5, eighth * 3, 0.1); // a quinta, uma oitava abaixo
       if (tr.waltz) {

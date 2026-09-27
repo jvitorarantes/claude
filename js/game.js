@@ -151,6 +151,8 @@ const drawKind = a => ANIMAL[a.k].desenho || a.k;
 const lifeLeft = a => ANIMAL[a.k].tipo === 'prod' ? a.born + ANIMAL[a.k].periodo * DAY - Date.now() : Infinity;
 const isTired = () => false;
 // Vender um animal vale bem menos que a compra, e cai um pouco a cada dia que passa.
+// Quanto o animal vale na venda: adulto de cria vale o preço cheio; filhote e bicho de companhia, parte da compra.
+const precoVenda = a => { const d = ANIMAL[a.k]; return d.tipo === 'prod' ? sellPrice(a) : isAdult(a) ? d.venda : Math.max(1, Math.round(d.custo * (d.tipo === 'cria' ? 0.5 : 0.4))); };
 const sellPrice = a => { const d = ANIMAL[a.k]; return Math.max(1, Math.round(d.custo * 0.4 * clamp(lifeLeft(a) / (d.periodo * DAY), 0, 1))); };
 function vida(ms) {
   if (ms >= DAY) { const n = Math.floor(ms / DAY); return `${n} ${n > 1 ? 'dias' : 'dia'}`; }
@@ -543,6 +545,7 @@ function addXP(n, pos) {
     const bonus = state.level * 50; state.coins += bonus;
     const novas = [...CROPS, ...ANIMALS, ...DECOR].filter(c => c.nivel === state.level).map(c => c.nome);
     if (filaMax(state.level) > filaMax(state.level - 1)) novas.push('1 espaço a mais na fábrica');
+    for (const [id, n] of AV_OPC.mao) if (AV_NIVEL[id] === state.level) { novas.push(`${n.toLowerCase()} para o avatar (⚙️ › Seu avatar)`); addNews(`🎁 Item novo para o avatar: ${n}! Coloque na mão dele em ⚙️ › Seu avatar.`); }
     toast(`Nível ${state.level}! +${bonus} moedas` + (novas.length ? ` · novidades: ${novas.join(', ')}` : ''), 'good');
   }
 }
@@ -914,6 +917,9 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 69, txt: 'Venda animais direto no abrigo: clique na casa deles, e cada bicho da lista tem o botão Vender.' },
+  { v: 69, txt: 'Itens novos para o avatar que liberam por nível: facão (5), foice (10), laço (15), viola (20) e machado (25). Escolha em ⚙️ › Seu avatar › Na mão.' },
+  { v: 69, txt: 'Música nova: "Rock na Porteira", um rock rural com guitarra, bateria e viola. Troque em ⚙️ › Música.' },
   { v: 68, txt: 'Dá para trocar o nome de todos os animais e dos cachorros por 50 moedas: toque em Nome no abrigo, na Loja › Animais ou na Loja › Cachorros. O nome de quem acabou de chegar continua de graça.' },
   { v: 67, txt: 'Visitas mais vivas: na roça dos amigos (e do Seu Zé e da Dona Maria), o avatar do dono também passeia. Clique nele para ouvir o que ele tem a dizer!' },
   { v: 66, txt: 'Nomes: dar o primeiro nome para a fazenda e para o avatar continua grátis; para trocar um nome depois, custa 100 moedas (em ⚙️ › Nomes).' },
@@ -992,8 +998,10 @@ function abrigoHTML() {
     const d = ANIMAL[a.k];
     const st = d.tipo === 'prod' ? (a.ready ? 'produto pronto!' : a.fed ? 'produzindo' : 'com fome') + ` · vive mais ${vida(lifeLeft(a))}`
       : d.tipo === 'cria' ? (isAdult(a) ? 'adulto, pronto para vender' : `crescendo · falta ${fmt(d.tempo - a.g)}`) : 'companhia';
+    const armed = buyPending && buyPending.i === 'venda' + a.id && performance.now() < buyPending.until;
     html += `<div class="row"><img alt="" src="${animalIcon(d.id)}"><div><div class="name">${esc(a.nome || d.nome)}</div><div class="meta">${d.nome} · ${st}</div></div>
-      <button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${CUSTO_NOME_BICHO}</small></button></div>`;
+      <div class="stack"><button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${CUSTO_NOME_BICHO}</small></button>
+      <button class="btn ${armed ? 'danger' : isAdult(a) ? 'gold' : 'ghost'}" data-sell-animal="${a.id}" title="Vender">${armed ? 'Confirmar' : 'Vender ' + moeda(precoVenda(a))}</button></div></div>`;
   }
   html += `<h3>Comprar para ${b.o === 'a' ? 'a' : 'o'} ${b.nome.toLowerCase()}</h3>`;
   for (const k of b.bichos) {
@@ -4122,11 +4130,12 @@ $('#pane').addEventListener('click', e => {
       return;
     }
     buyPending = null;
-    const price = sellPrice(a), nome = ANIMAL[a.k].nome.toLowerCase();
+    if (isAdult(a)) { sellAdult(a, null); return renderPane(); }
+    const price = precoVenda(a), nome = ANIMAL[a.k].nome.toLowerCase();
     state.animals = state.animals.filter(x => x !== a); delete amb[a.id];
     state.coins += price; sfx('coin'); track('vender', price);
-    toast(`Vendeu ${ANIMAL[a.k].f ? 'a' : 'o'} ${nome} por ${price.toLocaleString('pt-BR')} moedas.`, 'good');
-    return done();
+    toast(`Vendeu ${ANIMAL[a.k].f ? 'a' : 'o'} ${nome}${a.nome && a.nome !== ANIMAL[a.k].nome ? ` ${a.nome}` : ''} por ${price.toLocaleString('pt-BR')} moedas.`, 'good');
+    done(); return renderPane();
   }
   if (d.seg) { shopSeg = d.seg; renderPane(); $('#pane').scrollTop = 0; if (d.focus) focusRow('abrigo-' + d.focus); }
   else if (d.abrigo) buyAbrigo(d.abrigo);
@@ -4499,7 +4508,7 @@ function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* sem armazenamento */ }
   applySettings();
 }
-const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde'];
+const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde', 'Rock rural: guitarra, bateria e viola'];
 // Nomes: dar o primeiro nome é de graça; trocar um nome que já existe custa 100 moedas (cada um).
 const CUSTO_NOME = 100;
 function custoNomes() {
@@ -5379,7 +5388,7 @@ const AV_OPC = {
   sexo: [['m', 'Menino'], ['f', 'Menina']],
   cabelo: [['curto', 'Curto'], ['cacheado', 'Cacheado'], ['comprido', 'Comprido'], ['rabo', 'Rabo de cavalo']],
   chapeu: [['sem', 'Sem'], ['palha', 'Palha'], ['bone', 'Boné'], ['cowboy', 'Cowboy']],
-  mao: [['nada', 'Nada'], ['vara', 'Vara de pesca'], ['espingarda', 'Espingarda'], ['enxada', 'Enxada']],
+  mao: [['nada', 'Nada'], ['vara', 'Vara de pesca'], ['espingarda', 'Espingarda'], ['enxada', 'Enxada'], ['facao', 'Facão'], ['foice', 'Foice'], ['laco', 'Laço'], ['viola', 'Viola'], ['machado', 'Machado']],
 };
 // Roupas: cada um tem as suas (menino e menina têm peças e cores diferentes).
 const AV_ROUPAS = {
@@ -5394,6 +5403,9 @@ const AV_ROUPAS = {
     sapato: [['sapatilha', 'Sapatilha'], ['botinha', 'Botinha'], ['sandalia', 'Sandália']],
   },
 };
+// Itens de avatar que liberam ao subir de nível (os outros já vêm liberados).
+const AV_NIVEL = { facao: 5, foice: 10, laco: 15, viola: 20, machado: 25 };
+const avTravado = (k, id) => k === 'mao' && AV_NIVEL[id] > (state ? state.level : 1);
 const ROUPA_PADRAO = { m: { camisa: 'xadrez', calca: 'jeans', sapato: 'bota' }, f: { camisa: 'blusa', calca: 'saia', sapato: 'sapatilha' } };
 const opcoesAvatar = (av, k) => AV_OPC[k] || AV_ROUPAS[av.sexo === 'f' ? 'f' : 'm'][k];
 const AV_PADRAO = { sexo: 'm', pele: 1, camisa: 'xadrez', calca: 'jeans', sapato: 'bota', cabelo: 'curto', corCabelo: 1, chapeu: 'sem', mao: 'nada' };
@@ -5442,6 +5454,39 @@ function drawNaMao(g, tipo, t) {
     g.fillStyle = '#5e646b'; g.fillRect(-1.8, -30, 1.6, 31); g.fillRect(0.2, -30, 1.6, 31);
     g.fillStyle = '#3a3e43'; g.fillRect(-2, -2, 4, 3);
     g.restore();
+  } else if (tipo === 'facao') {
+    // facão de lâmina larga, apontando para baixo e para frente
+    g.fillStyle = '#5a341a'; g.beginPath(); g.roundRect(-1.6, 12, 3.2, 7, 1.2); g.fill();
+    g.fillStyle = '#3a3e43'; g.fillRect(-2.4, 18.5, 4.8, 1.4);
+    g.fillStyle = '#c3ccd4'; g.beginPath(); g.moveTo(-1.6, 20); g.lineTo(1.8, 20); g.quadraticCurveTo(5.5, 29, 6, 37); g.lineTo(3.4, 36); g.quadraticCurveTo(0.5, 29, -1.6, 20); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(1.4, 21); g.quadraticCurveTo(5, 29, 5.6, 35.5); g.stroke();
+  } else if (tipo === 'foice') {
+    g.strokeStyle = '#a4703f'; g.lineWidth = 2; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-1, 26); g.lineTo(2, -14); g.stroke();
+    g.strokeStyle = '#9aa4ac'; g.lineWidth = 2.2; g.beginPath(); g.arc(9, -12, 8, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 0.6; g.beginPath(); g.arc(9, -12, 7, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+  } else if (tipo === 'laco') {
+    // laço de corda enrolado, balançando de leve
+    const bal = Math.sin(t / 600) * 0.12;
+    g.save(); g.translate(0, 16.5); g.rotate(bal);
+    g.strokeStyle = '#c9a15a'; g.lineWidth = 1.4;
+    for (let i = 0; i < 3; i++) { g.beginPath(); g.ellipse(1 + i * 0.6, 9, 6.5 - i * 0.7, 8.5 - i * 0.6, 0, 0, 7); g.stroke(); }
+    g.strokeStyle = '#a57f3e'; g.beginPath(); g.moveTo(1, 17); g.quadraticCurveTo(4, 22, 2, 26); g.stroke();
+    g.restore();
+  } else if (tipo === 'viola') {
+    // viola caipira segurada pelo braço
+    g.save(); g.translate(0, 16.5); g.rotate(-0.35);
+    g.fillStyle = '#6b3d1c'; g.fillRect(-1.3, -12, 2.6, 16); g.fillRect(-2, -15, 4, 4);
+    g.fillStyle = '#c98a3e'; g.beginPath(); g.ellipse(0, 9, 5, 4.2, 0, 0, 7); g.ellipse(0, 15.5, 6.4, 5.4, 0, 0, 7); g.fill();
+    g.strokeStyle = '#7a4a1e'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(0, 9, 5, 4.2, 0, 0, 7); g.ellipse(0, 15.5, 6.4, 5.4, 0, 0, 7); g.stroke();
+    g.fillStyle = '#3a2410'; g.beginPath(); g.arc(0, 11.5, 1.8, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(240,240,220,.8)'; g.lineWidth = 0.35; for (const x of [-0.7, 0, 0.7]) { g.beginPath(); g.moveTo(x, -13); g.lineTo(x, 18); g.stroke(); }
+    g.restore();
+  } else if (tipo === 'machado') {
+    g.strokeStyle = '#a4703f'; g.lineWidth = 2.2; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-1, 26); g.lineTo(3, -16); g.stroke();
+    g.fillStyle = '#8f9aa3'; g.beginPath(); g.moveTo(2, -17); g.lineTo(10, -21); g.quadraticCurveTo(12.5, -15, 10, -8); g.lineTo(2.6, -11); g.fill();
+    g.fillStyle = '#d9e0e6'; g.beginPath(); g.moveTo(10, -21); g.quadraticCurveTo(12.5, -15, 10, -8); g.lineTo(9, -9); g.quadraticCurveTo(11, -15, 9, -20); g.fill();
   } else if (tipo === 'enxada') {
     g.strokeStyle = '#a4703f'; g.lineWidth = 2; g.lineCap = 'round';
     g.beginPath(); g.moveTo(-1, 26); g.lineTo(3, -18); g.stroke();
@@ -5634,7 +5679,9 @@ function drawAvatares(sc, t) {
 function renderAvatarCfg() {
   const box = $('#avatarCfg'); if (!box || !state) return;
   const av = state.avatar = avatarOk(state.avatar);
-  const linha = (k, nome) => `<div class="avrow"><span>${nome}</span><div class="seg small" role="radiogroup" aria-label="${nome}">${opcoesAvatar(av, k).map(([id, n]) => `<button type="button" role="radio" data-av="${k}:${id}" aria-checked="${av[k] === id}" aria-selected="${av[k] === id}">${n}</button>`).join('')}</div></div>`;
+  const linha = (k, nome) => `<div class="avrow"><span>${nome}</span><div class="seg small" role="radiogroup" aria-label="${nome}">${opcoesAvatar(av, k).map(([id, n]) => avTravado(k, id)
+    ? `<button type="button" role="radio" disabled aria-checked="false" title="Libera no nível ${AV_NIVEL[id]}">🔒 ${n} <small>Nv ${AV_NIVEL[id]}</small></button>`
+    : `<button type="button" role="radio" data-av="${k}:${id}" aria-checked="${av[k] === id}" aria-selected="${av[k] === id}">${n}</button>`).join('')}</div></div>`;
   box.innerHTML = `<canvas id="avPrev" width="120" height="150" aria-label="Prévia do avatar"></canvas><div class="avopts">
     ${linha('sexo', 'Sexo')}
     <div class="avrow"><span>Pele</span><div class="peles" role="radiogroup" aria-label="Cor de pele">${AV_PELE.map((c, k) => `<button type="button" role="radio" class="pele" style="background:${c}" data-av="pele:${k}" aria-checked="${av.pele === k}" aria-label="Tom ${k + 1}"></button>`).join('')}</div></div>
@@ -5656,6 +5703,7 @@ function avPreview() {
 function avatarClick(e) {
   const b = e.target.closest('#avatarCfg [data-av]'); if (!b) return false;
   const [k, v] = b.dataset.av.split(':');
+  if (avTravado(k, v)) return false;
   state.avatar = avatarOk(Object.assign({}, state.avatar, { [k]: k === 'pele' || k === 'corCabelo' ? Number(v) : v }));
   const run = document.querySelector('#avPrev') && true;
   renderAvatarCfg(); done(); sfx('click');
