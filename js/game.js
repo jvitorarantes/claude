@@ -914,6 +914,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 68, txt: 'Dá para trocar o nome de todos os animais e dos cachorros por 50 moedas: toque em Nome no abrigo, na Loja › Animais ou na Loja › Cachorros. O nome de quem acabou de chegar continua de graça.' },
   { v: 67, txt: 'Visitas mais vivas: na roça dos amigos (e do Seu Zé e da Dona Maria), o avatar do dono também passeia. Clique nele para ouvir o que ele tem a dizer!' },
   { v: 66, txt: 'Nomes: dar o primeiro nome para a fazenda e para o avatar continua grátis; para trocar um nome depois, custa 100 moedas (em ⚙️ › Nomes).' },
   { v: 65, txt: 'Peixe novo ✨: quando pegar um peixe pela primeira vez, aparece o selo NOVO! e ele fica marcado no 📖 Livro de peixes. A dica da isca mostra com ✨ os que você ainda não pegou.' },
@@ -992,7 +993,7 @@ function abrigoHTML() {
     const st = d.tipo === 'prod' ? (a.ready ? 'produto pronto!' : a.fed ? 'produzindo' : 'com fome') + ` · vive mais ${vida(lifeLeft(a))}`
       : d.tipo === 'cria' ? (isAdult(a) ? 'adulto, pronto para vender' : `crescendo · falta ${fmt(d.tempo - a.g)}`) : 'companhia';
     html += `<div class="row"><img alt="" src="${animalIcon(d.id)}"><div><div class="name">${esc(a.nome || d.nome)}</div><div class="meta">${d.nome} · ${st}</div></div>
-      <button class="btn ghost" data-renomear="${a.id}">Nome</button></div>`;
+      <button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${CUSTO_NOME_BICHO}</small></button></div>`;
   }
   html += `<h3>Comprar para ${b.o === 'a' ? 'a' : 'o'} ${b.nome.toLowerCase()}</h3>`;
   for (const k of b.bichos) {
@@ -1032,21 +1033,59 @@ function buyAnimal(k) {
 // Janelinha para dar nome ao bicho que acabou de chegar.
 const NOMES = { f: ['Mimosa', 'Estrela', 'Pintada', 'Florzinha', 'Malhada', 'Belinha', 'Dona Chica', 'Pipoca', 'Jujuba', 'Violeta'],
   m: ['Bidu', 'Tonico', 'Pingo', 'Faísca', 'Zé Pequeno', 'Chiquinho', 'Barão', 'Bolota', 'Paçoca', 'Trovão'] };
-let nomeDe = null;
+// O nome de quem acabou de chegar é de graça; trocar depois custa CUSTO_NOME_BICHO (animais e cachorros).
+const CUSTO_NOME_BICHO = 50;
+let nomeDe = null;   // { animal: id } ou { dog: slot }, com troca: true quando é renomear (pago)
 function askName(a) {
   const d = ANIMAL[a.k], l = NOMES[d.f ? 'f' : 'm'];
-  nomeDe = a.id;
+  nomeDe = { animal: a.id, troca: false };
   $('#nomeImg').src = animalIcon(d.id);
   $('#nomeTxt').textContent = `${d.f ? 'Sua nova' : 'Seu novo'} ${d.nome.toLowerCase()} chegou! Como ${d.f ? 'ela' : 'ele'} vai se chamar?`;
   $('#nomeInput').value = l[Math.floor(Math.random() * l.length)];
+  abrirNome();
+}
+function abrirNome() {
+  const btn = $('#nomeForm button');
+  btn.textContent = nomeDe.troca ? `Salvar · ${CUSTO_NOME_BICHO} moedas` : 'Salvar';
+  btn.disabled = nomeDe.troca && state.coins < CUSTO_NOME_BICHO;
+  $('#nomeCusto').hidden = !nomeDe.troca;
+  $('#nomeCusto').textContent = state.coins < CUSTO_NOME_BICHO ? `Trocar o nome custa ${CUSTO_NOME_BICHO} moedas. Faltam ${CUSTO_NOME_BICHO - state.coins}.` : `Trocar o nome custa ${CUSTO_NOME_BICHO} moedas.`;
   $('#nome').hidden = false; $('#nomeInput').select(); $('#nomeInput').focus();
+}
+function trocarNome(alvo) {
+  if (!isHome()) return;
+  if (alvo.animal) {
+    const a = state.animals.find(x => x.id === alvo.animal); if (!a) return;
+    const d = ANIMAL[a.k];
+    $('#nomeImg').src = animalIcon(d.id);
+    $('#nomeTxt').textContent = `Qual vai ser o novo nome de ${a.nome || d.nome} (${d.nome.toLowerCase()})?`;
+    $('#nomeInput').value = a.nome || d.nome;
+  } else {
+    const c = state.dogs[alvo.dog]; if (!c) return;
+    $('#nomeImg').src = dogIcon(c.raca);
+    $('#nomeTxt').textContent = `Qual vai ser o novo nome de ${c.nome}, que vigia ${SLOT[alvo.dog].a}?`;
+    $('#nomeInput').value = c.nome;
+  }
+  nomeDe = Object.assign({ troca: true }, alvo);
+  abrirNome();
 }
 function saveName(e) {
   if (e) e.preventDefault();
-  const a = state.animals.find(x => x.id === nomeDe), v = $('#nomeInput').value.trim().slice(0, 18);
-  if (a && v) { a.nome = v; toast(`Bem-vind${ANIMAL[a.k].f ? 'a' : 'o'}, ${v}!`, 'good'); done(); }
-  $('#nome').hidden = true; nomeDe = null;
+  if (!nomeDe) return;
+  const v = limpaNome($('#nomeInput').value).slice(0, 18);
+  const a = nomeDe.animal && state.animals.find(x => x.id === nomeDe.animal), c = nomeDe.dog && state.dogs[nomeDe.dog];
+  const atual = a ? a.nome : c ? c.nome : '';
+  if (!v || !(a || c)) return fecharNome();
+  if (nomeDe.troca) {
+    if (v === atual) return fecharNome();
+    if (state.coins < CUSTO_NOME_BICHO) { sfx('error'); return toast(`Trocar o nome custa ${CUSTO_NOME_BICHO} moedas.`, 'bad'); }
+    state.coins -= CUSTO_NOME_BICHO; sfx('buy');
+  }
+  if (a) { a.nome = v; toast(nomeDe.troca ? `Agora ${ANIMAL[a.k].f ? 'ela' : 'ele'} se chama ${v}! (−${CUSTO_NOME_BICHO} moedas)` : `Bem-vind${ANIMAL[a.k].f ? 'a' : 'o'}, ${v}!`, 'good'); }
+  else { c.nome = v; toast(`Agora o cachorro se chama ${v}! (−${CUSTO_NOME_BICHO} moedas)`, 'good'); }
+  done(); fecharNome(); renderPane();
 }
+function fecharNome() { $('#nome').hidden = true; nomeDe = null; }
 // Constrói um abrigo ou aumenta o nível dele.
 function buyAbrigo(id) {
   const b = ABRIGO[id], lv = abrigoLv(state, id);
@@ -3854,15 +3893,16 @@ function renderPane() {
       const pets = state.animals.filter(a => ANIMAL[a.k].tipo === 'pet');
       if (pets.length) {
         html += `<h3>Nomes dos seus bichos</h3>`;
-        for (const a of pets) html += `<form class="addform" data-rename="${a.id}"><input id="pet-${a.id}" maxlength="18" value="${esc(a.nome || ANIMAL[a.k].nome)}" aria-label="Nome do ${esc(ANIMAL[a.k].nome.toLowerCase())}" style="text-transform:none;letter-spacing:0"><button class="btn" type="submit">Salvar</button></form>`;
+        for (const a of pets) html += `<div class="row"><img alt="" src="${animalIcon(a.k)}"><div><div class="name">${esc(a.nome || ANIMAL[a.k].nome)}</div><div class="meta">${ANIMAL[a.k].nome}</div></div>
+          <button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${CUSTO_NOME_BICHO}</small></button></div>`;
       }
       const meus = state.animals.filter(a => ANIMAL[a.k].tipo === 'prod').sort((x, y) => lifeLeft(x) - lifeLeft(y));
       if (meus.length) {
         html += `<h3>Seus animais de produção</h3><p class="hint">Vender dá bem menos que a compra, e o valor cai a cada dia de vida que passa.</p>`;
         for (const a of meus) {
           const d = ANIMAL[a.k], left = lifeLeft(a), armed = buyPending && buyPending.i === 'venda' + a.id && performance.now() < buyPending.until;
-          html += `<div class="row"><img alt="" src="${animalIcon(d.id)}"><div><div class="name">${d.nome}</div>
-            <div class="meta">vive mais ${vida(left)}</div><div class="mbar"><i style="width:${clamp(left / (d.periodo * DAY), 0, 1) * 100}%"></i></div></div>
+          html += `<div class="row"><img alt="" src="${animalIcon(d.id)}"><div><div class="name">${esc(a.nome || d.nome)}</div>
+            <div class="meta">${a.nome && a.nome !== d.nome ? d.nome.toLowerCase() + ' · ' : ''}vive mais ${vida(left)}</div><div class="mbar"><i style="width:${clamp(left / (d.periodo * DAY), 0, 1) * 100}%"></i></div></div>
             <button class="btn ${armed ? 'danger' : 'ghost'}" data-sell-animal="${a.id}">${armed ? 'Confirmar' : moeda(sellPrice(a))}</button></div>`;
         }
       }
@@ -3887,7 +3927,7 @@ function renderPane() {
         html += `<div class="row ${awake ? '' : 'sel'}"><img alt="" src="${dogIcon(d.raca)}">
           <div><div class="name">${esc(d.nome)} · ${slot === 'roca' ? 'roça' : 'rancho'}</div>
           <div class="meta">${awake ? `Acordado · ração por mais ${fmt((d.fedUntil - Date.now()) / 1000)}` : '<b>Dormindo de fome!</b> Não está vigiando.'}<br>${b.nome} · vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}</div></div>
-          ${awake ? '<div></div>' : `<button class="btn" data-feed-dog="${slot}">Dar ração</button>`}</div>`;
+          <div class="stack">${awake ? '' : `<button class="btn" data-feed-dog="${slot}">Dar ração</button>`}<button class="btn ghost" data-renomear-dog="${slot}">Nome<br><small>${CUSTO_NOME_BICHO}</small></button></div></div>`;
       }
       html += `<div class="row"><img alt="" src="${bowlIcon()}">
         <div><div class="name">Ração de cachorro</div><div class="meta">${DOG_FOOD.custo} moedas · dura ${DOG_FOOD.horas}h · você tem <b>${state.dogFood}</b></div></div>
@@ -4049,7 +4089,8 @@ function renderPane() {
 $('#pane').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   const d = b.dataset;
-  if (d.renomear) { const a = state.animals.find(x => x.id === d.renomear); if (a) askName(a); return; }
+  if (d.renomear) return trocarNome({ animal: d.renomear });
+  if (d.renomearDog) return trocarNome({ dog: d.renomearDog });
   if (d.fseg) { fabSeg = d.fseg; renderPane(); $('#pane').scrollTop = 0; return; }
   if (d.fabricar) return fabricar(d.fabricar);
   if ('fabRecolher' in d) return recolherFab();
@@ -4145,13 +4186,6 @@ $('#pane').addEventListener('click', e => {
 $('#pane').addEventListener('change', e => {
 });
 $('#pane').addEventListener('submit', e => {
-  const rn = e.target.dataset && e.target.dataset.rename;
-  if (rn) {
-    e.preventDefault();
-    const a = state.animals.find(x => x.id === rn), v = $('#pet-' + rn).value.trim().slice(0, 18);
-    if (a && v) { a.nome = v; toast(`Agora ele${ANIMAL[a.k].f ? 'a' : ''} se chama ${v}!`, 'good'); done(); }
-    return;
-  }
   if (e.target.id !== 'addFriend') return;
   e.preventDefault();
   addFriend($('#friendCode').value);
@@ -4729,7 +4763,7 @@ $('#presente').addEventListener('click', e => {
   if (e.target === $('#presente') || e.target.closest('[data-close]')) $('#presente').hidden = true;
 });
 $('#nomeForm').addEventListener('submit', saveName);
-$('#nome').addEventListener('click', e => { if (e.target === $('#nome') || e.target.closest('[data-close]')) { $('#nome').hidden = true; nomeDe = null; } });
+$('#nome').addEventListener('click', e => { if (e.target === $('#nome') || e.target.closest('[data-close]')) fecharNome(); });
 $('#giftOpen').addEventListener('click', openGift);
 $('#gift').addEventListener('click', e => { if (e.target === $('#gift') || e.target.closest('[data-close]')) closeGift(); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gift').hidden) closeGift(); });
