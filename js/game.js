@@ -1374,6 +1374,7 @@ async function cloudSave() {
     publicarRanking();
   } catch (e) {
     console.warn(e);
+    if (e && e.code === 'outroAparelho') { salvando = false; return kick(e.session); }
     if (e && e.code === 'conflito') { salvando = false; return recarregarDaNuvem('A roça foi salva em outro aparelho. Carregando a versão mais nova…'); }
     dirty = true; syncStatus = 'Sem conexão';
   } finally { salvando = false; }
@@ -1470,10 +1471,8 @@ async function onUser(u) {
     save();
     cloudStatus = 'ready';
     await cloudSave();
-    unsubFarm = Cloud.watchFarm(u.uid, data => {
-      const sess = data && data.session;
-      if (sess && sess.id !== SESSION.id && sess.at > SESSION.at) kick(sess);
-    });
+    // Outro aparelho entrou? Descobre na hora de salvar (a gravação confere) ou quando o jogo volta
+    // para a tela — sem ficar ouvindo o documento da roça, o que gastava uma leitura a cada salvamento.
     unsubVisits = Cloud.watchVisits(u.uid, applyVisits);
     if (Cloud.watchChat) unsubChat = Cloud.watchChat(u.uid, onChat);
     marcarPresenca(!document.hidden); presencaDe = ''; vigiarPresenca();
@@ -4960,8 +4959,8 @@ async function sendFriendGift(uid, escolha) {
 }
 
 // ---------- Presença dos amigos (online / offline) ----------
-// Enquanto o jogo está aberto e na tela, marca "online" a cada 2 minutos. Ao sair, marca offline.
-const PRESENCA_MS = 2 * 60e3, ONLINE_ATE = 5 * 60e3;
+// Enquanto o jogo está aberto e na tela, marca "online" a cada 5 minutos. Ao sair, marca offline.
+const PRESENCA_MS = 5 * 60e3, ONLINE_ATE = 11 * 60e3;
 const presenca = {};
 let presencaTimer = 0, unsubPresenca = null, presencaDe = '';
 function marcarPresenca(online) {
@@ -4988,8 +4987,17 @@ function statusAmigo(uid) {
   return { on: false, txt: min < 60 ? `Visto há ${min} min` : min < 60 * 24 ? `Visto há ${Math.round(min / 60)} h` : `Visto há ${Math.round(min / 1440)} dia${min >= 2880 ? 's' : ''}` };
 }
 const bolinhaStatus = uid => { const st = statusAmigo(uid); return `<span class="status ${st.on ? 'on' : ''}" title="${st.txt}">${st.txt}</span>`; };
-document.addEventListener('visibilitychange', () => { if (user) marcarPresenca(!document.hidden); });
-window.addEventListener('pagehide', () => { if (user) marcarPresenca(false); });
+let sessaoConferida = 0;
+document.addEventListener('visibilitychange', () => {
+  if (!user) return;
+  marcarPresenca(!document.hidden);
+  if (document.hidden) publicarRanking(true);
+  if (!document.hidden && !kicked && Cloud.sessaoAtual && Date.now() - sessaoConferida > 2 * 60e3) {
+    sessaoConferida = Date.now();
+    Cloud.sessaoAtual(user.uid).then(sess => { if (sess && sess.id !== SESSION.id && sess.at > SESSION.at) kick(sess); }).catch(() => {});
+  }
+});
+window.addEventListener('pagehide', () => { if (user) { marcarPresenca(false); publicarRanking(true); } });
 
 // ---------- Chat com amigos ----------
 let chatMsgs = [], chatCom = null, chatUltimoEnvio = 0, chatPrimeira = true;
@@ -6043,11 +6051,13 @@ function rankAtual() {
 }
 function rankPontos(ev) { const p = PONTOS_RANK[ev]; if (p && state) rankAtual().pts += p; }
 let rankPublicado = '', rankCache = null, rankCacheEm = 0;
-function publicarRanking() {
+let rankPubEm = 0;
+function publicarRanking(forcar) {
   if (!user || !Cloud.salvarRanking) return;
+  if (!forcar && Date.now() - rankPubEm < 5 * 60e3) return; // no máximo a cada 5 min (poupa gravações)
   const r = rankAtual(), d = { w: r.w, pts: r.pts, antW: r.ant ? r.ant.w : 0, antPts: r.ant ? r.ant.pts : 0, nome: meuApelido(), fazenda: minhaFazenda(), nivel: state.level };
   const chave = JSON.stringify(d); if (chave === rankPublicado) return;
-  rankPublicado = chave; Cloud.salvarRanking(user.uid, d).catch(e => { console.warn('ranking:', e); rankPublicado = ''; });
+  rankPublicado = chave; rankPubEm = Date.now(); Cloud.salvarRanking(user.uid, d).catch(e => { console.warn('ranking:', e); rankPublicado = ''; });
 }
 async function lerRanking(forcar) {
   if (!user || !Cloud.lerRanking) return null;

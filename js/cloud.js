@@ -54,6 +54,9 @@
     const ref = farm(uid);
     return db.runTransaction(async tx => {
       const d = await tx.get(ref), atual = d.exists ? (d.data().rev || 0) : 0;
+      // outro aparelho entrou depois deste: este não grava e sai (sem ficar ouvindo o documento o tempo todo)
+      const sess = d.exists && d.data().session, minha = data.session;
+      if (sess && minha && sess.id !== minha.id && (sess.at || 0) > (minha.at || 0)) { const e = new Error('outro aparelho'); e.code = 'outroAparelho'; e.session = sess; throw e; }
       if (atual !== baseRev) { const e = new Error('conflito'); e.code = 'conflito'; e.rev = atual; throw e; }
       tx.set(ref, Object.assign({}, data, { rev: baseRev + 1 }));
       return baseRev + 1;
@@ -69,6 +72,8 @@
   // Sessão: qual aparelho está jogando agora. Entrar num aparelho novo tira o anterior.
   const claimSession = (uid, session) => farm(uid).set({ session }, { merge: true });
   const watchFarm = (uid, cb) => farm(uid).onSnapshot(d => cb(d.exists ? d.data() : null), e => console.warn('roça:', e));
+  // Confere (1 leitura) se outro aparelho entrou nesta conta.
+  async function sessaoAtual(uid) { const d = await farm(uid).get(); return d.exists ? d.data().session || null : null; }
 
   // Código de amigo: 6 letras/números, fácil de ditar (sem 0/O, 1/I/L).
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -177,7 +182,7 @@
   }
 
   window.RFCloud = {
-    salvarRanking, lerRanking,
+    salvarRanking, lerRanking, sessaoAtual,
     marcarPresenca, watchPresenca,
     enviarMsg, watchChat, apagarMsg,
     ativarPush, desativarPush, salvarPush, mandarAviso, saveFarmSeguro, salvarBackup, listarBackups, apagarBackup,
