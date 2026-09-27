@@ -267,6 +267,8 @@
         o.start(t + d); o.stop(t + d + 0.2);
       }
     },
+    // "fala" do avatar: umas sílabas curtinhas, tipo desenho animado
+    fala: t => { [0, 0.09, 0.18, 0.3].forEach((d, k) => { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime([420, 520, 470, 600][k], t + d); o.frequency.exponentialRampToValueAtTime([380, 480, 430, 700][k], t + d + 0.07); o.connect(g); g.connect(sfxBus); g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.25, t + d + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.08); o.start(t + d); o.stop(t + d + 0.09); }); },
     bark: t => { for (const d of [0, 0.22]) { const o = ac.createOscillator(), b = ac.createBiquadFilter(), g = ac.createGain(); o.type = 'sawtooth'; b.type = 'bandpass'; b.frequency.value = 900; b.Q.value = 2; o.frequency.setValueAtTime(380, t + d); o.frequency.exponentialRampToValueAtTime(170, t + d + 0.14); o.connect(b); b.connect(g); g.connect(sfxBus); g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.35, t + d + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.16); o.start(t + d); o.stop(t + d + 0.2); } },
   };
 

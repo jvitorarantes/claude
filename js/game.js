@@ -801,17 +801,21 @@ function collectAll() {
 // ---------- Cachorros ----------
 const dogAlive = d => d && Date.now() - d.born < DOG[d.raca].vida * DAY;
 const dogAwake = d => dogAlive(d) && d.fedUntil > Date.now();
+const latir = (slot, nome) => { falar('dog:' + slot, nome, 'Au au! 🐶'); sfx('bark'); };
 function actDog(slot) {
   const d = S().dogs && S().dogs[slot];
   if (!isHome()) {
+    if (view.kind === 'npc' && !d) return latir(slot, view.cao);
     if (!d) return;
+    if (dogAwake(d)) latir(slot, d.nome); else falar('dog:' + slot, d.nome, 'Zzz… 💤');
     return toast(dogAwake(d) ? `${d.nome} está acordado vigiando ${SLOT[slot].a}. Cuidado!` : `${d.nome} está dormindo… é a sua chance.`);
   }
   if (!d) {
     openPanel('loja', 'caes');
     return toast(`Compre um cachorro na Loja para vigiar ${SLOT[slot].a}.`);
   }
-  if (!dogAwake(d)) return feedDog(slot);
+  if (!dogAwake(d)) { feedDog(slot); if (dogAwake(d)) latir(slot, d.nome); return; }
+  latir(slot, d.nome);
   const dias = Math.ceil((d.born + DOG[d.raca].vida * DAY - Date.now()) / DAY);
   toast(`${d.nome} está de guarda. Comida por mais ${fmt((d.fedUntil - Date.now()) / 1000)} · vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}.`);
 }
@@ -3323,6 +3327,35 @@ function drawCursorTool() {
   ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3;
   ctx.drawImage(im, -S * 0.2, -S * 0.8, S, S); ctx.restore();
 }
+// Balões de fala (cachorro e avatar): nome em negrito e a fala embaixo, somem em ~2,5 s.
+let falas = [];
+function falar(alvo, nome, txt) { falas = falas.filter(f => f.alvo !== alvo); falas.push({ alvo, nome, txt, t0: performance.now() }); }
+function posFala(alvo) {
+  if (alvo === 'avatar') { const w = avWalk[scene]; return w && w.tela; }
+  if (alvo.startsWith('dog:')) return dogPos(alvo.slice(4));
+  return null;
+}
+function drawFalas(t) {
+  falas = falas.filter(f => t - f.t0 < 2600);
+  for (const f of falas) {
+    const p = posFala(f.alvo); if (!p) continue;
+    const age = (t - f.t0) / 2600, sobe = Math.min(1, age * 8);
+    ctx.globalAlpha = age > 0.8 ? (1 - age) * 5 : 1;
+    const fs = Math.round(clamp(L.W * 0.13, 12, 17));
+    ctx.font = `800 ${fs}px 'Baloo 2', sans-serif`; const w1 = ctx.measureText(f.nome).width;
+    ctx.font = `700 ${fs}px 'Baloo 2', sans-serif`; const w2 = ctx.measureText(f.txt).width;
+    const bw = Math.max(w1, w2) + 22, bh = fs * 2.5 + 10, x = clamp(p.x, bw / 2 + 6, L.cw - bw / 2 - 6), y = p.y - 10 - bh - (1 - sobe) * -8;
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.roundRect(x - bw / 2 + 2, y + 3, bw, bh, 12); ctx.fill();
+    ctx.fillStyle = '#fffdf2'; ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x - bw / 2, y, bw, bh, 12); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.x - 7, y + bh - 1); ctx.lineTo(p.x, y + bh + 9); ctx.lineTo(p.x + 7, y + bh - 1); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(p.x - 7, y + bh); ctx.lineTo(p.x, y + bh + 9); ctx.lineTo(p.x + 7, y + bh); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#7a4a22'; ctx.font = `800 ${fs}px 'Baloo 2', sans-serif`; ctx.fillText(f.nome, x, y + 5 + fs * 0.65);
+    ctx.fillStyle = '#2f2a1f'; ctx.font = `700 ${fs}px 'Baloo 2', sans-serif`; ctx.fillText(f.txt, x, y + 5 + fs * 1.85);
+  }
+  ctx.globalAlpha = 1;
+}
 function drawPopups(t) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `800 ${Math.round(clamp(L.W * 0.16, 12, 20))}px 'Baloo 2', sans-serif`;
@@ -3346,7 +3379,7 @@ function draw(t, dt) {
   else if (scene === 'animais') drawPen(s, t, home, dt);
   else drawRoom(s, t, home);
   drawFx(t);
-  drawPopups(t);
+  drawPopups(t); drawFalas(t);
   drawCursorTool();
 }
 
@@ -4158,7 +4191,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? `<b>${esc(meuApelido())}</b><br>Clique para dar um oi.` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4317,6 +4350,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'abrigo') actAbrigo(target.id);
   else if (target.kind === 'land') openPanel('terreno');
   else if (target.kind === 'bicho') actBicho(target.i);
+  else if (target.kind === 'avatar') { falar('avatar', meuApelido(), 'Cê tá bão?'); sfx('fala'); }
   else if (target.kind === 'enfeite') actEnfeite(target.id);
   else if (target.kind === 'casa') setScene('casa');
   else if (target.kind === 'celeiro') { if (isHome()) openPanel('celeiro'); else toast(`Celeiro de ${view.nome}.`); }
@@ -5365,8 +5399,12 @@ function drawAvatarWalk(sc, t) {
     w.t0 = t; w.dur = dist / 0.7 * 1000; w.wait = 1200 + Math.random() * 3500; k = 0;
   }
   const u = w.fu + (w.tu - w.fu) * k, v = w.fv + (w.tv - w.fv) * k, q = iso(u, v), W = L.W;
+  const esc = W / 95 * (sc === 'animais' ? 1.25 : 1);
+  w.tela = { x: q.x, y: q.y - 70 * esc };
+  hits.push({ kind: 'avatar', x: q.x, y: q.y - 34 * esc, r: Math.max(26 * esc, 16) });
+  if (hover && hover.kind === 'avatar') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.17, W * 0.06, 0, 0, 7); ctx.stroke(); }
   ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.13, W * 0.045, 0, 0, 7); ctx.fill();
-  drawAvatar(ctx, q.x, q.y, W / 95 * (sc === 'animais' ? 1.25 : 1), state.avatar, t, k < 1, w.dir);
+  drawAvatar(ctx, q.x, q.y, esc, state.avatar, t, k < 1, w.dir);
 }
 // Prévia nas Configurações.
 function renderAvatarCfg() {
@@ -6131,7 +6169,7 @@ function drawObjetos(s, sc, t, home, stage) {
       }
     } else if (o.key === 'canil') {
       const slot = sc === 'roca' ? 'roca' : 'animais';
-      if (view.kind === 'npc') { const d = DOG_AT(); drawDog(d.x, d.y, W * 0.7, t); continue; }
+      if (view.kind === 'npc') { const d = DOG_AT(); drawDog(d.x, d.y, W * 0.7, t); hits.push({ kind: 'dog', slot, x: d.x, y: d.y - W * 0.2, r: W * 0.4 }); continue; }
       drawKennelSpot(slot, s, home);
       if (stage === 'tras' && sc === 'roca') cachorroDepois = true; // o cachorro vai na frente da cerca
       else drawDogSpot(slot, s, t, home);
