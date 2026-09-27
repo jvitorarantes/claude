@@ -288,9 +288,10 @@ function growAnimal(a, sec, s = state) {
 
 function newState() {
   const plots = Array.from({ length: N }, () => emptyPlot());
+  const novVisto = typeof NOVIDADES !== 'undefined' ? NOVIDADES.reduce((m, n) => Math.max(m, n.v), 0) - 1 : 0;
   START_LOTS.forEach(i => plots[i].s = 'plowed');
   return {
-    v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0,
+    v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0, novVisto,
     tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
     animals: [], decor: {}, abrigos: { galinheiro: 1 }, racaoEsp: 0,
     enfeites: {}, objetos: { roca: [], animais: [] }, pos: {}, invNovos: 0, skins: {}, skin: null,
@@ -894,6 +895,35 @@ function buyDogFood(n) {
 }
 
 // ---------- Tempo de vida, XP diário dos cães e avisos ----------
+// ---------- Novidades do jogo: viram cartas na caixa de correio ----------
+// Ao lançar algo novo, acrescente aqui { v: número da versão (rf-version), txt }.
+const NOVIDADES = [
+  { v: 46, txt: 'Seu progresso agora é protegido: o jogo guarda uma cópia da roça por dia e dá para restaurar em ⚙️ › Cópias de segurança.' },
+  { v: 51, txt: 'Notificações! Ative em ⚙️ › Notificações e receba avisos de colheita pronta, animais, fábrica, caminhão e amigos, mesmo com o jogo fechado.' },
+  { v: 52, txt: 'Dê um nome para a sua fazenda e para o seu avatar em ⚙️ › Nomes. Quem visitar vai ver "[fazenda] de [avatar]".' },
+  { v: 54, txt: 'Avatar de menina com roupas próprias: blusa de babado, saia rodada, jardineira, sapatilha e mais. Veja em ⚙️ › Seu avatar.' },
+  { v: 55, txt: 'Chat com amigos! Na aba Amigos, toque em 💬 Conversar para trocar mensagens.' },
+  { v: 57, txt: 'Os animais agora falam e fazem barulho quando você clica neles. E chegou a galinha-d\'angola (nível 3, no Galinheiro)!' },
+  { v: 59, txt: 'Veja quem está online: a lista de amigos mostra 🟢 Online ou "visto há X min".' },
+  { v: 60, txt: 'Pescaria 🎣: clique no pesqueiro na frente da casinha do cachorro, espere a boia afundar e puxe! Tem 8 peixes, do lambari ao pirarucu.' },
+  { v: 60, txt: 'Pedidos da vila: Seu Zé e Dona Maria pedem coisas da sua roça em Missões › Vila. Entregue, ganhe corações ❤️ e presentes exclusivos.' },
+  { v: 60, txt: 'Ranking semanal 🏆: na aba Amigos, veja quem fez mais pontos na semana. Os 3 primeiros ganham moedas toda segunda!' },
+  { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
+];
+const VERSAO_NUM = Number(document.querySelector('meta[name="rf-version"]')?.content) || 0;
+function checarNovidades() {
+  if (!state) return;
+  const ultima = NOVIDADES.reduce((m, n) => Math.max(m, n.v), 0);
+  // quem já jogava antes desta carta existir recebe só as novidades mais recentes
+  if (state.novVisto == null) state.novVisto = 56;
+  const novas = NOVIDADES.filter(n => n.v > state.novVisto && n.v <= Math.max(VERSAO_NUM, ultima));
+  if (!novas.length) return;
+  const agora = Date.now();
+  novas.forEach((n, k) => { state.news.unshift({ at: agora + k, msg: '📰 Novidade na Roça Feliz: ' + n.txt }); });
+  state.news.length = Math.min(state.news.length, 30);
+  state.novVisto = ultima; save(); renderTabs();
+  setTimeout(() => toast(`📬 Chegou ${novas.length > 1 ? `${novas.length} cartas novas` : 'uma carta nova'} no correio: novidades do jogo!`, 'good'), 2500);
+}
 function addNews(msg) {
   state.news.unshift({ at: Date.now(), msg });
   state.news.length = Math.min(state.news.length, 30);
@@ -1478,7 +1508,7 @@ function showGate(mode, msg) {
 function enterGame() {
   root.classList.remove('gated');
   resize(); setScene(scene);
-  presentePioneiro();
+  presentePioneiro(); checarNovidades();
   setTimeout(() => { if (giftReady() && !isGated()) showGift(); }, 1500);
 }
 // Recado para o jogador: na tela de entrada, vai no status; no jogo, vira aviso.
@@ -3934,7 +3964,7 @@ function renderPane() {
     html += `<p class="hint">Pragas comem parte da colheita enquanto ficam lá. Terra seca faz a planta crescer mais devagar. Nunca acontecem os dois juntos. Cada planta dá XP em até ${XP_CAP} colheitas por dia.</p>`;
   } else if (tab === 'correio') {
     // Caixa de correio: as novidades da sua roça (visitas, presentes, cachorro, animais…)
-    html += `<p class="hint">Tudo o que aconteceu na sua roça: visitas dos amigos, presentes, o que o cachorro fez e recados da vila.</p>`;
+    html += `<p class="hint">Tudo o que aconteceu na sua roça (visitas dos amigos, presentes, o que o cachorro fez, recados da vila) e as novidades do jogo 📰.</p>`;
     if (!state.news.length) html += `<div class="empty">A caixa de correio está vazia.</div>`;
     else {
       html += `<div class="news">${state.news.slice(0, 30).map(n =>
@@ -6820,7 +6850,7 @@ function frame(now) {
 function start(data) {
   state = (data && data.state && migrate(data.state)) || load() || newState();
   applySettings();
-  rollPeriods(); presentePioneiro();
+  rollPeriods(); presentePioneiro(); checarNovidades();
   resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons(); afterUpdate(); renderTabs();
   ultimaChecagem = Date.now(); autoUpdate();
   // app instalável (celular, tablet e o app de Android): abre mesmo sem internet
