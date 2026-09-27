@@ -947,6 +947,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
+  { v: 106, txt: 'Canteiros se mudam como o resto: segure o dedo (ou botão direito) em cima de um e escolha Mover. A placa de terras à venda agora fica no lugar dela, e também dá para mudar de lugar.' },
   { v: 105, txt: 'Pomar com limite: até 4 de cada arbusto e 3 de cada árvore (contando as do inventário). Derrubou uma seca? Libera para comprar outra.' },
   { v: 104, txt: 'Pomar ainda mais barato: enxada 50, motosserra 100 e frutíferas que rendem mais de 2,5× o preço. E chegou o 🌳 Domínio do pomar: colher frutas (e ajudar as dos amigos) sobe o nível, que dá mais frutas por colheita, mais colheitas antes de secar e trevos para resgatar.' },
   { v: 103, txt: 'Na Loja, "Mudas" virou Horta e o Pomar ficou do lado. Os montes de folhas brilham e têm o rastelo em cima. E o botão 🆘 Precisa de ajuda leva direto para a roça (ou o rancho) do amigo, com a frutífera marcada.' },
@@ -3191,9 +3192,10 @@ function landSignText() {
   if (state.level < next.nivel) return [`+${extra} canteiros`, `no nível ${next.nivel}`, '#7a1d10'];
   return [`+${extra} canteiros`, `comprar · ${next.preco.toLocaleString('pt-BR')}`, '#2f5e14'];
 }
-function drawLandSign() {
+// A placa fica no lugar dela (dá para mudar no modo Mover), sem depender de onde estão os canteiros.
+function drawLandSign(x, y, fantasma) {
   const txt = landSignText(); if (!txt) return;
-  const W = L.W, x = L.ox - W * 0.6, y = L.oy + W * 0.26;
+  const W = L.W;
   const hov = hover && hover.kind === 'land';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, W * 0.18, W * 0.05, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - W * 0.035, y - W * 0.5, W * 0.07, W * 0.5);
@@ -3207,7 +3209,7 @@ function drawLandSign() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = '#4a2a10'; ctx.fillText(txt[0], bx, top + bh * 0.3);
   ctx.fillStyle = txt[2]; ctx.fillText(txt[1], bx, top + bh * 0.72);
-  hits.push({ kind: 'land', x: bx, y: top + bh / 2, r: Math.max(bw / 2, 30) });
+  if (!fantasma && !moveMode) hits.push({ kind: 'land', x: bx, y: top + bh / 2, r: Math.max(bw / 2, 30) });
 }
 // Planta podre: manchas escuras no chão e mosquinhas voando.
 function drawRot(c, r, t) {
@@ -3266,7 +3268,6 @@ function drawRoca(s, t, home) {
   const cachorroDepois = drawObjetos(s, 'roca', t, home, 'tras');
   // (a roça não tem mais cerca em volta: as cercas agora são compradas e postas onde quiser)
   if (cachorroDepois) drawDogSpot('roca', s, t, home);
-  if (home) drawLandSign();
   // canteiros e o que está no gramado entre eles, do fundo para a frente
   const mov = home && moveMode && moving && moving.plot !== undefined ? moving.plot : -1;
   let d0 = -Infinity;
@@ -4746,18 +4747,21 @@ let holdTimer = null, holdFired = false;
 function objAt(x, y) {
   if (!isHome() || scene === 'casa') return null;
   // a área de clique cobre o desenho inteiro (largura para cada lado e altura, em casas da grade)
-  const CAIXA = { casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05], pesqueiro: [0.5, 0.3] };
+  const CAIXA = { placa: [0.5, 0.95], casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05], pesqueiro: [0.5, 0.3] };
   let best = null, bd = Infinity;
   for (const o of objList(state, scene)) {
+    if (o.key === 'placa' && !landSignText()) continue;
     const q = iso(o.u, o.v), [w, h] = o.cerca ? [0.2, 0.25] : o.id ? [0.32, 0.7] : CAIXA[o.key];
     if (Math.abs(x - q.x) > w * L.W || y > q.y + 0.12 * L.W || y < q.y - h * L.W) continue;
     const d = Math.hypot(x - q.x, y - (q.y - h * L.W / 2));
     if (d < bd) { best = o; bd = d; }
   }
+  // sem casa/enfeite ali: um canteiro seu também tem o menu (para mudar de lugar)
+  if (!best && scene === 'roca') { const i = cellAt(x, y); if (i >= 0 && state.plots[i].s !== 'locked') return { key: 'plot:' + i, plot: i, u: i % COLS + 0.5, v: Math.floor(i / COLS) + 0.5 }; }
   return best;
 }
 function abrirMenuObj(o, x, y) {
-  const m = $('#ctxMenu'), nome = o.id ? ENFEITE[o.id].nome : OBJ_INFO[o.key].nome;
+  const m = $('#ctxMenu'), nome = o.plot !== undefined ? 'Canteiro' : o.id ? ENFEITE[o.id].nome : OBJ_INFO[o.key].nome;
   m.innerHTML = `<b>${esc(nome)}</b><button type="button" data-ctx="mover">↔️ Mover</button>${o.id ? '<button type="button" data-ctx="guardar">📦 Guardar no inventário</button>' : ''}<button type="button" data-ctx="fechar">Cancelar</button>`;
   m.dataset.key = o.key;
   m.hidden = false;
@@ -4769,7 +4773,11 @@ function fecharMenuObj() { $('#ctxMenu').hidden = true; }
 $('#ctxMenu').addEventListener('click', e => {
   const b = e.target.closest('[data-ctx]'); if (!b) return;
   const key = $('#ctxMenu').dataset.key; fecharMenuObj();
-  if (b.dataset.ctx === 'mover') {
+  if (b.dataset.ctx === 'mover' && key.startsWith('plot:')) {
+    const i = Number(key.slice(5));
+    moveMode = true; moving = { plot: i, uma: true, u: i % COLS + 0.5, v: Math.floor(i / COLS) + 0.5 }; renderMoveBtn(); renderTools();
+    toast(moveDica('Canteiro'));
+  } else if (b.dataset.ctx === 'mover') {
     const o = objList(state, scene).find(x => x.key === key);
     moveMode = true; moving = { key, uma: true, u: o ? o.u : 0, v: o ? o.v : 0, rot: o && o.rot }; renderMoveBtn(); renderTools();
     toast(moveDica(o && o.id ? ENFEITE[o.id].nome : OBJ_INFO[key] ? OBJ_INFO[key].nome : 'Pronto'));
@@ -7739,11 +7747,11 @@ const LUGARES = {
 // Posição padrão de cada coisa, em coordenadas da grade da cena.
 const POS_PADRAO = {
   // (as árvores de enfeite saíram: agora as árvores são as frutíferas do Pomar, compradas na Loja)
-  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], pesqueiro: [-1.05, 4.85] },
+  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], pesqueiro: [-1.05, 4.85], placa: [-0.1, 1.1] },
   animais: { canil: [-1.65, 3.65] },
 };
 const LAGO_POS = [3.55, -1.95];
-const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 } };
+const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 }, placa: { nome: 'Placa de terras', r: 0.45 } };
 function posOf(s, sc, key) {
   const p = s.pos && s.pos[sc] && s.pos[sc][key];
   if (Array.isArray(p)) return p;
@@ -7873,7 +7881,9 @@ function salvarMove() {
   if (moving.plot !== undefined) {
     const i = moving.plot, j = celulaMov();
     if (j !== i) { [state.plots[i], state.plots[j]] = [state.plots[j], state.plots[i]]; if (hover && hover.kind === 'plot') hover = null; }
-    moving = null; sfx('buy'); done(); renderMoveBar();
+    const uma = moving.uma; moving = null; sfx('buy'); done();
+    if (uma) { moveMode = false; renderMoveBtn(); renderTools(); renderMoveBar(); return toast('Canteiro no lugar novo!', 'good'); }
+    renderMoveBar();
     return toast(pointer.touch ? 'Canteiro no lugar novo! Toque em outro para mudar, ou em Concluir.' : 'Canteiro no lugar novo! Clique em outro para mudar, ou Esc para sair.', 'good');
   }
   if (cerca && moving.novo) {
@@ -7937,6 +7947,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
   const l = objList(s, sc).filter(o => (o.u < 0 || o.v < 0) === (stage === 'tras') && o.u + o.v >= d0 && o.u + o.v < d1).sort((a, b) => (a.u + a.v) - (b.u + b.v));
   for (const o of l) {
     if (moving && !moving.novo && moving.key === o.key) continue; // está na mão do jogador
+    if (o.key === 'placa' && !(home && landSignText())) continue; // só aparece na sua roça, com terra para comprar
     const q = iso(o.u, o.v);
     if (o.cerca) {
       drawCercaSeg(o.u, o.v, o.rot, s);
@@ -7951,6 +7962,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       ctx.beginPath(); ctx.ellipse(q.x, q.y, W * o.r * 0.55, W * o.r * 0.2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]);
       hits.push({ kind: 'obj', key: o.key, nome: o.id ? ENFEITE[o.id].nome : OBJ_INFO[o.key].nome, x: q.x, y: q.y - W * 0.3, r: W * Math.max(0.35, o.r * 0.5) });
     }
+    if (o.key === 'placa') { drawLandSign(q.x, q.y); continue; }
     if (o.key === 'casa') {
       drawHouse(q.x, q.y, W * 0.95, home ? '#f1dcae' : view.casa, s.skin);
       if (!moveMode) {
@@ -8029,6 +8041,7 @@ function drawMoving(sc, t) {
   else if (k === 'celeiro') drawBarn(q.x, q.y, W * 1.15, s.skin);
   else if (k === 'canil') drawKennel(q.x, q.y, L.W * 0.85, s.skin);
   else if (k === 'pesqueiro') drawLake(q.x, q.y, W * 0.48, t);
+  else if (k === 'placa') drawLandSign(q.x, q.y, true);
   else drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro);
   ctx.globalAlpha = 1;
 }
