@@ -164,7 +164,20 @@
     return () => unsubs.forEach(u => u());
   }
 
+  // Ranking semanal: ranking/{uid} com os pontos da semana (e os da semana passada, para o prêmio).
+  const salvarRanking = (uid, d) => db.collection('ranking').doc(uid).set(d);
+  async function lerRanking(uids) {
+    const out = {};
+    for (let i = 0; i < uids.length; i += 30) {
+      const lote = uids.slice(i, i + 30); if (!lote.length) continue;
+      const qs = await db.collection('ranking').where(firebase.firestore.FieldPath.documentId(), 'in', lote).get();
+      qs.docs.forEach(d => { out[d.id] = d.data(); });
+    }
+    return out;
+  }
+
   window.RFCloud = {
+    salvarRanking, lerRanking,
     marcarPresenca, watchPresenca,
     enviarMsg, watchChat, apagarMsg,
     ativarPush, desativarPush, salvarPush, mandarAviso, saveFarmSeguro, salvarBackup, listarBackups, apagarBackup,

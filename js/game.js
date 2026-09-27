@@ -1341,6 +1341,7 @@ async function cloudSave() {
     state.rev = rev; state.pendente = false; nivelNuvem = Math.max(nivelNuvem, state.level); save();
     syncStatus = 'Salvo na nuvem';
     sincronizarPush(); // agenda dos avisos (só grava se mudou)
+    publicarRanking();
   } catch (e) {
     console.warn(e);
     if (e && e.code === 'conflito') { salvando = false; return recarregarDaNuvem('A roça foi salva em outro aparelho. Carregando a versão mais nova…'); }
@@ -1447,7 +1448,7 @@ async function onUser(u) {
     if (Cloud.watchChat) unsubChat = Cloud.watchChat(u.uid, onChat);
     marcarPresenca(!document.hidden); presencaDe = ''; vigiarPresenca();
     unsubRequests = Cloud.watchRequests(u.uid, onRequests);
-    checkSent(); recuperarAmigos();
+    checkSent(); recuperarAmigos(); setTimeout(premioRanking, 4000);
     enterGame();
     toast(`Olá, ${firstName(u.name)}! Bom te ver na roça.`, 'good');
   } catch (e) {
@@ -2415,6 +2416,7 @@ function drawBug(x, y, s, t, k) {
 // Produtos dos animais, centrados em (x, y); s ≈ 1/10 do tamanho.
 function drawProduct(id, x, y, s) {
   if (RECEITA[id]) return drawGood(id, x, y, s);
+  if (PEIXE[id]) return drawPeixe(ctx, x, y, s * 0.85, PEIXE[id]);
   ctx.lineWidth = Math.max(1, 0.6 * s);
   if (id === 'ovo') {
     ctx.fillStyle = '#fff6df'; ctx.strokeStyle = '#cdb88c';
@@ -2957,7 +2959,10 @@ function drawLake(x, y, W, t) {
 function drawRoca(s, t, home) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
-  if (temaDe(s).lago) { const q = iso(...LAGO_POS); drawLake(q.x, q.y, W * 0.72, t); }
+  // lago (grande no tema "Lago dos patos"; nos outros, um pesqueiro menor). Na sua roça, clique para pescar.
+  if (temaDe(s).lago) { const q = iso(...LAGO_POS); drawLake(q.x, q.y, W * 0.72, t);
+    if (home && !moveMode) { hits.push({ kind: 'lago', x: q.x, y: q.y, r: W * 0.6 });
+      if (hover && hover.kind === 'lago') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.75, W * 0.3, 0, 0, 7); ctx.stroke(); } } }
   // casa, celeiro, casinha, árvores e enfeites: cada um no seu lugar (dá para mudar no modo Mover)
   const cachorroDepois = drawObjetos(s, 'roca', t, home, 'tras');
   drawFence(COLS, ROWS, 'back');
@@ -3891,7 +3896,7 @@ function renderPane() {
       }
     }
   } else if (tab === 'celeiro') {
-    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...RECEITAS].filter(it => state.barn[it.id] > 0);
+    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PEIXES.map(p => PRODUCT[p.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
     let total = 0; for (const it of items) total += state.barn[it.id] * it.preco;
     html += `<h3>Celeiro</h3>`;
     if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha na roça e recolha ovos, leite, lã e trufas dos animais.</div>`;
@@ -3958,6 +3963,7 @@ function renderPane() {
             <div class="stack"><button class="btn" data-accept="${esc(r.from)}">Aceitar</button><button class="btn ghost" data-refuse="${esc(r.from)}">Recusar</button></div></div>`;
         }
       }
+      html += rankingHTML();
       html += `<h3>Seus amigos</h3>`;
       if (state.friends.length) html += `<p class="hint">Mande um presente por dia para até ${PRESENTE_MAX} amigos (hoje: ${giftsToday().to.length} de ${PRESENTE_MAX}). Não custa nada!</p>`;
       if (!state.friends.length) html += `<div class="empty">Mande seu código para um amigo e peça o dele. A amizade começa quando um aceitar o pedido do outro.</div>`;
@@ -4010,6 +4016,7 @@ $('#pane').addEventListener('click', e => {
   if (d.bancaComprar) return bancaComprar(d.bancaComprar);
   if (d.entregar) return entregar(Number(d.entregar));
   if (d.mseg) { missSeg = d.mseg; renderPane(); $('#pane').scrollTop = 0; return; }
+  if (d.vila) { const [npc, id] = d.vila.split(':'); return entregarVila(npc, id); }
   if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
   if (d.temaRoca) return buyTema(d.temaRoca);
   if ('skin' in d) { state.skin = d.skin || null; toast(d.skin ? 'Celeiro e casa dos Pioneiros!' : 'Celeiro e casa clássicos.', 'good'); if (isHome()) setScene('roca'); return done(); }
@@ -4213,7 +4220,7 @@ function tipBicho(i) {
 }
 function tipEnfeite(id) {
   const e = ENFEITE[id]; if (!e) return null;
-  return `<b>${e.nome}</b><br>+${e.conforto}% de XP${e.especial ? `<br>Especial dos pioneiros · ${obtidoEm(S())}` : ''}${isHome() ? '<br>Mude de lugar com o botão Mover.' : ''}`;
+  return `<b>${e.nome}</b><br>+${e.conforto}% de XP${e.especial ? `<br>${origemEnfeite(e, S())}` : ''}${isHome() ? '<br>Mude de lugar com o botão Mover.' : ''}`;
 }
 function tipLand() {
   const next = EXPANSOES[state.exp + 1];
@@ -4229,7 +4236,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? `<b>${esc(meuApelido())}</b><br>Clique para dar um oi.` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? `<b>${esc(meuApelido())}</b><br>Clique para dar um oi.` : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${state.iscas == null ? 10 : state.iscas} iscas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4308,7 +4315,7 @@ let holdTimer = null, holdFired = false;
 function objAt(x, y) {
   if (!isHome() || scene === 'casa') return null;
   // a área de clique cobre o desenho inteiro (largura para cada lado e altura, em casas da grade)
-  const CAIXA = { casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05] };
+  const CAIXA = { casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05], pesqueiro: [0.5, 0.3] };
   let best = null, bd = Infinity;
   for (const o of objList(state, scene)) {
     const q = iso(o.u, o.v), [w, h] = o.id ? [0.32, 0.7] : CAIXA[o.key];
@@ -4388,6 +4395,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'abrigo') actAbrigo(target.id);
   else if (target.kind === 'land') openPanel('terreno');
   else if (target.kind === 'bicho') actBicho(target.i);
+  else if (target.kind === 'lago') abrirPesca();
   else if (target.kind === 'avatar') { falar('avatar', meuApelido(), sorteia(FALAS_AVATAR)); sfx('fala'); }
   else if (target.kind === 'enfeite') actEnfeite(target.id);
   else if (target.kind === 'casa') setScene('casa');
@@ -4747,6 +4755,8 @@ const MISSOES_SEMANA = [
   { ev: 'adubar', txt: 'Use {n} fertilizantes', alvo: [10, 20, 30] },
   { ev: 'fabricar', txt: 'Faça {n} coisas na fábrica', alvo: [15, 30, 50], need: () => state.level >= 2 },
   { ev: 'entregar', txt: 'Entregue {n} pedidos do caminhão', alvo: [8, 15, 25] },
+  { ev: 'vila', txt: 'Atenda {n} pedidos da vila', alvo: [3, 5, 8] },
+  { ev: 'pescar', txt: 'Pesque {n} peixes', alvo: [10, 20, 30] },
 ];
 const faixaNivel = () => state.level < 5 ? 0 : state.level < 15 ? 1 : 2;
 function sortear(pool, n) {
@@ -4764,9 +4774,12 @@ function rollPeriods() {
   if (novoDia) { m.d = d; m.dia = sortear(MISSOES_DIA, 3); }
   if (m.w !== w) { m.w = w; m.semana = sortear(MISSOES_SEMANA, 3); }
   if (novoDia && state.helpDay !== d) { state.helpDay = d; npcHelps(); }
+  if (novoDia) state.iscas = Math.max(state.iscas == null ? 10 : state.iscas, ISCA.gratisDia); // 5 iscas grátis por dia
+  rankAtual();
 }
 function track(ev, n = 1) {
   if (!state) return;
+  rankPontos(ev);
   if (!state.missions) rollPeriods();
   let pronto = false;
   for (const m of [...state.missions.dia, ...state.missions.semana]) {
@@ -4788,7 +4801,7 @@ function claimMission(tipo, k) {
   renderTabs(); done();
 }
 const prontasDe = tipo => state && state.missions ? state.missions[tipo].filter(m => m.feito >= m.alvo && !m.pego).length : 0;
-const missoesProntas = () => prontasDe('dia') + prontasDe('semana') + ((state && state.newStamps) || 0);
+const missoesProntas = () => prontasDe('dia') + prontasDe('semana') + ((state && state.newStamps) || 0) + vilaProntos();
 
 // ---------- Presente diário: 7 dias, depois vem uma leva nova ----------
 const PRESENTES = [
@@ -5025,6 +5038,12 @@ async function enviarChat(txt) {
     else toast('Não consegui mandar a mensagem agora. Tente de novo.', 'bad');
   }
 }
+$('#pesca').addEventListener('click', e => {
+  if (e.target === $('#pesca') || e.target.closest('[data-close]')) return fecharPesca();
+  if (e.target.closest('#pescaBtn') || e.target.closest('#pescaCv')) return puxar();
+  if (e.target.closest('#pescaComprar')) return comprarIscas();
+});
+window.addEventListener('keydown', e => { if (!$('#pesca').hidden && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); puxar(); } if (e.key === 'Escape' && !$('#pesca').hidden) fecharPesca(); });
 $('#chatForm').addEventListener('submit', e => { e.preventDefault(); enviarChat($('#chatTxt').value); });
 $('#chat').addEventListener('click', e => {
   if (e.target === $('#chat') || e.target.closest('[data-close]')) return fecharChat();
@@ -5070,7 +5089,8 @@ const CARIMBOS = [
   { n: 500, nome: 'diamante', cor: '#6fd3f2', moedas: 5000, xp: 400 },
 ];
 const COLECAO = () => [...CROPS.map(c => ({ id: c.prod, nome: c.prodNome, icon: () => cropIcon(c.id), nivel: c.nivel })),
-  ...PRODUCTS.filter(p => p.id !== 'leitao').map(p => ({ id: p.id, nome: p.nome, icon: () => productIcon(p.id), nivel: 0 }))];
+  ...PRODUCTS.filter(p => p.id !== 'leitao').map(p => ({ id: p.id, nome: p.nome, icon: () => productIcon(p.id), nivel: 0 })),
+  ...PEIXES.filter(p => !p.lixo).map(p => ({ id: p.id, nome: p.nome, icon: () => productIcon(p.id), nivel: p.nivel }))];
 function collect(id, pos) {
   const n = state.col[id] = (state.col[id] || 0) + 1, lv = state.stamps[id] || 0, c = CARIMBOS[lv];
   if (!c || n < c.n) return;
@@ -5747,17 +5767,306 @@ function drawCritters(t, tod) {
   }
 }
 
+// ============================================================
+// Pescaria: lago da roça, isca, minijogo de fisgar e livro de peixes
+// ============================================================
+const PEIXES = [
+  { id: 'lata',     nome: 'Lata velha', preco: 2,    raro: 'lixo',     peso: 5,   nivel: 1, lixo: true },
+  { id: 'bota',     nome: 'Bota velha', preco: 5,    raro: 'lixo',     peso: 4,   nivel: 1, lixo: true },
+  { id: 'lambari',  nome: 'Lambari',    preco: 30,   raro: 'comum',    peso: 30,  nivel: 1,  cor: ['#c9d3dc', '#8fa3b5'], tam: 0.7 },
+  { id: 'tilapia',  nome: 'Tilápia',    preco: 50,   raro: 'comum',    peso: 25,  nivel: 1,  cor: ['#9aa88f', '#6f7d64'], tam: 0.85 },
+  { id: 'traira',   nome: 'Traíra',     preco: 70,   raro: 'comum',    peso: 15,  nivel: 3,  cor: ['#7a6a4a', '#4f4430'], tam: 0.95 },
+  { id: 'pacu',     nome: 'Pacu',       preco: 90,   raro: 'incomum',  peso: 10,  nivel: 4,  cor: ['#8a8f99', '#e07a3a'], tam: 0.95, alto: true },
+  { id: 'tucunare', nome: 'Tucunaré',   preco: 160,  raro: 'raro',     peso: 6,   nivel: 6,  cor: ['#e3bf3a', '#4f7a2a'], tam: 1, listras: true },
+  { id: 'pintado',  nome: 'Pintado',    preco: 220,  raro: 'raro',     peso: 4,   nivel: 9,  cor: ['#c7c1b3', '#4a4a4a'], tam: 1.1, pintas: true },
+  { id: 'dourado',  nome: 'Dourado',    preco: 400,  raro: 'épico',    peso: 2,   nivel: 12, cor: ['#f2b705', '#d9822b'], tam: 1.1 },
+  { id: 'pirarucu', nome: 'Pirarucu',   preco: 1000, raro: 'lendário', peso: 0.6, nivel: 18, cor: ['#6b5a4a', '#c8402f'], tam: 1.3 },
+];
+const PEIXE = Object.fromEntries(PEIXES.map(p => [p.id, p]));
+for (const p of PEIXES) PRODUCT[p.id] = { id: p.id, nome: p.nome, preco: p.preco, peixe: true };
+const COR_RARO = { lixo: '#8a8672', comum: '#6a8a4a', incomum: '#3f8ac8', raro: '#8a4fc8', 'épico': '#d9822b', 'lendário': '#c8402f' };
+const ISCA = { pacote: 10, custo: 60, gratisDia: 5 };
+function drawPeixe(g, x, y, s, p) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  if (p.id === 'bota') {
+    g.fillStyle = '#6b4220'; g.beginPath(); g.moveTo(-5, -9); g.lineTo(2, -9); g.lineTo(2, 1); g.lineTo(8, 2); g.quadraticCurveTo(9, 6, 6, 6); g.lineTo(-5, 6); g.closePath(); g.fill();
+    g.fillStyle = '#4a2c14'; g.fillRect(-5, 4.5, 14, 2);
+  } else if (p.id === 'lata') {
+    g.fillStyle = '#9aa3aa'; g.fillRect(-4, -7, 8, 13); g.fillStyle = '#c8402f'; g.fillRect(-4, -3, 8, 5); g.fillStyle = '#6b7780'; g.fillRect(-4, -8, 8, 1.5);
+  } else {
+    const k = p.tam || 1, a = p.alto ? 1.35 : 1;
+    g.fillStyle = p.cor[1]; g.beginPath(); g.moveTo(-8 * k, 0); g.lineTo(-13 * k, -5 * k * a); g.lineTo(-13 * k, 5 * k * a); g.closePath(); g.fill(); // rabo
+    g.beginPath(); g.moveTo(-2 * k, -4 * k * a); g.quadraticCurveTo(1 * k, -8 * k * a, 4 * k, -4 * k * a); g.fill(); // barbatana
+    g.fillStyle = p.cor[0]; g.beginPath(); g.ellipse(0, 0, 10 * k, 4.6 * k * a, 0, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(1 * k, 1.8 * k * a, 7 * k, 1.8 * k * a, 0, 0, 7); g.fill();
+    if (p.listras) { g.fillStyle = 'rgba(40,60,20,.55)'; for (const lx of [-4, 0, 4]) g.fillRect(lx * k, -4 * k, 1.4 * k, 7 * k); }
+    if (p.pintas) { g.fillStyle = 'rgba(30,30,30,.6)'; for (const [px, py] of [[-4, -1], [-1, -2], [2, -1], [-2, 1], [4, 0]]) { g.beginPath(); g.arc(px * k, py * k, 0.8 * k, 0, 7); g.fill(); } }
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(6 * k, -1.2 * k, 1.5 * k, 0, 7); g.fill();
+    g.fillStyle = '#111'; g.beginPath(); g.arc(6.4 * k, -1.2 * k, 0.8 * k, 0, 7); g.fill();
+  }
+  g.restore();
+}
+let pesca = null, pescaRaf = 0;
+function abrirPesca() {
+  if (!isHome()) return;
+  if (state.iscas == null) state.iscas = 10;
+  pesca = { fase: 'pronto', t0: performance.now() };
+  $('#pesca').hidden = false; renderPesca();
+  if (!pescaRaf) pescaRaf = requestAnimationFrame(desenharPesca);
+}
+function fecharPesca() { $('#pesca').hidden = true; pesca = null; }
+function sortearPeixe() {
+  const ok = PEIXES.filter(p => p.nivel <= state.level), tot = ok.reduce((t, p) => t + p.peso, 0);
+  let r = Math.random() * tot;
+  for (const p of ok) { r -= p.peso; if (r <= 0) return p; }
+  return ok[0];
+}
+function lancar() {
+  if (!pesca || (pesca.fase !== 'pronto' && pesca.fase !== 'resultado')) return;
+  if ((state.iscas || 0) <= 0) return toast('Acabaram as iscas! Compre mais aqui embaixo (ou ganhe 5 grátis amanhã).', 'bad');
+  state.iscas--; save();
+  const agora = performance.now();
+  pesca = { fase: 'esperando', t0: agora, mordida: agora + 1800 + Math.random() * 3800, beliscos: [agora + 700 + Math.random() * 900] };
+  sfx('water'); renderPesca();
+}
+function puxar() {
+  if (!pesca) return;
+  if (pesca.fase === 'pronto' || pesca.fase === 'resultado') return lancar();
+  if (pesca.fase === 'esperando') { pesca = { fase: 'resultado', t0: performance.now(), msg: 'Puxou cedo demais! O peixe fugiu.' }; sfx('error'); return renderPesca(); }
+  if (pesca.fase === 'fisgou') {
+    const p = pesca.peixe;
+    state.barn[p.id] = (state.barn[p.id] || 0) + 1;
+    if (!p.lixo) { collect(p.id, null); track('pescar'); }
+    addXP({ lixo: 0, comum: 2, incomum: 4, raro: 8, 'épico': 15, 'lendário': 40 }[p.raro], null);
+    state.stats.peixes = (state.stats.peixes || 0) + (p.lixo ? 0 : 1);
+    pesca = { fase: 'resultado', t0: performance.now(), peixe: p, msg: p.lixo ? `Ih… veio uma ${p.nome.toLowerCase()}. 😅` : `Pegou um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''} ${p.nome}! (${p.raro})` };
+    sfx(p.lixo ? 'error' : ['raro', 'épico', 'lendário'].includes(p.raro) ? 'level' : 'collect');
+    done(); renderPesca();
+  }
+}
+function renderPesca() {
+  if (!pesca) return;
+  const btn = $('#pescaBtn'), msg = $('#pescaMsg');
+  btn.textContent = pesca.fase === 'esperando' ? 'Esperando…' : pesca.fase === 'fisgou' ? 'PUXA! 🎣' : pesca.fase === 'resultado' ? 'Lançar de novo' : 'Lançar a linha';
+  btn.classList.toggle('gold', pesca.fase === 'fisgou' || pesca.fase === 'pronto' || pesca.fase === 'resultado');
+  btn.classList.toggle('pulsa', pesca.fase === 'fisgou');
+  msg.textContent = pesca.fase === 'pronto' ? 'Toque em "Lançar a linha" e espere a boia afundar. Aí, puxe rápido!'
+    : pesca.fase === 'esperando' ? 'Shhh… espere a boia afundar de verdade.' : pesca.fase === 'fisgou' ? 'Afundou! Puxa agora!' : pesca.msg || '';
+  $('#pescaIscas').textContent = `🪱 ${state.iscas || 0} iscas`;
+  $('#pescaComprar').disabled = state.coins < ISCA.custo;
+}
+function desenharPesca(t) {
+  pescaRaf = 0;
+  const c = $('#pescaCv'); if (!c || !pesca || $('#pesca').hidden) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1), cw = c.clientWidth, ch = c.clientHeight;
+  if (c.width !== Math.round(cw * dpr)) { c.width = Math.round(cw * dpr); c.height = Math.round(ch * dpr); }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // fases que mudam com o tempo
+  if (pesca.fase === 'esperando' && t >= pesca.mordida) { pesca = { fase: 'fisgou', t0: t, peixe: sortearPeixe() }; pesca.janela = { comum: 950, lixo: 1000, incomum: 850, raro: 720, 'épico': 620, 'lendário': 520 }[pesca.peixe.raro]; sfx('water'); renderPesca(); }
+  if (pesca.fase === 'fisgou' && t - pesca.t0 > pesca.janela) { pesca = { fase: 'resultado', t0: t, msg: 'Ah, escapou… tente de novo!' }; renderPesca(); }
+  // céu, margem e água
+  const ceu = g.createLinearGradient(0, 0, 0, ch * 0.4); ceu.addColorStop(0, '#8fd0f5'); ceu.addColorStop(1, '#d9f1ff');
+  g.fillStyle = ceu; g.fillRect(0, 0, cw, ch * 0.4);
+  g.fillStyle = '#7dbb48'; g.beginPath(); g.moveTo(0, ch * 0.4); for (let x = 0; x <= cw; x += 20) g.lineTo(x, ch * 0.36 - Math.sin(x / 50) * 6); g.lineTo(cw, ch * 0.42); g.lineTo(0, ch * 0.42); g.fill();
+  const agua = g.createLinearGradient(0, ch * 0.4, 0, ch); agua.addColorStop(0, '#6cb6e8'); agua.addColorStop(1, '#2f7ab8');
+  g.fillStyle = agua; g.fillRect(0, ch * 0.4, cw, ch);
+  g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = 1.5;
+  for (let k = 0; k < 6; k++) { const yy = ch * 0.5 + k * ch * 0.08, xx = ((t / 40 + k * 90) % (cw + 60)) - 30; g.beginPath(); g.moveTo(xx, yy); g.quadraticCurveTo(xx + 15, yy - 3, xx + 30, yy); g.stroke(); }
+  // barranco com o avatar
+  g.fillStyle = '#8a5a33'; g.beginPath(); g.moveTo(0, ch); g.lineTo(0, ch * 0.62); g.quadraticCurveTo(cw * 0.22, ch * 0.6, cw * 0.3, ch); g.fill();
+  g.fillStyle = '#7dbb48'; g.beginPath(); g.moveTo(0, ch * 0.64); g.quadraticCurveTo(cw * 0.2, ch * 0.6, cw * 0.28, ch * 0.66); g.lineTo(0, ch * 0.68); g.fill();
+  const esc = clamp(ch / 260, 0.8, 1.6), ax = cw * 0.13, ay = ch * 0.66;
+  drawAvatar(g, ax, ay, 1.1 * esc, Object.assign({}, state.avatar, { mao: 'nada' }), t, false, 1);
+  // vara e linha
+  const mao = { x: ax + 13 * esc, y: ay - 26 * esc }, ponta = { x: ax + 70 * esc, y: ay - 95 * esc };
+  const fisgou = pesca.fase === 'fisgou';
+  const curva = fisgou ? 10 * esc : 0;
+  g.strokeStyle = '#7a4a24'; g.lineWidth = 2.5 * esc; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(mao.x, mao.y); g.quadraticCurveTo((mao.x + ponta.x) / 2, (mao.y + ponta.y) / 2 - curva, ponta.x, ponta.y + curva); g.stroke(); g.lineCap = 'butt';
+  const naAgua = pesca.fase === 'esperando' || fisgou;
+  const bx = cw * 0.62, by = ch * 0.62;
+  let boiaY = by + Math.sin(t / 400) * 2;
+  if (pesca.fase === 'esperando' && pesca.beliscos.some(b => t > b && t < b + 250)) boiaY += 4; // beliscada
+  if (fisgou) boiaY += 9 + Math.sin(t / 45) * 3;
+  if (naAgua) {
+    g.strokeStyle = 'rgba(40,40,40,.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(ponta.x, ponta.y + curva); g.quadraticCurveTo(bx - 20, by - 60, bx, boiaY - 6); g.stroke();
+    if (fisgou) { g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2; for (let k = 0; k < 2; k++) { const r = ((t - pesca.t0) / 400 + k / 2) % 1; g.globalAlpha = 1 - r; g.beginPath(); g.ellipse(bx, by + 4, 8 + r * 30, 3 + r * 10, 0, 0, 7); g.stroke(); } g.globalAlpha = 1; }
+    g.fillStyle = '#d8402f'; g.beginPath(); g.arc(bx, boiaY - 4, 5, Math.PI, 0); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(bx, boiaY - 4, 5, 0, Math.PI); g.fill();
+    if (fisgou) { g.font = `900 ${Math.round(34 * esc)}px system-ui, sans-serif`; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#6b1f14'; g.strokeText('!', bx, by - 30); g.fillStyle = '#ffe08a'; g.fillText('!', bx, by - 30); }
+  } else {
+    g.strokeStyle = 'rgba(40,40,40,.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(ponta.x, ponta.y); g.lineTo(ponta.x + 4, ponta.y + 40); g.stroke();
+  }
+  // resultado: o peixe pendurado e a raridade
+  if (pesca.fase === 'resultado' && pesca.peixe) {
+    const p = pesca.peixe, k = Math.min(1, (t - pesca.t0) / 350);
+    g.fillStyle = 'rgba(255,253,242,.95)'; g.strokeStyle = '#6b4220'; g.lineWidth = 3;
+    const w = Math.min(cw * 0.5, 220), h = 120 * esc * 0.8, x0 = cw * 0.55 - w / 2, y0 = ch * 0.08 + (1 - k) * 20;
+    g.beginPath(); g.roundRect(x0, y0, w, h, 14); g.fill(); g.stroke();
+    drawPeixe(g, x0 + w / 2, y0 + h * 0.42, 3.2 * esc * 0.8, p);
+    g.textAlign = 'center'; g.font = `800 ${Math.round(15 * esc)}px system-ui, sans-serif`; g.fillStyle = '#2f2a1f'; g.fillText(p.nome, x0 + w / 2, y0 + h * 0.8);
+    g.font = `800 ${Math.round(11 * esc)}px system-ui, sans-serif`; g.fillStyle = COR_RARO[p.raro]; g.fillText(`${p.raro.toUpperCase()} · vale ${p.preco}`, x0 + w / 2, y0 + h * 0.94);
+  }
+  pescaRaf = requestAnimationFrame(desenharPesca);
+}
+function comprarIscas() {
+  if (state.coins < ISCA.custo) return toast('Faltam moedas para as iscas.', 'bad');
+  state.coins -= ISCA.custo; state.iscas = (state.iscas || 0) + ISCA.pacote; sfx('buy');
+  toast(`+${ISCA.pacote} iscas!`, 'good'); done(); renderPesca();
+}
+
+// ============================================================
+// Pedidos da vila: Seu Zé e Dona Maria pedem coisas e viram seus amigos
+// ============================================================
+const VILA_MAX = 2, VILA_PRAZO = 24 * 3600e3, VILA_NOVO = 2 * 3600e3, CORACAO = 5;
+const VILA_FALAS = {
+  ze: ['Tô precisando de {itens} pra levar na feira. Me ajuda?', 'Minha patroa pediu {itens}. Cê tem aí?', 'Ô, vizinho! Me arruma {itens}? Te pago direitinho.'],
+  maria: ['Vou fazer um bolo pros netos! Me arruma {itens}?', 'Querido(a), tem {itens} sobrando? É pra quermesse da igreja.', 'Ai, esqueci de comprar {itens}! Você me salva?'],
+};
+const VILA_MARCOS = [
+  { c: 1, txt: '300 moedas', dar: () => { state.coins += 300; } },
+  { c: 2, txt: '10 iscas', dar: () => { state.iscas = (state.iscas || 0) + 10; } },
+  { c: 3, txt: 'um enfeite exclusivo', dar: npc => { const id = npc === 'ze' ? 'carroca' : 'roseira'; state.enfeites[id] = (state.enfeites[id] || 0) + 1; state.invNovos = (state.invNovos || 0) + 1; } },
+  { c: 4, txt: '+10% nas recompensas dos pedidos' , dar: () => {} },
+  { c: 5, txt: '2.000 moedas e o título de melhor vizinho(a)', dar: () => { state.coins += 2000; } },
+];
+const coracoes = npc => Math.min(VILA_MARCOS.length, Math.floor(((state.vila && state.vila[npc] && state.vila[npc].amz) || 0) / CORACAO));
+function vilaDe(npc) {
+  state.vila = state.vila || {};
+  if (!state.vila[npc]) { state.vila[npc] = { amz: 0, pedidos: [], novoEm: 0 }; for (let k = 0; k < VILA_MAX; k++) state.vila[npc].pedidos.push(novoPedidoVila(npc)); }
+  return state.vila[npc];
+}
+function itensDaVila() {
+  const lista = [];
+  for (const c of CROPS) if (c.nivel <= state.level && !c.arvore) lista.push({ id: c.prod, min: 4, max: 12 });
+  const temAnimal = new Set(state.animals.map(a => ANIMAL[a.k].prod).filter(Boolean));
+  for (const p of PRODUCTS) if (temAnimal.has(p.id)) lista.push({ id: p.id, min: 2, max: 5 });
+  for (const r of RECEITAS) if (r.nivel <= state.level && state.level >= r.nivel + 2) lista.push({ id: r.id, min: 1, max: 2 });
+  return lista;
+}
+function novoPedidoVila(npc) {
+  const pool = itensDaVila(), n = pool.length > 3 && Math.random() < 0.5 ? 2 : 1, itens = {};
+  for (let k = 0; k < n && pool.length; k++) { const it = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; itens[it.id] = it.min + Math.floor(Math.random() * (it.max - it.min + 1)); }
+  const valor = Object.entries(itens).reduce((t, [id, q]) => t + ((item(id) || {}).preco || 10) * q, 0);
+  const bonus = coracoes(npc) >= 4 ? 1.1 : 1;
+  const fala = VILA_FALAS[npc][Math.floor(Math.random() * VILA_FALAS[npc].length)];
+  return { id: newId(), itens, moedas: Math.round(valor * 1.6 * bonus / 10) * 10, xp: 6 + Math.round(state.level * 1.5), fala, ate: Date.now() + VILA_PRAZO };
+}
+function atualizarVila() {
+  for (const nb of NEIGHBORS) {
+    const v = vilaDe(nb.id), agora = Date.now(), antes = v.pedidos.length;
+    v.pedidos = v.pedidos.filter(p => p.ate > agora);
+    if (v.pedidos.length < antes && !v.novoEm) v.novoEm = agora + VILA_NOVO; // venceu: outro chega em 2 h
+    if (!v.pedidos.length && !v.novoEm) v.novoEm = agora; // sem nenhum pedido: chega um na hora
+    if (v.pedidos.length < VILA_MAX && v.novoEm && agora >= v.novoEm) {
+      v.pedidos.push(novoPedidoVila(nb.id));
+      v.novoEm = v.pedidos.length < VILA_MAX ? agora + VILA_NOVO : 0;
+    }
+  }
+}
+const podeVila = p => Object.entries(p.itens).every(([id, q]) => (state.barn[id] || 0) >= q);
+const vilaProntos = () => state && state.vila ? NEIGHBORS.reduce((t, nb) => t + ((state.vila[nb.id] && state.vila[nb.id].pedidos) || []).filter(podeVila).length, 0) : 0;
+function entregarVila(npc, id) {
+  const v = vilaDe(npc), p = v.pedidos.find(x => x.id === id), nb = NEIGHBORS.find(n => n.id === npc);
+  if (!p || !podeVila(p)) return toast('Faltam itens no celeiro para esse pedido.', 'bad');
+  for (const [iid, q] of Object.entries(p.itens)) { state.barn[iid] -= q; if (!state.barn[iid]) delete state.barn[iid]; }
+  v.pedidos = v.pedidos.filter(x => x.id !== id); if (!v.novoEm) v.novoEm = Date.now() + VILA_NOVO;
+  const antes = coracoes(npc);
+  v.amz += 1; state.coins += p.moedas; addXP(p.xp, null); track('vila'); sfx('coin');
+  let msg = `${nb.nome} agradece! +${p.moedas.toLocaleString('pt-BR')} moedas e +${p.xp} XP.`;
+  const depois = coracoes(npc);
+  if (depois > antes) { const m = VILA_MARCOS[depois - 1]; m.dar(npc); sfx('level'); msg += ` ❤️ Amizade com ${nb.nome} subiu: ganhou ${m.txt}!`; }
+  toast(msg, 'good'); done();
+}
+function vilaHTML() {
+  atualizarVila();
+  let html = `<p class="hint">Os vizinhos da vila pedem coisas da sua roça. Cada entrega dá moedas, XP e amizade: a cada ${CORACAO} entregas, um coração ❤️ e um presente. Pedidos novos chegam a cada 2 horas.</p>`;
+  for (const nb of NEIGHBORS) {
+    const v = vilaDe(nb.id), c = coracoes(nb.id), prox = VILA_MARCOS[c];
+    html += `<div class="row sel"><div class="avatar" style="background:${nb.casa}">${esc(nb.nome.split(' ').pop()[0])}</div>
+      <div><div class="name">${esc(nb.nome)} <span class="meta">· ${esc(nb.fazenda)}</span></div>
+      <div class="meta">${'❤️'.repeat(c)}${'🤍'.repeat(VILA_MARCOS.length - c)}${prox ? ` · próximo: ${prox.txt} (${v.amz % CORACAO}/${CORACAO})` : ' · melhor vizinho(a)! ⭐'}</div></div><div></div></div>`;
+    if (!v.pedidos.length) html += `<div class="empty">${esc(nb.nome)} não precisa de nada agora. Volta mais tarde!</div>`;
+    for (const p of v.pedidos) {
+      const itensTxt = Object.entries(p.itens).map(([id, q]) => `${q} ${(item(id) || { nome: id }).nome.toLowerCase()}`).join(' e ');
+      const ok = podeVila(p), falta = Math.max(0, p.ate - Date.now());
+      html += `<div class="row pedvila"><div class="icons">${Object.keys(p.itens).map(id => `<img alt="" src="${itemIcon(id)}">`).join('')}</div>
+        <div><div class="meta" style="font-style:italic">“${esc(p.fala.replace('{itens}', itensTxt))}”</div>
+        <div class="meta">${Object.entries(p.itens).map(([id, q]) => `<span class="${(state.barn[id] || 0) >= q ? '' : 'falta'}">${q} ${(item(id) || { nome: id }).nome.toLowerCase()} (tem ${state.barn[id] || 0})</span>`).join(' + ')}</div>
+        <div class="meta">Recompensa: ${moeda(p.moedas)} + ${p.xp} XP · ❤️ · vale por ${fmt(falta / 1000)}</div></div>
+        <button class="btn ${ok ? 'gold' : ''}" data-vila="${nb.id}:${p.id}" ${ok ? '' : 'disabled'}>Entregar</button></div>`;
+    }
+  }
+  return html;
+}
+
+// ============================================================
+// Ranking semanal entre amigos
+// ============================================================
+const PONTOS_RANK = { colher: 1, coletar: 1, fabricar: 2, entregar: 5, ajudar: 3, presentear: 3, pescar: 2, vila: 8, dourada: 5 };
+const PREMIO_RANK = [{ moedas: 1500, xp: 60 }, { moedas: 800, xp: 40 }, { moedas: 400, xp: 20 }];
+function rankAtual() {
+  const w = thisWeek();
+  const r = state.rank || (state.rank = { w, pts: 0 });
+  if (r.w !== w) { state.rank = { w, pts: 0, ant: { w: r.w, pts: r.pts }, premiado: r.premiado }; }
+  return state.rank;
+}
+function rankPontos(ev) { const p = PONTOS_RANK[ev]; if (p && state) rankAtual().pts += p; }
+let rankPublicado = '', rankCache = null, rankCacheEm = 0;
+function publicarRanking() {
+  if (!user || !Cloud.salvarRanking) return;
+  const r = rankAtual(), d = { w: r.w, pts: r.pts, antW: r.ant ? r.ant.w : 0, antPts: r.ant ? r.ant.pts : 0, nome: meuApelido(), fazenda: minhaFazenda(), nivel: state.level };
+  const chave = JSON.stringify(d); if (chave === rankPublicado) return;
+  rankPublicado = chave; Cloud.salvarRanking(user.uid, d).catch(e => { console.warn('ranking:', e); rankPublicado = ''; });
+}
+async function lerRanking(forcar) {
+  if (!user || !Cloud.lerRanking) return null;
+  if (!forcar && rankCache && Date.now() - rankCacheEm < 60e3) return rankCache;
+  try { rankCache = await Cloud.lerRanking(state.friends.slice(0, 60)); rankCacheEm = Date.now(); } catch (e) { console.warn(e); }
+  return rankCache;
+}
+const ptsNaSemana = (d, w) => !d ? 0 : d.w === w ? d.pts || 0 : d.antW === w ? d.antPts || 0 : 0;
+// Na primeira vez que abre o jogo numa semana nova, vê a colocação da semana passada e dá o prêmio.
+async function premioRanking() {
+  const r = rankAtual();
+  if (!user || !r.ant || r.premiado === r.ant.w) return;
+  const docs = await lerRanking(true); if (!docs) return;
+  const w = r.ant.w, meus = r.ant.pts;
+  const pos = 1 + Object.values(docs).filter(d => ptsNaSemana(d, w) > meus).length;
+  r.premiado = w;
+  if (meus <= 0) return done();
+  const pr = PREMIO_RANK[pos - 1] || { moedas: 100, xp: 5 };
+  state.coins += pr.moedas; addXP(pr.xp, null); sfx('level'); done();
+  toast(`🏆 Ranking da semana passada: você ficou em ${pos}º lugar com ${meus} pontos! +${pr.moedas.toLocaleString('pt-BR')} moedas e +${pr.xp} XP.`, 'good');
+}
+let rankHTMLcache = '';
+function rankingHTML() {
+  const r = rankAtual();
+  const fim = new Date(); fim.setHours(0, 0, 0, 0); fim.setDate(fim.getDate() + ((8 - fim.getDay()) % 7 || 7));
+  const dias = Math.max(0, Math.ceil((fim - Date.now()) / 86400e3));
+  lerRanking().then(docs => { if (docs && tab === 'amigos') { const novo = listaRank(docs, r); if (novo !== rankHTMLcache) { rankHTMLcache = novo; const el = $('#rankLista'); if (el) el.innerHTML = novo; } } });
+  return `<h3>🏆 Ranking da semana</h3><p class="hint">Pontos por colher (1), recolher dos animais (1), fábrica (2), pescar (2), ajudar amigos (3), presentear (3), caminhão (5), pedidos da vila (8). Termina ${dias <= 1 ? 'hoje à meia-noite' : `em ${dias} dias`} (segunda 0h). Prêmios: 🥇 ${PREMIO_RANK[0].moedas} · 🥈 ${PREMIO_RANK[1].moedas} · 🥉 ${PREMIO_RANK[2].moedas} moedas.</p>
+    <div id="rankLista">${rankHTMLcache || listaRank(rankCache || {}, r)}</div>`;
+}
+function listaRank(docs, r) {
+  const w = r.w, linhas = [{ uid: 'eu', nome: `${meuApelido()} (você)`, pts: r.pts, eu: true }];
+  for (const uid of state.friends) { const d = docs[uid], f = friendInfo[uid]; linhas.push({ uid, nome: (d && d.nome) || (f && f.name && !f.erro ? f.name : 'Amigo'), pts: ptsNaSemana(d, w) }); }
+  linhas.sort((a, b) => b.pts - a.pts || (a.eu ? -1 : 1));
+  return linhas.map((l, k) => `<div class="rankrow ${l.eu ? 'eu' : ''}"><b>${['🥇', '🥈', '🥉'][k] || `${k + 1}º`}</b><span>${esc(l.nome)}</span><strong>${l.pts} pts</strong></div>`).join('');
+}
+
 // ---------- Tela de missões e coleção ----------
 let missSeg = 'dia';
 function missoesHTML() {
   rollPeriods();
   if (missSeg === 'colecao' && state.newStamps) { state.newStamps = 0; setTimeout(renderTabs, 0); save(); }
-  const segs = [['dia', 'Diárias'], ['semana', 'Semanais'], ['colecao', 'Coleção']];
-  const conta = { dia: prontasDe('dia'), semana: prontasDe('semana'), colecao: state.newStamps || 0 };
+  const segs = [['dia', 'Diárias'], ['semana', 'Semanais'], ['vila', 'Vila'], ['colecao', 'Coleção']];
+  const conta = { dia: prontasDe('dia'), semana: prontasDe('semana'), vila: vilaProntos(), colecao: state.newStamps || 0 };
   let html = `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-mseg="${id}" aria-selected="${missSeg === id}">${n}${conta[id] ? `<span class="badge" aria-label="${conta[id]} novidades">${conta[id]}</span>` : ''}</button>`).join('')}</div>`;
   const est = estacao();
   html += `<div class="row sel"><div class="avatar" style="background:#7aa35a;font-size:26px">${est.icone}</div><div><div class="name">${est.nome}</div>
     <div class="meta">Esta semana rendem ${Math.round(ESTACAO_BONUS * 100)}% a mais: ${est.plantas.map(id => CROP[id].nome.toLowerCase()).join(', ')}.</div></div><div></div></div>`;
+  if (missSeg === 'vila') return html + vilaHTML();
   if (missSeg === 'colecao') {
     const lista = COLECAO(), temCarimbo = lista.filter(c => state.stamps[c.id]).length;
     html += `<p class="hint">Cada colheita ou produto recolhido conta. ${CARIMBOS.map((c, k) => `${c.n} dão o carimbo de ${c.nome} (+${c.moedas.toLocaleString('pt-BR')} moedas, ${Math.round(RAPIDEZ[k + 1] * 100)}% mais rápido)`).join(', ')}. Você já tem ${temCarimbo} de ${lista.length} com carimbo.</p><div class="colgrid">`;
@@ -6103,7 +6412,11 @@ const ENFEITES = [
   { id: 'moinho',     nome: 'Cata-vento',             nivel: 14, custo: 5000, conforto: 3 },
   { id: 'bandeira',   nome: 'Bandeira dos Pioneiros', especial: true, conforto: 2 },
   { id: 'bolo',       nome: 'Bolo de boas-vindas',    especial: true, conforto: 2 },
+  { id: 'carroca',    nome: 'Carroça de feno do Seu Zé',    especial: true, vila: true, conforto: 3 },
+  { id: 'roseira',    nome: 'Roseira da Dona Maria',         especial: true, vila: true, conforto: 3 },
 ];
+// Etiqueta de onde veio um item especial.
+const origemEnfeite = (e, s) => e.vila ? 'Presente da vila' : `Especial dos pioneiros · ${obtidoEm(s)}`;
 const ENFEITE = Object.fromEntries(ENFEITES.map(e => [e.id, e]));
 // Lugares antigos (saves de antes do modo Mover): viram posições livres.
 const LUGARES = {
@@ -6113,11 +6426,11 @@ const LUGARES = {
 // ---------- Objetos que dá para mudar de lugar (modo Mover) ----------
 // Posição padrão de cada coisa, em coordenadas da grade da cena.
 const POS_PADRAO = {
-  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], arv1: [3.6, -1.6], arv2: [5.8, -1.4] },
+  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], arv1: [3.6, -1.6], arv2: [5.8, -1.4], pesqueiro: [-1.05, 4.85] },
   animais: { canil: [-1.65, 3.65], arv1: [-0.9, RANCH_R - 0.6], arv2: [RANCH_C + 0.8, 0.8] },
 };
 const LAGO_POS = [3.55, -1.95];
-const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 } };
+const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 } };
 function posOf(s, sc, key) {
   const p = s.pos && s.pos[sc] && s.pos[sc][key];
   if (Array.isArray(p)) return p;
@@ -6246,6 +6559,16 @@ function drawObjetos(s, sc, t, home, stage) {
         if (hover && hover.kind === 'celeiro') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.7, W * 0.18, 0, 0, 7); ctx.stroke(); }
         hits.push({ kind: 'celeiro', x: q.x, y: q.y - W * 0.4, r: W * 0.5 });
       }
+    } else if (o.key === 'pesqueiro') {
+      // pesqueiro: laguinho com uma plaquinha. Na sua roça, clique para pescar.
+      drawLake(q.x, q.y, W * 0.48, t);
+      ctx.fillStyle = '#7a4a22'; ctx.fillRect(q.x + W * 0.4, q.y - W * 0.34, W * 0.035, W * 0.3);
+      ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(q.x + W * 0.28, q.y - W * 0.46, W * 0.28, W * 0.14, 3); ctx.fill(); ctx.stroke();
+      ctx.font = `${Math.round(W * 0.1)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎣', q.x + W * 0.42, q.y - W * 0.39);
+      if (!moveMode && home) {
+        if (hover && hover.kind === 'lago') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.52, W * 0.21, 0, 0, 7); ctx.stroke(); }
+        hits.push({ kind: 'lago', x: q.x, y: q.y - W * 0.05, r: W * 0.45 });
+      }
     } else if (o.key === 'canil') {
       const slot = sc === 'roca' ? 'roca' : 'animais';
       if (view.kind === 'npc') { const d = DOG_AT(); drawDog(d.x, d.y, W * 0.7, t); hits.push({ kind: 'dog', slot, x: d.x, y: d.y - W * 0.2, r: W * 0.4 }); continue; }
@@ -6284,6 +6607,7 @@ function drawMoving(sc, t) {
   else if (k === 'casa') drawHouse(q.x, q.y, W * 0.95, '#f1dcae', s.skin);
   else if (k === 'celeiro') drawBarn(q.x, q.y, W * 1.15, s.skin);
   else if (k === 'canil') drawKennel(q.x, q.y, L.W * 0.85);
+  else if (k === 'pesqueiro') drawLake(q.x, q.y, W * 0.48, t);
   else drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro);
   ctx.globalAlpha = 1;
 }
@@ -6337,7 +6661,7 @@ function inventarioHTML() {
   html += `<h3>Guardados</h3>`;
   if (!guardados.length) html += `<div class="empty">Nada guardado. Compre enfeites na Loja › Enfeites.</div>`;
   for (const e of guardados) {
-    html += `<div class="row wide ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome} × ${state.enfeites[e.id]}${e.especial ? ' <span class="tag">⭐ pioneiros</span>' : ''}</div><div class="meta">+${e.conforto}% de XP quando está na roça ou no rancho${e.especial ? `<br>${obtidoEm(state)}` : ''}</div></div>
+    html += `<div class="row wide ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome} × ${state.enfeites[e.id]}${e.especial ? ` <span class="tag">${e.vila ? '🏡 vila' : '⭐ pioneiros'}</span>` : ''}</div><div class="meta">+${e.conforto}% de XP quando está na roça ou no rancho${e.especial ? `<br>${origemEnfeite(e, state)}` : ''}</div></div>
       <div class="actions"><button class="btn gold" data-inv-por="${e.id}" data-sc="roca">Pôr na roça</button><button class="btn gold" data-inv-por="${e.id}" data-sc="animais">Pôr no rancho</button>
       ${e.especial ? '' : venderBtn('enf:' + e.id, Math.floor(e.custo / 2))}</div></div>`;
   }
@@ -6347,7 +6671,7 @@ function inventarioHTML() {
     html += `<h3>${sc === 'roca' ? 'Na roça' : 'No rancho'}</h3>`;
     l.forEach((o, i) => {
       const e = ENFEITE[o.id];
-      html += `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${e.especial ? ` · ${obtidoEm(state)}` : ''}</div></div><button class="btn ghost" data-inv-guardar="${sc}:${i}">Guardar</button></div>`;
+      html += `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${e.especial ? ` · ${origemEnfeite(e, state)}` : ''}</div></div><button class="btn ghost" data-inv-guardar="${sc}:${i}">Guardar</button></div>`;
     });
   }
   return html;
@@ -6369,6 +6693,28 @@ function invGuardar(sc, i) {
 function drawEnfeite(id, x, y, s, t) {
   ctx.lineWidth = Math.max(1, 1.2 * s); ctx.strokeStyle = 'rgba(60,30,10,.5)';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, 26 * s, 8 * s, 0, 0, 7); ctx.fill();
+  if (id === 'carroca') {
+    // carroça de feno (presente do Seu Zé)
+    ctx.strokeStyle = '#7a4a24'; ctx.lineWidth = 2.5 * s; ctx.beginPath(); ctx.moveTo(x + 14 * s, y - 10 * s); ctx.lineTo(x + 30 * s, y - 4 * s); ctx.stroke();
+    ctx.fillStyle = '#e8c65a'; ctx.beginPath(); ctx.ellipse(x - 2 * s, y - 24 * s, 17 * s, 9 * s, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#d9b44a'; for (const dx of [-12, -4, 4, 10]) { ctx.beginPath(); ctx.ellipse(x + dx * s, y - 26 * s, 3 * s, 5 * s, 0.3, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#a86b38'; ctx.strokeStyle = '#6b3f1f'; ctx.lineWidth = 1.5 * s;
+    ctx.beginPath(); ctx.roundRect(x - 20 * s, y - 24 * s, 36 * s, 13 * s, 2 * s); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(107,63,31,.6)'; ctx.beginPath(); ctx.moveTo(x - 20 * s, y - 17.5 * s); ctx.lineTo(x + 16 * s, y - 17.5 * s); ctx.stroke();
+    for (const wx of [-11, 8]) { ctx.strokeStyle = '#4a2c14'; ctx.lineWidth = 2 * s; ctx.beginPath(); ctx.arc(x + wx * s, y - 7 * s, 7 * s, 0, 7); ctx.stroke();
+      ctx.lineWidth = 1 * s; for (let k = 0; k < 4; k++) { const a = k * Math.PI / 4; ctx.beginPath(); ctx.moveTo(x + wx * s - Math.cos(a) * 6 * s, y - 7 * s - Math.sin(a) * 6 * s); ctx.lineTo(x + wx * s + Math.cos(a) * 6 * s, y - 7 * s + Math.sin(a) * 6 * s); ctx.stroke(); } }
+    return;
+  }
+  if (id === 'roseira') {
+    // roseira (presente da Dona Maria)
+    ctx.fillStyle = '#8b5a33'; ctx.beginPath(); ctx.ellipse(x, y - 2 * s, 16 * s, 5 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3f8a2a'; for (const [dx, dy, r] of [[-9, -12, 9], [8, -13, 9], [0, -20, 10], [-4, -8, 8], [5, -7, 8]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, 7); ctx.fill(); }
+    for (const [dx, dy] of [[-10, -15], [7, -18], [0, -26], [-3, -10], [9, -9], [-12, -6], [3, -14]]) {
+      ctx.fillStyle = '#e25b8f'; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 3.4 * s, 0, 7); ctx.fill();
+      ctx.fillStyle = '#b83a6b'; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 1.6 * s, 0, 7); ctx.fill();
+    }
+    return;
+  }
   if (id === 'flores') {
     ctx.fillStyle = '#8b5a33'; ctx.beginPath(); ctx.ellipse(x, y - 3 * s, 24 * s, 8 * s, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#4f9a2f'; ctx.beginPath(); ctx.ellipse(x, y - 7 * s, 21 * s, 7 * s, 0, 0, 7); ctx.fill();

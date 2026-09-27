@@ -89,6 +89,13 @@ service cloud.firestore {
       allow write: if signedIn() && me() == uid && request.resource.data.size() <= 2;
     }
 
+    // Ranking semanal: pontos da semana de cada jogador. Todos logados leem; cada um grava o seu.
+    match /ranking/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && me() == uid && request.resource.data.size() < 10
+                   && request.resource.data.pts is int && request.resource.data.pts < 100000;
+    }
+
     // Códigos de amigo (6 letras) apontando para o jogador. Não podem ser trocados depois.
     match /codes/{code} {
       allow read: if signedIn();
