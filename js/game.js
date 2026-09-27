@@ -1572,6 +1572,7 @@ function showGate(mode, msg) {
 }
 function enterGame() {
   root.classList.remove('gated');
+  if (state) { state.tool = 'hand'; renderTools(); }
   resize(); setScene(scene);
   presentePioneiro(); checarNovidades();
   if (state.boasVindas && isHome()) setTimeout(abrirBoasVindas, 400);
@@ -5193,7 +5194,7 @@ function renderChat() {
   if (noFim || box.dataset.com !== chatCom) box.scrollTop = box.scrollHeight;
   box.dataset.com = chatCom;
 }
-async function enviarChat(txt) {
+async function enviarChat(txt, tentativa = 0) {
   txt = String(txt || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
   if (!txt || !chatCom || !user) return;
   if (Date.now() - chatUltimoEnvio < 800) return; // sem enxurrada
@@ -5205,7 +5206,14 @@ async function enviarChat(txt) {
     avisarAmigo(para, 'chat', `💬 ${meuApelido()}: ${txt.slice(0, 90)}`);
   } catch (e) {
     console.warn(e);
-    if (e && e.code === 'permission-denied') toast('Não deu para mandar: publique as regras novas do firestore.rules, ou a amizade sumiu do lado do seu amigo (toque em Reatar).', 'bad');
+    if (e && e.code === 'permission-denied' && !tentativa) {
+      // amizade recém-feita: o lado de lá pode ainda não ter confirmado. Confirma o nosso e tenta de novo.
+      oficializar(para); checkSent();
+      toast('Confirmando a amizade… já tento mandar de novo.');
+      chatUltimoEnvio = 0;
+      return setTimeout(() => { if (chatCom === para) enviarChat(txt, 1); }, 3000);
+    }
+    if (e && e.code === 'permission-denied') toast('A amizade ainda não foi confirmada do lado do seu amigo. Assim que ele abrir o jogo, a mensagem vai. Se continuar, toque em Reatar.', 'bad');
     else toast('Não consegui mandar a mensagem agora. Tente de novo.', 'bad');
   }
 }
@@ -7568,6 +7576,7 @@ function frame(now) {
 
 function start(data) {
   state = (data && data.state && migrate(data.state)) || load() || newState();
+  state.tool = 'hand'; // o jogo sempre começa com a Mão
   applySettings();
   rollPeriods(); presentePioneiro(); checarNovidades();
   resize(); setScene('roca'); renderHUD(); renderAccount(); renderPane(); paintMenuIcons(); afterUpdate(); renderTabs();

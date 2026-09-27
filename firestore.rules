@@ -28,7 +28,9 @@ service cloud.firestore {
                       && request.resource.data.from == me()
                       && request.resource.data.t in ['help', 'steal', 'feed', 'stealA', 'gift', 'buy']
                       && request.resource.size() < 2000
-                      && (me() in get(/databases/$(database)/documents/farms/$(uid)).data.get('friends', []) || amigoDe(uid));
+                      && (me() in get(/databases/$(database)/documents/farms/$(uid)).data.get('friends', [])
+                          || me() in get(/databases/$(database)/documents/farms/$(uid)).data.get('sent', [])
+                          || amigoDe(uid));
         allow read, delete: if signedIn() && me() == uid;
       }
 
@@ -42,6 +44,9 @@ service cloud.firestore {
                       && request.resource.data.size() < 8
                       && (me() == uid
                           || me() in get(/databases/$(database)/documents/farms/$(uid)).data.get('friends', [])
+                          // quem pediu a amizade (lista sent) já pode receber mensagem de quem aceitou,
+                          // mesmo antes do jogo dele perceber que o pedido foi aceito
+                          || me() in get(/databases/$(database)/documents/farms/$(uid)).data.get('sent', [])
                           || amigoDe(uid));
       }
 
