@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Roça Feliz</title>
 <meta name="theme-color" content="#7a4a22">
 <meta name="mobile-web-app-capable" content="yes">
@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="49">
-<script src="firebase-config.js?v=49"></script>
+<meta name="rf-version" content="50">
+<script src="firebase-config.js?v=50"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -56,6 +56,10 @@
   * { box-sizing: border-box; }
   /* sem o "flash" cinza/azul do Android a cada toque */
   * { -webkit-tap-highlight-color: transparent; }
+  /* a pinça nunca amplia a página inteira (só o cenário, pelo jogo); listas continuam rolando */
+  html, body { touch-action: none; overscroll-behavior: none; }
+  .pane, .pane *, .modal-card, .modal-card *, .bmitens, .bmitens * { touch-action: pan-y; }
+  .tools, .tools * { touch-action: pan-x; }
   canvas { -webkit-user-select: none; user-select: none; outline: none; }
   [hidden] { display: none !important; }
   html, body { margin: 0; min-height: 100%; }
@@ -736,8 +740,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=49"></script>
-<script src="js/cloud.js?v=49"></script>
-<script src="js/game.js?v=49"></script>
+<script src="js/audio.js?v=50"></script>
+<script src="js/cloud.js?v=50"></script>
+<script src="js/game.js?v=50"></script>
 </body>
 </html>

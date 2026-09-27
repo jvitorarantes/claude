@@ -65,7 +65,7 @@ service cloud.firestore {
     // o programinha de notificações entrega e apaga.
     match /avisos/{id} {
       allow create: if signedIn() && request.resource.data.de == me()
-                    && request.resource.data.para is string && request.resource.data.para != me()
+                    && request.resource.data.para is string && (request.resource.data.para != me() || request.resource.data.tipo == 'teste')
                     && request.resource.data.txt is string && request.resource.data.txt.size() < 200
                     && request.resource.data.size() < 8;
     }

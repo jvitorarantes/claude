@@ -20,6 +20,7 @@ async function enviar(uid, tokens, title, body, tag) {
     data: { title, body, tag, link: SITE },
     webpush: { headers: { Urgency: 'high', TTL: String(6 * 3600) }, fcmOptions: { link: SITE } },
   });
+  res.responses.forEach((r, i) => { if (!r.success) console.log(`  falhou para ${uid.slice(0, 6)}… aparelho ${i + 1}: ${r.error && r.error.code}`); });
   // aparelhos que desinstalaram o app ou tiraram a permissão: sai da lista
   const mortos = res.responses.map((r, i) => (!r.success && r.error && TOKEN_MORTO.includes(r.error.code) ? tokens[i] : null)).filter(Boolean);
   if (mortos.length) await db.collection('push').doc(uid).update({ tokens: admin.firestore.FieldValue.arrayRemove(...mortos) });
@@ -30,6 +31,7 @@ const TITULO = { colheita: '🌽 Roça Feliz', animais: '🐔 Roça Feliz', fabr
 
 async function agendas(agora) {
   const snap = await db.collection('push').where('proximo', '<=', agora).get();
+  console.log(`Agendas vencidas: ${snap.size}`);
   let n = 0;
   for (const doc of snap.docs) {
     const p = doc.data(), prefs = p.prefs || {}, desde = p.enviadoAte || 0;
@@ -48,12 +50,17 @@ async function agendas(agora) {
 
 async function avisos() {
   const snap = await db.collection('avisos').limit(500).get();
+  console.log(`Avisos de amigos/testes na fila: ${snap.size}`);
   const porPessoa = {};
   for (const d of snap.docs) { const a = d.data(); (porPessoa[a.para] = porPessoa[a.para] || []).push(a); }
   let n = 0;
-  for (const [uid, lista] of Object.entries(porPessoa)) {
+  for (let [uid, lista] of Object.entries(porPessoa)) {
     const p = (await db.collection('push').doc(uid).get()).data();
-    if (!p || !p.tokens || !p.tokens.length || (p.prefs && p.prefs.amigos === false)) continue;
+    if (!p || !p.tokens || !p.tokens.length) { console.log(`  ${uid.slice(0, 6)}… não tem aparelho com avisos ligados`); continue; }
+    const testes = lista.filter(a => a.tipo === 'teste');
+    if (testes.length) n += await enviar(uid, p.tokens, '🧪 Roça Feliz', testes[testes.length - 1].txt, 'teste');
+    if (p.prefs && p.prefs.amigos === false) continue;
+    lista = lista.filter(a => a.tipo !== 'teste'); if (!lista.length) continue;
     lista.sort((a, b) => (a.at || 0) - (b.at || 0));
     const x = lista[lista.length - 1];
     const body = lista.length > 1 ? `${x.txt} (e mais ${lista.length - 1} novidade${lista.length > 2 ? 's' : ''} dos amigos)` : x.txt;

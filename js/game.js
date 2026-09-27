@@ -4191,6 +4191,14 @@ function pinch(e) {
 }
 const endTouch = e => { fingers.delete(e.pointerId); if (drag && drag.pinch && fingers.size < 2) drag = { x: 0, y: 0, moved: true, dead: true }; };
 cv.addEventListener('pointercancel', endTouch);
+// Dedo que soltou fora do desenho (em cima de um botão) também tem que sair da conta; senão o jogo
+// achava que ainda havia dois dedos na tela e o arrastar travava depois de um zoom de pinça.
+// Pinça começando em cima de um botão (fora do desenho) também dá zoom no cenário.
+const foraDaPinca = el => el === cv || (el && el.closest && el.closest('.panel, .modal, #ctxMenu, .movebar'));
+window.addEventListener('pointerdown', e => { if (e.pointerType === 'touch' && !foraDaPinca(e.target)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); }, true);
+window.addEventListener('pointermove', e => { if (e.pointerType === 'touch' && e.target !== cv && fingers.size >= 2 && pinch(e)) hover = null; }, true);
+window.addEventListener('pointerup', e => { if (e.target !== cv) { fingers.delete(e.pointerId); if (drag && drag.dead && !fingers.size) drag = null; } }, true);
+window.addEventListener('pointercancel', e => { fingers.delete(e.pointerId); if (!fingers.size && drag && (drag.dead || drag.pinch)) drag = null; }, true);
 $('#zoomIn')?.addEventListener('click', () => setZoom(zoomOf(scene) * 1.25));
 $('#zoomOut')?.addEventListener('click', () => setZoom(zoomOf(scene) / 1.25));
 $('#zoomReset')?.addEventListener('click', () => { setZoom(1); L.pan = { x: 0, y: 0 }; });
@@ -4253,6 +4261,8 @@ cv.addEventListener('contextmenu', e => {
 });
 cv.addEventListener('pointerdown', e => {
   pointer.touch = e.pointerType === 'touch';
+  // primeiro dedo de um toque novo: esquece dedos antigos que ficaram presos
+  if (e.isPrimary) { fingers.clear(); if (drag && (drag.dead || drag.pinch)) drag = null; }
   if (e.pointerType === 'touch') fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (fingers.size >= 2) return;
   drag = { x: e.clientX, y: e.clientY, px: L.pan.x, py: L.pan.y, moved: false };
@@ -4393,8 +4403,32 @@ async function ativarNotificacoes() {
     pushCfg().on = true; done(); sincronizarPush(true);
     st.textContent = 'Pronto! Você vai receber avisos neste aparelho.';
     toast('Notificações ligadas!', 'good');
-  } catch (e) { console.warn(e); st.textContent = 'Não deu para ligar agora. Tente de novo.'; }
+  } catch (e) {
+    console.warn(e);
+    pushErro = (e && (e.code || e.message)) || String(e);
+    st.textContent = pushErro.includes('permission-denied') ? 'O Firebase recusou: publique as regras novas do firestore.rules.' : `Não deu para ligar: ${pushErro}`;
+    return;
+  }
   renderPushCfg();
+}
+let pushErro = '';
+// Testes: "neste aparelho" mostra um aviso na hora (confere permissão e o service worker);
+// "pelo servidor" pede para o programinha do GitHub mandar um aviso (chega em até ~15 min).
+async function testarAvisoAqui() {
+  const st = $('#pushStatus');
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification('Roça Feliz', { body: 'Teste: as notificações aparecem neste aparelho! 🌽', icon: 'icons/icon-192.png', tag: 'teste' });
+    st.textContent = 'Mandei um aviso de teste agora. Apareceu? Se não, libere as notificações do app nas configurações do celular.';
+  } catch (e) { st.textContent = `Não consegui mostrar o aviso: ${(e && e.message) || e}`; }
+}
+async function testarAvisoServidor() {
+  const st = $('#pushStatus');
+  if (!user) return (st.textContent = 'Entre com a conta Google primeiro.');
+  try {
+    await Cloud.mandarAviso({ para: user.uid, de: user.uid, tipo: 'teste', txt: 'Teste do servidor: os avisos estão funcionando! 🎉', at: Date.now() });
+    st.textContent = 'Pedido de teste enviado. Feche o jogo: o aviso chega na próxima rodada do servidor (até uns 15–20 min).';
+  } catch (e) { st.textContent = (e && e.code) === 'permission-denied' ? 'O Firebase recusou: publique as regras novas do firestore.rules.' : `Erro: ${(e && e.message) || e}`; }
 }
 async function desligarNotificacoes() {
   let token = null; try { token = localStorage.getItem('rf-push-token'); localStorage.removeItem('rf-push-token'); } catch (e) { /* tanto faz */ }
@@ -4409,6 +4443,8 @@ function renderPushCfg() {
   box.innerHTML = !VAPID() ? '<p class="hint" style="margin:0">As notificações ainda não foram configuradas no Firebase.</p>'
     : `<div class="setrow"><span>${ligado ? '🔔 Avisos ligados neste aparelho' : '🔕 Avisos desligados neste aparelho'}</span>${ligado ? '<button class="btn ghost" type="button" data-push-off>Desligar</button>' : '<button class="btn gold" type="button" data-push-on>Ativar avisos</button>'}</div>
     ${PUSH_TIPOS.map(([k, n]) => `<div class="setrow"><label for="push_${k}">${n}</label><input type="checkbox" class="switch" id="push_${k}" data-push-tipo="${k}" ${c.prefs[k] !== false ? 'checked' : ''}></div>`).join('')}
+    <div class="setrow"><span>Testar</span><span class="stack" style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost" type="button" data-push-teste-aqui>Neste aparelho</button><button class="btn ghost" type="button" data-push-teste-servidor ${ligado ? '' : 'disabled'}>Pelo servidor</button></span></div>
+    <p class="hint" style="margin:0;color:var(--muted);font-size:12px">Permissão: ${'Notification' in window ? { granted: 'liberada', denied: 'bloqueada', default: 'ainda não pedida' }[Notification.permission] : 'sem suporte'} · aparelho registrado: ${neste ? 'sim' : 'não'} · conta: ${user ? 'conectada' : 'não'}${pushErro ? ` · último erro: ${esc(pushErro)}` : ''}</p>
     <p class="hint" id="pushStatus" role="status" style="margin:0;color:var(--muted);font-size:13px">Os avisos chegam mesmo com o jogo fechado (podem atrasar alguns minutos).</p>`;
 }
 // Aviso para um amigo (visita, presente, pedido). Visitas: no máximo um aviso a cada 30 min por amigo.
@@ -4530,6 +4566,8 @@ $('#settings').addEventListener('click', e => {
   if (e.target.closest('#verCopias')) return verCopias();
   const rc = e.target.closest('[data-restaurar]'); if (rc) return restaurarCopia(Number(rc.dataset.restaurar));
   if (e.target.closest('[data-push-off]')) return desligarNotificacoes();
+  if (e.target.closest('[data-push-teste-aqui]')) return testarAvisoAqui();
+  if (e.target.closest('[data-push-teste-servidor]')) return testarAvisoServidor();
   // Só os botões de dentro da janela (a página inteira também tem data-tema).
   const tr = e.target.closest('#tracks [data-track]');
   if (tr) { settings.track = Number(tr.dataset.track); settings.music = true; saveSettings(); renderSettings(); }
