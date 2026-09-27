@@ -78,6 +78,18 @@ const PRODUCTS = [
   { id: 'leitebufala', nome: 'Leite de búfala', preco: 500 },
 ];
 const PRODUCT = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
+// Frutas do pomar (vêm das frutíferas plantadas no gramado)
+const FRUTAS = [
+  { id: 'pitanga',    nome: 'Pitanga',    preco: 25, cor: '#e0402a' },
+  { id: 'amora',      nome: 'Amora',      preco: 30, cor: '#5a1f4a' },
+  { id: 'maracuja',   nome: 'Maracujá',   preco: 45, cor: '#e8c030' },
+  { id: 'jabuticaba', nome: 'Jabuticaba', preco: 35, cor: '#2a1a2a' },
+  { id: 'manga',      nome: 'Manga',      preco: 60, cor: '#f2a030' },
+  { id: 'caju',       nome: 'Caju',       preco: 55, cor: '#e8502a' },
+  { id: 'pequi',      nome: 'Pequi',      preco: 90, cor: '#b8c040' },
+];
+const FRUTA = Object.fromEntries(FRUTAS.map(f => [f.id, f]));
+for (const f of FRUTAS) PRODUCT[f.id] = { id: f.id, nome: f.nome, preco: f.preco, fruta: true };
 PRODUCT.leitao = { id: 'leitao', nome: 'Leitão', preco: 700 };
 
 // tipo 'prod': produz a cada "tempo" se alimentado (racao = moedas por produção) durante "periodo" dias;
@@ -517,7 +529,12 @@ function neighbors(i) {
 const touches = i => state.plots[i].s === 'locked' && neighbors(i).some(j => state.plots[j].s !== 'locked');
 const allowedLots = () => EXPANSOES[state.exp].total;
 const freeLots = () => Math.max(0, allowedLots() - state.owned);
-const canBuy = i => freeLots() > 0 && touches(i); // lote onde dá para colocar um canteiro agora
+const canBuy = i => freeLots() > 0 && touches(i) && !objetoNaCelula(i); // lote onde dá para colocar um canteiro agora
+// Tem enfeite ou frutífera em cima deste pedaço de terra? (aí não dá para virar canteiro)
+function objetoNaCelula(i) {
+  const c = i % COLS + 0.5, r = Math.floor(i / COLS) + 0.5;
+  return objetosDe(state, 'roca').some(o => Math.abs(o.u - c) < 0.5 + 0.35 && Math.abs(o.v - r) < 0.5 + 0.35);
+}
 let buyPending = null; // lote clicado uma vez, esperando o segundo clique para confirmar
 const sfx = name => { if (window.RFAudio) window.RFAudio.play(name); };
 const comfort = s => DECOR.reduce((t, d) => t + (emUso(s, d.id) ? emUso(s, d.id).conforto : 0), 0) + confortoEnfeites(s);
@@ -922,6 +939,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
+  { v: 97, txt: 'Pomar 🌳: as árvores de enfeite saíram e chegaram as frutíferas! Compre na Loja › Pomar pitangueira, amoreira, maracujazeiro, jabuticabeira, mangueira, cajueiro e pequizeiro, e plante no gramado (agora dá para pôr enfeites e frutíferas no gramado dentro da cerca, fora da terra comprada). Elas dão frutas e secam depois de uns dias: arbusto seco sai com a 🪓 enxada de arrancar e árvore seca com a 🪚 motosserra, que você ganha completando missões, de amigos ou comprando.' },
   { v: 93, txt: 'O tema da casa agora vale também para a casinha do cachorro e para os abrigos dos bichos no rancho: tudo combinando!' },
   { v: 91, txt: 'Loja do Trevo 🍀 cheia de novidades: chapéu de cangaceiro, boina, panamá, gorro, sanfona, buquê, regador dourado, ipê-amarelo, fogueira de São João, balanço, carro de boi, as casas Lavanda, do Cerrado e Estrelada, a música Seresta ao Luar e itens úteis (iscas, ração especial, tarrafa e pontos de pesca prontos na hora).' },
   { v: 90, txt: 'Chegaram os Trevos 🍀, a moeda verde da roça! Ganhe resgatando cada peixe novo no 📖 Livro de peixes, os níveis do domínio de pesca e as conquistas (Missões › 🍀 Trevos). O que você já fez também vale: é só resgatar! Troque na Loja do Trevo por itens exclusivos: chapéus, lampião, músicas, enfeites e temas de casa.' },
@@ -2664,6 +2682,7 @@ function drawBug(x, y, s, t, k) {
 function drawProduct(id, x, y, s) {
   if (RECEITA[id]) return drawGood(id, x, y, s);
   if (PEIXE[id]) return drawPeixe(ctx, x, y, s * 0.85 * cabePeixe(PEIXE[id]), PEIXE[id]);
+  if (FRUTA[id]) return drawFruta(id, x, y, s);
   ctx.lineWidth = Math.max(1, 0.6 * s);
   if (id === 'ovo') {
     ctx.fillStyle = '#fff6df'; ctx.strokeStyle = '#cdb88c';
@@ -4082,7 +4101,7 @@ function renderPane() {
   else if (tab === 'missoes') html = missoesHTML();
   else if (tab === 'fabrica') html = fabricaHTML();
   else if (tab === 'loja') {
-    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['enfeites', 'Enfeites'], ['temas', 'Temas'], ['trevo', '🍀 Trevo']];
+    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['pomar', 'Pomar'], ['enfeites', 'Enfeites'], ['temas', 'Temas'], ['trevo', '🍀 Trevo']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
     if (shopSeg === 'sementes' || shopSeg === 'mudas') {
       const trees = shopSeg === 'mudas';
@@ -4194,13 +4213,15 @@ function renderPane() {
       }
     } else if (shopSeg === 'enfeites') {
       html += `<p class="hint">Enfeites vão para o Inventário. De lá você escolhe onde pôr, na roça ou no rancho, fora dos canteiros e cercados. Cada um dá conforto (+XP).</p>`;
-      for (const e of ENFEITES.filter(x => !x.especial)) {
+      for (const e of ENFEITES.filter(x => !x.especial && !x.fruteira)) {
         const tem = state.enfeites[e.id] || 0, postos = ['roca', 'animais'].reduce((t, sc) => t + objetosDe(state, sc).filter(o => o.id === e.id).length, 0);
         const locked = e.nivel > state.level;
         html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}">
           <div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${tem ? ` · no inventário: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
           ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
       }
+    } else if (shopSeg === 'pomar') {
+      html += pomarLojaHTML();
     } else if (shopSeg === 'trevo') {
       html += trevoLojaHTML();
     } else if (shopSeg === 'temas') {
@@ -4354,6 +4375,7 @@ $('#pane').addEventListener('click', e => {
   if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
   if (d.temaRoca) return buyTema(d.temaRoca);
   if (d.casaTema) return usarCasaTema(d.casaTema);
+  if (d.comprarFerr) return comprarFerramenta(d.comprarFerr);
   if (d.trevoConq) { resgatarConquista(d.trevoConq); return renderPane(); }
   if (d.trevoTodos) { resgatarTodosPeixes(); return renderPane(); }
   if (d.trevoDominio) { resgatarDominio(); return renderPane(); }
@@ -4556,8 +4578,9 @@ function tipBicho(i) {
   const c = crittersOf(scene).list[i];
   return c ? `<b>${BICHO[c.tipo].nome}</b><br>Clique para ouvir.` : null;
 }
-function tipEnfeite(id) {
+function tipEnfeite(id, key, sc) {
   const e = ENFEITE[id]; if (!e) return null;
+  if (e.fruteira) { const o = key && objetosDe(S(), sc || scene)[Number(String(key).slice(4))]; if (o) return tipFruteira(o); }
   return `<b>${e.nome}</b><br>+${e.conforto}% de XP${e.especial ? `<br>${origemEnfeite(e, S())}` : ''}${isHome() ? '<br>Mude de lugar com o botão Mover.' : ''}`;
 }
 function tipLand() {
@@ -4574,7 +4597,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4738,7 +4761,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'lago') abrirPesca();
   else if (target.kind === 'avatar' && target.quem === 'dono') { falar('avatar:dono', view.nome, sorteia(FALAS_DONO.concat(FALAS_AVATAR))); sfx('fala'); }
   else if (target.kind === 'avatar') { falar('avatar', meuApelido(), sorteia(FALAS_AVATAR)); sfx('fala'); }
-  else if (target.kind === 'enfeite') actEnfeite(target.id);
+  else if (target.kind === 'enfeite') actEnfeite(target.id, target.key, target.sc);
   else if (target.kind === 'casa') { if (isHome()) openPanel('casaTemas'); else setScene('casa'); }
   else if (target.kind === 'celeiro') { if (isHome()) openPanel('celeiro'); else toast(`Celeiro de ${view.nome}.`); }
 });
@@ -5193,6 +5216,8 @@ function claimMission(tipo, k) {
   if (ms[tipo].every(x => x.pego) && ms['trevo_' + tipo] !== ms[marca]) {
     ms['trevo_' + tipo] = ms[marca];
     setTimeout(() => ganharTrevos(TREVO_MISSOES[tipo], tipo === 'dia' ? 'Todas as missões do dia!' : 'Todas as missões da semana!'), 700);
+    const fer = tipo === 'dia' ? 'enxada' : 'motosserra'; derrubarDe()[fer]++;
+    setTimeout(() => toast(`${tipo === 'dia' ? '🪓 +1 enxada de arrancar' : '🪚 +1 motosserra'} de prêmio!`, 'good'), 1500);
   }
   renderTabs(); done();
 }
@@ -5271,6 +5296,8 @@ const PRESENTE_AMIGO = [
   { id: 'basico', nome: '1 fertilizante básico', dar: s => { s.fert.basico = (s.fert.basico || 0) + 1; } },
   { id: 'racao', nome: '1 ração especial', dar: s => { s.racaoEsp += 1; } },
   { id: 'racaoCao', nome: '2 rações de cachorro', dar: s => { s.dogFood += 2; } },
+  { id: 'enxada', nome: '1 enxada de arrancar', dar: s => { (s.derrubar = s.derrubar || {}).enxada = (s.derrubar.enxada || 0) + 1; } },
+  { id: 'motosserra', nome: '1 motosserra', dar: s => { (s.derrubar = s.derrubar || {}).motosserra = (s.derrubar.motosserra || 0) + 1; } },
 ];
 const PRESENTE_MAX = 5;
 function giftsToday() {
@@ -5286,7 +5313,7 @@ function escolherPresente(uid) {
   presenteParaUid = uid;
   const f = friendInfo[uid];
   $('#presTxt').textContent = `Escolha o presente para ${firstName(f && f.name ? f.name : 'seu amigo')}. Não custa nada!`;
-  const icon = { basico: fertIcon('basico'), racao: bowlIcon(), racaoCao: dogIcon('caramelo') };
+  const icon = { basico: fertIcon('basico'), racao: bowlIcon(), racaoCao: dogIcon('caramelo'), enxada: ferramentaIcon('enxada'), motosserra: ferramentaIcon('motosserra') };
   $('#presOpcoes').innerHTML = PRESENTE_AMIGO.map(p => `<button type="button" class="presopt" data-pres="${p.id}"><img alt="" src="${p.id === 'moedas' ? giftIcon({ moedas: 100 }) : icon[p.id]}"><span>${p.nome}</span></button>`).join('');
   $('#presente').hidden = false;
   $('#presOpcoes button').focus();
@@ -5530,7 +5557,8 @@ const CARIMBOS = [
 ];
 const COLECAO = () => [...CROPS.map(c => ({ id: c.prod, nome: c.prodNome, icon: () => cropIcon(c.id), nivel: c.nivel })),
   ...PRODUCTS.filter(p => p.id !== 'leitao').map(p => ({ id: p.id, nome: p.nome, icon: () => productIcon(p.id), nivel: 0 })),
-  ...PEIXES.filter(p => !p.lixo).map(p => ({ id: p.id, nome: p.nome, icon: () => productIcon(p.id), nivel: p.nivel }))];
+  ...PEIXES.filter(p => !p.lixo).map(p => ({ id: p.id, nome: p.nome, icon: () => productIcon(p.id), nivel: p.nivel })),
+  ...FRUTAS.map(f => ({ id: f.id, nome: f.nome, icon: () => productIcon(f.id), nivel: 0 }))];
 function collect(id, pos) {
   const n = state.col[id] = (state.col[id] || 0) + 1, lv = state.stamps[id] || 0, c = CARIMBOS[lv];
   if (!c || n < c.n) return;
@@ -7152,7 +7180,7 @@ function missoesHTML() {
     return html + '</div>';
   }
   const tipo = missSeg, lista = state.missions[tipo], p = tipo === 'dia' ? premioDia() : premioSemana();
-  html += `<p class="hint">${tipo === 'dia' ? 'Missões novas todo dia à meia-noite.' : 'Missões novas toda segunda-feira à meia-noite.'} Cada uma dá ${p.moedas.toLocaleString('pt-BR')} moedas e ${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}. ${state.missions['trevo_' + tipo] === state.missions[tipo === 'dia' ? 'd' : 'w'] ? `<b>🍀 +${TREVO_MISSOES[tipo]} trevos já ganhos!</b>` : `Pegue o prêmio de todas e ganhe <b>🍀 ${TREVO_MISSOES[tipo]} trevos</b>.`}</p>`;
+  html += `<p class="hint">${tipo === 'dia' ? 'Missões novas todo dia à meia-noite.' : 'Missões novas toda segunda-feira à meia-noite.'} Cada uma dá ${p.moedas.toLocaleString('pt-BR')} moedas e ${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}. ${state.missions['trevo_' + tipo] === state.missions[tipo === 'dia' ? 'd' : 'w'] ? `<b>🍀 +${TREVO_MISSOES[tipo]} trevos já ganhos!</b>` : `Pegue o prêmio de todas e ganhe <b>🍀 ${TREVO_MISSOES[tipo]} trevos</b> e ${tipo === 'dia' ? '🪓 1 enxada de arrancar' : '🪚 1 motosserra'}.`}</p>`;
   lista.forEach((m, k) => {
     const ok = m.feito >= m.alvo;
     html += `<div class="row ${m.pego ? 'locked' : ok ? 'sel' : ''}"><div class="avatar" style="background:${ok ? '#4f9a2f' : '#d39a5c'}">${ok ? '✓' : k + 1}</div>
@@ -7510,6 +7538,15 @@ const ENFEITES = [
   { id: 'carroca',    nome: 'Carroça de feno do Seu Zé',    especial: true, vila: true, conforto: 3 },
   { id: 'roseira',    nome: 'Roseira da Dona Maria',         especial: true, vila: true, conforto: 3 },
   { id: 'peixedourado', nome: 'Estátua do Peixe Dourado', especial: true, trevo: true, conforto: 3 },
+  // Pomar: frutíferas. Dão frutas de tempos em tempos e secam depois de uns dias.
+  // Arbusto seco sai com enxada; árvore seca, com motosserra.
+  { id: 'pitangueira',   nome: 'Pitangueira',    fruteira: 'arbusto', fruta: 'pitanga',    nivel: 3,  custo: 900,  tempo: 6 * 3600,  rende: 3, vida: 10, conforto: 1, copa: '#4f9a2f' },
+  { id: 'amoreira',      nome: 'Amoreira',       fruteira: 'arbusto', fruta: 'amora',      nivel: 5,  custo: 1200, tempo: 7 * 3600,  rende: 4, vida: 10, conforto: 1, copa: '#3f8a2a' },
+  { id: 'maracujazeiro', nome: 'Maracujazeiro',  fruteira: 'arbusto', fruta: 'maracuja',   nivel: 8,  custo: 1600, tempo: 8 * 3600,  rende: 3, vida: 12, conforto: 1, copa: '#5aa03a' },
+  { id: 'jabuticabeira', nome: 'Jabuticabeira',  fruteira: 'arvore',  fruta: 'jabuticaba', nivel: 7,  custo: 2500, tempo: 10 * 3600, rende: 6, vida: 20, conforto: 2, copa: '#3f7a2a' },
+  { id: 'mangueira',     nome: 'Mangueira',      fruteira: 'arvore',  fruta: 'manga',      nivel: 10, custo: 3500, tempo: 12 * 3600, rende: 4, vida: 20, conforto: 2, copa: '#2f6a22' },
+  { id: 'cajueiro',      nome: 'Cajueiro',       fruteira: 'arvore',  fruta: 'caju',       nivel: 12, custo: 4000, tempo: 12 * 3600, rende: 4, vida: 20, conforto: 2, copa: '#4f8a2a' },
+  { id: 'pequizeiro',    nome: 'Pequizeiro',     fruteira: 'arvore',  fruta: 'pequi',      nivel: 15, custo: 5000, tempo: 16 * 3600, rende: 3, vida: 25, conforto: 2, copa: '#5a8a3a' },
   { id: 'arcoflores',   nome: 'Arco de flores',            especial: true, trevo: true, conforto: 2 },
   { id: 'ipe',          nome: 'Ipê-amarelo',               especial: true, trevo: true, conforto: 3 },
   { id: 'fogueira',     nome: 'Fogueira de São João',      especial: true, trevo: true, conforto: 2 },
@@ -7527,8 +7564,9 @@ const LUGARES = {
 // ---------- Objetos que dá para mudar de lugar (modo Mover) ----------
 // Posição padrão de cada coisa, em coordenadas da grade da cena.
 const POS_PADRAO = {
-  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], arv1: [3.6, -1.6], arv2: [5.8, -1.4], pesqueiro: [-1.05, 4.85] },
-  animais: { canil: [-1.65, 3.65], arv1: [-0.9, RANCH_R - 0.6], arv2: [RANCH_C + 0.8, 0.8] },
+  // (as árvores de enfeite saíram: agora as árvores são as frutíferas do Pomar, compradas na Loja)
+  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], pesqueiro: [-1.05, 4.85] },
+  animais: { canil: [-1.65, 3.65] },
 };
 const LAGO_POS = [3.55, -1.95];
 const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 } };
@@ -7541,14 +7579,23 @@ function posOf(s, sc, key) {
 const objetosDe = (s, sc) => (s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && ENFEITE[o.id]);
 function objList(s, sc) {
   const l = Object.keys(POS_PADRAO[sc]).map(key => { const [u, v] = posOf(s, sc, key); return { key, u, v, r: OBJ_INFO[key].r }; });
-  objetosDe(s, sc).forEach((o, i) => l.push({ key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: 0.55 }));
+  objetosDe(s, sc).forEach((o, i) => l.push({ key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: ENFEITE[o.id].fruteira === 'arvore' ? 0.65 : 0.55, obj: o }));
   return l;
 }
 const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + objetosDe(s, sc).reduce((u, o) => u + ENFEITE[o.id].conforto, 0), 0);
 // Dá para pôr fora dos canteiros e dos cercados, sem encostar em outra coisa.
 function validSpot(sc, u, v, ignora, raio = 0.55) {
   const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R];
-  if (u > -0.5 && u < B[0] + 0.5 && v > -0.5 && v < B[1] + 0.5) return false;
+  if (u > -0.5 && u < B[0] + 0.5 && v > -0.5 && v < B[1] + 0.5) {
+    if (sc !== 'roca') return false; // no rancho, os cercados ocupam tudo
+    // na roça dá para pôr no gramado dentro da cerca, desde que não encoste em terra comprada
+    if (u < 0.4 || v < 0.4 || u > COLS - 0.4 || v > ROWS - 0.4) return false;
+    const m = raio * 0.7;
+    for (let c = Math.floor(u - m); c <= Math.floor(u + m); c++) for (let r = Math.floor(v - m); r <= Math.floor(v + m); r++) {
+      if (c < 0 || r < 0 || c >= COLS || r >= ROWS) continue;
+      if (state.plots[r * COLS + c].s !== 'locked') return false;
+    }
+  }
   if (u < -6 || v < -6 || u > B[0] + 6 || v > B[1] + 6) return false;
   if (sc === 'roca' && temaDe(state).lago && Math.hypot(u - LAGO_POS[0], v - LAGO_POS[1]) < 1.4) return false;
   return objList(state, sc).every(o => o.key === ignora || Math.hypot(o.u - u, o.v - v) >= (o.r + raio) * 0.75);
@@ -7599,10 +7646,12 @@ function moveClick(x, y) {
 function salvarMove() {
   if (!moving) return;
   const { u, v } = moving;
-  if (!validSpot(scene, u, v, moving.key, raioMov())) return toast('Aqui não dá: tem que ser fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
+  if (!validSpot(scene, u, v, moving.key, raioMov())) return toast('Aqui não dá: tem que ser no gramado, fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
   if (moving.novo) {
     if (!(state.enfeites[moving.novo] > 0)) { moving = null; return; }
-    (state.objetos[scene] = objetosDe(state, scene)).push({ id: moving.novo, u, v });
+    const novo = { id: moving.novo, u, v };
+    if (ENFEITE[moving.novo].fruteira) { novo.t0 = Date.now(); novo.ult = Date.now(); } // frutífera: começa a contar ao plantar
+    (state.objetos[scene] = objetosDe(state, scene)).push(novo);
     state.enfeites[moving.novo]--;
     toast(`${ENFEITE[moving.novo].nome} colocado! +${ENFEITE[moving.novo].conforto}% de XP.`, 'good');
     moveMode = false; renderMoveBtn(); // pôr um item do inventário termina o modo
@@ -7680,8 +7729,9 @@ function drawObjetos(s, sc, t, home, stage) {
     else if (o.id) {
       const hov = !moveMode && hover && hover.kind === 'enfeite' && hover.sc === sc && hover.key === o.key;
       if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.35, W * 0.12, 0, 0, 7); ctx.stroke(); }
-      drawEnfeite(o.id, q.x, q.y, W / 100, t);
-      if (!moveMode) hits.push({ kind: 'enfeite', sc, key: o.key, id: o.id, x: q.x, y: q.y - W * 0.25, r: W * 0.32 });
+      if (ENFEITE[o.id].fruteira && o.obj) drawFruteira(o.obj, q.x, q.y, W / 100, t, home);
+      else drawEnfeite(o.id, q.x, q.y, W / 100, t);
+      if (!moveMode) hits.push({ kind: 'enfeite', sc, key: o.key, id: o.id, x: q.x, y: q.y - W * (ENFEITE[o.id].fruteira === 'arvore' ? 0.45 : 0.25), r: W * (ENFEITE[o.id].fruteira === 'arvore' ? 0.45 : 0.32) });
     }
   }
   return cachorroDepois;
@@ -7750,8 +7800,9 @@ function comprarEnfeite(id) {
   toast(`${e.nome} comprado! Está no Inventário.`, 'good');
   renderTabs(); done();
 }
-function actEnfeite(id) {
+function actEnfeite(id, key, sc) {
   const e = ENFEITE[id];
+  if (e.fruteira && key) return actFruteira(sc || scene, Number(String(key).slice(4)));
   toast(isHome() ? `${e.nome}: +${e.conforto}% de XP. Para mudar de lugar, use o botão Mover; para guardar, o Inventário.` : `${e.nome} de ${view.nome}.`);
 }
 // ---------- Inventário: enfeites guardados e os que estão na roça ou no rancho ----------
@@ -7772,7 +7823,8 @@ function inventarioHTML() {
     html += `<h3>${sc === 'roca' ? 'Na roça' : 'No rancho'}</h3>`;
     l.forEach((o, i) => {
       const e = ENFEITE[o.id];
-      html += `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${e.especial ? ` · ${origemEnfeite(e, state)}` : ''}</div></div><button class="btn ghost" data-inv-guardar="${sc}:${i}">Guardar</button></div>`;
+      html += e.fruteira ? `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">${estadoFruteira(o).txt}</div></div><div></div></div>`
+        : `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${e.especial ? ` · ${origemEnfeite(e, state)}` : ''}</div></div><button class="btn ghost" data-inv-guardar="${sc}:${i}">Guardar</button></div>`;
     });
   }
   return html;
@@ -7792,6 +7844,7 @@ function invGuardar(sc, i) {
 }
 // Desenho dos enfeites, com a base em (x, y). s = escala (1 = casa de 100px).
 function drawEnfeite(id, x, y, s, t) {
+  if (ENFEITE[id] && ENFEITE[id].fruteira) return drawFruteira({ id }, x, y, s, t, false);
   ctx.lineWidth = Math.max(1, 1.2 * s); ctx.strokeStyle = 'rgba(60,30,10,.5)';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, 26 * s, 8 * s, 0, 0, 7); ctx.fill();
   if (id === 'carroca') {
@@ -7952,7 +8005,117 @@ function drawEnfeite(id, x, y, s, t) {
     ctx.fillStyle = '#ffb300'; ctx.beginPath(); ctx.ellipse(x, y - 54 * s + Math.sin(t / 120) * 0.5 * s, 2 * s, 3.5 * s, 0, 0, 7); ctx.fill();
   }
 }
-const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, { bandeira: 1.15, espantalho: 1.3, moinho: 1.3, ipe: 1.2, fogueira: 1.5, balanco: 1.4, arcoflores: 1.4, peixedourado: 1.5, carrodeboi: 1.4 }[id] || 1.6, 0));
+const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, ENFEITE[id] && ENFEITE[id].fruteira === 'arvore' ? 1.1 : { bandeira: 1.15, espantalho: 1.3, moinho: 1.3, ipe: 1.2, fogueira: 1.5, balanco: 1.4, arcoflores: 1.4, peixedourado: 1.5, carrodeboi: 1.4 }[id] || 1.6, 0));
+
+// ============================================================
+// Pomar: frutíferas (arbustos e árvores) plantadas no gramado. Dão frutas de tempos em tempos
+// e secam depois de uns dias. Arbusto seco sai com a enxada de arrancar; árvore seca, com a motosserra.
+// As ferramentas de derrubar se compram na Loja › Pomar, ganham-se completando missões e vêm de amigos.
+// ============================================================
+const FERR_DERRUBAR = { enxada: { nome: 'Enxada de arrancar', emoji: '🪓', custo: 250, para: 'arbusto' }, motosserra: { nome: 'Motosserra', emoji: '🪚', custo: 600, para: 'arvore' } };
+function derrubarDe() { const d = state.derrubar || (state.derrubar = {}); d.enxada = d.enxada || 0; d.motosserra = d.motosserra || 0; return d; }
+const ferramentaIcon = id => makeIcon('ferr:' + id, () => { ctx.font = '60px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(FERR_DERRUBAR[id].emoji, 48, 52); });
+function estadoFruteira(o) {
+  const e = ENFEITE[o.id], agora = Date.now(), t0 = o.t0 || agora, ult = o.ult || t0;
+  const morre = t0 + e.vida * 86400e3, morta = agora >= morre, pronto = !morta && agora - ult >= e.tempo * 1000;
+  const falta = Math.max(0, ult + e.tempo * 1000 - agora), dias = Math.max(0, Math.ceil((morre - agora) / 86400e3));
+  const f = FRUTA[e.fruta];
+  const txt = morta ? `Secou 🥀. Derrube com ${e.fruteira === 'arvore' ? 'a motosserra' : 'a enxada de arrancar'}.`
+    : pronto ? `Pronta! ${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} para colher · vive mais ${dias} dia${dias > 1 ? 's' : ''}`
+    : `Próxima colheita em ${fmt(falta / 1000)} · vive mais ${dias} dia${dias > 1 ? 's' : ''}`;
+  return { morta, pronto, falta, dias, txt };
+}
+function tipFruteira(o) {
+  const e = ENFEITE[o.id], st = estadoFruteira(o);
+  return `<b>${e.nome}</b><br>${st.txt}${st.morta && isHome() ? `<br>Você tem ${derrubarDe()[e.fruteira === 'arvore' ? 'motosserra' : 'enxada']}.` : ''}`;
+}
+function actFruteira(sc, i) {
+  const o = objetosDe(S(), sc)[i]; if (!o) return;
+  const e = ENFEITE[o.id], st = estadoFruteira(o), f = FRUTA[e.fruta];
+  if (!isHome()) return toast(`${e.nome} de ${view.nome}: ${st.txt}`);
+  if (st.pronto) {
+    state.barn[f.id] = (state.barn[f.id] || 0) + e.rende;
+    for (let k = 0; k < e.rende; k++) collect(f.id, null);
+    o.ult = Date.now(); state.stats.colheitas = (state.stats.colheitas || 0) + 1; track('colher');
+    addXP(e.fruteira === 'arvore' ? 6 : 3, null); sfx('collect');
+    toast(`🧺 +${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} no celeiro!`, 'good');
+    return done();
+  }
+  if (st.morta) {
+    const fer = e.fruteira === 'arvore' ? 'motosserra' : 'enxada', F = FERR_DERRUBAR[fer], d = derrubarDe();
+    if (!d[fer]) { toast(`${e.nome} secou. Precisa de ${F.emoji} ${F.nome.toLowerCase()} para derrubar: compre na Loja › Pomar, ganhe completando as missões ou peça a um amigo.`, 'bad'); return openPanel('loja', 'pomar'); }
+    return confirmTwice('derrubar' + sc + i, `Usar ${F.emoji} 1 ${F.nome.toLowerCase()} para tirar ${e.nome.toLowerCase()} seca? Toque de novo.`, () => {
+      d[fer]--; const l = objetosDe(state, sc); l.splice(i, 1); state.objetos[sc] = l;
+      sfx('water'); toast(`${F.emoji} ${e.nome} derrubada. O lugar ficou livre para plantar outra!`, 'good'); done();
+    });
+  }
+  toast(`${e.nome}: ${st.txt}`);
+}
+function drawFruta(id, x, y, s) {
+  const f = FRUTA[id]; ctx.lineWidth = Math.max(1, 0.5 * s); ctx.strokeStyle = 'rgba(0,0,0,.25)';
+  const bola = (dx, dy, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.arc(x + (dx - r * 0.35) * s, y + (dy - r * 0.35) * s, r * 0.3 * s, 0, 7); ctx.fill(); };
+  if (id === 'manga') { ctx.fillStyle = '#f2a030'; ctx.beginPath(); ctx.ellipse(x, y + 1 * s, 5 * s, 6.5 * s, 0.5, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(200,60,30,.5)'; ctx.beginPath(); ctx.ellipse(x + 2 * s, y - 1 * s, 2.5 * s, 3.5 * s, 0.5, 0, 7); ctx.fill(); }
+  else if (id === 'caju') { ctx.fillStyle = '#e8502a'; ctx.beginPath(); ctx.ellipse(x, y + 1 * s, 4.5 * s, 5.5 * s, 0, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#8a6a3a'; ctx.beginPath(); ctx.ellipse(x, y + 7.5 * s, 2.2 * s, 1.8 * s, 0, 0, 7); ctx.fill(); }
+  else if (id === 'maracuja') bola(0, 1, 5.5, f.cor);
+  else if (id === 'pequi') bola(0, 1, 5.5, f.cor);
+  else for (const [dx, dy] of [[-2.5, 2], [2.5, 2], [0, -1.5]]) bola(dx, dy, id === 'jabuticaba' ? 2.8 : 2.5, f.cor);
+  ctx.fillStyle = '#4f9a2f'; ctx.beginPath(); ctx.ellipse(x + 2 * s, y - 5 * s, 2.6 * s, 1.2 * s, -0.5, 0, 7); ctx.fill();
+}
+// A frutífera no chão: arbusto redondinho ou árvore com tronco. Pronta = cheia de frutas; seca = galhos pelados.
+function drawFruteira(o, x, y, s, t, home) {
+  const e = ENFEITE[o.id], st = o.t0 ? estadoFruteira(o) : { pronto: true, morta: false }, f = FRUTA[e.fruta], arv = e.fruteira === 'arvore';
+  ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(x, y, (arv ? 30 : 22) * s, (arv ? 9 : 7) * s, 0, 0, 7); ctx.fill();
+  const seca = st.morta, copa = seca ? '#9a8a5a' : e.copa;
+  if (arv) {
+    ctx.fillStyle = seca ? '#7a6a5a' : '#6b4a2a';
+    ctx.beginPath(); ctx.moveTo(x - 4 * s, y); ctx.lineTo(x - 2.5 * s, y - 34 * s); ctx.lineTo(x + 2.5 * s, y - 34 * s); ctx.lineTo(x + 4 * s, y); ctx.fill();
+    ctx.strokeStyle = seca ? '#7a6a5a' : '#6b4a2a'; ctx.lineWidth = 2.4 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y - 26 * s); ctx.lineTo(x - 13 * s, y - 40 * s); ctx.moveTo(x, y - 28 * s); ctx.lineTo(x + 14 * s, y - 42 * s); ctx.moveTo(x, y - 33 * s); ctx.lineTo(x + 2 * s, y - 50 * s); ctx.stroke(); ctx.lineCap = 'butt';
+    if (!seca) {
+      for (const [dx, dy, r] of [[-14, -44, 13], [14, -46, 14], [0, -54, 15], [-5, -40, 11], [7, -40, 11]]) { ctx.fillStyle = copa; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, 7); ctx.fill(); }
+      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.arc(x - 6 * s, y - 56 * s, 7 * s, 0, 7); ctx.fill();
+      if (o.id === 'jabuticabeira' && st.pronto) for (let k = 0; k < 10; k++) { ctx.fillStyle = f.cor; ctx.beginPath(); ctx.arc(x + ((k * 7) % 10 - 5) * 0.6 * s, y - (6 + k * 2.6) * s, 1.8 * s, 0, 7); ctx.fill(); } // nasce no tronco!
+    } else for (const [dx, dy] of [[-16, -44], [16, -46], [3, -54]]) { ctx.strokeStyle = '#7a6a5a'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.moveTo(x + dx * 0.7 * s, y + dy * 0.9 * s); ctx.lineTo(x + dx * s, y + dy * s - 5 * s); ctx.stroke(); }
+  } else {
+    ctx.fillStyle = seca ? '#8a7a4a' : tomCor(copa, -0.15);
+    for (const [dx, dy, r] of [[-11, -10, 10], [10, -11, 10], [0, -17, 12], [-4, -8, 9], [5, -8, 9]]) { ctx.fillStyle = seca ? '#9a8a5a' : copa; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, 7); ctx.fill(); }
+    if (o.id === 'maracujazeiro' && !seca) { ctx.fillStyle = '#f4f1ea'; for (const [dx, dy] of [[-8, -20], [9, -16]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 2.2 * s, 0, 7); ctx.fill(); ctx.fillStyle = '#7a4aa0'; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 0.9 * s, 0, 7); ctx.fill(); ctx.fillStyle = '#f4f1ea'; } }
+    if (seca) { ctx.strokeStyle = '#6b5a3a'; ctx.lineWidth = 1 * s; for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(x + (k * 5 - 10) * s, y - 3 * s); ctx.lineTo(x + (k * 6 - 12) * s, y - 20 * s); ctx.stroke(); } }
+  }
+  // frutas quando está pronta
+  if (st.pronto && !(arv && o.id === 'jabuticabeira')) {
+    const pos = arv ? [[-15, -44], [-6, -52], [8, -50], [16, -42], [2, -42], [-10, -38]] : [[-10, -12], [9, -13], [0, -20], [-3, -9], [6, -8]];
+    for (const [dx, dy] of pos) { ctx.fillStyle = f.cor; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, (arv ? 3 : 2.4) * s, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.arc(x + (dx - 0.8) * s, y + (dy - 0.8) * s, 0.8 * s, 0, 7); ctx.fill(); }
+  }
+  // balãozinho em cima: pronta (cesta) ou seca (ferramenta)
+  if (home && o.t0 && (st.pronto || st.morta)) {
+    const by = y - (arv ? 72 : 36) * s + Math.sin(t / 300) * 2 * s, r = 9 * s;
+    ctx.fillStyle = 'rgba(255,253,242,.95)'; ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, by, r, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.font = `${Math.round(11 * s)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(st.morta ? (arv ? '🪚' : '🪓') : '🧺', x, by + 0.5); ctx.textBaseline = 'alphabetic';
+  }
+}
+function pomarLojaHTML() {
+  const d = derrubarDe();
+  let html = `<p class="hint">Plante frutíferas no gramado da roça ou do rancho (fora dos canteiros). Elas dão frutas de tempos em tempos e, depois de uns dias, secam. Arbusto seco sai com a 🪓 enxada de arrancar; árvore seca, com a 🪚 motosserra. Ganhe essas ferramentas completando todas as missões (dia: enxada, semana: motosserra), de presente de amigos ou compre aqui.</p>`;
+  html += `<h3>Ferramentas de derrubar</h3>`;
+  for (const [id, F] of Object.entries(FERR_DERRUBAR)) html += `<div class="row"><img alt="" src="${ferramentaIcon(id)}"><div><div class="name">${F.nome}</div><div class="meta">Tira um${F.para === 'arvore' ? 'a árvore' : ' arbusto'} seco · você tem <b>${d[id]}</b></div></div>
+    <button class="btn" data-comprar-ferr="${id}" ${state.coins < F.custo ? 'disabled' : ''}>${moeda(F.custo)}</button></div>`;
+  for (const [tipo, titulo] of [['arbusto', 'Arbustos'], ['arvore', 'Árvores']]) {
+    html += `<h3>${titulo}</h3>`;
+    for (const e of ENFEITES.filter(x => x.fruteira === tipo)) {
+      const f = FRUTA[e.fruta], locked = e.nivel > state.level, tem = state.enfeites[e.id] || 0;
+      html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div>
+        <div class="meta">${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} (vale ${f.preco}) a cada ${fmt(e.tempo)} · vive ${e.vida} dias${tem ? ` · no inventário: <b>${tem}</b>` : ''}</div></div>
+        ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
+    }
+  }
+  return html;
+}
+function comprarFerramenta(id) {
+  const F = FERR_DERRUBAR[id]; if (!F) return;
+  if (state.coins < F.custo) return toast(`${F.nome} custa ${F.custo} moedas.`, 'bad');
+  state.coins -= F.custo; derrubarDe()[id]++; sfx('buy'); toast(`${F.emoji} +1 ${F.nome.toLowerCase()}!`, 'good'); done();
+}
 
 // ============================================================
 // Trevos 🍀: a moeda verde. Não se compra: ganha resgatando peixes novos (no Livro de peixes),
@@ -8062,6 +8225,8 @@ const TREVO_LOJA = [
   { id: 'util:camarao',   nome: '10 camarões',              tipo: 'Útil', preco: 4,  repete: true, desc: 'Isca de camarão para a pescaria.', usar: () => { iscasDe().camarao = (iscasDe().camarao || 0) + 10; } },
   { id: 'util:artificial', nome: '5 iscas artificiais',     tipo: 'Útil', preco: 6,  repete: true, desc: 'Para tucunaré, dourado e pirarucu.', usar: () => { iscasDe().artificial = (iscasDe().artificial || 0) + 5; } },
   { id: 'util:tarrafa',   nome: 'Tarrafa pronta agora',     tipo: 'Útil', preco: 8,  repete: true, desc: 'Seca a tarrafa na hora: pode jogar de novo.', pode: () => faltaTarrafa() > 0, naoPode: 'A tarrafa já está pronta!', usar: () => { state.tarrafaEm = 0; } },
+  { id: 'util:enxada',    nome: 'Enxada de arrancar',       tipo: 'Útil', preco: 3,  repete: true, desc: 'Tira um arbusto seco do pomar.', usar: () => { derrubarDe().enxada++; } },
+  { id: 'util:motosserra', nome: 'Motosserra',              tipo: 'Útil', preco: 6,  repete: true, desc: 'Derruba uma árvore seca do pomar.', usar: () => { derrubarDe().motosserra++; } },
   { id: 'util:racao',     nome: '3 rações especiais',       tipo: 'Útil', preco: 6,  repete: true, desc: 'Cada uma faz um animal produzir em dobro.', usar: () => { state.racaoEsp = (state.racaoEsp || 0) + 3; } },
   { id: 'util:pontos',    nome: 'Pontos de pesca descansados', tipo: 'Útil', preco: 10, repete: true, desc: 'Todos os seus pontos de pesca voltam a ter 3 pescarias.', pode: () => PONTOS.some(p => faltaPonto(p.id) > 0), naoPode: 'Seus pontos de pesca já estão prontos!', usar: () => { const pp = pontosDe(); pp.prox = {}; pp.usos = {}; } },
 ];
@@ -8073,7 +8238,7 @@ function iconeTrevoItem(it) {
   if (tipo === 'enfeite') return enfeiteIcon(id);
   return makeIcon('trevoitem:' + it.id, () => {
     if (tipo === 'musica') { ctx.fillStyle = '#2f8a2f'; ctx.font = '56px system-ui'; ctx.textAlign = 'center'; ctx.fillText({ 4: '🪕', 5: '🪗', 6: '🌙' }[id] || '🎵', 48, 70); return; }
-    if (tipo === 'util') { ctx.font = '54px system-ui'; ctx.textAlign = 'center'; ctx.fillText({ camarao: '🦐', artificial: '🎏', tarrafa: '🕸️', racao: '🌾', pontos: '🎣' }[id] || '🧺', 48, 70); return; }
+    if (tipo === 'util') { ctx.font = '54px system-ui'; ctx.textAlign = 'center'; ctx.fillText({ camarao: '🦐', artificial: '🎏', tarrafa: '🕸️', racao: '🌾', pontos: '🎣', enxada: '🪓', motosserra: '🪚' }[id] || '🧺', 48, 70); return; }
     const av = Object.assign({}, avatarOk(state.avatar), tipo === 'chapeu' ? { chapeu: id } : { mao: id });
     drawAvatar(ctx, 48, 92, 1.2, av, 0, false, 1);
   });
