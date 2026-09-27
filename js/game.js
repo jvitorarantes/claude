@@ -1860,8 +1860,10 @@ function layout(sc) {
   // Zoom em volta do meio da tela; arrastar anda pela parte que ficou de fora.
   const z = zoomOf(sc);
   L.W *= z; L.ox = cx + (L.ox - cx) * z; L.oy = cy + (L.oy - cy) * z;
-  // sempre dá para arrastar um pouco para os lados (e mais, se a cena não couber)
-  const ovx = Math.max(aw * 0.35, (box.w * z - aw) / 2 + aw * 0.1), ovy = Math.max(ah * 0.25, (box.h * z - ah) / 2 + ah * 0.1);
+  // sempre dá para arrastar para os lados (e mais, se a cena não couber). A folga também depende do
+  // tamanho da fazenda (L.W = uma casa da grade), senão com o celular em pé (tela estreita) quase não arrastava.
+  const ovx = Math.max(aw * 0.35, L.W * 4, (box.w * z - aw) / 2 + Math.max(aw * 0.1, L.W * 1.5));
+  const ovy = Math.max(ah * 0.25, L.W * 2.5, (box.h * z - ah) / 2 + Math.max(ah * 0.1, L.W));
   L.pan.x = clamp(L.pan.x, -ovx, ovx); L.pan.y = clamp(L.pan.y, -ovy, ovy);
   L.ox += L.pan.x; L.oy += L.pan.y;
   L.canPan = ovx > 0 || ovy > 0;
@@ -3725,8 +3727,8 @@ function renderTabs() {
   setBadge(document.querySelector('.tab[data-tab="amigos"]'), requests.length + naoLidas(), 'pedidos de amizade e mensagens');
   setBadge(document.querySelector('.tab[data-tab="correio"]'), unread, 'cartas novas');
   if (state) {
-    setBadge(document.querySelector('.tab[data-tab="celeiro"]'), Object.values(state.barn).reduce((t, q) => t + (q > 0 ? q : 0), 0), 'itens no celeiro');
-    setBadge(document.querySelector('.tab[data-tab="inventario"]'), state.invNovos || 0, 'coisas novas no inventário');
+    setBadge(document.querySelector('.tab[data-tab="celeiro"]'), avisoItens('celeiro') ? Object.values(state.barn).reduce((t, q) => t + (q > 0 ? q : 0), 0) : 0, 'itens no celeiro');
+    setBadge(document.querySelector('.tab[data-tab="inventario"]'), avisoItens('inventario') ? state.invNovos || 0 : 0, 'coisas novas no inventário');
     setBadge(document.querySelector('.tab[data-tab="fabrica"]'), prontosFab() + entregaveis(), 'coisas prontas na fábrica ou pedidos para entregar');
   }
   const mb = document.querySelector('.tab[data-tab="missoes"]'), mn = missoesProntas();
@@ -3929,6 +3931,7 @@ function renderPane() {
       }
     }
   } else if (tab === 'celeiro') {
+    html += chaveAviso('celeiro', 'Mostrar a quantidade de itens no botão do Celeiro');
     const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PEIXES.map(p => PRODUCT[p.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
     let total = 0; for (const it of items) total += state.barn[it.id] * it.preco;
     html += `<h3>Celeiro</h3>`;
@@ -6159,6 +6162,15 @@ function listaRank(docs, r) {
   return linhas.map((l, k) => `<div class="rankrow ${l.eu ? 'eu' : ''}"><b>${['🥇', '🥈', '🥉'][k] || `${k + 1}º`}</b><span>${esc(l.nome)}</span><strong>${l.pts} pts</strong></div>`).join('');
 }
 
+// Liga/desliga do número vermelho (aviso de itens) no botão do Celeiro e do Inventário.
+const avisoItens = qual => !(state && state.semAviso && state.semAviso[qual]);
+const chaveAviso = (qual, txt) => `<div class="setrow avisoitens"><label for="aviso_${qual}">🔴 ${txt}</label><input type="checkbox" class="switch" id="aviso_${qual}" data-aviso-itens="${qual}" ${avisoItens(qual) ? 'checked' : ''}></div>`;
+$('#pane').addEventListener('change', e => {
+  const t = e.target.closest('[data-aviso-itens]'); if (!t) return;
+  (state.semAviso ||= {})[t.dataset.avisoItens] = !t.checked; done(); renderTabs();
+  toast(t.checked ? 'Aviso de itens ligado.' : 'Aviso de itens desligado.');
+});
+
 // ---------- Tela de missões e coleção ----------
 let missSeg = 'dia';
 function missoesHTML() {
@@ -6781,7 +6793,7 @@ function actEnfeite(id) {
 // ---------- Inventário: enfeites guardados e os que estão na roça ou no rancho ----------
 function inventarioHTML() {
   if (state.invNovos) { state.invNovos = 0; setTimeout(renderTabs, 0); save(); }
-  let html = `<p class="hint">Dá para vender enfeites guardados pela metade do preço (os de eventos não se vendem).</p><p class="hint">Aqui ficam os enfeites que você comprou ou ganhou. Para pôr um na roça ou no rancho, escolha e clique no lugar. Para mudar de lugar, use o botão Mover.</p>`;
+  let html = chaveAviso('inventario', 'Avisar coisas novas no botão do Inventário') + `<p class="hint">Dá para vender enfeites guardados pela metade do preço (os de eventos não se vendem).</p><p class="hint">Aqui ficam os enfeites que você comprou ou ganhou. Para pôr um na roça ou no rancho, escolha e clique no lugar. Para mudar de lugar, use o botão Mover.</p>`;
   const guardados = ENFEITES.filter(e => state.enfeites[e.id] > 0);
   html += `<h3>Guardados</h3>`;
   if (!guardados.length) html += `<div class="empty">Nada guardado. Compre enfeites na Loja › Enfeites.</div>`;
