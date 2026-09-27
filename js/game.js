@@ -6079,10 +6079,10 @@ const PONTOS = [
   // (os ids ficam os mesmos de antes para quem já tinha comprado; o "cena" diz o que desenhar)
   { id: 'riacho',   nome: 'Córrego Cascavel',     emoji: '🪨', nivel: 5,  custo: 1500,  sorte: 1.2,  cena: 'pedras',  agua: ['#8ad4e0', '#3a8ea6'], margem: '#86c050' },
   { id: 'represa',  nome: 'Rio Meia Ponte',       emoji: '🌉', nivel: 10, custo: 5000,  sorte: 1.45, cena: 'ponte',   agua: ['#7fb0c8', '#3a6f8a'], margem: '#6fae44' },
-  { id: 'rio',      nome: 'Ribeirão João Leite',  emoji: '🧱', nivel: 15, custo: 12000, sorte: 1.75, cena: 'represa', agua: ['#5d9fca', '#22598a'], margem: '#5e9e3a' },
-  { id: 'lagoa',    nome: 'Rio dos Bois',         emoji: '🐂', nivel: 20, custo: 25000, sorte: 2.1,  cena: 'mata',    agua: ['#9aae72', '#56703f'], margem: '#66a844' },
-  { id: 'araguaia', nome: 'Rio Araguaia',         emoji: '🏖️', nivel: 25, custo: 45000, sorte: 2.5,  cena: 'praia',   agua: ['#6fc0d8', '#1f7a9a'], margem: '#7cb850' },
-  { id: 'amazonas', nome: 'Rio Amazonas',         emoji: '🌴', nivel: 30, custo: 80000, sorte: 3,    cena: 'amazonas', agua: ['#a08a5a', '#5a4a2a'], margem: '#3f8a2a' },
+  { id: 'rio',      nome: 'Ribeirão João Leite',  emoji: '🧱', nivel: 15, custo: 8000, sorte: 1.75, cena: 'represa', agua: ['#5d9fca', '#22598a'], margem: '#5e9e3a' },
+  { id: 'lagoa',    nome: 'Rio dos Bois',         emoji: '🐂', nivel: 20, custo: 14000, sorte: 2.1,  cena: 'mata',    agua: ['#9aae72', '#56703f'], margem: '#66a844' },
+  { id: 'araguaia', nome: 'Rio Araguaia',         emoji: '🏖️', nivel: 25, custo: 22000, sorte: 2.5,  cena: 'praia',   agua: ['#6fc0d8', '#1f7a9a'], margem: '#7cb850' },
+  { id: 'amazonas', nome: 'Rio Amazonas',         emoji: '🌴', nivel: 30, custo: 35000, sorte: 3,    cena: 'amazonas', agua: ['#a08a5a', '#5a4a2a'], margem: '#3f8a2a' },
 ];
 const PONTO = Object.fromEntries(PONTOS.map(p => [p.id, p]));
 function pontosDe() {
