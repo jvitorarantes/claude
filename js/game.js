@@ -832,7 +832,10 @@ function collectAll() {
 // ---------- Cachorros ----------
 const dogAlive = d => d && Date.now() - d.born < DOG[d.raca].vida * DAY;
 const dogAwake = d => dogAlive(d) && d.fedUntil > Date.now();
-const latir = (slot, nome) => { falar('dog:' + slot, nome, 'Au au! 🐶'); sfx('bark'); };
+const sorteia = l => l[Math.floor(Math.random() * l.length)];
+const FALAS_CAO = ['Au au! 🐶', 'Au! Tô de olho!', 'Cadê meu osso? 🦴', 'Aqui ninguém pega nada!', 'Au au! Brinca comigo?', 'Grrr… quem vem lá?', 'Au! Bora passear?', '*abana o rabo*'];
+const FALAS_AVATAR = ['Cê tá bão?', 'Ô trem bão!', 'Bora trabaiá!', 'Que dia bonito, sô!', 'Essa roça tá uma belezura!', 'Uai, cadê meu chapéu?', 'Hoje tem colheita boa!', 'Vou tomar um cafezin ☕', 'Nó, que calor!', 'Bão demais da conta!'];
+const latir = (slot, nome) => { falar('dog:' + slot, nome, sorteia(FALAS_CAO)); sfx('bark'); };
 function actDog(slot) {
   const d = S().dogs && S().dogs[slot];
   if (!isHome()) {
@@ -4383,7 +4386,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'abrigo') actAbrigo(target.id);
   else if (target.kind === 'land') openPanel('terreno');
   else if (target.kind === 'bicho') actBicho(target.i);
-  else if (target.kind === 'avatar') { falar('avatar', meuApelido(), 'Cê tá bão?'); sfx('fala'); }
+  else if (target.kind === 'avatar') { falar('avatar', meuApelido(), sorteia(FALAS_AVATAR)); sfx('fala'); }
   else if (target.kind === 'enfeite') actEnfeite(target.id);
   else if (target.kind === 'casa') setScene('casa');
   else if (target.kind === 'celeiro') { if (isHome()) openPanel('celeiro'); else toast(`Celeiro de ${view.nome}.`); }
