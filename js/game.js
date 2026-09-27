@@ -5206,6 +5206,7 @@ $('#pesca').addEventListener('click', e => {
   if (e.target.closest('#pescaComprar')) return comprarIscas();
   if (e.target.closest('#pescaTarrafa')) return jogarTarrafa();
   const pb = e.target.closest('[data-ponto]');
+  if (pb && pontosArrastou) return;
   if (pb) {
     if (pesca && (pesca.fase === 'esperando' || pesca.fase === 'fisgou' || pesca.fase === 'tarrafa')) return;
     if (!temPonto(pb.dataset.ponto)) return comprarPonto(pb.dataset.ponto);
@@ -6072,7 +6073,7 @@ const faltaPonto = id => Math.max(0, (pontosDe().prox[id] || 0) - Date.now());
 const faltaTarrafa = () => Math.max(0, (state.tarrafaEm || 0) - Date.now());
 function comprarPonto(id) {
   const d = PONTO[id]; if (!d || temPonto(id)) return;
-  if (state.level < d.nivel) return toast(`${d.nome} libera no nível ${d.nivel}.`, 'bad');
+  if (state.level < d.nivel) return toast(`${d.emoji} ${d.nome}: libera no nível ${d.nivel} e custa ${d.custo.toLocaleString('pt-BR')} moedas.`);
   if (state.coins < d.custo) { sfx('error'); return toast(`${d.nome} custa ${d.custo.toLocaleString('pt-BR')} moedas. Faltam ${(d.custo - state.coins).toLocaleString('pt-BR')}.`, 'bad'); }
   return confirmTwice('ponto' + id, `Comprar o ponto ${d.nome} por ${d.custo.toLocaleString('pt-BR')} moedas? Toque de novo para confirmar.`, () => {
     state.coins -= d.custo; pontosDe().meus.push(id); state.pontoSel = id; sfx('buy');
@@ -6146,6 +6147,16 @@ function puxar() {
     done(); renderPesca();
   }
 }
+// Fileira de pontos: dá para arrastar com o mouse (no celular, é só deslizar) e a roda do mouse anda para os lados.
+let pontosArrastou = false;
+(() => {
+  const el = $('#pescaPontos'); if (!el) return;
+  let ini = null;
+  el.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') { ini = { x: e.clientX, s: el.scrollLeft }; pontosArrastou = false; } });
+  window.addEventListener('pointermove', e => { if (!ini) return; const dx = e.clientX - ini.x; if (Math.abs(dx) > 5) pontosArrastou = true; el.scrollLeft = ini.s - dx; });
+  window.addEventListener('pointerup', () => { if (ini) { ini = null; setTimeout(() => { pontosArrastou = false; }, 0); } });
+  el.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { el.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+})();
 // Só troca o HTML se mudou (assim o relógio atualiza sem "comer" o toque no botão).
 const setHtml = (el, html) => { if (el && el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
 function renderPesca() {
@@ -6162,7 +6173,7 @@ function renderPesca() {
   setHtml($('#pescaPontos'), PONTOS.map(d => {
     const meu = pp.meus.includes(d.id), trava = d.nivel > state.level, f = meu ? faltaPonto(d.id) : 0;
     const st = meu ? (f ? `⏳ ${fmt(f / 1000)}` : 'Pronto!') : trava ? `🔒 Nv ${d.nivel}` : moeda(d.custo);
-    return `<button type="button" class="pontobtn ${meu ? '' : 'loja'} ${f ? 'descansa' : ''}" data-ponto="${d.id}" aria-pressed="${meu && d.id === pt.id}" ${trava && !meu ? 'disabled' : ''}>
+    return `<button type="button" class="pontobtn ${meu ? '' : trava ? 'trava' : 'loja'} ${f ? 'descansa' : ''}" data-ponto="${d.id}" aria-pressed="${meu && d.id === pt.id}">
       <b>${d.emoji} ${d.nome}</b><small>${st}</small></button>`;
   }).join(''));
   btn.classList.toggle('gold', pesca.fase === 'fisgou' || pesca.fase === 'pronto' || pesca.fase === 'resultado');
