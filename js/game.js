@@ -5049,15 +5049,29 @@ const AV_OPC = {
   cabelo: [['curto', 'Curto'], ['cacheado', 'Cacheado'], ['comprido', 'Comprido'], ['rabo', 'Rabo de cavalo']],
   chapeu: [['sem', 'Sem'], ['palha', 'Palha'], ['bone', 'Boné'], ['cowboy', 'Cowboy']],
   mao: [['nada', 'Nada'], ['vara', 'Vara de pesca'], ['espingarda', 'Espingarda'], ['enxada', 'Enxada']],
-  camisa: [['camiseta', 'Camiseta'], ['xadrez', 'Xadrez'], ['regata', 'Regata']],
-  calca: [['jeans', 'Jeans'], ['bermuda', 'Bermuda'], ['macacao', 'Macacão']],
-  sapato: [['bota', 'Bota'], ['tenis', 'Tênis'], ['chinelo', 'Chinelo']],
 };
+// Roupas: cada um tem as suas (menino e menina têm peças e cores diferentes).
+const AV_ROUPAS = {
+  m: {
+    camisa: [['camiseta', 'Camiseta'], ['xadrez', 'Xadrez'], ['regata', 'Regata']],
+    calca: [['jeans', 'Jeans'], ['bermuda', 'Bermuda'], ['macacao', 'Macacão']],
+    sapato: [['bota', 'Bota'], ['tenis', 'Tênis'], ['chinelo', 'Chinelo']],
+  },
+  f: {
+    camisa: [['blusa', 'Blusa de babado'], ['florida', 'Florida'], ['regatinha', 'Regatinha']],
+    calca: [['saia', 'Saia rodada'], ['jardineira', 'Jardineira'], ['jeansclara', 'Calça jeans']],
+    sapato: [['sapatilha', 'Sapatilha'], ['botinha', 'Botinha'], ['sandalia', 'Sandália']],
+  },
+};
+const ROUPA_PADRAO = { m: { camisa: 'xadrez', calca: 'jeans', sapato: 'bota' }, f: { camisa: 'blusa', calca: 'saia', sapato: 'sapatilha' } };
+const opcoesAvatar = (av, k) => AV_OPC[k] || AV_ROUPAS[av.sexo === 'f' ? 'f' : 'm'][k];
 const AV_PADRAO = { sexo: 'm', pele: 1, camisa: 'xadrez', calca: 'jeans', sapato: 'bota', cabelo: 'curto', corCabelo: 1, chapeu: 'sem', mao: 'nada' };
 function avatarOk(a) {
   const r = Object.assign({}, AV_PADRAO);
   if (a && typeof a === 'object') {
     for (const k of Object.keys(AV_OPC)) if (AV_OPC[k].some(([id]) => id === a[k])) r[k] = a[k];
+    Object.assign(r, ROUPA_PADRAO[r.sexo]);
+    for (const k of ['camisa', 'calca', 'sapato']) if (opcoesAvatar(r, k).some(([id]) => id === a[k])) r[k] = a[k];
     if (Number.isInteger(a.pele) && a.pele >= 0 && a.pele < AV_PELE.length) r.pele = a.pele;
     if (Number.isInteger(a.corCabelo) && a.corCabelo >= 0 && a.corCabelo < AV_CORES_CABELO.length) r.corCabelo = a.corCabelo;
     if (!a.cabelo && r.sexo === 'f') r.cabelo = 'comprido'; // avatar antigo: menina de cabelo comprido
@@ -5108,74 +5122,140 @@ function drawAvatar(g, x, y, s, av, t, andando, dir = 1) {
   av = avatarOk(av);
   const pele = AV_PELE[av.pele], f = av.sexo === 'f';
   const ph = andando ? Math.sin(t / 110) : 0, pe = [Math.max(0, ph) * 3, Math.max(0, -ph) * 3];
-  const jeans = '#3f6fa8', jeansD = '#2c5282';
+  const jeans = '#3f6fa8', jeansD = '#2c5282', jeansF = '#7fa8d8', jeansFD = '#5f88bc';
   g.save(); g.translate(x, y); g.scale(s, s); g.translate(0, andando ? -Math.abs(Math.cos(t / 110)) * 1.2 : 0);
   const rr = (x0, y0, w, h, r, c) => { g.fillStyle = c; g.beginPath(); g.roundRect(x0, y0, w, h, r); g.fill(); };
+  const ombro = f ? 9.3 : 10.5;
   // cabelo comprido fica atrás de tudo
   const corCab = AV_CORES_CABELO[av.corCabelo];
-  if (av.cabelo === 'comprido') { g.fillStyle = corCab; g.beginPath(); g.roundRect(-11.5, -60, 23, 26, 8); g.fill(); }
+  if (av.cabelo === 'comprido') { g.fillStyle = corCab; g.beginPath(); g.roundRect(-11.5, -60, 23, f ? 30 : 26, 8); g.fill(); }
   if (av.cabelo === 'rabo') { g.fillStyle = corCab; g.beginPath(); g.ellipse(-dir * 9, -52, 4, 10, dir * 0.35 + (andando ? ph * 0.15 : 0), 0, 7); g.fill(); }
-  // pernas e calça
-  for (const [k, lx] of [[0, -6.5], [1, 1.5]]) {
-    const up = pe[k];
-    rr(lx, -25 - up, 5, 21, 2, pele);
-    if (av.calca === 'bermuda') rr(lx - 0.5, -25 - up, 6, 11, 2, '#c9a66b');
-    else rr(lx - 0.5, -25 - up, 6, 20, 2, k ? jeansD : jeans);
-    // sapatos
+  // pernas, calça e calçados
+  for (const [k, lx0] of [[0, -6.5], [1, 1.5]]) {
+    const up = pe[k], lx = f ? lx0 + (k ? -0.3 : 0.8) : lx0, lw = f ? 4.3 : 5;
+    rr(lx, -25 - up, lw, 21, 2, pele);
+    if (!f) {
+      if (av.calca === 'bermuda') rr(lx - 0.5, -25 - up, 6, 11, 2, '#c9a66b');
+      else rr(lx - 0.5, -25 - up, 6, 20, 2, k ? jeansD : jeans);
+    } else if (av.calca === 'jeansclara') {
+      rr(lx - 0.6, -25 - up, lw + 1.2, 20, 2, k ? jeansFD : jeansF);
+      g.fillStyle = k ? jeansFD : jeansF; g.beginPath(); g.moveTo(lx - 0.6, -8 - up); g.lineTo(lx - 1.6, -5 - up); g.lineTo(lx + lw + 1.6, -5 - up); g.lineTo(lx + lw + 0.6, -8 - up); g.fill(); // boca larga
+    }
     const sy = -5 - up;
-    if (av.sapato === 'bota') { rr(lx - 1, sy - 4, 7.5, 9, 2, '#7a4a24'); rr(lx - 1, sy + 3.5, 8, 1.8, 1, '#4a2c14'); }
-    else if (av.sapato === 'tenis') { rr(lx - 1, sy, 7.5, 5, 2.2, '#f4f1ea'); g.fillStyle = '#d8402f'; g.fillRect(lx, sy + 1.5, 5.5, 1.3); rr(lx - 1, sy + 4, 7.5, 1.4, 0.7, '#9a9a9a'); }
-    else { rr(lx - 1, sy + 3, 7.5, 2.2, 1, '#e08a2e'); rr(lx, sy, 5, 3.5, 1.5, pele); g.strokeStyle = '#3f6fa8'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(lx, sy + 3); g.lineTo(lx + 2.5, sy + 0.8); g.lineTo(lx + 5, sy + 3); g.stroke(); }
+    if (!f) {
+      if (av.sapato === 'bota') { rr(lx - 1, sy - 4, 7.5, 9, 2, '#7a4a24'); rr(lx - 1, sy + 3.5, 8, 1.8, 1, '#4a2c14'); }
+      else if (av.sapato === 'tenis') { rr(lx - 1, sy, 7.5, 5, 2.2, '#f4f1ea'); g.fillStyle = '#d8402f'; g.fillRect(lx, sy + 1.5, 5.5, 1.3); rr(lx - 1, sy + 4, 7.5, 1.4, 0.7, '#9a9a9a'); }
+      else { rr(lx - 1, sy + 3, 7.5, 2.2, 1, '#e08a2e'); rr(lx, sy, 5, 3.5, 1.5, pele); g.strokeStyle = '#3f6fa8'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(lx, sy + 3); g.lineTo(lx + 2.5, sy + 0.8); g.lineTo(lx + 5, sy + 3); g.stroke(); }
+    } else if (av.sapato === 'sapatilha') {
+      rr(lx - 1, sy + 1, 6.5, 4, 2, '#c8233f'); g.fillStyle = '#ff9fb5'; g.beginPath(); g.ellipse(lx + 2.2, sy + 1.4, 1.6, 0.9, 0, 0, 7); g.fill();
+    } else if (av.sapato === 'botinha') {
+      rr(lx - 0.8, sy - 3, 6.2, 8, 2, '#c98f57'); rr(lx - 1, sy + 3.6, 6.8, 1.6, 0.8, '#8a5a33'); g.fillStyle = '#f4e1c6'; g.fillRect(lx - 0.8, sy - 3, 6.2, 1.4);
+    } else {
+      rr(lx - 1, sy + 3.2, 6.8, 1.8, 0.9, '#f4d9a8'); rr(lx, sy + 0.5, 4.5, 3.2, 1.5, pele);
+      g.strokeStyle = '#e25b8f'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(lx - 0.3, sy + 2); g.lineTo(lx + 4.8, sy + 2); g.moveTo(lx + 2.2, sy + 0.4); g.lineTo(lx + 2.2, sy + 3.3); g.stroke();
+    }
   }
+  // cores e mangas de cada peça
+  const LOOK = {
+    camiseta: ['#d8402f', 8], xadrez: ['#c8402f', 16], regata: ['#f2c14e', 0],
+    blusa: ['#f48fb1', 6], florida: ['#b39ddb', 12], regatinha: ['#7fd1b9', 0],
+  };
+  const [corCamisa, manga] = LOOK[av.camisa] || LOOK.xadrez;
+  const corManga = av.camisa === 'xadrez' ? '#a53325' : av.camisa === 'blusa' ? '#f8a8c4' : corCamisa;
   // braços (balançam ao contrário das pernas)
-  const manga = { camiseta: 8, xadrez: 16, regata: 0 }[av.camisa], corCamisa = { camiseta: '#d8402f', xadrez: '#c8402f', regata: '#f2c14e' }[av.camisa];
   const angMao = 0.12 + (andando ? -ph * 0.35 : 0) * (av.mao === 'nada' ? 1 : 0.3);
   for (const [sx, k] of [[-1, 1], [1, 0]]) {
-    g.save(); g.translate(sx * 10.5, -41); g.rotate(sx === 1 ? angMao : sx * 0.12 + (andando ? (k ? ph : -ph) * 0.35 : 0));
-    rr(-2.5, 0, 5, 17, 2.5, pele);
-    if (manga) rr(-3, -0.5, 6, manga, 2.5, av.camisa === 'xadrez' ? '#a53325' : corCamisa);
+    g.save(); g.translate(sx * ombro, -41); g.rotate(sx === 1 ? angMao : sx * 0.12 + (andando ? (k ? ph : -ph) * 0.35 : 0));
+    rr(f ? -2.1 : -2.5, 0, f ? 4.2 : 5, 17, 2.3, pele);
+    if (manga) {
+      if (av.camisa === 'blusa') { g.fillStyle = corManga; g.beginPath(); g.ellipse(0, 2.5, 3.8, 4, 0, 0, 7); g.fill(); } // manga bufante
+      else rr(-3, -0.5, 6, manga, 2.5, corManga);
+    }
     g.restore();
   }
-  // tronco
-  g.save(); g.beginPath(); g.roundRect(-10.5, -44, 21, 21, f ? 7 : 5); g.clip();
+  // tronco (menina: cintura marcada)
+  g.save(); g.beginPath();
+  if (f) { g.moveTo(-9.5, -42); g.quadraticCurveTo(-9.5, -44.5, -6, -44.5); g.lineTo(6, -44.5); g.quadraticCurveTo(9.5, -44.5, 9.5, -42); g.quadraticCurveTo(7, -34, 7.6, -30); g.quadraticCurveTo(9.5, -26, 9.5, -23); g.lineTo(-9.5, -23); g.quadraticCurveTo(-9.5, -26, -7.6, -30); g.quadraticCurveTo(-7, -34, -9.5, -42); g.closePath(); }
+  else g.roundRect(-10.5, -44, 21, 21, 5);
+  g.clip();
   g.fillStyle = corCamisa; g.fillRect(-11, -45, 22, 23);
   if (av.camisa === 'xadrez') {
     g.fillStyle = 'rgba(40,20,20,.35)'; for (let k = -10; k < 11; k += 5) g.fillRect(k, -45, 2, 23);
     g.fillStyle = 'rgba(255,240,220,.3)'; for (let k = -43; k < -22; k += 5) g.fillRect(-11, k, 22, 2);
   }
+  if (av.camisa === 'florida') {
+    for (const [fx, fy] of [[-5, -40], [3, -37], [-2, -31], [5, -28], [-6, -27], [6, -42]]) {
+      g.fillStyle = '#fff'; for (let a = 0; a < 5; a++) { g.beginPath(); g.arc(fx + Math.cos(a * 1.26) * 1.2, fy + Math.sin(a * 1.26) * 1.2, 0.9, 0, 7); g.fill(); }
+      g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(fx, fy, 0.7, 0, 7); g.fill();
+    }
+  }
   if (av.camisa === 'regata') { g.fillStyle = pele; g.beginPath(); g.ellipse(-11, -44, 5, 7, 0, 0, 7); g.ellipse(11, -44, 5, 7, 0, 0, 7); g.ellipse(0, -45, 5, 3.5, 0, 0, 7); g.fill(); }
-  if (av.calca === 'macacao') {
-    g.fillStyle = jeans; g.fillRect(-7, -35, 14, 13); g.fillRect(-11, -26, 22, 5);
-    g.strokeStyle = jeans; g.lineWidth = 2.5; g.beginPath(); g.moveTo(-6, -35); g.lineTo(-7, -45); g.moveTo(6, -35); g.lineTo(7, -45); g.stroke();
-    g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(-5, -33, 1.2, 0, 7); g.arc(5, -33, 1.2, 0, 7); g.fill();
-  } else { g.fillStyle = av.calca === 'bermuda' ? '#b08d55' : jeansD; g.fillRect(-11, -26, 22, 4); g.fillStyle = '#e8c65a'; g.fillRect(-1.5, -25.5, 3, 3); }
+  if (av.camisa === 'regatinha') { g.fillStyle = pele; g.beginPath(); g.ellipse(-10, -44, 5.5, 7, 0, 0, 7); g.ellipse(10, -44, 5.5, 7, 0, 0, 7); g.ellipse(0, -45, 5, 3, 0, 0, 7); g.fill(); g.strokeStyle = corCamisa; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-4.5, -39); g.lineTo(-5.5, -45); g.moveTo(4.5, -39); g.lineTo(5.5, -45); g.stroke(); }
+  if (av.camisa === 'blusa') { g.fillStyle = '#fff'; for (let k = -5; k <= 5; k += 2.5) { g.beginPath(); g.arc(k, -43.5, 1.6, 0, 7); g.fill(); } }
+  if (!f) {
+    if (av.calca === 'macacao') {
+      g.fillStyle = jeans; g.fillRect(-7, -35, 14, 13); g.fillRect(-11, -26, 22, 5);
+      g.strokeStyle = jeans; g.lineWidth = 2.5; g.beginPath(); g.moveTo(-6, -35); g.lineTo(-7, -45); g.moveTo(6, -35); g.lineTo(7, -45); g.stroke();
+      g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(-5, -33, 1.2, 0, 7); g.arc(5, -33, 1.2, 0, 7); g.fill();
+    } else { g.fillStyle = av.calca === 'bermuda' ? '#b08d55' : jeansD; g.fillRect(-11, -26, 22, 4); g.fillStyle = '#e8c65a'; g.fillRect(-1.5, -25.5, 3, 3); }
+  } else if (av.calca === 'jardineira') {
+    g.fillStyle = jeansF; g.fillRect(-6, -35, 12, 12);
+    g.strokeStyle = jeansF; g.lineWidth = 2; g.beginPath(); g.moveTo(-5, -35); g.lineTo(-6, -45); g.moveTo(5, -35); g.lineTo(6, -45); g.stroke();
+    g.fillStyle = '#ff9fb5'; g.beginPath(); g.arc(0, -30, 1.8, 0, 7); g.fill(); // coraçãozinho no bolso
+  } else if (av.calca === 'jeansclara') { g.fillStyle = jeansFD; g.fillRect(-11, -26, 22, 3.5); }
   g.restore();
+  // saias (por cima das pernas, rodando um pouquinho ao andar)
+  if (f && (av.calca === 'saia' || av.calca === 'jardineira')) {
+    const roda = andando ? ph * 1.2 : 0, cor = av.calca === 'saia' ? '#e25b8f' : jeansF, bar = av.calca === 'saia' ? '#b83a6b' : jeansFD;
+    g.fillStyle = cor; g.beginPath(); g.moveTo(-8.5, -26); g.lineTo(8.5, -26); g.lineTo(12 + roda, -12); g.quadraticCurveTo(0, -9.5, -12 + roda, -12); g.closePath(); g.fill();
+    g.strokeStyle = bar; g.lineWidth = 1.6; g.beginPath(); g.moveTo(12 + roda, -12.5); g.quadraticCurveTo(0, -10, -12 + roda, -12.5); g.stroke();
+    if (av.calca === 'saia') { g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(-3, -25); g.lineTo(-5 + roda, -12); g.moveTo(3, -25); g.lineTo(5 + roda, -12); g.stroke(); }
+    else { g.fillStyle = jeansFD; g.fillRect(-9, -26, 18, 2.5); }
+  }
   // pescoço e cabeça
-  rr(-2.5, -47, 5, 4, 1, pele); rr(-2.5, -47, 5, 4, 1, 'rgba(90,40,20,.2)');
-  g.fillStyle = pele; g.beginPath(); g.arc(0, -56, 10.5, 0, 7); g.fill();
-  g.fillStyle = pele; g.beginPath(); g.arc(-10.2, -55, 2.4, 0, 7); g.arc(10.2, -55, 2.4, 0, 7); g.fill();
+  rr(-2.3, -47, 4.6, 4, 1, pele); rr(-2.3, -47, 4.6, 4, 1, 'rgba(90,40,20,.2)');
+  g.fillStyle = pele; g.beginPath(); if (f) g.ellipse(0, -56, 10.2, 10.6, 0, 0, 7); else g.arc(0, -56, 10.5, 0, 7); g.fill();
+  g.fillStyle = pele; g.beginPath(); g.arc(-10.2, -55, 2.3, 0, 7); g.arc(10.2, -55, 2.3, 0, 7); g.fill();
+  if (f) { g.fillStyle = '#f2c14e'; g.beginPath(); g.arc(-10.4, -52.6, 1.1, 0, 7); g.arc(10.4, -52.6, 1.1, 0, 7); g.fill(); } // brinquinhos
   // cabelo
   g.fillStyle = corCab;
   if (av.cabelo === 'cacheado') {
     for (let k = 0; k < 9; k++) { const a = Math.PI * (1.0 + k / 8); g.beginPath(); g.arc(Math.cos(a) * 10, -57 + Math.sin(a) * 10, 4.2, 0, 7); g.fill(); }
     g.beginPath(); g.arc(-11, -52, 3.4, 0, 7); g.arc(11, -52, 3.4, 0, 7); g.fill();
+    if (f) { g.beginPath(); g.arc(-11.5, -47.5, 3.2, 0, 7); g.arc(11.5, -47.5, 3.2, 0, 7); g.fill(); }
   } else {
     g.beginPath(); g.arc(0, -57, 11, Math.PI * 1.02, Math.PI * 1.98); g.fill();
-    g.beginPath(); g.moveTo(-10.5, -59); g.quadraticCurveTo(-3, -54, 4, -60); g.quadraticCurveTo(8, -56, 10.5, -59); g.lineTo(10, -63); g.lineTo(-10, -63); g.fill();
-    if (av.cabelo === 'comprido') { g.fillRect(-11.5, -58, 3, 12); g.fillRect(8.5, -58, 3, 12); }
+    if (f) { g.beginPath(); g.moveTo(-10.5, -59); g.quadraticCurveTo(-6, -58, -1, -62.5); g.quadraticCurveTo(4, -57, 10.5, -58); g.lineTo(10, -64); g.lineTo(-10, -64); g.fill(); } // franja de lado
+    else { g.beginPath(); g.moveTo(-10.5, -59); g.quadraticCurveTo(-3, -54, 4, -60); g.quadraticCurveTo(8, -56, 10.5, -59); g.lineTo(10, -63); g.lineTo(-10, -63); g.fill(); }
+    if (av.cabelo === 'comprido') { g.fillRect(-11.5, -58, 3, f ? 16 : 12); g.fillRect(8.5, -58, 3, f ? 16 : 12); }
     if (av.cabelo === 'rabo') { g.fillStyle = '#e25b8f'; g.beginPath(); g.arc(-dir * 9, -60, 1.8, 0, 7); g.fill(); }
+  }
+  if (f && av.chapeu === 'sem' && av.cabelo !== 'rabo') { // presilha de florzinha
+    g.fillStyle = '#ff7aa2'; for (let a = 0; a < 5; a++) { g.beginPath(); g.arc(7 + Math.cos(a * 1.26) * 1.6, -62 + Math.sin(a * 1.26) * 1.6, 1.3, 0, 7); g.fill(); }
+    g.fillStyle = '#ffe08a'; g.beginPath(); g.arc(7, -62, 1, 0, 7); g.fill();
   }
   drawChapeu(g, av.chapeu);
   // rosto (olha um pouquinho para onde anda)
   const o = dir * 1.2;
-  g.fillStyle = '#2a1a10'; g.beginPath(); g.ellipse(-3.8 + o, -55, 1.3, 1.8, 0, 0, 7); g.ellipse(3.8 + o, -55, 1.3, 1.8, 0, 0, 7); g.fill();
-  if (f) { g.strokeStyle = '#2a1a10'; g.lineWidth = 0.9; g.beginPath(); g.moveTo(-5.5 + o, -56.5); g.lineTo(-6.3 + o, -57.5); g.moveTo(5.5 + o, -56.5); g.lineTo(6.3 + o, -57.5); g.stroke(); }
-  g.fillStyle = 'rgba(230,110,110,.45)'; g.beginPath(); g.ellipse(-6.5 + o, -51.5, 2.3, 1.4, 0, 0, 7); g.ellipse(6.5 + o, -51.5, 2.3, 1.4, 0, 0, 7); g.fill();
-  g.strokeStyle = '#7a3a22'; g.lineWidth = 1.1; g.lineCap = 'round'; g.beginPath(); g.arc(o, -51.5, 2.6, 0.25, Math.PI - 0.25); g.stroke();
+  if (f) {
+    // olhos maiores com brilho e cílios, batom
+    g.fillStyle = '#2a1a10'; g.beginPath(); g.ellipse(-3.8 + o, -55, 1.6, 2.2, 0, 0, 7); g.ellipse(3.8 + o, -55, 1.6, 2.2, 0, 0, 7); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(-3.3 + o, -55.8, 0.55, 0, 7); g.arc(4.3 + o, -55.8, 0.55, 0, 7); g.fill();
+    g.strokeStyle = '#2a1a10'; g.lineWidth = 0.8; g.lineCap = 'round'; g.beginPath();
+    for (const ex of [-3.8, 3.8]) { const sg = Math.sign(ex); g.moveTo(ex + o + sg * 1.2, -56.6); g.lineTo(ex + o + sg * 2.4, -57.8); g.moveTo(ex + o + sg * 0.3, -57.1); g.lineTo(ex + o + sg * 0.9, -58.6); }
+    g.stroke();
+    g.fillStyle = 'rgba(240,100,130,.5)'; g.beginPath(); g.ellipse(-6.3 + o, -51.3, 2.4, 1.5, 0, 0, 7); g.ellipse(6.3 + o, -51.3, 2.4, 1.5, 0, 0, 7); g.fill();
+    g.fillStyle = '#d9546e'; g.beginPath(); g.moveTo(-2 + o, -51); g.quadraticCurveTo(o, -52, 2 + o, -51); g.quadraticCurveTo(o, -48.8, -2 + o, -51); g.fill();
+    g.lineCap = 'butt';
+  } else {
+    g.fillStyle = '#2a1a10'; g.beginPath(); g.ellipse(-3.8 + o, -55, 1.3, 1.8, 0, 0, 7); g.ellipse(3.8 + o, -55, 1.3, 1.8, 0, 0, 7); g.fill();
+    g.fillStyle = 'rgba(230,110,110,.45)'; g.beginPath(); g.ellipse(-6.5 + o, -51.5, 2.3, 1.4, 0, 0, 7); g.ellipse(6.5 + o, -51.5, 2.3, 1.4, 0, 0, 7); g.fill();
+    g.strokeStyle = '#7a3a22'; g.lineWidth = 1.1; g.lineCap = 'round'; g.beginPath(); g.arc(o, -51.5, 2.6, 0.25, Math.PI - 0.25); g.stroke(); g.lineCap = 'butt';
+  }
   if (av.mao !== 'nada') {
-    g.save(); g.translate(10.5, -41); g.rotate(angMao);
+    g.save(); g.translate(ombro, -41); g.rotate(angMao);
     drawNaMao(g, av.mao, t);
-    g.fillStyle = pele; g.beginPath(); g.arc(0, 16.5, 2.8, 0, 7); g.fill(); // a mão segurando
+    g.fillStyle = pele; g.beginPath(); g.arc(0, 16.5, 2.6, 0, 7); g.fill(); // a mão segurando
     g.restore();
   }
   g.restore();
@@ -5212,13 +5292,13 @@ function drawAvatarWalk(sc, t) {
 function renderAvatarCfg() {
   const box = $('#avatarCfg'); if (!box || !state) return;
   const av = state.avatar = avatarOk(state.avatar);
-  const linha = (k, nome) => `<div class="avrow"><span>${nome}</span><div class="seg small" role="radiogroup" aria-label="${nome}">${AV_OPC[k].map(([id, n]) => `<button type="button" role="radio" data-av="${k}:${id}" aria-checked="${av[k] === id}" aria-selected="${av[k] === id}">${n}</button>`).join('')}</div></div>`;
+  const linha = (k, nome) => `<div class="avrow"><span>${nome}</span><div class="seg small" role="radiogroup" aria-label="${nome}">${opcoesAvatar(av, k).map(([id, n]) => `<button type="button" role="radio" data-av="${k}:${id}" aria-checked="${av[k] === id}" aria-selected="${av[k] === id}">${n}</button>`).join('')}</div></div>`;
   box.innerHTML = `<canvas id="avPrev" width="120" height="150" aria-label="Prévia do avatar"></canvas><div class="avopts">
     ${linha('sexo', 'Sexo')}
     <div class="avrow"><span>Pele</span><div class="peles" role="radiogroup" aria-label="Cor de pele">${AV_PELE.map((c, k) => `<button type="button" role="radio" class="pele" style="background:${c}" data-av="pele:${k}" aria-checked="${av.pele === k}" aria-label="Tom ${k + 1}"></button>`).join('')}</div></div>
     ${linha('cabelo', 'Cabelo')}
     <div class="avrow"><span>Cor</span><div class="peles" role="radiogroup" aria-label="Cor do cabelo">${AV_CORES_CABELO.map((c, k) => `<button type="button" role="radio" class="pele" style="background:${c}" data-av="corCabelo:${k}" aria-checked="${av.corCabelo === k}" aria-label="${['Preto', 'Castanho', 'Ruivo', 'Loiro', 'Grisalho'][k]}"></button>`).join('')}</div></div>
-    ${linha('chapeu', 'Chapéu')}${linha('camisa', 'Camisa')}${linha('calca', 'Calça')}${linha('sapato', 'Sapato')}${linha('mao', 'Na mão')}</div>`;
+    ${linha('chapeu', 'Chapéu')}${linha('camisa', av.sexo === 'f' ? 'Blusa' : 'Camisa')}${linha('calca', av.sexo === 'f' ? 'Baixo' : 'Calça')}${linha('sapato', av.sexo === 'f' ? 'Calçado' : 'Sapato')}${linha('mao', 'Na mão')}</div>`;
   if (!avLoop) { avLoop = true; requestAnimationFrame(avPreview); }
 }
 let avLoop = false;
