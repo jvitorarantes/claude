@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="89">
-<script src="firebase-config.js?v=89"></script>
+<meta name="rf-version" content="90">
+<script src="firebase-config.js?v=90"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -108,6 +108,7 @@
   .xpbar { position: relative; height: 14px; width: 150px; max-width: 40vw; border-radius: 8px; background: rgba(0,0,0,.35); overflow: hidden; border: 1px solid rgba(255,255,255,.3); }
   .xpbar i { display: block; height: 100%; width: 0; background: linear-gradient(#9fe06a, #4caf2a); transition: width .3s; }
   .xpbar small { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 1px #000; line-height: 1; }
+  .trevohud { margin-left: 8px; border: 0; background: rgba(47,138,47,.35); color: #d8ffc0; font: inherit; font-size: 14px; font-weight: 800; border-radius: 10px; padding: 0 7px; cursor: pointer; }
   .coins { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; color: #ffe08a; line-height: 1.1; }
   .coin {
     width: 18px; height: 18px; border-radius: 50%; flex: none;
@@ -400,7 +401,8 @@
   .pescalivro { height: min(300px, 42vh); overflow-y: auto; padding: 10px 12px; background: #eaf3dc; touch-action: pan-y; }
   .livro { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 6px; }
   .lvcard { display: grid; justify-items: center; text-align: center; gap: 1px; background: #fff; border-radius: 12px; padding: 6px 4px; color: #2f2a1f; border: 2px solid #f2c14e; }
-  .lvcard { position: relative; } .lvnovo { position: absolute; top: -6px; right: -4px; background: #e8a317; color: #fffbe6; font: 900 10px system-ui, sans-serif; padding: 2px 6px; border-radius: 9px; border: 2px solid #7a4a10; transform: rotate(8deg); }
+  .lvcard { position: relative; } .lvresg { font-size: 11px; padding: 3px 8px; margin-top: 3px; } .lvok { color: #2f8a2f !important; font-weight: 800; }
+  .dominio .dresg { font-size: 12px; padding: 3px 10px; } .lvnovo { position: absolute; top: -6px; right: -4px; background: #e8a317; color: #fffbe6; font: 900 10px system-ui, sans-serif; padding: 2px 6px; border-radius: 9px; border: 2px solid #7a4a10; transform: rotate(8deg); }
   .lvcard.falta { border-color: #d8d2c4; background: #f6f3ea; }
   .lvcard img { width: 56px; height: 56px; }
   .lvcard b { font-size: 13px; } .lvcard .raro { font-size: 11px; font-weight: 800; text-transform: uppercase; }
@@ -651,7 +653,7 @@
       <div class="pinfo">
         <div class="pname" id="pname">Roça Feliz</div>
         <div class="xpbar" title="Experiência"><i id="xpbar"></i><small id="xptxt">0 / 100</small></div>
-        <div class="coins"><span class="coin" aria-hidden="true"></span><span id="coins">0</span></div>
+        <div class="coins"><span class="coin" aria-hidden="true"></span><span id="coins">0</span><button type="button" class="trevohud" id="trevosHud" title="Trevos 🍀: ver conquistas e a Loja do Trevo">🍀 <span id="trevos">0</span></button></div>
       </div>
     </header>
     <div class="topright over">
@@ -875,8 +877,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=89"></script>
-<script src="js/cloud.js?v=89"></script>
-<script src="js/game.js?v=89"></script>
+<script src="js/audio.js?v=90"></script>
+<script src="js/cloud.js?v=90"></script>
+<script src="js/game.js?v=90"></script>
 </body>
 </html>

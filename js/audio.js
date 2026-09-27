@@ -207,6 +207,36 @@
         [[N.E5, 6], [0, 2]],
       ],
     },
+    { // Exclusiva da Loja do Trevo: moda de viola em sol, com a viola fazendo a melodia em terças
+      nome: 'Moda de Viola', bpm: 100, steps: 8, lead: 'viola', shaker: false, trevo: true,
+      chords: [[43, 59, 62, 67], [48, 60, 64, 67], [50, 62, 66, 69], [43, 59, 62, 67], [40, 59, 64, 67], [48, 60, 64, 67], [50, 62, 66, 69], [43, 59, 62, 67]],
+      arp: [0, 3, 2, 3, 1, 3, 2, 3],
+      melody: [
+        [[N.B4, 2], [N.D5, 2], [N.G5, 3], [N.Fs5, 1]],
+        [[N.E5, 2], [N.G5, 2], [N.E5, 2], [N.C5, 2]],
+        [[N.D5, 3], [N.E5, 1], [N.Fs5, 2], [N.A5, 2]],
+        [[N.G5, 6], [0, 2]],
+        [[N.E5, 2], [N.G5, 2], [N.B5, 2], [N.A5, 2]],
+        [[N.G5, 2], [N.E5, 2], [N.C5, 4]],
+        [[N.D5, 2], [N.Fs5, 2], [N.A5, 2], [N.Fs5, 2]],
+        [[N.G5, 8]],
+      ],
+    },
+    { // Exclusiva da Loja do Trevo: forró com sanfona, zabumba (baixo no ritmo de baião) e triângulo
+      nome: 'Forró na Roça', bpm: 118, steps: 8, lead: 'accordion', shaker: true, baiao: true, trevo: true,
+      chords: [[50, 62, 66, 69], [50, 62, 66, 69], [45, 61, 64, 69], [45, 61, 64, 69], [43, 59, 62, 67], [45, 61, 64, 69], [50, 62, 66, 69], [50, 62, 66, 69]],
+      arp: [1, 2, 3, 2, 1, 2, 3, 2],
+      melody: [
+        [[N.A5, 1], [N.A5, 1], [N.Fs5, 1], [N.D5, 1], [N.E5, 2], [N.Fs5, 2]],
+        [[N.A5, 3], [N.G5, 1], [N.Fs5, 4]],
+        [[N.E5, 1], [N.E5, 1], [N.Cs5, 1], [N.A4, 1], [N.B4, 2], [N.Cs5, 2]],
+        [[N.E5, 3], [N.D5, 1], [N.Cs5, 4]],
+        [[N.B4, 2], [N.D5, 2], [N.G5, 2], [N.Fs5, 2]],
+        [[N.E5, 2], [N.Cs5, 2], [N.A4, 2], [N.Cs5, 2]],
+        [[N.D5, 2], [N.Fs5, 2], [N.A5, 2], [N.Fs5, 2]],
+        [[N.D5, 6], [0, 2]],
+      ],
+    },
   ];
   // Terça abaixo dentro de ré maior (a "segunda voz" da viola).
   const D_MAJOR = [2, 4, 6, 7, 9, 11, 1];
@@ -260,6 +290,7 @@
         continue;
       }
       if (s === 0) bass(musicBus, t, ch[0] - 12 + (tr.waltz ? 12 : 0), eighth * (tr.waltz ? 2 : 3));
+      if (tr.baiao && s === 3) bass(musicBus, t, ch[0] - 12, eighth, 0.14);          // a zabumba do baião
       if (!tr.waltz && s === 4) bass(musicBus, t, ch[0] - 5, eighth * 3, 0.1); // a quinta, uma oitava abaixo
       if (tr.waltz) {
         if (s === 2 || s === 4) for (const n of ch.slice(1)) pluck(musicBus, t, n, eighth * 1.5, 0.05, 1800);
@@ -388,6 +419,7 @@
   let unlocked = false, rainSrc = null, rainGain = null;
   const RFAudio = {
     tracks: TRACKS.map(t => t.nome),
+    exclusivas: TRACKS.map(t => !!t.trevo),
     // Navegadores só liberam som depois de um toque/clique do jogador.
     unlock() {
       if (!ensure()) return;

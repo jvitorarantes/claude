@@ -523,6 +523,7 @@ const sfx = name => { if (window.RFAudio) window.RFAudio.play(name); };
 const comfort = s => DECOR.reduce((t, d) => t + (emUso(s, d.id) ? emUso(s, d.id).conforto : 0), 0) + confortoEnfeites(s);
 const firstName = n => (n || '').split(' ')[0] || 'Você';
 
+$('#trevosHud').addEventListener('click', () => { missSeg = 'trevos'; openPanel('missoes'); });
 // A caixa de avisos fica no topo da página (por cima das janelas abertas, como a pescaria).
 (() => { const t = document.getElementById('toasts'); if (t && t.parentElement !== document.body) document.body.appendChild(t); })();
 function toast(msg, kind = '') {
@@ -920,6 +921,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
+  { v: 90, txt: 'Chegaram os Trevos 🍀, a moeda verde da roça! Ganhe resgatando cada peixe novo no 📖 Livro de peixes, os níveis do domínio de pesca e as conquistas (Missões › 🍀 Trevos). O que você já fez também vale: é só resgatar! Troque na Loja do Trevo por itens exclusivos: chapéus, lampião, músicas, enfeites e temas de casa.' },
   { v: 88, txt: 'Visual caprichado: abrigos, casinha do cachorro e enfeites com mais detalhes; animais maiores e mais fáceis de clicar; e a roça aparece mais perto na tela.' },
   { v: 87, txt: 'Casa e celeiro de cara nova 🏡: desenho novo, com telhado, chaminé, floreiras e celeiro de telhado quebrado. Clique na sua casa para entrar ou trocar o tema: Chalé de madeira, Casarão colonial, Casa Girassol, Casa da Vovó e Casa de pedra.' },
   { v: 85, txt: 'Pescaria mais prática 🎣: depois de fisgar, é só tocar quando o anel em volta do peixe ficar VERDE. Peixe comum precisa de 2 puxadas certas, raro de 3 e lendário de 4. Errou? Perde um pouquinho, e o peixe só escapa com 3 erros seguidos.' },
@@ -2081,7 +2083,15 @@ const TEMAS_CASA = [
     parede: '#f4b8c8', telhado: '#7a3f63', porta: '#7a3f63', moldura: '#ffffff', celeiro: '#d97a9a', celTelhado: '#6a3a5a', friso: '#ffffff' },
   { id: 'pedra',    nome: 'Casa de pedra',      desc: 'Paredes de pedra e telhado escuro, bem de fazenda antiga.', nivel: 20, custo: 12000,
     parede: '#a3a7ab', telhado: '#3f4a55', porta: '#5a3a1f', moldura: '#e8e2d0', celeiro: '#7f858c', celTelhado: '#3f4a55', friso: '#e8e2d0', pedra: true },
+  { id: 'trevo',    nome: 'Casa do Trevo',      desc: 'Verde-menta com trevo na fachada. Exclusiva da Loja do Trevo 🍀.', trevo: 40,
+    parede: '#d8f0c8', telhado: '#3f8a3a', porta: '#2f6a2a', moldura: '#ffffff', celeiro: '#5aa04a', celTelhado: '#2f6a2a', friso: '#ffffff', icone: 'trevo' },
+  { id: 'real',     nome: 'Rancho Real',        desc: 'Vinho e dourado, de fazenda de novela. Exclusiva da Loja do Trevo 🍀.', trevo: 60,
+    parede: '#f6e7c8', telhado: '#8a1f2a', porta: '#8a1f2a', moldura: '#e0b030', celeiro: '#9a2530', celTelhado: '#5a1018', friso: '#e0b030', estrela: true },
 ];
+function desenhaTrevo(g, x, y, r) {
+  g.fillStyle = '#2f8a2f'; for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; g.beginPath(); g.arc(x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55, r * 0.5, 0, 7); g.fill(); }
+  g.strokeStyle = '#2f6a2a'; g.lineWidth = Math.max(1, r * 0.2); g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + r * 0.3, y + r * 0.9, x + r * 0.7, y + r * 1.2); g.stroke();
+}
 const TEMA_CASA = Object.fromEntries(TEMAS_CASA.map(t => [t.id, t]));
 // Escurece (k < 0) ou clareia (k > 0) uma cor #rrggbb.
 function tomCor(hex, k) {
@@ -2148,6 +2158,7 @@ function drawHouse(x, y, s, cor, skin) {
   const lx = X0 + fw + dx * 0.35, ly = (Y - fh * 0.72) - (dy / dx) * (X0 + fw + dx * 0.35) + dy * 0.35;
   janelaCasa(lx, ly, dx * 0.32, jh, tm); ctx.restore();
   if (tm.estrela) star(cume[0], Y - fh - rh * 0.4, s * 0.04);
+  if (tm.icone === 'trevo') desenhaTrevo(ctx, cume[0], Y - fh - rh * 0.42, s * 0.035);
 }
 function drawBarn(x, y, s, skin) {
   const tm = temaCasa(skin), fw = s * 0.72, fh = s * 0.44, rh = s * 0.34, dx = s * 0.36, dy = -s * 0.18, ov = s * 0.05;
@@ -2177,6 +2188,7 @@ function drawBarn(x, y, s, skin) {
   ctx.fillStyle = '#e8c35a'; ctx.fillRect(cume[0] - hw / 2 + 2, hy + hh * 0.55, hw - 4, hh * 0.4); // feno
   ctx.strokeRect(X0, Y - fh, fw, fh);
   if (tm.estrela) star(cume[0], Y - fh - rh * 0.78, s * 0.045);
+  if (tm.icone === 'trevo') desenhaTrevo(ctx, cume[0], Y - fh - rh * 0.8, s * 0.04);
 }
 function drawCoop(x, y, s) {
   const w = s * 0.8, h = s * 0.45;
@@ -3867,6 +3879,7 @@ function renderHUD() {
   $('#xptxt').textContent = `${state.xp} / ${n}`;
   $('#xpbar').style.width = `${Math.min(100, state.xp / n * 100)}%`;
   $('#coins').textContent = state.coins.toLocaleString('pt-BR');
+  $('#trevos').textContent = (state.trevos && state.trevos.saldo) || 0;
   const nome = state.apelido || (user ? firstName(user.name) : 'Roça Feliz');
   if ($('#pname').textContent !== nome) $('#pname').textContent = nome;
   const face = user && user.photo ? `<img alt="" referrerpolicy="no-referrer" src="${esc(user.photo)}">` : esc(user ? nome[0] : '☺');
@@ -3999,6 +4012,7 @@ function casaTemasHTML() {
     const tem = t.id === 'classico' || state.skins[t.id], usando = atual === t.id, trava = !tem && t.nivel > state.level;
     const btn = usando ? '<button class="btn ghost" disabled>Em uso</button>'
       : tem ? `<button class="btn" data-casa-tema="${t.id}">Usar</button>`
+      : t.trevo ? `<button class="btn ghost" data-abrir-trevos="1">🍀 ${t.trevo}</button>`
       : trava ? `<button class="btn" disabled>Nível ${t.nivel}</button>`
       : `<button class="btn gold" data-casa-tema="${t.id}" ${state.coins < t.custo ? 'disabled' : ''}>${moeda(t.custo)}</button>`;
     return `<div class="row ${usando ? 'sel' : ''} ${trava ? 'locked' : ''}"><img alt="" src="${casaTemaIcon(t.id)}">
@@ -4010,6 +4024,7 @@ function usarCasaTema(id) {
   const tem = id === 'classico' || state.skins[id];
   if (!tem) {
     if (t.especial) return;
+    if (t.trevo) { missSeg = 'trevos'; return openPanel('missoes'); }
     if (state.level < t.nivel) return toast(`${t.nome} libera no nível ${t.nivel}.`, 'bad');
     if (state.coins < t.custo) { sfx('error'); return toast(`${t.nome} custa ${t.custo.toLocaleString('pt-BR')} moedas.`, 'bad'); }
     return confirmTwice('casatema' + id, `Comprar o tema ${t.nome} por ${t.custo.toLocaleString('pt-BR')} moedas? Toque de novo para confirmar.`, () => {
@@ -4246,6 +4261,10 @@ $('#pane').addEventListener('click', e => {
   if (d.claim) { const [tp, k] = d.claim.split(':'); return claimMission(tp, Number(k)); }
   if (d.temaRoca) return buyTema(d.temaRoca);
   if (d.casaTema) return usarCasaTema(d.casaTema);
+  if (d.trevoConq) { resgatarConquista(d.trevoConq); return renderPane(); }
+  if (d.trevoComprar) return comprarTrevoItem(d.trevoComprar);
+  if (d.abrirTrevos) { missSeg = 'trevos'; return openPanel('missoes'); }
+  if (d.abrirLivro) { closePanel(); if (!isHome()) goHome(); abrirPesca(); pescaLivro = true; return renderPesca(); }
   if (d.entrarCasa) { closePanel(); return setScene('casa'); }
   if ('skin' in d) { state.skin = d.skin || null; toast(d.skin ? 'Celeiro e casa dos Pioneiros!' : 'Celeiro e casa clássicos.', 'good'); if (isHome()) setScene('roca'); return done(); }
   if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar);
@@ -4639,6 +4658,7 @@ new ResizeObserver(resize).observe(stage);
 // Configurações: música, sons e tema (ficam salvas neste aparelho)
 // ============================================================
 function applySettings() {
+  if (state && !musicaLiberada(settings.track)) settings.track = 0; // música exclusiva de outra conta
   if (window.RFAudio) window.RFAudio.configure({
     music: settings.music, sfx: settings.sfx, musicVol: settings.musicVol, sfxVol: settings.sfxVol, track: settings.track,
   });
@@ -4648,7 +4668,7 @@ function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* sem armazenamento */ }
   applySettings();
 }
-const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde', 'Rock rural: guitarra, bateria e viola'];
+const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde', 'Rock rural: guitarra, bateria e viola', 'Viola de raiz em terças', 'Sanfona, zabumba e triângulo'];
 // Nomes: dar o primeiro nome é de graça; trocar um nome que já existe custa 100 moedas (cada um).
 const CUSTO_NOME = 100;
 function custoNomes() {
@@ -4689,8 +4709,9 @@ function renderSettings() {
   $('#volMusic').value = Math.round(settings.musicVol * 100); $('#volMusicOut').textContent = $('#volMusic').value;
   $('#volSfx').value = Math.round(settings.sfxVol * 100); $('#volSfxOut').textContent = $('#volSfx').value;
   const names = window.RFAudio ? window.RFAudio.tracks : ['Música 1', 'Música 2', 'Música 3'];
-  $('#tracks').innerHTML = names.map((n, k) => `<button type="button" class="track" role="radio" aria-checked="${settings.track === k}" data-track="${k}">
-    <span class="dot"></span><span>${esc(n)}<small>${TRACK_INFO[k] || ''}</small></span></button>`).join('');
+  $('#tracks').innerHTML = names.map((n, k) => musicaLiberada(k) ? `<button type="button" class="track" role="radio" aria-checked="${settings.track === k}" data-track="${k}">
+    <span class="dot"></span><span>${esc(n)}<small>${TRACK_INFO[k] || ''}</small></span></button>`
+    : `<button type="button" class="track" role="radio" aria-checked="false" disabled data-abrir-trevos-set="1"><span class="dot"></span><span>🍀 ${esc(n)}<small>Exclusiva da Loja do Trevo (Missões › 🍀 Trevos)</small></span></button>`).join('');
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.tema === settings.tema)));
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tema === settings.tema)));
 }
@@ -5074,7 +5095,7 @@ function claimMission(tipo, k) {
   renderTabs(); done();
 }
 const prontasDe = tipo => state && state.missions ? state.missions[tipo].filter(m => m.feito >= m.alvo && !m.pego).length : 0;
-const missoesProntas = () => prontasDe('dia') + prontasDe('semana') + ((state && state.newStamps) || 0) + vilaProntos();
+const missoesProntas = () => prontasDe('dia') + prontasDe('semana') + ((state && state.newStamps) || 0) + vilaProntos() + trevosPendentes();
 
 // ---------- Presente diário: 7 dias, depois vem uma leva nova ----------
 const PRESENTES = [
@@ -5333,6 +5354,9 @@ $('#pesca').addEventListener('click', e => {
   if (e.target.closest('#pescaBtn') || e.target.closest('#pescaCv')) { if (puxouNoToque) { puxouNoToque = false; return; } return puxar(); }
   if (e.target.closest('#pescaComprar')) return comprarIscas();
   if (e.target.closest('#pescaTarrafa')) return jogarTarrafa();
+  const tp = e.target.closest('[data-trevo-peixe]'); if (tp) { resgatarPeixe(tp.dataset.trevoPeixe); return renderPesca(); }
+  if (e.target.closest('[data-trevo-todos]')) { resgatarTodosPeixes(); return renderPesca(); }
+  if (e.target.closest('[data-trevo-dominio]')) { resgatarDominio(); return renderPesca(); }
   const pb = e.target.closest('[data-ponto]');
   if (pb && pontosArrastou) return;
   if (pb) {
@@ -5573,8 +5597,8 @@ const AV_CORES_CABELO = ['#2a1a10', '#5a3614', '#a8481e', '#e0b44a', '#b9b4ac'];
 const AV_OPC = {
   sexo: [['m', 'Menino'], ['f', 'Menina']],
   cabelo: [['curto', 'Curto'], ['cacheado', 'Cacheado'], ['comprido', 'Comprido'], ['rabo', 'Rabo de cavalo']],
-  chapeu: [['sem', 'Sem'], ['palha', 'Palha'], ['bone', 'Boné'], ['cowboy', 'Cowboy']],
-  mao: [['nada', 'Nada'], ['vara', 'Vara de pesca'], ['espingarda', 'Espingarda'], ['enxada', 'Enxada'], ['facao', 'Facão'], ['foice', 'Foice'], ['laco', 'Laço'], ['viola', 'Viola'], ['machado', 'Machado']],
+  chapeu: [['sem', 'Sem'], ['palha', 'Palha'], ['bone', 'Boné'], ['cowboy', 'Cowboy'], ['couro', 'Couro'], ['flores', 'Coroa de flores']],
+  mao: [['nada', 'Nada'], ['vara', 'Vara de pesca'], ['espingarda', 'Espingarda'], ['enxada', 'Enxada'], ['facao', 'Facão'], ['foice', 'Foice'], ['laco', 'Laço'], ['viola', 'Viola'], ['machado', 'Machado'], ['lampiao', 'Lampião']],
 };
 // Roupas: cada um tem as suas (menino e menina têm peças e cores diferentes).
 const AV_ROUPAS = {
@@ -5591,7 +5615,9 @@ const AV_ROUPAS = {
 };
 // Itens de avatar que liberam ao subir de nível (os outros já vêm liberados).
 const AV_NIVEL = { facao: 5, foice: 10, laco: 15, viola: 20, machado: 25 };
-const avTravado = (k, id) => k === 'mao' && AV_NIVEL[id] > (state ? state.level : 1);
+// Itens exclusivos da Loja do Trevo (só depois de comprar com 🍀).
+const AV_TREVO = { couro: 'chapeu:couro', flores: 'chapeu:flores', lampiao: 'mao:lampiao' };
+const avTravado = (k, id) => (k === 'mao' && AV_NIVEL[id] > (state ? state.level : 1)) || (!!AV_TREVO[id] && !temTrevoItem(AV_TREVO[id]));
 const ROUPA_PADRAO = { m: { camisa: 'xadrez', calca: 'jeans', sapato: 'bota' }, f: { camisa: 'blusa', calca: 'saia', sapato: 'sapatilha' } };
 const opcoesAvatar = (av, k) => AV_OPC[k] || AV_ROUPAS[av.sexo === 'f' ? 'f' : 'm'][k];
 const AV_PADRAO = { sexo: 'm', pele: 1, camisa: 'xadrez', calca: 'jeans', sapato: 'bota', cabelo: 'curto', corCabelo: 1, chapeu: 'sem', mao: 'nada' };
@@ -5618,6 +5644,17 @@ function drawChapeu(g, tipo) {
     g.fillStyle = '#3f6fa8'; g.beginPath(); g.ellipse(0, -63, 11, 8.5, 0, Math.PI, 0); g.fill(); g.fillRect(-11, -63.5, 22, 2.5);
     g.fillStyle = '#2c5282'; g.beginPath(); g.ellipse(6, -61.5, 9, 2.6, 0.05, 0, 7); g.fill();
     g.fillStyle = '#f4f1ea'; g.beginPath(); g.arc(0, -67, 2.3, 0, 7); g.fill();
+  } else if (tipo === 'couro') {
+    // chapéu de couro de vaqueiro, aba larga e cordão trançado
+    g.fillStyle = '#6b3f1f'; g.beginPath(); g.ellipse(0, -63, 19, 4.5, 0, 0, 7); g.fill();
+    g.fillStyle = '#7a4a24'; g.beginPath(); g.moveTo(-10, -63); g.quadraticCurveTo(-10, -74, 0, -74); g.quadraticCurveTo(10, -74, 10, -63); g.fill();
+    g.strokeStyle = '#e8c35a'; g.lineWidth = 1.4; g.setLineDash([2, 1.5]); g.beginPath(); g.moveTo(-10, -65.5); g.lineTo(10, -65.5); g.stroke(); g.setLineDash([]);
+    g.strokeStyle = 'rgba(40,20,5,.5)'; g.lineWidth = 0.7; g.beginPath(); g.ellipse(0, -63, 15, 3, 0, 0, 7); g.stroke();
+  } else if (tipo === 'flores') {
+    // coroa de flores
+    g.strokeStyle = '#4f9a2f'; g.lineWidth = 2; g.beginPath(); g.ellipse(0, -64, 10.5, 3, 0, 0, 7); g.stroke();
+    const cores = ['#e53b2f', '#ffd54a', '#f06292', '#ffffff', '#ba68c8', '#ff9a3a'];
+    for (let k = 0; k < 7; k++) { const a = Math.PI + k * Math.PI / 6, fx = Math.cos(a) * 10.5, fy = -64 + Math.sin(a) * 3; g.fillStyle = cores[k % cores.length]; g.beginPath(); g.arc(fx, fy - 1, 2.4, 0, 7); g.fill(); g.fillStyle = '#f2a900'; g.beginPath(); g.arc(fx, fy - 1, 0.9, 0, 7); g.fill(); }
   } else if (tipo === 'cowboy') {
     g.fillStyle = '#8a5a33'; g.beginPath(); g.moveTo(-19, -64); g.quadraticCurveTo(0, -58, 19, -64); g.quadraticCurveTo(0, -61.5, -19, -64); g.fill();
     g.beginPath(); g.ellipse(0, -62.5, 16, 3.4, 0, 0, 7); g.fill();
@@ -5667,6 +5704,17 @@ function drawNaMao(g, tipo, t) {
     g.strokeStyle = '#7a4a1e'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(0, 9, 5, 4.2, 0, 0, 7); g.ellipse(0, 15.5, 6.4, 5.4, 0, 0, 7); g.stroke();
     g.fillStyle = '#3a2410'; g.beginPath(); g.arc(0, 11.5, 1.8, 0, 7); g.fill();
     g.strokeStyle = 'rgba(240,240,220,.8)'; g.lineWidth = 0.35; for (const x of [-0.7, 0, 0.7]) { g.beginPath(); g.moveTo(x, -13); g.lineTo(x, 18); g.stroke(); }
+    g.restore();
+  } else if (tipo === 'lampiao') {
+    // lampião aceso pendurado na mão, com brilho que pulsa
+    g.save(); g.translate(0, 18); g.rotate(Math.sin(t / 700) * 0.1);
+    const bril = 0.35 + Math.sin(t / 300) * 0.1;
+    g.fillStyle = `rgba(255,210,90,${bril})`; g.beginPath(); g.arc(0, 11, 11, 0, 7); g.fill();
+    g.strokeStyle = '#3a3e43'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 3); g.stroke();
+    g.fillStyle = '#3a3e43'; g.fillRect(-4, 3, 8, 2); g.fillRect(-4.5, 17, 9, 2.5);
+    g.fillStyle = 'rgba(255,230,150,.95)'; g.beginPath(); g.roundRect(-3.5, 5, 7, 12, 2); g.fill();
+    g.fillStyle = '#ff9a2a'; g.beginPath(); g.ellipse(0, 12, 1.6, 3, 0, 0, 7); g.fill();
+    g.strokeStyle = '#3a3e43'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-3.5, 5); g.lineTo(-3.5, 17); g.moveTo(3.5, 5); g.lineTo(3.5, 17); g.stroke();
     g.restore();
   } else if (tipo === 'machado') {
     g.strokeStyle = '#a4703f'; g.lineWidth = 2.2; g.lineCap = 'round';
@@ -5870,7 +5918,8 @@ function renderAvatarCfg(sel = '#avatarCfg') {
   const box = $(sel); if (!box || !state) return;
   const av = state.avatar = avatarOk(state.avatar);
   const linha = (k, nome) => `<div class="avrow"><span>${nome}</span><div class="seg small" role="radiogroup" aria-label="${nome}">${opcoesAvatar(av, k).map(([id, n]) => avTravado(k, id)
-    ? `<button type="button" role="radio" disabled aria-checked="false" title="Libera no nível ${AV_NIVEL[id]}">🔒 ${n} <small>Nv ${AV_NIVEL[id]}</small></button>`
+    ? (AV_TREVO[id] ? `<button type="button" role="radio" disabled aria-checked="false" title="Exclusivo da Loja do Trevo">🍀 ${n}</button>`
+      : `<button type="button" role="radio" disabled aria-checked="false" title="Libera no nível ${AV_NIVEL[id]}">🔒 ${n} <small>Nv ${AV_NIVEL[id]}</small></button>`)
     : `<button type="button" role="radio" data-av="${k}:${id}" aria-checked="${av[k] === id}" aria-selected="${av[k] === id}">${n}</button>`).join('')}</div></div>`;
   box.innerHTML = `<canvas class="avprev" width="120" height="150" aria-label="Prévia do avatar"></canvas><div class="avopts">
     ${linha('sexo', 'Sexo')}
@@ -6319,6 +6368,7 @@ const esperaTarrafa = () => Math.round(TARRAFA_MS * (1 - dominio().corte));
 function dominioHTML() {
   const d = dominio(), pct = d.max ? 100 : Math.round((d.xp - d.ini) / (d.fim - d.ini) * 100);
   return `<span class="dnv">🎖️ Domínio de pesca <b>Nv ${d.nv}</b></span><span class="dbar"><i style="width:${pct}%"></i></span>
+    ${dominioAResgatar().length ? `<button class="btn gold dresg" type="button" data-trevo-dominio="1">Resgatar 🍀${dominioAResgatar().reduce((t, n) => t + (TREVO_DOMINIO[n - 1] || 0), 0)}</button>` : ''}
     <span class="dinfo">${d.corte ? `−${Math.round(d.corte * 100)}% de espera · ` : ''}vara ${fmt(esperaVara() / 1000)} · tarrafa ${fmt(esperaTarrafa() / 1000)}${d.max ? ' · máximo!' : ` · ${d.fim - d.xp} pts p/ Nv ${d.nv + 1}`}</span>`;
 }
 const PONTOS = [
@@ -6570,13 +6620,16 @@ function renderPesca() {
 let pescaLivro = false;
 const peixeSombra = id => makeIcon('ps:' + id, () => { ctx.globalAlpha = 0.85; drawPeixe(ctx, 48, 48, 4.7 * cabePeixe(PEIXE[id]), Object.assign({}, PEIXE[id], { cor: ['#5b6470', '#4a525c'], listras: false, pintas: false, barriga: false, armadura: false })); ctx.globalAlpha = 1; });
 function livroPeixes() {
-  const lista = PEIXES.filter(p => !p.lixo), pegos = lista.filter(p => state.col[p.id]).length;
-  return `<p class="hint" style="margin:0 0 8px">Você já pegou <b>${pegos} de ${lista.length}</b> peixes.</p><div class="livro">${lista.map(p => {
-    const n = state.col[p.id] || 0, novo = (state.peixesNovos || []).includes(p.id);
+  const lista = PEIXES.filter(p => !p.lixo), pegos = lista.filter(p => state.col[p.id]).length, pend = peixesAResgatar();
+  const soma = pend.reduce((t, p) => t + (TREVO_PEIXE[p.raro] || 1), 0);
+  return `<p class="hint" style="margin:0 0 8px">Você já pegou <b>${pegos} de ${lista.length}</b> peixes. Cada espécie nova vale trevos 🍀: comum 1, incomum 2, raro 3, épico 5, lendário 10.</p>
+    ${pend.length ? `<p style="margin:0 0 8px;text-align:center"><button class="btn gold" type="button" data-trevo-todos="1">Resgatar tudo · 🍀 ${soma}</button></p>` : ''}<div class="livro">${lista.map(p => {
+    const n = state.col[p.id] || 0, novo = (state.peixesNovos || []).includes(p.id), resg = n && !trevosDe().peixes[p.id];
     return `<div class="lvcard ${n ? '' : 'falta'}">${novo ? '<span class="lvnovo">NOVO!</span>' : ''}<img alt="" src="${n ? productIcon(p.id) : peixeSombra(p.id)}">
       <b>${n ? esc(p.nome) : '???'}</b><span class="raro" style="color:${COR_RARO[p.raro]}">${p.raro}</span>
       <small>${n ? `Pegou ${n}× · vale ${p.preco}` : 'Ainda não pegou'}</small>
-      <small class="req">Nível ${p.nivel}${p.nivel > state.level ? ' 🔒' : ''} · ${p.iscas.map(i => ISCA[i].emoji).join(' ')}</small>${p.pontos ? `<small class="req">📍 ${p.pontos.map(id => PONTO[id].nome).slice(0, 2).join(', ')}${p.pontos.length > 2 ? '…' : ''}</small>` : ''}</div>`;
+      <small class="req">Nível ${p.nivel}${p.nivel > state.level ? ' 🔒' : ''} · ${p.iscas.map(i => ISCA[i].emoji).join(' ')}</small>${p.pontos ? `<small class="req">📍 ${p.pontos.map(id => PONTO[id].nome).slice(0, 2).join(', ')}${p.pontos.length > 2 ? '…' : ''}</small>` : ''}
+      ${resg ? `<button class="btn gold lvresg" type="button" data-trevo-peixe="${p.id}">Resgatar 🍀${TREVO_PEIXE[p.raro] || 1}</button>` : n ? '<small class="lvok">🍀 resgatado</small>' : `<small class="req">🍀 ${TREVO_PEIXE[p.raro] || 1}</small>`}</div>`;
   }).join('')}</div>`;
 }
 function desenharPesca(t) {
@@ -6939,13 +6992,14 @@ let missSeg = 'dia';
 function missoesHTML() {
   rollPeriods();
   if (missSeg === 'colecao' && state.newStamps) { state.newStamps = 0; setTimeout(renderTabs, 0); save(); }
-  const segs = [['dia', 'Diárias'], ['semana', 'Semanais'], ['vila', 'Vila'], ['colecao', 'Coleção']];
-  const conta = { dia: prontasDe('dia'), semana: prontasDe('semana'), vila: vilaProntos(), colecao: state.newStamps || 0 };
+  const segs = [['dia', 'Diárias'], ['semana', 'Semanais'], ['vila', 'Vila'], ['colecao', 'Coleção'], ['trevos', '🍀 Trevos']];
+  const conta = { dia: prontasDe('dia'), semana: prontasDe('semana'), vila: vilaProntos(), colecao: state.newStamps || 0, trevos: trevosPendentes() };
   let html = `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-mseg="${id}" aria-selected="${missSeg === id}">${n}${conta[id] ? `<span class="badge" aria-label="${conta[id]} novidades">${conta[id]}</span>` : ''}</button>`).join('')}</div>`;
   const est = estacao();
   html += `<div class="row sel"><div class="avatar" style="background:#7aa35a;font-size:26px">${est.icone}</div><div><div class="name">${est.nome}</div>
     <div class="meta">Esta semana rendem ${Math.round(ESTACAO_BONUS * 100)}% a mais: ${est.plantas.map(id => CROP[id].nome.toLowerCase()).join(', ')}.</div></div><div></div></div>`;
   if (missSeg === 'vila') return html + vilaHTML();
+  if (missSeg === 'trevos') return html + trevosHTML();
   if (missSeg === 'colecao') {
     const lista = COLECAO(), temCarimbo = lista.filter(c => state.stamps[c.id]).length;
     html += `<p class="hint">Cada colheita ou produto recolhido conta. ${CARIMBOS.map((c, k) => `${c.n} dão o carimbo de ${c.nome} (+${c.moedas.toLocaleString('pt-BR')} moedas, ${Math.round(RAPIDEZ[k + 1] * 100)}% mais rápido)`).join(', ')}. Você já tem ${temCarimbo} de ${lista.length} com carimbo.</p><div class="colgrid">`;
@@ -7314,9 +7368,11 @@ const ENFEITES = [
   { id: 'bolo',       nome: 'Bolo de boas-vindas',    especial: true, conforto: 2 },
   { id: 'carroca',    nome: 'Carroça de feno do Seu Zé',    especial: true, vila: true, conforto: 3 },
   { id: 'roseira',    nome: 'Roseira da Dona Maria',         especial: true, vila: true, conforto: 3 },
+  { id: 'peixedourado', nome: 'Estátua do Peixe Dourado', especial: true, trevo: true, conforto: 3 },
+  { id: 'arcoflores',   nome: 'Arco de flores',            especial: true, trevo: true, conforto: 2 },
 ];
 // Etiqueta de onde veio um item especial.
-const origemEnfeite = (e, s) => e.vila ? 'Presente da vila' : `Especial dos pioneiros · ${obtidoEm(s)}`;
+const origemEnfeite = (e, s) => e.trevo ? 'Exclusivo da Loja do Trevo 🍀' : e.vila ? 'Presente da vila' : `Especial dos pioneiros · ${obtidoEm(s)}`;
 const ENFEITE = Object.fromEntries(ENFEITES.map(e => [e.id, e]));
 // Lugares antigos (saves de antes do modo Mover): viram posições livres.
 const LUGARES = {
@@ -7705,6 +7761,17 @@ function drawEnfeite(id, x, y, s, t) {
     ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.moveTo(x + 19 * s, y - 66 * s + w(3)); ctx.lineTo(x + 34 * s, y - 56 * s + w(5)); ctx.lineTo(x + 19 * s, y - 46 * s + w(3)); ctx.lineTo(x + 4 * s, y - 56 * s + w(1)); ctx.closePath(); ctx.fill();
     star(x + 19 * s, y - 56 * s + w(3), 5 * s);
+  } else if (id === 'peixedourado') {
+    // pedestal de pedra com um dourado saltando, brilhando
+    ctx.fillStyle = '#a8a294'; ctx.fillRect(x - 13 * s, y - 14 * s, 26 * s, 12 * s); ctx.fillStyle = '#c7c1b3'; ctx.fillRect(x - 15 * s, y - 17 * s, 30 * s, 4 * s); ctx.fillRect(x - 15 * s, y - 4 * s, 30 * s, 3 * s);
+    ctx.save(); ctx.translate(x, y - 34 * s); ctx.rotate(-0.5);
+    drawPeixe(ctx, 0, 0, 1.6 * s, Object.assign({}, PEIXE.dourado, { cor: ['#f2c14e', '#d9822b'] })); ctx.restore();
+    for (let k = 0; k < 3; k++) { const a = t / 400 + k * 2.1, bx = x + Math.cos(a) * 16 * s, by = y - 34 * s + Math.sin(a) * 10 * s; ctx.fillStyle = `rgba(255,236,150,${0.5 + 0.5 * Math.sin(t / 160 + k)})`; ctx.beginPath(); ctx.arc(bx, by, 1.6 * s, 0, 7); ctx.fill(); }
+  } else if (id === 'arcoflores') {
+    ctx.strokeStyle = '#8a5a33'; ctx.lineWidth = 3 * s; ctx.beginPath(); ctx.moveTo(x - 20 * s, y); ctx.lineTo(x - 20 * s, y - 34 * s); ctx.arc(x, y - 34 * s, 20 * s, Math.PI, 0); ctx.lineTo(x + 20 * s, y); ctx.stroke();
+    const cores = ['#e53b2f', '#ffd54a', '#f06292', '#ffffff', '#ba68c8'];
+    for (let k = 0; k <= 14; k++) { const f = k / 14; let fx, fy; if (f < 0.3) { fx = x - 20 * s; fy = y - f / 0.3 * 34 * s; } else if (f > 0.7) { fx = x + 20 * s; fy = y - (1 - f) / 0.3 * 34 * s; } else { const a = Math.PI + (f - 0.3) / 0.4 * Math.PI; fx = x + Math.cos(a) * 20 * s; fy = y - 34 * s + Math.sin(a) * 20 * s; }
+      ctx.fillStyle = '#4f9a2f'; ctx.beginPath(); ctx.arc(fx + 2 * s, fy + 1 * s, 3 * s, 0, 7); ctx.fill(); ctx.fillStyle = cores[k % 5]; ctx.beginPath(); ctx.arc(fx, fy, 2.6 * s, 0, 7); ctx.fill(); }
   } else if (id === 'bolo') {
     ctx.fillStyle = '#b07a44'; ctx.fillRect(x - 18 * s, y - 16 * s, 3 * s, 16 * s); ctx.fillRect(x + 15 * s, y - 16 * s, 3 * s, 16 * s);
     ctx.fillStyle = '#fff4e0'; ctx.fillRect(x - 22 * s, y - 20 * s, 44 * s, 5 * s); ctx.fillStyle = '#e0463a'; for (let k = 0; k < 6; k++) ctx.fillRect(x - 22 * s + k * 8 * s, y - 20 * s, 4 * s, 5 * s);
@@ -7716,6 +7783,124 @@ function drawEnfeite(id, x, y, s, t) {
   }
 }
 const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, id === 'bandeira' ? 1.15 : id === 'espantalho' || id === 'moinho' ? 1.3 : 1.6, 0));
+
+// ============================================================
+// Trevos 🍀: a moeda verde. Não se compra: ganha resgatando peixes novos (no Livro de peixes),
+// níveis do domínio de pesca e conquistas. Serve para a Loja do Trevo, com itens exclusivos.
+// Tudo o que já foi feito antes (peixes, níveis, conquistas) também pode ser resgatado.
+// ============================================================
+const TREVO_PEIXE = { comum: 1, incomum: 2, raro: 3, 'épico': 5, 'lendário': 10 };
+const TREVO_DOMINIO = [0, 0, 2, 2, 3, 3, 4, 4, 5, 10]; // ao chegar em cada nível (índice = nível - 1)
+function trevosDe() {
+  const t = state.trevos || (state.trevos = { saldo: 0, peixes: {}, dominio: {}, conq: {}, itens: {} });
+  for (const k of ['peixes', 'dominio', 'conq', 'itens']) t[k] = t[k] || {};
+  t.saldo = t.saldo || 0; return t;
+}
+const temTrevoItem = id => !!(state && state.trevos && state.trevos.itens && state.trevos.itens[id]);
+const PEIXES_REAIS = () => PEIXES.filter(p => !p.lixo);
+const CONQUISTAS = [
+  { id: 'colher100',  nome: 'Mão na terra',          desc: 'Colher 100 vezes',                      alvo: 100,   valor: () => state.stats.colheitas || 0, trevos: 3 },
+  { id: 'colher1000', nome: 'Lavrador de mão cheia', desc: 'Colher 1.000 vezes',                    alvo: 1000,  valor: () => state.stats.colheitas || 0, trevos: 10 },
+  { id: 'coletas200', nome: 'Cuidador do rancho',    desc: 'Recolher 200 produtos dos animais',     alvo: 200,   valor: () => state.stats.coletas || 0, trevos: 5 },
+  { id: 'vender50k',  nome: 'Bom de negócio',        desc: 'Vender 50.000 moedas em produtos',      alvo: 50000, valor: () => state.stats.vendido || 0, trevos: 5 },
+  { id: 'ajudas30',   nome: 'Vizinho camarada',      desc: 'Ajudar amigos 30 vezes',                alvo: 30,    valor: () => state.stats.ajudas || 0, trevos: 5 },
+  { id: 'peixes50',   nome: 'Pescador de fé',        desc: 'Pegar 50 peixes (vara ou tarrafa)',     alvo: 50,    valor: () => state.stats.peixes || 0, trevos: 4 },
+  { id: 'lendario',   nome: 'Lenda do rio',          desc: 'Pegar um peixe lendário',               alvo: 1,     valor: () => PEIXES_REAIS().filter(p => p.raro === 'lendário' && state.col[p.id]).length, trevos: 8 },
+  { id: 'livro',      nome: 'Livro completo',        desc: 'Pegar todas as espécies de peixe',      alvo: () => PEIXES_REAIS().length, valor: () => PEIXES_REAIS().filter(p => state.col[p.id]).length, trevos: 20 },
+  { id: 'rios',       nome: 'Conhece todos os rios', desc: 'Ter todos os pontos de pesca',          alvo: () => PONTOS.length, valor: () => PONTOS.filter(p => temPonto(p.id)).length, trevos: 10 },
+  { id: 'animais10',  nome: 'Fazendão',              desc: 'Ter 10 animais ao mesmo tempo',         alvo: 10,    valor: () => state.animals.length, trevos: 4 },
+  { id: 'amigos5',    nome: 'Roça cheia de amigos',  desc: 'Ter 5 amigos',                          alvo: 5,     valor: () => state.friends.length, trevos: 4 },
+  { id: 'nivel10',    nome: 'Sitiante',              desc: 'Chegar ao nível 10',                    alvo: 10,    valor: () => state.level, trevos: 3 },
+  { id: 'nivel20',    nome: 'Fazendeiro',            desc: 'Chegar ao nível 20',                    alvo: 20,    valor: () => state.level, trevos: 6 },
+  { id: 'nivel30',    nome: 'Coronel da roça',       desc: 'Chegar ao nível 30',                    alvo: 30,    valor: () => state.level, trevos: 10 },
+];
+const alvoDe = c => typeof c.alvo === 'function' ? c.alvo() : c.alvo;
+const conqPronta = c => !trevosDe().conq[c.id] && c.valor() >= alvoDe(c);
+const peixesAResgatar = () => PEIXES_REAIS().filter(p => state.col[p.id] && !trevosDe().peixes[p.id]);
+const dominioAResgatar = () => { const nv = dominio().nv, r = []; for (let n = 2; n <= nv; n++) if (!trevosDe().dominio[n]) r.push(n); return r; };
+const trevosPendentes = () => !state ? 0 : peixesAResgatar().length + dominioAResgatar().length + CONQUISTAS.filter(conqPronta).length;
+function ganharTrevos(n, motivo) {
+  if (!n) return;
+  trevosDe().saldo += n; sfx('level');
+  toast(`🍀 +${n} trevo${n > 1 ? 's' : ''}! ${motivo}`, 'good');
+  done(); renderTabs(); renderHUD();
+}
+function resgatarPeixe(id) {
+  const p = PEIXE[id], t = trevosDe(); if (!p || !state.col[id] || t.peixes[id]) return;
+  t.peixes[id] = true; ganharTrevos(TREVO_PEIXE[p.raro] || 1, `${p.nome} no livro.`);
+}
+function resgatarTodosPeixes() {
+  const l = peixesAResgatar(), t = trevosDe(); if (!l.length) return;
+  let n = 0; for (const p of l) { t.peixes[p.id] = true; n += TREVO_PEIXE[p.raro] || 1; }
+  ganharTrevos(n, `${l.length} peixe${l.length > 1 ? 's' : ''} do livro.`);
+}
+function resgatarDominio() {
+  const l = dominioAResgatar(), t = trevosDe(); if (!l.length) return;
+  let n = 0; for (const nv of l) { t.dominio[nv] = true; n += TREVO_DOMINIO[nv - 1] || 0; }
+  ganharTrevos(n, `Domínio de pesca ${l.length > 1 ? `níveis ${l[0]} a ${l[l.length - 1]}` : `nível ${l[0]}`}.`);
+}
+function resgatarConquista(id) {
+  const c = CONQUISTAS.find(x => x.id === id); if (!c || !conqPronta(c)) return;
+  trevosDe().conq[id] = true; ganharTrevos(c.trevos, `Conquista: ${c.nome}.`);
+}
+// Loja do Trevo: só coisas exclusivas.
+const TREVO_LOJA = [
+  { id: 'chapeu:couro',         nome: 'Chapéu de couro',            tipo: 'Avatar',  preco: 15, desc: 'Chapéu de vaqueiro com cordão dourado.' },
+  { id: 'chapeu:flores',        nome: 'Coroa de flores',            tipo: 'Avatar',  preco: 15, desc: 'Uma coroa de flores do campo.' },
+  { id: 'mao:lampiao',          nome: 'Lampião',                    tipo: 'Avatar',  preco: 20, desc: 'Lampião aceso na mão do avatar.' },
+  { id: 'musica:4',             nome: 'Música "Moda de Viola"',     tipo: 'Música',  preco: 25, desc: 'Viola caipira em terças, bem de raiz.' },
+  { id: 'musica:5',             nome: 'Música "Forró na Roça"',     tipo: 'Música',  preco: 25, desc: 'Sanfona, zabumba e triângulo.' },
+  { id: 'enfeite:arcoflores',   nome: 'Arco de flores',             tipo: 'Enfeite', preco: 20, desc: 'Arco de madeira coberto de flores (+2% XP).' },
+  { id: 'enfeite:peixedourado', nome: 'Estátua do Peixe Dourado',   tipo: 'Enfeite', preco: 30, desc: 'Um dourado de ouro saltando (+3% XP).' },
+  { id: 'casa:trevo',           nome: 'Tema Casa do Trevo',         tipo: 'Tema',    preco: 40, desc: 'Casa e celeiro verde-menta, com trevo na fachada.' },
+  { id: 'casa:real',            nome: 'Tema Rancho Real',           tipo: 'Tema',    preco: 60, desc: 'Casa e celeiro vinho com dourado.' },
+];
+const musicaLiberada = k => !(window.RFAudio && window.RFAudio.exclusivas && window.RFAudio.exclusivas[k]) || temTrevoItem('musica:' + k);
+function iconeTrevoItem(it) {
+  const [tipo, id] = it.id.split(':');
+  if (tipo === 'casa') return casaTemaIcon(id);
+  if (tipo === 'enfeite') return enfeiteIcon(id);
+  return makeIcon('trevoitem:' + it.id, () => {
+    if (tipo === 'musica') { ctx.fillStyle = '#2f8a2f'; ctx.font = '56px system-ui'; ctx.textAlign = 'center'; ctx.fillText(id === '4' ? '🪕' : '🪗', 48, 70); return; }
+    const av = Object.assign({}, avatarOk(state.avatar), tipo === 'chapeu' ? { chapeu: id } : { mao: id });
+    drawAvatar(ctx, 48, 92, 1.2, av, 0, false, 1);
+  });
+}
+function comprarTrevoItem(id) {
+  const it = TREVO_LOJA.find(x => x.id === id), t = trevosDe(); if (!it || t.itens[id]) return;
+  if (t.saldo < it.preco) { sfx('error'); return toast(`Faltam ${it.preco - t.saldo} 🍀 para ${it.nome}. Resgate peixes, domínio e conquistas!`, 'bad'); }
+  return confirmTwice('trevo' + id, `Trocar ${it.preco} 🍀 por ${it.nome}? Toque de novo para confirmar.`, () => {
+    t.saldo -= it.preco; t.itens[id] = true;
+    const [tipo, x] = id.split(':');
+    if (tipo === 'casa') state.skins[x] = true;
+    if (tipo === 'enfeite') { state.enfeites[x] = (state.enfeites[x] || 0) + 1; state.invNovos = (state.invNovos || 0) + 1; }
+    sfx('buy');
+    toast(`🍀 ${it.nome} é seu! ${tipo === 'casa' ? 'Use clicando na sua casa.' : tipo === 'enfeite' ? 'Está no Inventário.' : tipo === 'musica' ? 'Escolha em ⚙️ › Música.' : 'Escolha em ⚙️ › Seu avatar.'}`, 'good');
+    done(); renderPane(); renderTabs(); renderHUD();
+  });
+}
+function trevosHTML() {
+  const t = trevosDe(), pp = peixesAResgatar(), dd = dominioAResgatar();
+  let html = `<div class="row sel"><div class="avatar" style="background:#2f8a2f;font-size:26px">🍀</div><div><div class="name">Você tem ${t.saldo} trevo${t.saldo === 1 ? '' : 's'}</div>
+    <div class="meta">A moeda verde da roça. Ganhe resgatando peixes novos no 📖 Livro de peixes, os níveis do domínio de pesca e as conquistas abaixo. Troque por itens exclusivos.</div></div><div></div></div>`;
+  if (pp.length || dd.length) html += `<div class="row"><div class="avatar" style="background:#3f8ac8;font-size:24px">🎣</div><div><div class="name">Para resgatar na pescaria</div>
+    <div class="meta">${pp.length ? `${pp.length} peixe${pp.length > 1 ? 's' : ''} no livro` : ''}${pp.length && dd.length ? ' · ' : ''}${dd.length ? `domínio de pesca (${dd.length} nível${dd.length > 1 ? 'is' : ''})` : ''}</div></div>
+    <button class="btn gold" data-abrir-livro="1">Abrir o livro</button></div>`;
+  html += `<h3>Conquistas</h3>`;
+  for (const c of CONQUISTAS) {
+    const alvo = alvoDe(c), v = Math.min(alvo, c.valor()), feita = trevosDe().conq[c.id], pronta = conqPronta(c);
+    html += `<div class="row ${pronta ? 'sel' : ''}"><div class="avatar" style="background:${feita ? '#b7b39c' : '#2f8a2f'};font-size:20px">${feita ? '✔' : '🏅'}</div>
+      <div><div class="name">${c.nome}</div><div class="meta">${c.desc} · ${v.toLocaleString('pt-BR')}/${alvo.toLocaleString('pt-BR')}</div><div class="mbar"><i style="width:${Math.round(v / alvo * 100)}%"></i></div></div>
+      ${feita ? '<button class="btn ghost" disabled>Resgatado</button>' : pronta ? `<button class="btn gold" data-trevo-conq="${c.id}">Resgatar 🍀${c.trevos}</button>` : `<button class="btn ghost" disabled>🍀 ${c.trevos}</button>`}</div>`;
+  }
+  html += `<h3>Loja do Trevo 🍀</h3><p class="hint">Itens exclusivos: só se conseguem com trevos.</p>`;
+  for (const it of TREVO_LOJA) {
+    const tem = t.itens[it.id];
+    html += `<div class="row ${tem ? 'sel' : ''}"><img alt="" src="${iconeTrevoItem(it)}"><div><div class="name">${it.nome} <span class="tag">${it.tipo}</span></div><div class="meta">${it.desc}</div></div>
+      ${tem ? '<button class="btn ghost" disabled>Já é seu</button>' : `<button class="btn gold" data-trevo-comprar="${it.id}" ${t.saldo < it.preco ? 'disabled' : ''}>🍀 ${it.preco}</button>`}</div>`;
+  }
+  return html;
+}
 
 // ---------- Presente dos pioneiros: quem joga no primeiro mês ganha itens especiais ----------
 // Mês e ano em que os itens de evento chegaram (aparece no mouse e no inventário).
