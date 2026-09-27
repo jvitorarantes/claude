@@ -917,7 +917,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
-  { v: 79, txt: 'Novo ponto de pesca: 🔄 Pesque e Solte! Fica sempre aberto e não gasta isca: pesque quanto quiser. Mas é pesque e solte: cada peixe volta para o rio e dá só 10 moedas e 1 XP. Ele NÃO vai para o celeiro, o livro de peixes, as conquistas, as missões nem o domínio de pesca.' },
+  { v: 79, txt: 'Novo ponto de pesca: 🔄 Pesque e Solte (libera no nível 5, de graça)! Fica sempre aberto e não gasta isca: pesque quanto quiser. Mas é pesque e solte: cada peixe volta para o rio e dá só 10 moedas e 1 XP. Ele NÃO vai para o celeiro, o livro de peixes, as conquistas, as missões nem o domínio de pesca.' },
   { v: 78, txt: 'Peixes de Goiás 🐟: chegaram 15 espécies novas, como cará, piau, mandi, curimbatá, cascudo, piranha, corvina, matrinxã, peixe-cachorra, aruanã, barbado, tambaqui, pirarara, jaú e piraíba. Alguns só aparecem nos rios grandes: veja no 📖 Livro de peixes onde cada um morde.' },
   { v: 77, txt: 'Mais pescaria: agora cada ponto de pesca dá 3 pescarias de vara antes de descansar (a tarrafa continua igual).' },
   { v: 75, txt: 'Domínio de pesca 🎖️: cada peixe pego dá pontos (os raros valem mais). A cada nível de domínio, a espera da vara e da tarrafa cai 5%, até 45% no nível 10. Os peixes que você já pegou contam!' },
@@ -6104,7 +6104,7 @@ function dominioHTML() {
 const PONTOS = [
   { id: 'casa',    nome: 'Pesqueiro de casa', emoji: '🏡', nivel: 1,  custo: 0,     sorte: 1,    agua: ['#6cb6e8', '#2f7ab8'], margem: '#7dbb48' },
   // Pesque e solte: sempre aberto, sem gastar isca. O peixe volta para a água: só dá moedas e XP.
-  { id: 'solte',    nome: 'Pesque e Solte',       emoji: '🔄', nivel: 1,  custo: 0,     sorte: 1,    cena: 'solte', solte: true, agua: ['#7cc4e4', '#3584b8'], margem: '#8cc458' },
+  { id: 'solte',    nome: 'Pesque e Solte',       emoji: '🔄', nivel: 5,  custo: 0,     sorte: 1,    cena: 'solte', solte: true, agua: ['#7cc4e4', '#3584b8'], margem: '#8cc458' },
   // (os ids ficam os mesmos de antes para quem já tinha comprado; o "cena" diz o que desenhar)
   { id: 'riacho',   nome: 'Córrego Cascavel',     emoji: '🪨', nivel: 5,  custo: 1500,  sorte: 1.2,  cena: 'pedras',  agua: ['#8ad4e0', '#3a8ea6'], margem: '#86c050' },
   { id: 'represa',  nome: 'Rio Meia Ponte',       emoji: '🌉', nivel: 10, custo: 5000,  sorte: 1.45, cena: 'ponte',   agua: ['#7fb0c8', '#3a6f8a'], margem: '#6fae44' },
@@ -6120,7 +6120,7 @@ function pontosDe() {
   p.prox = p.prox || {}; p.usos = p.usos || {};
   return p;
 }
-const temPonto = id => !!PONTO[id] && (PONTO[id].custo === 0 || pontosDe().meus.includes(id));
+const temPonto = id => !!PONTO[id] && (PONTO[id].custo === 0 ? state.level >= PONTO[id].nivel : pontosDe().meus.includes(id));
 const SOLTE_MOEDAS = 10, SOLTE_XP = 1;
 const pontoSel = () => { const id = state.pontoSel; return PONTO[id] && temPonto(id) ? id : 'casa'; };
 const faltaPonto = id => Math.max(0, (pontosDe().prox[id] || 0) - Date.now());
@@ -6130,7 +6130,7 @@ const restamVara = id => PONTO[id] && PONTO[id].solte ? Infinity : faltaPonto(id
 const faltaTarrafa = () => Math.max(0, (state.tarrafaEm || 0) - Date.now());
 function comprarPonto(id) {
   const d = PONTO[id]; if (!d || temPonto(id)) return;
-  if (state.level < d.nivel) return toast(`${d.emoji} ${d.nome}: libera no nível ${d.nivel} e custa ${d.custo.toLocaleString('pt-BR')} moedas.`);
+  if (state.level < d.nivel) return toast(`${d.emoji} ${d.nome}: libera no nível ${d.nivel}${d.custo ? ` e custa ${d.custo.toLocaleString('pt-BR')} moedas` : ' (de graça)'}.`);
   if (state.coins < d.custo) { sfx('error'); return toast(`${d.nome} custa ${d.custo.toLocaleString('pt-BR')} moedas. Faltam ${(d.custo - state.coins).toLocaleString('pt-BR')}.`, 'bad'); }
   return confirmTwice('ponto' + id, `Comprar o ponto ${d.nome} por ${d.custo.toLocaleString('pt-BR')} moedas? Toque de novo para confirmar.`, () => {
     state.coins -= d.custo; pontosDe().meus.push(id); state.pontoSel = id; sfx('buy');
@@ -6256,7 +6256,7 @@ function renderPesca() {
   const pp = pontosDe();
   setHtml($('#pescaPontos'), PONTOS.map(d => {
     const meu = temPonto(d.id), trava = d.nivel > state.level, f = meu ? faltaPonto(d.id) : 0;
-    const st = d.solte ? `Sempre aberto · ${moeda(SOLTE_MOEDAS)}` : meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎣 ${restamVara(d.id)}/${VARA_POR_VEZ}`) : trava ? `🔒 Nv ${d.nivel} · ${moeda(d.custo)}` : moeda(d.custo);
+    const st = d.solte && meu ? `Sempre aberto · ${moeda(SOLTE_MOEDAS)}` : meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎣 ${restamVara(d.id)}/${VARA_POR_VEZ}`) : trava ? `🔒 Nv ${d.nivel} · ${d.custo ? moeda(d.custo) : 'grátis'}` : moeda(d.custo);
     return `<button type="button" class="pontobtn ${meu ? '' : trava ? 'trava' : 'loja'} ${f ? 'descansa' : ''}" data-ponto="${d.id}" aria-pressed="${meu && d.id === pt.id}">
       <b>${d.emoji} ${d.nome}</b><small>${st}</small></button>`;
   }).join(''));
