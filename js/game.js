@@ -921,6 +921,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
+  { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
   { v: 93, txt: 'O tema da casa agora vale também para a casinha do cachorro e para os abrigos dos bichos no rancho: tudo combinando!' },
   { v: 91, txt: 'Loja do Trevo 🍀 cheia de novidades: chapéu de cangaceiro, boina, panamá, gorro, sanfona, buquê, regador dourado, ipê-amarelo, fogueira de São João, balanço, carro de boi, as casas Lavanda, do Cerrado e Estrelada, a música Seresta ao Luar e itens úteis (iscas, ração especial, tarrafa e pontos de pesca prontos na hora).' },
   { v: 90, txt: 'Chegaram os Trevos 🍀, a moeda verde da roça! Ganhe resgatando cada peixe novo no 📖 Livro de peixes, os níveis do domínio de pesca e as conquistas (Missões › 🍀 Trevos). O que você já fez também vale: é só resgatar! Troque na Loja do Trevo por itens exclusivos: chapéus, lampião, músicas, enfeites e temas de casa.' },
@@ -5112,8 +5113,15 @@ function claimMission(tipo, k) {
   if (p.racao) state.racaoEsp += p.racao;
   sfx('coin');
   toast(`Prêmio: +${p.moedas.toLocaleString('pt-BR')} moedas e +${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}!`, 'good');
+  // completou todas do dia (ou da semana)? ganha trevos, uma vez por dia / por semana
+  const ms = state.missions, marca = tipo === 'dia' ? 'd' : 'w';
+  if (ms[tipo].every(x => x.pego) && ms['trevo_' + tipo] !== ms[marca]) {
+    ms['trevo_' + tipo] = ms[marca];
+    setTimeout(() => ganharTrevos(TREVO_MISSOES[tipo], tipo === 'dia' ? 'Todas as missões do dia!' : 'Todas as missões da semana!'), 700);
+  }
   renderTabs(); done();
 }
+const TREVO_MISSOES = { dia: 2, semana: 6 };
 const prontasDe = tipo => state && state.missions ? state.missions[tipo].filter(m => m.feito >= m.alvo && !m.pego).length : 0;
 const missoesProntas = () => prontasDe('dia') + prontasDe('semana') + ((state && state.newStamps) || 0) + vilaProntos() + trevosPendentes();
 
@@ -6467,7 +6475,8 @@ function comprarPonto(id) {
 function sortearPeixe(isca, sorte = 1, semLixo = false, ponto = 'casa') {
   let ok = PEIXES.filter(p => p.nivel <= state.level && (!isca || p.iscas.includes(isca)) && !(semLixo && p.lixo) && peixeNoPonto(p, ponto));
   if (!ok.length) ok = PEIXES.filter(p => p.id === 'lambari');
-  const peso = p => p.lixo ? p.peso / sorte : ['raro', 'épico', 'lendário'].includes(p.raro) ? p.peso * sorte : p.raro === 'incomum' ? p.peso * Math.sqrt(sorte) : p.peso;
+  const peso0 = p => p.lixo ? p.peso / sorte : ['raro', 'épico', 'lendário'].includes(p.raro) ? p.peso * sorte : p.raro === 'incomum' ? p.peso * Math.sqrt(sorte) : p.peso;
+  const peso = p => peso0(p) * (p.lixo ? 1 : 1 + 0.15 * estrelasDe(p)); // cada estrela do domínio da espécie: morde 15% mais
   const tot = ok.reduce((t, p) => t + peso(p), 0);
   let r = Math.random() * tot;
   for (const p of ok) { r -= peso(p); if (r <= 0) return p; }
@@ -6677,15 +6686,16 @@ let pescaLivro = false;
 const peixeSombra = id => makeIcon('ps:' + id, () => { ctx.globalAlpha = 0.85; drawPeixe(ctx, 48, 48, 4.7 * cabePeixe(PEIXE[id]), Object.assign({}, PEIXE[id], { cor: ['#5b6470', '#4a525c'], listras: false, pintas: false, barriga: false, armadura: false })); ctx.globalAlpha = 1; });
 function livroPeixes() {
   const lista = PEIXES.filter(p => !p.lixo), pegos = lista.filter(p => state.col[p.id]).length, pend = peixesAResgatar();
-  const soma = pend.reduce((t, p) => t + (TREVO_PEIXE[p.raro] || 1), 0);
-  return `<p class="hint" style="margin:0 0 8px">Você já pegou <b>${pegos} de ${lista.length}</b> peixes. Cada espécie nova vale trevos 🍀: comum 1, incomum 2, raro 3, épico 5, lendário 10.</p>
+  const soma = pend.reduce((t, p) => t + trevosDoPeixe(p), 0);
+  return `<p class="hint" style="margin:0 0 8px">Você já pegou <b>${pegos} de ${lista.length}</b> peixes. Cada espécie nova vale trevos 🍀 (comum 1, incomum 2, raro 3, épico 5, lendário 10). E cada peixe tem o seu domínio ★: pegando mais do mesmo, ele ganha estrelas (até 4), morde 15% mais por estrela e cada estrela vale trevos (1, 2, 3 e 5).</p>
     ${pend.length ? `<p style="margin:0 0 8px;text-align:center"><button class="btn gold" type="button" data-trevo-todos="1">Resgatar tudo · 🍀 ${soma}</button></p>` : ''}<div class="livro">${lista.map(p => {
-    const n = state.col[p.id] || 0, novo = (state.peixesNovos || []).includes(p.id), resg = n && !trevosDe().peixes[p.id];
+    const n = state.col[p.id] || 0, novo = (state.peixesNovos || []).includes(p.id), resg = trevosDoPeixe(p), est = estrelasDe(p), prox = (MAESTRIA[p.raro] || MAESTRIA.comum)[est];
     return `<div class="lvcard ${n ? '' : 'falta'}">${novo ? '<span class="lvnovo">NOVO!</span>' : ''}<img alt="" src="${n ? productIcon(p.id) : peixeSombra(p.id)}">
       <b>${n ? esc(p.nome) : '???'}</b><span class="raro" style="color:${COR_RARO[p.raro]}">${p.raro}</span>
       <small>${n ? `Pegou ${n}× · vale ${p.preco}` : 'Ainda não pegou'}</small>
+      ${n ? `<small class="lvest" title="Domínio desta espécie">${'★'.repeat(est)}${'☆'.repeat(4 - est)}${prox ? ` <span>${n}/${prox}</span>` : ' <span>máximo!</span>'}</small>` : ''}
       <small class="req">Nível ${p.nivel}${p.nivel > state.level ? ' 🔒' : ''} · ${p.iscas.map(i => ISCA[i].emoji).join(' ')}</small>${p.pontos ? `<small class="req">📍 ${p.pontos.map(id => PONTO[id].nome).slice(0, 2).join(', ')}${p.pontos.length > 2 ? '…' : ''}</small>` : ''}
-      ${resg ? `<button class="btn gold lvresg" type="button" data-trevo-peixe="${p.id}">Resgatar 🍀${TREVO_PEIXE[p.raro] || 1}</button>` : n ? '<small class="lvok">🍀 resgatado</small>' : `<small class="req">🍀 ${TREVO_PEIXE[p.raro] || 1}</small>`}</div>`;
+      ${resg ? `<button class="btn gold lvresg" type="button" data-trevo-peixe="${p.id}">Resgatar 🍀${resg}</button>` : n ? '<small class="lvok">🍀 em dia</small>' : `<small class="req">🍀 ${TREVO_PEIXE[p.raro] || 1}</small>`}</div>`;
   }).join('')}</div>`;
 }
 function desenharPesca(t) {
@@ -7067,7 +7077,7 @@ function missoesHTML() {
     return html + '</div>';
   }
   const tipo = missSeg, lista = state.missions[tipo], p = tipo === 'dia' ? premioDia() : premioSemana();
-  html += `<p class="hint">${tipo === 'dia' ? 'Missões novas todo dia à meia-noite.' : 'Missões novas toda segunda-feira à meia-noite.'} Cada uma dá ${p.moedas.toLocaleString('pt-BR')} moedas e ${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}.</p>`;
+  html += `<p class="hint">${tipo === 'dia' ? 'Missões novas todo dia à meia-noite.' : 'Missões novas toda segunda-feira à meia-noite.'} Cada uma dá ${p.moedas.toLocaleString('pt-BR')} moedas e ${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}. ${state.missions['trevo_' + tipo] === state.missions[tipo === 'dia' ? 'd' : 'w'] ? `<b>🍀 +${TREVO_MISSOES[tipo]} trevos já ganhos!</b>` : `Pegue o prêmio de todas e ganhe <b>🍀 ${TREVO_MISSOES[tipo]} trevos</b>.`}</p>`;
   lista.forEach((m, k) => {
     const ok = m.feito >= m.alvo;
     html += `<div class="row ${m.pego ? 'locked' : ok ? 'sel' : ''}"><div class="avatar" style="background:${ok ? '#4f9a2f' : '#d39a5c'}">${ok ? '✓' : k + 1}</div>
@@ -7877,8 +7887,8 @@ const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, { 
 const TREVO_PEIXE = { comum: 1, incomum: 2, raro: 3, 'épico': 5, 'lendário': 10 };
 const TREVO_DOMINIO = [0, 0, 2, 2, 3, 3, 4, 4, 5, 5, 10]; // ao chegar em cada nível (índice = nível)
 function trevosDe() {
-  const t = state.trevos || (state.trevos = { saldo: 0, peixes: {}, dominio: {}, conq: {}, itens: {} });
-  for (const k of ['peixes', 'dominio', 'conq', 'itens']) t[k] = t[k] || {};
+  const t = state.trevos || (state.trevos = { saldo: 0, peixes: {}, dominio: {}, conq: {}, itens: {}, maestria: {} });
+  for (const k of ['peixes', 'dominio', 'conq', 'itens', 'maestria']) t[k] = t[k] || {};
   t.saldo = t.saldo || 0;
   // conserto: na primeira versão o nível 2 do domínio pagava 0 e os outros um nível atrasado; paga a diferença
   if (!t.domFix) { t.domFix = 1; const antigo = [0, 0, 2, 2, 3, 3, 4, 4, 5, 10]; for (const nv of Object.keys(t.dominio)) t.saldo += Math.max(0, (TREVO_DOMINIO[nv] || 0) - (antigo[nv - 1] || 0)); }
@@ -7904,7 +7914,20 @@ const CONQUISTAS = [
 ];
 const alvoDe = c => typeof c.alvo === 'function' ? c.alvo() : c.alvo;
 const conqPronta = c => !trevosDe().conq[c.id] && c.valor() >= alvoDe(c);
-const peixesAResgatar = () => PEIXES_REAIS().filter(p => state.col[p.id] && !trevosDe().peixes[p.id]);
+// Domínio de cada espécie (estrelas): quanto mais você pega o mesmo peixe, mais estrelas ele ganha.
+// Cada estrela faz ele morder 15% mais (entre os que mordem na isca e no ponto) e vale trevos.
+const MAESTRIA = { comum: [10, 30, 75, 150], incomum: [8, 20, 50, 100], raro: [5, 15, 35, 70], 'épico': [3, 8, 20, 40], 'lendário': [2, 5, 10, 20] };
+const TREVO_ESTRELA = [1, 2, 3, 5];
+const estrelasDe = p => { const n = state.col[p.id] || 0, m = MAESTRIA[p.raro] || MAESTRIA.comum; return m.filter(x => n >= x).length; };
+const estrelasPegas = id => (trevosDe().maestria[id] || 0);
+// trevos que faltam resgatar de um peixe: a 1ª vez que pegou + as estrelas novas
+function trevosDoPeixe(p) {
+  const t = trevosDe(); if (!state.col[p.id]) return 0;
+  let n = t.peixes[p.id] ? 0 : (TREVO_PEIXE[p.raro] || 1);
+  for (let k = estrelasPegas(p.id); k < estrelasDe(p); k++) n += TREVO_ESTRELA[k];
+  return n;
+}
+const peixesAResgatar = () => PEIXES_REAIS().filter(p => trevosDoPeixe(p) > 0);
 const dominioAResgatar = () => { const nv = dominio().nv, r = []; for (let n = 2; n <= nv; n++) if (!trevosDe().dominio[n]) r.push(n); return r; };
 const trevosPendentes = () => !state ? 0 : peixesAResgatar().length + dominioAResgatar().length + CONQUISTAS.filter(conqPronta).length;
 function ganharTrevos(n, motivo) {
@@ -7913,13 +7936,15 @@ function ganharTrevos(n, motivo) {
   toast(`🍀 +${n} trevo${n > 1 ? 's' : ''}! ${motivo}`, 'good');
   done(); renderTabs(); renderHUD();
 }
+function marcarPeixe(p) { const t = trevosDe(), n = trevosDoPeixe(p); t.peixes[p.id] = true; t.maestria[p.id] = estrelasDe(p); return n; }
 function resgatarPeixe(id) {
-  const p = PEIXE[id], t = trevosDe(); if (!p || !state.col[id] || t.peixes[id]) return;
-  t.peixes[id] = true; ganharTrevos(TREVO_PEIXE[p.raro] || 1, `${p.nome} no livro.`);
+  const p = PEIXE[id]; if (!p || !trevosDoPeixe(p)) return;
+  const e = estrelasDe(p), n = marcarPeixe(p);
+  ganharTrevos(n, `${p.nome}${e ? ` ${'★'.repeat(e)}` : ''} no livro.`);
 }
 function resgatarTodosPeixes() {
-  const l = peixesAResgatar(), t = trevosDe(); if (!l.length) return;
-  let n = 0; for (const p of l) { t.peixes[p.id] = true; n += TREVO_PEIXE[p.raro] || 1; }
+  const l = peixesAResgatar(); if (!l.length) return;
+  let n = 0; for (const p of l) n += marcarPeixe(p);
   ganharTrevos(n, `${l.length} peixe${l.length > 1 ? 's' : ''} do livro.`);
 }
 function resgatarDominio() {
