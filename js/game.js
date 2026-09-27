@@ -947,6 +947,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
+  { v: 105, txt: 'Pomar com limite: até 4 de cada arbusto e 3 de cada árvore (contando as do inventário). Derrubou uma seca? Libera para comprar outra.' },
   { v: 104, txt: 'Pomar ainda mais barato: enxada 50, motosserra 100 e frutíferas que rendem mais de 2,5× o preço. E chegou o 🌳 Domínio do pomar: colher frutas (e ajudar as dos amigos) sobe o nível, que dá mais frutas por colheita, mais colheitas antes de secar e trevos para resgatar.' },
   { v: 103, txt: 'Na Loja, "Mudas" virou Horta e o Pomar ficou do lado. Os montes de folhas brilham e têm o rastelo em cima. E o botão 🆘 Precisa de ajuda leva direto para a roça (ou o rancho) do amigo, com a frutífera marcada.' },
   { v: 102, txt: 'Pomar mais barato 🍊: frutíferas e ferramentas custam bem menos, e cada frutífera agora dá 3 colheitas (não morre mais por dias). Depois da última, ela seca: toque nela e ponha a 🪧 placa de ajuda. Todos os seus amigos são avisados e, quando um ajudar, ela volta a dar frutas. Na lista de Amigos, o botão 🆘 Precisa de ajuda fica colorido quando um amigo está pedindo. Ajudar frutífera não conta no limite do dia.' },
@@ -4419,6 +4420,7 @@ function explicarBloqueado(e) {
   else if (/🍀/.test(txt)) msg = `🍀 Faltam trevos: custa ${txt.replace(/[^0-9]/g, '')}. Ganhe resgatando peixes, domínio e conquistas em Missões › 🍀 Trevos.`;
   else if (/^\d|moedas|^×/.test(txt) || b.querySelector('.coin')) msg = `🪙 Moedas insuficientes: custa ${txt.replace(/^×\d+/, '').replace(/[^0-9.]/g, '')} moedas.`;
   else if (/cheio|cheia/i.test(txt)) msg = 'Não cabe mais: aumente o abrigo na aba Abrigos.';
+  else if (b.dataset.fruteiraCheia) msg = `Limite de ${ENFEITE[b.dataset.fruteiraCheia].nome.toLowerCase()} atingido (${LIMITE_FRUTEIRA[ENFEITE[b.dataset.fruteiraCheia].fruteira]}). Derrube uma seca para comprar outra.`;
   if (!msg) return false;
   sfx('error'); toast(msg, 'bad'); return true;
 }
@@ -8058,9 +8060,13 @@ function venderDecoracao(key) {
   toast(`Vendeu ${nome.toLowerCase()} por ${preco.toLocaleString('pt-BR')} moedas.`, 'good');
   done();
 }
+// Limite de cada frutífera: contando as plantadas (roça e rancho) e as guardadas no inventário.
+const LIMITE_FRUTEIRA = { arbusto: 4, arvore: 3 };
+const fruteirasDe = id => ['roca', 'animais'].reduce((n, sc) => n + objetosDe(state, sc).filter(o => o.id === id).length, 0) + (state.enfeites[id] || 0);
 function comprarEnfeite(id, qtd = 1) {
   const e = ENFEITE[id];
   if (e.especial) return;
+  if (e.fruteira && fruteirasDe(id) + qtd > LIMITE_FRUTEIRA[e.fruteira]) return toast(`Limite de ${e.nome.toLowerCase()}: no máximo ${LIMITE_FRUTEIRA[e.fruteira]} (contando as do inventário). Você já tem ${fruteirasDe(id)}.`, 'bad');
   if (state.level < e.nivel) return toast(`${e.nome} libera no nível ${e.nivel}.`);
   if (state.coins < e.custo * qtd) return toast(`${qtd > 1 ? qtd + ' × ' : ''}${e.nome} custa ${(e.custo * qtd).toLocaleString('pt-BR')} moedas.`, 'bad');
   state.coins -= e.custo * qtd; state.enfeites[id] = (state.enfeites[id] || 0) + qtd; state.invNovos = (state.invNovos || 0) + 1;
@@ -8450,17 +8456,17 @@ function drawFruteira(o, x, y, s, t, home) {
 }
 function pomarLojaHTML() {
   const d = derrubarDe();
-  let html = dominioPomarHTML() + `<p class="hint">Plante frutíferas no gramado da roça ou do rancho (fora dos canteiros). Cada uma dá ${colheitasDe(ENFEITE.pitangueira)} colheitas e depois seca. Seca, você escolhe: pôr a 🪧 placa de ajuda (todos os seus amigos são avisados e, quando um ajudar, ela volta a dar frutas) ou derrubar (arbusto com a 🪓 enxada de arrancar; árvore com a 🪚 motosserra). Ganhe as ferramentas completando todas as missões (dia: enxada, semana: motosserra), de presente de amigos ou compre aqui.</p>`;
+  let html = dominioPomarHTML() + `<p class="hint">Plante frutíferas no gramado da roça ou do rancho (fora dos canteiros). Dá para ter até ${LIMITE_FRUTEIRA.arbusto} de cada arbusto e ${LIMITE_FRUTEIRA.arvore} de cada árvore (derrube uma seca para comprar outra). Cada uma dá ${colheitasDe(ENFEITE.pitangueira)} colheitas e depois seca. Seca, você escolhe: pôr a 🪧 placa de ajuda (todos os seus amigos são avisados e, quando um ajudar, ela volta a dar frutas) ou derrubar (arbusto com a 🪓 enxada de arrancar; árvore com a 🪚 motosserra). Ganhe as ferramentas completando todas as missões (dia: enxada, semana: motosserra), de presente de amigos ou compre aqui.</p>`;
   html += `<h3>Ferramentas de derrubar</h3>`;
   for (const [id, F] of Object.entries(FERR_DERRUBAR)) html += `<div class="row"><img alt="" src="${ferramentaIcon(id)}"><div><div class="name">${F.nome}</div><div class="meta">Tira um${F.para === 'arvore' ? 'a árvore' : ' arbusto'} seco · você tem <b>${d[id]}</b></div></div>
     <button class="btn" data-comprar-ferr="${id}" ${state.coins < F.custo ? 'disabled' : ''}>${moeda(F.custo)}</button></div>`;
   for (const [tipo, titulo] of [['arbusto', 'Arbustos'], ['arvore', 'Árvores']]) {
     html += `<h3>${titulo}</h3>`;
     for (const e of ENFEITES.filter(x => x.fruteira === tipo)) {
-      const f = FRUTA[e.fruta], locked = e.nivel > state.level, tem = state.enfeites[e.id] || 0;
+      const f = FRUTA[e.fruta], locked = e.nivel > state.level, tem = state.enfeites[e.id] || 0, lim = LIMITE_FRUTEIRA[e.fruteira], ja = fruteirasDe(e.id), cheio = ja >= lim;
       html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div>
-        <div class="meta">${rendeDe(e)} ${f.nome.toLowerCase()}s (vale ${f.preco}) a cada ${fmt(e.tempo)} · ${colheitasDe(e)} colheitas: rende ${(rendeDe(e) * f.preco * colheitasDe(e)).toLocaleString('pt-BR')} moedas (${(rendeDe(e) * f.preco * colheitasDe(e) / e.custo).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}× o preço)${tem ? ` · no inventário: <b>${tem}</b>` : ''}</div></div>
-        ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
+        <div class="meta">${rendeDe(e)} ${f.nome.toLowerCase()}s (vale ${f.preco}) a cada ${fmt(e.tempo)} · ${colheitasDe(e)} colheitas: rende ${(rendeDe(e) * f.preco * colheitasDe(e)).toLocaleString('pt-BR')} moedas (${(rendeDe(e) * f.preco * colheitasDe(e) / e.custo).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}× o preço)<br>Você tem <b>${ja} de ${lim}</b>${tem ? ` (${tem} no inventário)` : ''}</div></div>
+        ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : cheio ? `<button class="btn" disabled data-fruteira-cheia="${e.id}">Limite ${lim}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
     }
   }
   return html;
