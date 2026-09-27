@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="51">
-<script src="firebase-config.js?v=51"></script>
+<meta name="rf-version" content="52">
+<script src="firebase-config.js?v=52"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -356,6 +356,7 @@
   }
   .codebox strong { font: 400 26px/1 Chewy, cursive; letter-spacing: 3px; color: var(--heading); user-select: all; }
   .addform { display: flex; gap: 8px; }
+  .txtin { flex: 1; min-width: 0; max-width: 230px; border: 2px solid var(--wood-3); border-radius: 10px; padding: 6px 10px; background: var(--card); font: inherit; font-weight: 700; color: var(--ink); }
   .addform input {
     flex: 1; min-width: 0; border: 2px solid var(--wood-3); border-radius: 10px; padding: 4px 10px;
     background: var(--card); text-transform: uppercase; letter-spacing: 2px; font-weight: 700;
@@ -697,6 +698,12 @@
       <div class="acct" id="account"></div>
     </section>
     <section>
+      <h3>Nomes</h3>
+      <div class="setrow"><label for="nomeFazenda">Nome da fazenda</label><input class="txtin" id="nomeFazenda" maxlength="24" placeholder="Roça Feliz" autocomplete="off"></div>
+      <div class="setrow"><label for="nomeAvatar">Nome do avatar</label><input class="txtin" id="nomeAvatar" maxlength="24" autocomplete="off"></div>
+      <p class="hint" style="margin:0;color:var(--muted);font-size:13px">Quem visitar vai ver: <b id="nomePrev"></b></p>
+    </section>
+    <section>
       <h3>Seu avatar</h3>
       <p class="hint" style="margin:0 0 6px;color:var(--muted);font-size:13px">Ele passeia pela sua roça e pelo rancho e vai junto de carroça quando você visita alguém.</p>
       <div class="avcfg" id="avatarCfg"></div>
@@ -740,8 +747,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=51"></script>
-<script src="js/cloud.js?v=51"></script>
-<script src="js/game.js?v=51"></script>
+<script src="js/audio.js?v=52"></script>
+<script src="js/cloud.js?v=52"></script>
+<script src="js/game.js?v=52"></script>
 </body>
 </html>

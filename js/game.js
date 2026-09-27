@@ -233,9 +233,15 @@ const STAGE_NAMES = ['Semente', 'Broto', 'Crescendo', 'Quase lá', 'Maduro'];
 
 // Vizinhos da vila (não são amigos de verdade). "acima": quantos níveis a roça deles tem a mais que a sua.
 const NEIGHBORS = [
-  { id: 'ze',    nome: 'Seu Zé',     cao: 'Rex',    casa: '#d9a441', pega: 0.16, acima: 2 },
-  { id: 'maria', nome: 'Dona Maria', cao: 'Pipoca', casa: '#c7658f', pega: 0.08, acima: 5 },
+  { id: 'ze',    nome: 'Seu Zé',     fazenda: 'Sítio Boa Vista',    cao: 'Rex',    casa: '#d9a441', pega: 0.16, acima: 2 },
+  { id: 'maria', nome: 'Dona Maria', fazenda: 'Chácara das Flores', cao: 'Pipoca', casa: '#c7658f', pega: 0.08, acima: 5 },
 ];
+// Nomes escolhidos pelo jogador: da fazenda e do avatar. Quem visita vê "[fazenda] de [avatar]".
+const NOME_MAX = 24;
+const limpaNome = v => String(v || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, NOME_MAX);
+const meuApelido = () => (state && state.apelido) || (user ? firstName(user.name) : 'Você');
+const minhaFazenda = () => (state && state.fazenda) || 'Roça Feliz';
+const deQuem = v => `${v.fazenda || 'Roça Feliz'} de ${v.nome}`;
 
 // Ordem em que os lotes são liberados: do centro para as bordas.
 function orderFor(cols, rows) {
@@ -352,6 +358,7 @@ function migrate(s) {
   s.friends = Array.isArray(s.friends) ? s.friends.filter(f => typeof f === 'string') : [];
   // cópia de segurança de quem já foi amigo (só sai daqui quando você exclui a pessoa)
   s.amigosVistos = obj(s.amigosVistos); for (const f of s.friends) s.amigosVistos[f] = 1;
+  s.fazenda = limpaNome(s.fazenda); s.apelido = limpaNome(s.apelido);
   s.sent = s.sent && typeof s.sent === 'object' && !Array.isArray(s.sent) ? s.sent : {};
   s.fert = s.fert && typeof s.fert === 'object' ? s.fert : {};
   if (!FERT[s.fertSel]) s.fertSel = 'basico';
@@ -1067,10 +1074,10 @@ function fecharCarregando() { clearTimeout(carregaTimer); const el = $('#loading
 
 function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
-  telaCarregando(`Indo até a roça de ${nb.nome}…`, CARREGA_MS, nb.nome);
+  telaCarregando(`Indo até ${nb.fazenda} de ${nb.nome}…`, CARREGA_MS, nb.fazenda);
   const cur = state.nb[id];
   if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry)) || !cur.plots.some(p => 'podre' in p) || !cur.banca) state.nb[id] = genNeighbor();
-  view = { kind: 'npc', id, nome: nb.nome, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima };
+  view = { kind: 'npc', id, nome: nb.nome, fazenda: nb.fazenda, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima };
   afterVisit();
   save();
 }
@@ -1078,14 +1085,15 @@ function visitNpc(id) {
 async function visitFriend(uid) {
   if (!user) return;
   const amigo = friendInfo[uid];
-  const nomeAmigo = amigo && amigo.name ? firstName(amigo.name) : 'Amigo';
-  telaCarregando(`Indo até a roça de ${nomeAmigo}…`, 0, nomeAmigo);
+  const nomeAmigo = amigo && amigo.name && !amigo.erro ? amigo.name : 'Amigo', fazAmigo = (amigo && amigo.fazenda) || 'Roça Feliz';
+  telaCarregando(`Indo até ${fazAmigo} de ${nomeAmigo}…`, 0, fazAmigo);
   try {
     const [f] = await Promise.all([Cloud.loadFarm(uid), espera(CARREGA_MS)]);
     const data = f && f.stateJson ? migrate(JSON.parse(f.stateJson)) : null;
     if (!data) return toast('Essa roça ainda não existe na nuvem.', 'bad');
     catchUp(data, (Date.now() - (f.updatedAt || Date.now())) / 1000);
-    view = { kind: 'friend', uid, nome: firstName(f.name) === 'Você' ? 'Amigo' : f.name, cao: 'Bidu', pega: 0.12, casa: '#7aa35a', data, nivel: data.level || f.level || 1 };
+    const nome = limpaNome(f.apelido || data.apelido) || (firstName(f.name) === 'Você' ? 'Amigo' : firstName(f.name));
+    view = { kind: 'friend', uid, nome, fazenda: limpaNome(f.fazenda || data.fazenda) || 'Roça Feliz', cao: 'Bidu', pega: 0.12, casa: '#7aa35a', data, nivel: data.level || f.level || 1 };
     afterVisit();
   } catch (e) {
     console.warn(e);
@@ -1097,9 +1105,9 @@ async function visitFriend(uid) {
 function afterVisit() {
   hover = null; setScene('roca');
   if (['seed', 'hoe', 'fert'].includes(state.tool)) state.tool = 'hand';
-  $('#bannerTxt').textContent = `Você está na roça de ${view.nome} (nível ${view.nivel}). Veja a banca em Negócios. Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
+  $('#bannerTxt').textContent = `Você está em ${deQuem(view)} (nível ${view.nivel}). Veja a banca em Negócios. Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
   $('#banner').hidden = false;
-  cv.setAttribute('aria-label', `Roça de ${view.nome}`);
+  cv.setAttribute('aria-label', deQuem(view));
   renderVisita();
   renderTools(); renderPane(); renderSceneInfo();
 }
@@ -1113,7 +1121,7 @@ function renderVisita() {
   renderMoveBtn(); pedirFitHud();
 }
 function goHome() {
-  if (!isHome()) telaCarregando('Voltando para a sua roça…', CARREGA_MS, (view.kind === 'npc' ? view.nome : firstName(view.nome)) || 'Vizinho', true);
+  if (!isHome()) telaCarregando(`Voltando para ${minhaFazenda()}…`, CARREGA_MS, view.fazenda || view.nome || 'Vizinho', true);
   view = { kind: 'home' }; hover = null; renderVisita();
   setScene('roca'); // voltar para a sua fazenda sempre começa na roça
   $('#banner').hidden = true; cv.setAttribute('aria-label', 'Sua roça');
@@ -1153,9 +1161,9 @@ function guarded(slot, pos, visit) {
 }
 function sendVisit(v) {
   if (view.kind !== 'friend' || !user) return;
-  Cloud.sendVisit(view.uid, Object.assign({ from: user.uid, fromName: user.name || 'Um amigo', at: Date.now() }, v))
+  Cloud.sendVisit(view.uid, Object.assign({ from: user.uid, fromName: meuApelido(), at: Date.now() }, v))
     .catch(e => console.warn('visita não enviada:', e));
-  if (v.t !== 'gift') avisarAmigo(view.uid, 'visita', `${firstName(user.name) || 'Um amigo'} passou na sua roça!`);
+  if (v.t !== 'gift') avisarAmigo(view.uid, 'visita', `${meuApelido()} passou na sua roça!`);
 }
 function alreadyTook(obj, key) {
   return obj.stolen || state.log[key] || (user && Array.isArray(obj.th) && obj.th.includes(user.uid));
@@ -1289,7 +1297,7 @@ async function cloudSave() {
     // friends e sent ficam fora do JSON para as regras do Firestore decidirem quem pode ver a roça.
     const rev = await Cloud.saveFarmSeguro(user.uid, {
       stateJson: JSON.stringify(Object.assign({}, state, { rev: base + 1, pendente: false })), name: user.name || '', photo: user.photo || '',
-      level: state.level, code: state.code || '', updatedAt: Date.now(),
+      level: state.level, code: state.code || '', updatedAt: Date.now(), apelido: state.apelido || '', fazenda: state.fazenda || '',
       friends: state.friends.slice(), sent: Object.keys(state.sent), session: SESSION,
     }, base);
     state.rev = rev; state.pendente = false; nivelNuvem = Math.max(nivelNuvem, state.level); save();
@@ -1495,8 +1503,8 @@ async function addFriend(code) {
     if (state.sent[uid]) return toast('Você já mandou um pedido para essa pessoa.');
     state.sent[uid] = { at: Date.now(), code };
     await cloudSave(); // libera a sua roça para essa pessoa espiar antes de aceitar
-    await Cloud.sendRequest(uid, { from: user.uid, fromName: user.name || 'Alguém', fromPhoto: user.photo || '', at: Date.now() });
-    avisarAmigo(uid, 'pedido', `${firstName(user.name) || 'Alguém'} quer ser seu amigo na Roça Feliz!`);
+    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: user.photo || '', at: Date.now() });
+    avisarAmigo(uid, 'pedido', `${meuApelido()} quer ser seu amigo na Roça Feliz!`);
     toast('Pedido enviado! A amizade começa quando a pessoa aceitar.', 'good');
     done();
   } catch (e) {
@@ -1576,7 +1584,7 @@ function fetchFriendInfo(uid) {
   if (!user || friendInfo[uid] !== undefined) return;
   friendInfo[uid] = 'loading';
   Cloud.loadFarm(uid).then(f => {
-    friendInfo[uid] = f ? { name: f.name || 'Amigo', photo: f.photo || '', level: f.level || 1 } : null;
+    friendInfo[uid] = f ? { name: limpaNome(f.apelido) || firstName(f.name || 'Amigo'), fazenda: limpaNome(f.fazenda) || 'Roça Feliz', photo: f.photo || '', level: f.level || 1 } : null;
   }).catch(e => {
     // Não conseguiu ler (sem internet, login ainda carregando, ou a pessoa desfez a amizade):
     // NUNCA apaga o amigo sozinho. Um erro passageiro apagava amigos de verdade.
@@ -3522,7 +3530,7 @@ function renderHUD() {
   $('#xptxt').textContent = `${state.xp} / ${n}`;
   $('#xpbar').style.width = `${Math.min(100, state.xp / n * 100)}%`;
   $('#coins').textContent = state.coins.toLocaleString('pt-BR');
-  const nome = user ? firstName(user.name) : 'Roça Feliz';
+  const nome = state.apelido || (user ? firstName(user.name) : 'Roça Feliz');
   if ($('#pname').textContent !== nome) $('#pname').textContent = nome;
   const face = user && user.photo ? `<img alt="" referrerpolicy="no-referrer" src="${esc(user.photo)}">` : esc(user ? nome[0] : '☺');
   if ($('#face').dataset.k !== face) { $('#face').innerHTML = face; $('#face').dataset.k = face; }
@@ -3545,7 +3553,7 @@ function renderPenActions() {
 function renderSceneInfo() {
   renderPenActions();
   const s = S(), el = $('#sceneInfo');
-  const est = estacao(), owner = `${est.icone} ${est.nome}${raining() ? (est.neve ? ' · nevando' : ' · chovendo') : ''} · ` + (isHome() ? '' : `${view.nome} (nível ${view.nivel}) · `);
+  const est = estacao(), owner = `${est.icone} ${est.nome}${raining() ? (est.neve ? ' · nevando' : ' · chovendo') : ''} · ` + (isHome() ? `${minhaFazenda()} · ` : `${deQuem(view)} (nível ${view.nivel}) · `);
   if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length}${isHome() ? ` de ${allowedLots()}` : ''} canteiros`;
   else if (scene === 'animais') {
     const cap = ABRIGOS.reduce((t, b) => t + ABRIGO_CAP[abrigoLv(s, b.id)], 0);
@@ -3888,7 +3896,7 @@ function renderPane() {
         const name = f ? f.name : 'Amigo';
         const armed = unfriendArmed === uid;
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
-          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `Roça nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
+          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `${esc(f.fazenda || 'Roça Feliz')} · nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : (f && f.erro ? `<button class="btn" data-reatar="${esc(uid)}">Reatar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`)}
           ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && !f.erro && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
           ${armed ? `<span class="meta">Excluir ${esc(firstName(name))}?</span><button class="btn ghost" data-unfriend-cancel>Cancelar</button><button class="btn danger" data-unfriend="${esc(uid)}">Confirmar</button>`
@@ -4331,8 +4339,24 @@ function saveSettings() {
   applySettings();
 }
 const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde'];
+function renderNomes() {
+  const fz = $('#nomeFazenda'), av = $('#nomeAvatar'); if (!fz || !state) return;
+  if (document.activeElement !== fz) fz.value = state.fazenda || '';
+  if (document.activeElement !== av) av.value = state.apelido || '';
+  av.placeholder = user ? firstName(user.name) : 'Seu nome';
+  $('#nomePrev').textContent = `${limpaNome(fz.value) || 'Roça Feliz'} de ${limpaNome(av.value) || av.placeholder}`;
+}
+function salvarNomes() {
+  const fz = limpaNome($('#nomeFazenda').value), av = limpaNome($('#nomeAvatar').value);
+  if (fz === (state.fazenda || '') && av === (state.apelido || '')) return;
+  state.fazenda = fz; state.apelido = av; done(); renderHUD(); renderSceneInfo(); renderNomes();
+  toast(`Nomes salvos: ${minhaFazenda()} de ${meuApelido()}!`, 'good');
+}
+$('#nomeFazenda').addEventListener('input', renderNomes); $('#nomeAvatar').addEventListener('input', renderNomes);
+$('#nomeFazenda').addEventListener('change', salvarNomes); $('#nomeAvatar').addEventListener('change', salvarNomes);
+for (const id of ['#nomeFazenda', '#nomeAvatar']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
 function renderSettings() {
-  renderAvatarCfg(); renderPushCfg();
+  renderNomes(); renderAvatarCfg(); renderPushCfg();
   $('#optMusic').checked = settings.music;
   $('#optSfx').checked = settings.sfx;
   $('#volMusic').value = Math.round(settings.musicVol * 100); $('#volMusicOut').textContent = $('#volMusic').value;
@@ -4787,8 +4811,8 @@ async function reatarAmizade(uid, silencioso) {
   const hoje = localDay(); state.reatar = state.reatar || {};
   if (state.reatar[uid] === hoje) { if (!silencioso) toast('O pedido para reatar a amizade já foi enviado hoje. Peça para seu amigo abrir o jogo e aceitar em Amigos.'); return; }
   try {
-    await Cloud.sendRequest(uid, { from: user.uid, fromName: user.name || 'Alguém', fromPhoto: user.photo || '', at: Date.now(), reatar: true });
-    avisarAmigo(uid, 'pedido', `${firstName(user.name) || 'Um amigo'} quer reatar a amizade na Roça Feliz!`);
+    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: user.photo || '', at: Date.now(), reatar: true });
+    avisarAmigo(uid, 'pedido', `${meuApelido()} quer reatar a amizade na Roça Feliz!`);
     state.reatar[uid] = hoje; done();
     const f = friendInfo[uid], nome = firstName(f && f.name && !f.erro ? f.name : 'seu amigo');
     if (!silencioso) toast(`A amizade tinha sumido do jogo de ${nome} (erro antigo). Mandei um pedido para reatar: quando aceitar em Amigos, presentes e visitas voltam.`, 'good');
@@ -4801,8 +4825,8 @@ async function sendFriendGift(uid, escolha) {
   if (g.to.length >= PRESENTE_MAX) return toast(`Você já mandou ${PRESENTE_MAX} presentes hoje. À meia-noite libera de novo!`);
   g.to.push(uid); renderPane();
   try {
-    await Cloud.sendVisit(uid, { t: 'gift', gift: pick.id, from: user.uid, fromName: user.name || 'Um amigo', at: Date.now() });
-    avisarAmigo(uid, 'presente', `🎁 ${firstName(user.name) || 'Um amigo'} te mandou um presente!`);
+    await Cloud.sendVisit(uid, { t: 'gift', gift: pick.id, from: user.uid, fromName: meuApelido(), at: Date.now() });
+    avisarAmigo(uid, 'presente', `🎁 ${meuApelido()} te mandou um presente!`);
     sfx('buy'); addXP(2, null); track('presentear');
     const f = friendInfo[uid];
     toast(`Presente enviado para ${firstName(f && f.name ? f.name : 'seu amigo')}: ${pick.nome}!`, 'good');
@@ -5274,11 +5298,15 @@ function drawViagem() {
     g.fillStyle = telhado; g.beginPath(); g.moveTo(x - 30, estrada - 42); g.lineTo(x, estrada - 64); g.lineTo(x + 30, estrada - 42); g.fill();
     g.fillStyle = '#6b3f1f'; g.fillRect(x - 6, estrada - 30, 12, 16);
     g.fillStyle = '#fff'; g.fillRect(x - 19, estrada - 38, 9, 8); g.fillRect(x + 10, estrada - 38, 9, 8);
-    g.font = '800 12px system-ui, sans-serif'; g.textAlign = 'center';
-    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.45)'; g.strokeText(nome, x, estrada - 70); g.fillStyle = '#fff'; g.fillText(nome, x, estrada - 70);
+    // nome da fazenda sempre inteiro dentro do quadro (diminui a letra se for comprido)
+    let fs = 13; g.font = `800 ${fs}px system-ui, sans-serif`;
+    while (g.measureText(nome).width > cw * 0.46 && fs > 9) g.font = `800 ${--fs}px system-ui, sans-serif`;
+    const tw = g.measureText(nome).width, tx = clamp(x, tw / 2 + 6, cw - tw / 2 - 6);
+    g.textAlign = 'center';
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.45)'; g.strokeText(nome, tx, estrada - 70); g.fillStyle = '#fff'; g.fillText(nome, tx, estrada - 70);
   };
   const xa = Math.max(46, cw * 0.1), xb = cw - xa;
-  casa(xa, '#c8402f', '#7a2a1e', 'Sua roça');
+  casa(xa, '#c8402f', '#7a2a1e', minhaFazenda());
   casa(xb, '#e3bf62', '#3f6fa8', viagem.nome);
   // progresso: vai de uma casa até a outra (na volta, o caminho inverso)
   const ms = viagem.fim - viagem.ini, k = clamp((t - viagem.ini) / ms, 0, viagem.espera ? 0.94 : 1);
