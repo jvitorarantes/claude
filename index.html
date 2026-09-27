@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="46">
-<script src="firebase-config.js?v=46"></script>
+<meta name="rf-version" content="47">
+<script src="firebase-config.js?v=47"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -54,6 +54,9 @@
     --bg3: #223458;
   }
   * { box-sizing: border-box; }
+  /* sem o "flash" cinza/azul do Android a cada toque */
+  * { -webkit-tap-highlight-color: transparent; }
+  canvas { -webkit-user-select: none; user-select: none; outline: none; }
   [hidden] { display: none !important; }
   html, body { margin: 0; min-height: 100%; }
   body {
@@ -733,8 +736,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=46"></script>
-<script src="js/cloud.js?v=46"></script>
-<script src="js/game.js?v=46"></script>
+<script src="js/audio.js?v=47"></script>
+<script src="js/cloud.js?v=47"></script>
+<script src="js/game.js?v=47"></script>
 </body>
 </html>

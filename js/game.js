@@ -1089,7 +1089,8 @@ async function visitFriend(uid) {
     afterVisit();
   } catch (e) {
     console.warn(e);
-    toast('Não consegui abrir a roça do amigo agora.', 'bad');
+    if (e && e.code === 'permission-denied') reatarAmizade(uid);
+    else toast('Não consegui abrir a roça do amigo agora.', 'bad');
   } finally { fecharCarregando(); }
 }
 
@@ -1472,10 +1473,11 @@ function onRequests(list) {
   requests = list
     .map(r => r.data)
     .filter(r => r && typeof r.from === 'string' && r.from !== user.uid && !state.friends.includes(r.from))
-    .map(r => ({ from: r.from, name: String(r.fromName || 'Alguém').slice(0, 60), photo: typeof r.fromPhoto === 'string' ? r.fromPhoto : '', at: r.at || 0 }));
-  // Se a pessoa já é amiga (ex.: pediu de novo), o pedido é só apagado.
-  for (const r of list) if (r.data && state.friends.includes(r.data.from)) Cloud.deleteRequest(user.uid, r.data.from).catch(() => {});
-  for (const r of requests) if (!seen.has(r.from)) toast(`${firstName(r.name)} quer ser seu amigo! Veja na aba Amigos.`, 'good');
+    .map(r => ({ from: r.from, name: String(r.fromName || 'Alguém').slice(0, 60), photo: typeof r.fromPhoto === 'string' ? r.fromPhoto : '', at: r.at || 0, reatar: !!r.reatar }));
+  // Se a pessoa já é amiga (ex.: pediu de novo ou pediu para reatar), o pedido é só apagado
+  // e a amizade é confirmada na lista oficial (isso conserta o lado de cá).
+  for (const r of list) if (r.data && state.friends.includes(r.data.from)) { oficializar(r.data.from); Cloud.deleteRequest(user.uid, r.data.from).catch(() => {}); }
+  for (const r of requests) if (!seen.has(r.from)) toast(r.reatar ? `${firstName(r.name)} quer reatar a amizade! Veja na aba Amigos.` : `${firstName(r.name)} quer ser seu amigo! Veja na aba Amigos.`, 'good');
   renderTabs();
   if (tab === 'amigos') renderPane();
 }
@@ -1701,7 +1703,10 @@ function resize() {
   const r = stage.getBoundingClientRect();
   const cw = Math.max(0, r.width), ch = Math.max(0, r.height);
   L.dpr = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = Math.round(cw * L.dpr); cv.height = Math.round(ch * L.dpr);
+  // só mexe no tamanho do canvas se mudou de verdade (mudar apaga o desenho e dava um "piscar")
+  const w = Math.round(cw * L.dpr), h = Math.round(ch * L.dpr);
+  if (cv.width !== w) cv.width = w;
+  if (cv.height !== h) cv.height = h;
   L.cw = cw; L.ch = ch;
 }
 const ZOOM_MIN = 0.6, ZOOM_MAX = 2.5;
@@ -3862,7 +3867,7 @@ function renderPane() {
         html += `<h3>Pedidos de amizade</h3>`;
         for (const r of requests) {
           html += `<div class="row sel">${avatar(r.photo, r.name, '#d9a441')}
-            <div><div class="name">${esc(r.name)}</div><div class="meta">quer ser seu amigo</div></div>
+            <div><div class="name">${esc(r.name)}</div><div class="meta">${r.reatar ? 'quer reatar a amizade (ela sumiu por um erro antigo do jogo)' : 'quer ser seu amigo'}</div></div>
             <div class="stack"><button class="btn" data-accept="${esc(r.from)}">Aceitar</button><button class="btn ghost" data-refuse="${esc(r.from)}">Recusar</button></div></div>`;
         }
       }
@@ -3877,8 +3882,8 @@ function renderPane() {
         const name = f ? f.name : 'Amigo';
         const armed = unfriendArmed === uid;
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
-          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f && f.erro ? 'Não deu para ver a roça agora' : f ? `Roça nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
-          <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f && !f.erro ? '' : 'disabled'}>Visitar</button>`}
+          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `Roça nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
+          <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : (f && f.erro ? `<button class="btn" data-reatar="${esc(uid)}">Reatar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`)}
           ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && !f.erro && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
           ${armed ? `<span class="meta">Excluir ${esc(firstName(name))}?</span><button class="btn ghost" data-unfriend-cancel>Cancelar</button><button class="btn danger" data-unfriend="${esc(uid)}">Confirmar</button>`
             : `<button class="btn ghost" data-unfriend="${esc(uid)}">Excluir</button>`}</div></div>`;
@@ -3973,6 +3978,7 @@ $('#pane').addEventListener('click', e => {
   else if (d.useFert) { state.fertSel = d.useFert; if (!isHome()) goHome(); setScene('roca'); setTool('fert'); closePanel(); save(); }
   else if (d.visit) { visitNpc(d.visit); closePanel(); }
   else if (d.visitFriend) { visitFriend(d.visitFriend); closePanel(); }
+  else if (d.reatar) reatarAmizade(d.reatar);
   else if (d.accept) acceptRequest(d.accept);
   else if (d.refuse) refuseRequest(d.refuse);
   else if (d.cancelRequest) cancelRequest(d.cancelRequest);
@@ -4725,6 +4731,20 @@ function escolherPresente(uid) {
   $('#presente').hidden = false;
   $('#presOpcoes button').focus();
 }
+// Quando o jogo do amigo perdeu você da lista (erro antigo), o Firebase recusa presentes e visitas.
+// Aí o jogo manda sozinho um pedido de "reatar": o amigo aceita com um toque e tudo volta.
+async function reatarAmizade(uid, silencioso) {
+  if (!user) return;
+  const hoje = localDay(); state.reatar = state.reatar || {};
+  if (state.reatar[uid] === hoje) { if (!silencioso) toast('O pedido para reatar a amizade já foi enviado hoje. Peça para seu amigo abrir o jogo e aceitar em Amigos.'); return; }
+  try {
+    await Cloud.sendRequest(uid, { from: user.uid, fromName: user.name || 'Alguém', fromPhoto: user.photo || '', at: Date.now(), reatar: true });
+    avisarAmigo(uid, 'pedido', `${firstName(user.name) || 'Um amigo'} quer reatar a amizade na Roça Feliz!`);
+    state.reatar[uid] = hoje; done();
+    const f = friendInfo[uid], nome = firstName(f && f.name && !f.erro ? f.name : 'seu amigo');
+    if (!silencioso) toast(`A amizade tinha sumido do jogo de ${nome} (erro antigo). Mandei um pedido para reatar: quando aceitar em Amigos, presentes e visitas voltam.`, 'good');
+  } catch (e) { console.warn(e); if (!silencioso) toast('Não consegui mandar o pedido para reatar agora. Tente de novo.', 'bad'); }
+}
 async function sendFriendGift(uid, escolha) {
   if (!user) return;
   const g = giftsToday(), pick = PRESENTE_AMIGO.find(p => p.id === escolha) || PRESENTE_AMIGO[0];
@@ -4741,9 +4761,8 @@ async function sendFriendGift(uid, escolha) {
   } catch (e) {
     console.warn(e);
     g.to = g.to.filter(x => x !== uid); renderPane();
-    toast(e && e.code === 'permission-denied'
-      ? 'O Firebase recusou o presente: publique as regras novas do arquivo firestore.rules (Firestore › Regras › Publicar).'
-      : 'Não consegui mandar o presente agora. Tente de novo.', 'bad');
+    if (e && e.code === 'permission-denied') reatarAmizade(uid);
+    else toast('Não consegui mandar o presente agora. Tente de novo.', 'bad');
   }
 }
 
