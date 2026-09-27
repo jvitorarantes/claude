@@ -917,6 +917,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 79, txt: 'Novo ponto de pesca: 🔄 Pesque e Solte! Fica sempre aberto e não gasta isca: pesque quanto quiser. Mas é pesque e solte: cada peixe volta para o rio e dá só 10 moedas e 1 XP. Ele NÃO vai para o celeiro, o livro de peixes, as conquistas, as missões nem o domínio de pesca.' },
   { v: 78, txt: 'Peixes de Goiás 🐟: chegaram 15 espécies novas, como cará, piau, mandi, curimbatá, cascudo, piranha, corvina, matrinxã, peixe-cachorra, aruanã, barbado, tambaqui, pirarara, jaú e piraíba. Alguns só aparecem nos rios grandes: veja no 📖 Livro de peixes onde cada um morde.' },
   { v: 77, txt: 'Mais pescaria: agora cada ponto de pesca dá 3 pescarias de vara antes de descansar (a tarrafa continua igual).' },
   { v: 75, txt: 'Domínio de pesca 🎖️: cada peixe pego dá pontos (os raros valem mais). A cada nível de domínio, a espera da vara e da tarrafa cai 5%, até 45% no nível 10. Os peixes que você já pegou contam!' },
@@ -6102,6 +6103,8 @@ function dominioHTML() {
 }
 const PONTOS = [
   { id: 'casa',    nome: 'Pesqueiro de casa', emoji: '🏡', nivel: 1,  custo: 0,     sorte: 1,    agua: ['#6cb6e8', '#2f7ab8'], margem: '#7dbb48' },
+  // Pesque e solte: sempre aberto, sem gastar isca. O peixe volta para a água: só dá moedas e XP.
+  { id: 'solte',    nome: 'Pesque e Solte',       emoji: '🔄', nivel: 1,  custo: 0,     sorte: 1,    cena: 'solte', solte: true, agua: ['#7cc4e4', '#3584b8'], margem: '#8cc458' },
   // (os ids ficam os mesmos de antes para quem já tinha comprado; o "cena" diz o que desenhar)
   { id: 'riacho',   nome: 'Córrego Cascavel',     emoji: '🪨', nivel: 5,  custo: 1500,  sorte: 1.2,  cena: 'pedras',  agua: ['#8ad4e0', '#3a8ea6'], margem: '#86c050' },
   { id: 'represa',  nome: 'Rio Meia Ponte',       emoji: '🌉', nivel: 10, custo: 5000,  sorte: 1.45, cena: 'ponte',   agua: ['#7fb0c8', '#3a6f8a'], margem: '#6fae44' },
@@ -6117,12 +6120,13 @@ function pontosDe() {
   p.prox = p.prox || {}; p.usos = p.usos || {};
   return p;
 }
-const temPonto = id => pontosDe().meus.includes(id);
+const temPonto = id => !!PONTO[id] && (PONTO[id].custo === 0 || pontosDe().meus.includes(id));
+const SOLTE_MOEDAS = 10, SOLTE_XP = 1;
 const pontoSel = () => { const id = state.pontoSel; return PONTO[id] && temPonto(id) ? id : 'casa'; };
 const faltaPonto = id => Math.max(0, (pontosDe().prox[id] || 0) - Date.now());
 // Cada ponto dá VARA_POR_VEZ pescarias de vara; depois descansa (2 horas, menos com o domínio).
 const VARA_POR_VEZ = 3;
-const restamVara = id => faltaPonto(id) ? 0 : Math.max(0, VARA_POR_VEZ - (pontosDe().usos[id] || 0));
+const restamVara = id => PONTO[id] && PONTO[id].solte ? Infinity : faltaPonto(id) ? 0 : Math.max(0, VARA_POR_VEZ - (pontosDe().usos[id] || 0));
 const faltaTarrafa = () => Math.max(0, (state.tarrafaEm || 0) - Date.now());
 function comprarPonto(id) {
   const d = PONTO[id]; if (!d || temPonto(id)) return;
@@ -6162,6 +6166,7 @@ function guardarPeixe(p) {
 // Tarrafa: joga a rede e pega 3 peixes de uma vez (sem isca), uma vez a cada 12 horas.
 function jogarTarrafa() {
   if (!pesca || pesca.fase === 'esperando' || pesca.fase === 'fisgou' || pesca.fase === 'tarrafa') return;
+  if (PONTO[pontoSel()].solte) return toast('No Pesque e Solte não vale tarrafa: aqui é só vara, e o peixe volta para o rio.');
   if (faltaTarrafa()) return toast(`A tarrafa está secando: dá para jogar de novo em ${fmt(faltaTarrafa() / 1000)}.`);
   const sorte = PONTO[pontoSel()].sorte;
   const peixes = Array.from({ length: TARRAFA_N }, () => sortearPeixe(null, sorte, true, pontoSel()));
@@ -6184,6 +6189,11 @@ function lancar() {
   const pt = PONTO[pontoSel()];
   if (faltaPonto(pt.id)) { sfx('error'); return toast(`${pt.nome} está descansando: os peixes voltam em ${fmt(faltaPonto(pt.id) / 1000)}. Tente outro ponto ou a tarrafa!`); }
   const isca = iscaSel(), def = ISCA[isca];
+  if (pt.solte) { // no pesque e solte a isca é por conta da casa
+    const agora = performance.now();
+    pesca = { fase: 'esperando', t0: agora, isca, ponto: pt.id, mordida: agora + 1800 + Math.random() * 3800, beliscos: [agora + 700 + Math.random() * 900] };
+    sfx('water'); return renderPesca();
+  }
   if (qtdIsca(isca) <= 0) return toast(def.doCeleiro ? 'Sem milho no celeiro! Colha milho para usar de isca.' : `Acabou a isca de ${def.nome.toLowerCase()}! Compre mais aqui embaixo${isca === 'minhoca' ? ' (ou ganhe 5 grátis amanhã)' : ''}.`, 'bad');
   if (def.doCeleiro) { state.barn[def.doCeleiro]--; if (!state.barn[def.doCeleiro]) delete state.barn[def.doCeleiro]; } else iscasDe()[isca]--;
   save();
@@ -6196,6 +6206,7 @@ function puxar() {
   if (pesca.fase === 'pronto' || pesca.fase === 'resultado') return lancar();
   if (pesca.fase === 'esperando') { pesca = { fase: 'resultado', t0: performance.now(), msg: 'Puxou cedo demais! O peixe fugiu.' }; sfx('error'); return renderPesca(); }
   if (pesca.fase === 'fisgou') {
+    if (PONTO[pesca.ponto] && PONTO[pesca.ponto].solte) return soltarPeixe(pesca.peixe);
     const p = pesca.peixe, novo = guardarPeixe(p);
     const pp = pontosDe(), pid = pesca.ponto || 'casa';
     pp.usos[pid] = (pp.usos[pid] || 0) + 1;
@@ -6207,6 +6218,15 @@ function puxar() {
     if (novo) toast(`✨ Peixe novo no livro: ${p.nome}!`, 'good');
     done(); renderPesca();
   }
+}
+// Pesque e solte: o peixe volta para o rio. Dá só moedas e XP; não vai para o celeiro, o livro,
+// as conquistas, as missões nem o domínio de pesca.
+function soltarPeixe(p) {
+  addCoins(SOLTE_MOEDAS, null); addXP(SOLTE_XP, null);
+  const um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''}`;
+  pesca = { fase: 'resultado', t0: performance.now(), peixe: p, solto: true, ponto: 'solte',
+    msg: `🔄 Pegou ${um} ${p.nome} e soltou de volta no rio! +${SOLTE_MOEDAS} moedas e +${SOLTE_XP} XP. (Pesque e solte: o peixe não vai para o celeiro, o livro nem as conquistas.)` };
+  sfx('coin'); done(); renderPesca();
 }
 // Fileira de pontos: dá para arrastar com o mouse (no celular, é só deslizar) e a roda do mouse anda para os lados.
 let pontosArrastou = false;
@@ -6225,16 +6245,18 @@ function renderPesca() {
   const btn = $('#pescaBtn'), msg = $('#pescaMsg');
   const pt = PONTO[pontoSel()], descansa = faltaPonto(pt.id), livre = pesca.fase === 'pronto' || pesca.fase === 'resultado';
   btn.textContent = pesca.fase === 'esperando' ? 'Esperando…' : pesca.fase === 'fisgou' ? 'PUXA! 🎣' : pesca.fase === 'tarrafa' ? 'Puxando a rede…'
-    : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : `${pesca.fase === 'resultado' ? 'Lançar de novo' : 'Lançar a linha'} (${restamVara(pt.id)}/${VARA_POR_VEZ})`;
+    : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : `${pesca.fase === 'resultado' ? 'Lançar de novo' : 'Lançar a linha'}${pt.solte ? '' : ` (${restamVara(pt.id)}/${VARA_POR_VEZ})`}`;
   btn.disabled = livre && !!descansa;
   const tb = $('#pescaTarrafa'), ft = faltaTarrafa();
   setHtml(tb, ft ? `🕸️ Tarrafa<br><small>em ${fmt(ft / 1000)}</small>` : `🕸️ Tarrafa<br><small>pega ${TARRAFA_N} peixes</small>`);
-  tb.disabled = !!ft || !livre;
+  tb.disabled = !!ft || !livre || !!pt.solte;
+  tb.hidden = !!pt.solte;
+  $('#pescaIscas').closest('.pescabar').hidden = !!pt.solte; // no pesque e solte a isca é da casa
   setHtml($('#pescaDominio'), dominioHTML());
   const pp = pontosDe();
   setHtml($('#pescaPontos'), PONTOS.map(d => {
-    const meu = pp.meus.includes(d.id), trava = d.nivel > state.level, f = meu ? faltaPonto(d.id) : 0;
-    const st = meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎣 ${restamVara(d.id)}/${VARA_POR_VEZ}`) : trava ? `🔒 Nv ${d.nivel} · ${moeda(d.custo)}` : moeda(d.custo);
+    const meu = temPonto(d.id), trava = d.nivel > state.level, f = meu ? faltaPonto(d.id) : 0;
+    const st = d.solte ? `Sempre aberto · ${moeda(SOLTE_MOEDAS)}` : meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎣 ${restamVara(d.id)}/${VARA_POR_VEZ}`) : trava ? `🔒 Nv ${d.nivel} · ${moeda(d.custo)}` : moeda(d.custo);
     return `<button type="button" class="pontobtn ${meu ? '' : trava ? 'trava' : 'loja'} ${f ? 'descansa' : ''}" data-ponto="${d.id}" aria-pressed="${meu && d.id === pt.id}">
       <b>${d.emoji} ${d.nome}</b><small>${st}</small></button>`;
   }).join(''));
@@ -6242,6 +6264,7 @@ function renderPesca() {
   btn.classList.toggle('pulsa', pesca.fase === 'fisgou');
   msg.textContent = pesca.fase === 'tarrafa' ? 'Lá vai a tarrafa… 🕸️'
     : pesca.fase === 'pronto' && descansa ? `${pt.nome} está descansando. Escolha outro ponto ou jogue a tarrafa!`
+    : pesca.fase === 'pronto' && pt.solte ? `🔄 Pesque e Solte: pesque quanto quiser, sem gastar isca! Cada peixe é solto de volta no rio e dá só ${SOLTE_MOEDAS} moedas e ${SOLTE_XP} XP — não vai para o celeiro, o livro, as conquistas nem as missões.`
     : pesca.fase === 'pronto' ? `${pt.emoji} ${pt.nome}: ${VARA_POR_VEZ} pescarias por vez. Toque em "Lançar a linha" e espere a boia afundar. Aí, puxe rápido!`
     : pesca.fase === 'esperando' ? 'Shhh… espere a boia afundar de verdade.' : pesca.fase === 'fisgou' ? 'Afundou! Puxa agora!' : pesca.msg || '';
   // escolha da isca
@@ -6251,9 +6274,9 @@ function renderPesca() {
     return `<button type="button" class="iscabtn" data-isca="${i.id}" aria-pressed="${sel === i.id}" ${trava ? 'disabled' : ''} title="${i.nome}">${i.emoji}<small>${trava ? `Nv ${i.nivel}` : qtdIsca(i.id)}</small></button>`;
   }).join(''));
   const d = ISCA[sel], cb = $('#pescaComprar');
-  cb.hidden = !!d.doCeleiro;
+  cb.hidden = !!d.doCeleiro || !!pt.solte;
   if (!d.doCeleiro) { setHtml(cb, `Comprar ${d.pacote} ${d.plural} · ${moeda(d.custo)}`); cb.disabled = state.coins < d.custo; }
-  $('#pescaDica').textContent = `${d.emoji} ${d.nome}${d.doCeleiro ? ' (do celeiro)' : ''}: atrai ${PEIXES.filter(p => !p.lixo && p.iscas.includes(sel) && peixeNoPonto(p, pt.id)).map(p => p.nivel > state.level ? '???' : p.nome + (state.col[p.id] ? '' : ' ✨')).join(', ')}.${PEIXES.some(p => !p.lixo && p.iscas.includes(sel) && peixeNoPonto(p, pt.id) && p.nivel <= state.level && !state.col[p.id]) ? ' (✨ = nunca pegou)' : ''}`;
+  $('#pescaDica').textContent = pt.solte ? `🔄 Aqui a isca é grátis e dá para pescar sem parar. Os peixes são soltos: não contam para o livro nem para as conquistas.` : `${d.emoji} ${d.nome}${d.doCeleiro ? ' (do celeiro)' : ''}: atrai ${PEIXES.filter(p => !p.lixo && p.iscas.includes(sel) && peixeNoPonto(p, pt.id)).map(p => p.nivel > state.level ? '???' : p.nome + (state.col[p.id] ? '' : ' ✨')).join(', ')}.${PEIXES.some(p => !p.lixo && p.iscas.includes(sel) && peixeNoPonto(p, pt.id) && p.nivel <= state.level && !state.col[p.id]) ? ' (✨ = nunca pegou)' : ''}`;
   $('#pescaLivro').hidden = !pescaLivro; $('#pescaCv').hidden = pescaLivro;
   const nn = (state.peixesNovos || []).length;
   $('#pescaLivroBtn').textContent = pescaLivro ? '🎣 Voltar a pescar' : `📖 Livro de peixes${nn ? ` · ✨ ${nn} novo${nn > 1 ? 's' : ''}` : ''}`;
@@ -6279,7 +6302,7 @@ function desenharPesca(t) {
   if (c.width !== Math.round(cw * dpr)) { c.width = Math.round(cw * dpr); c.height = Math.round(ch * dpr); }
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   // fases que mudam com o tempo
-  if (pesca.fase === 'esperando' && t >= pesca.mordida) { pesca = { fase: 'fisgou', t0: t, ponto: pesca.ponto, peixe: sortearPeixe(pesca.isca, PONTO[pesca.ponto || 'casa'].sorte, false, pesca.ponto || 'casa') }; pesca.janela = { comum: 950, lixo: 1000, incomum: 850, raro: 720, 'épico': 620, 'lendário': 520 }[pesca.peixe.raro]; sfx('water'); renderPesca(); }
+  if (pesca.fase === 'esperando' && t >= pesca.mordida) { pesca = { fase: 'fisgou', t0: t, ponto: pesca.ponto, peixe: sortearPeixe(pesca.isca, PONTO[pesca.ponto || 'casa'].sorte, !!PONTO[pesca.ponto || 'casa'].solte, pesca.ponto || 'casa') }; pesca.janela = { comum: 950, lixo: 1000, incomum: 850, raro: 720, 'épico': 620, 'lendário': 520 }[pesca.peixe.raro]; sfx('water'); renderPesca(); }
   if (pesca.fase === 'fisgou' && t - pesca.t0 > pesca.janela) { pesca = { fase: 'resultado', t0: t, msg: 'Ah, escapou… tente de novo!' }; renderPesca(); }
   if (pesca.fase === 'tarrafa' && t - pesca.t0 > 2200) recolherTarrafa();
   if (!pescaRelogio || t - pescaRelogio > 1000) { pescaRelogio = t; renderPesca(); } // contagem regressiva dos pontos e da tarrafa
@@ -6356,9 +6379,14 @@ function desenharPesca(t) {
     g.fillStyle = 'rgba(255,253,242,.95)'; g.strokeStyle = '#6b4220'; g.lineWidth = 3;
     const w = Math.min(cw * 0.5, 220), h = 120 * esc * 0.8, x0 = cw * 0.55 - w / 2, y0 = ch * 0.08 + (1 - k) * 20;
     g.beginPath(); g.roundRect(x0, y0, w, h, 14); g.fill(); g.stroke();
-    drawPeixe(g, x0 + w / 2, y0 + h * 0.42, 3.2 * esc * 0.8, p);
+    // solto: o peixe "nada" de volta para a água, saindo do cartão
+    const sai = pesca.solto ? Math.min(1, Math.max(0, (t - pesca.t0 - 900) / 900)) : 0;
+    g.save(); g.globalAlpha = 1 - sai; drawPeixe(g, x0 + w / 2 + sai * 30, y0 + h * 0.42 + sai * 40, 3.2 * esc * 0.8 * cabePeixe(p), p); g.restore();
     g.textAlign = 'center'; g.font = `800 ${Math.round(15 * esc)}px system-ui, sans-serif`; g.fillStyle = '#2f2a1f'; g.fillText(p.nome, x0 + w / 2, y0 + h * 0.8);
-    g.font = `800 ${Math.round(11 * esc)}px system-ui, sans-serif`; g.fillStyle = COR_RARO[p.raro]; g.fillText(`${p.raro.toUpperCase()} · vale ${p.preco}`, x0 + w / 2, y0 + h * 0.94);
+    g.font = `800 ${Math.round(11 * esc)}px system-ui, sans-serif`; g.fillStyle = pesca.solto ? '#2f7ab8' : COR_RARO[p.raro];
+    const linha2 = pesca.solto ? `↩ SOLTO · +${SOLTE_MOEDAS} moedas · +${SOLTE_XP} XP` : `${p.raro.toUpperCase()} · vale ${p.preco}`;
+    const larg = g.measureText(linha2).width; if (larg > w - 12) g.font = `800 ${Math.floor(11 * esc * (w - 12) / larg)}px system-ui, sans-serif`;
+    g.fillText(linha2, x0 + w / 2, y0 + h * 0.94);
     if (pesca.novo) {
       // selo dourado "NOVO!" pulsando no canto do cartão, com brilhinhos
       const pul = 1 + Math.sin(t / 180) * 0.07, sx = x0 + w - 8, sy = y0 + 6;
@@ -6381,6 +6409,13 @@ let pescaRelogio = 0;
 // Detalhes de cada ponto: pedras no riacho, o paredão da represa, as árvores do rio, as vitórias-régias da lagoa.
 function desenharFundoPonto(g, PT, cw, ch, t) {
   const c = PT.cena;
+  if (c === 'solte') {
+    // plaquinha na outra margem
+    const x = cw * 0.72, y = ch * 0.36;
+    g.fillStyle = '#6b4f30'; g.fillRect(x - 2, y - 4, 4, 14); g.fillRect(x + 60, y - 4, 4, 14);
+    g.fillStyle = '#f3e3b8'; g.strokeStyle = '#6b4f30'; g.lineWidth = 2; g.beginPath(); g.roundRect(x - 12, y - 26, 88, 24, 5); g.fill(); g.stroke();
+    g.fillStyle = '#2f5a8a'; g.font = '800 10px system-ui, sans-serif'; g.textAlign = 'center'; g.fillText('PESQUE E SOLTE', x + 32, y - 10);
+  }
   if (c === 'represa') {
     g.fillStyle = '#b9b3a3'; g.fillRect(cw * 0.45, ch * 0.28, cw * 0.55, ch * 0.13);
     g.fillStyle = '#9a9384'; for (let x = cw * 0.47; x < cw; x += cw * 0.08) g.fillRect(x, ch * 0.28, 3, ch * 0.13);
