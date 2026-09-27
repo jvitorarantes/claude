@@ -599,7 +599,7 @@ function actPlot(i) {
   if (p.s === 'growing' && p.poda && tool === 'hand') return prune(p, pos);
   if (p.s === 'withered' && has('hoe')) { Object.assign(p, emptyPlot('plowed')); sfx('hoe'); useFx('hoe', pos); addXP(1, pos); return done(); }
   if (p.s === 'growing' && tool === 'hoe') {
-    // A enxada arranca qualquer plantação (ou árvore). Pede um segundo clique.
+    // O rastelo (ferramenta 'hoe'; no save continua tools.enxada) arranca qualquer plantação. Pede um segundo clique.
     if (buyPending && buyPending.i === 'hoe' + i && performance.now() < buyPending.until) {
       buyPending = null; Object.assign(p, emptyPlot('plowed')); sfx('hoe'); useFx('hoe', pos);
       return done();
@@ -611,7 +611,7 @@ function actPlot(i) {
   // Terra vazia sem semente na mão: abre a Loja para escolher o que plantar (nada é plantado sozinho).
   if (p.s === 'plowed' && tool === 'hand') { openPanel('loja', CROP[state.seed] && CROP[state.seed].arvore ? 'mudas' : 'sementes'); return toast('Escolha uma semente na Loja e clique na terra para plantar.'); }
   const hints = {
-    hoe: 'A enxada limpa plantas secas e arranca plantações.', water: 'Essa terra não precisa de água.',
+    hoe: 'O rastelo limpa plantas secas e arranca plantações.', water: 'Essa terra não precisa de água.',
     pest: 'Não há pragas aqui.', weed: 'Não há mato aqui.', seed: 'Só dá para plantar em terra arada.',
   };
   if (hints[tool]) toast(hints[tool]);
@@ -3811,14 +3811,14 @@ const fertIcon = id => makeIcon('f:' + id, () => {
 // ============================================================
 const TOOL_ICONS = {
   hand: '<svg viewBox="0 0 24 24" fill="#ffd9b0" stroke="#6b4220" stroke-width="1.6" stroke-linejoin="round"><path d="M8 13V6a1.5 1.5 0 0 1 3 0v5V4.5a1.5 1.5 0 0 1 3 0V11V5.5a1.5 1.5 0 0 1 3 0V12V8.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-5-2.7L4.3 14a1.6 1.6 0 0 1 2.6-1.8L8 13.5z"/></svg>',
-  hoe: '<svg viewBox="0 0 24 24"><path d="M4 21 17 6" stroke="#8a5a2b" stroke-width="2.4" stroke-linecap="round"/><path d="M14.5 3.5 21 8l-2.5 1.5-5-4z" fill="#8f9aa3" stroke="#4d565c" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+  hoe: '<svg viewBox="0 0 24 24"><path d="M3.5 21.5 16 8" stroke="#8a5a2b" stroke-width="2.4" stroke-linecap="round"/><path d="M12.3 4.3 19.7 11.7" stroke="#5d6770" stroke-width="2.4" stroke-linecap="round"/><path d="M13.2 5.2l2.4-2.4M15.2 7.2l2.4-2.4M17.2 9.2l2.4-2.4M19.2 11.2l2.4-2.4" stroke="#5d6770" stroke-width="1.5" stroke-linecap="round"/></svg>',
   water: '<svg viewBox="0 0 24 24" stroke="#1d5f8f" stroke-width="1.4" stroke-linejoin="round"><path d="M6 10h9v9a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z" fill="#5cb4ee"/><path d="M15 12l5-5 1.5 1.5-5.5 6" fill="#5cb4ee"/><path d="M8 10a2.5 2.5 0 0 1 5 0" fill="none"/><path d="M21 11.5v1.5M19 13v1.5" stroke="#3aa0e8" stroke-linecap="round"/></svg>',
   pest: '<svg viewBox="0 0 24 24" stroke="#3b2a18" stroke-width="1.4" stroke-linejoin="round"><rect x="7" y="8" width="9" height="13" rx="2" fill="#e05a3a"/><path d="M9 8V5h5v3" fill="#bbb"/><path d="M14 5h3l2-1" fill="none"/><path d="M19 7l2-1M19 9l2 0" stroke="#7aa" stroke-linecap="round"/><circle cx="11.5" cy="14.5" r="2.2" fill="#fff"/></svg>',
   weed: '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 21v-7M12 14c-3 0-5-2-5-5 3 0 5 2 5 5zM12 14c3 0 5-2 5-5-3 0-5 2-5 5z" stroke="#2f6e1e" stroke-width="1.8" fill="#6cc24a"/><path d="M12 7V2M9.5 4.5 12 2l2.5 2.5" stroke="#6b4220" stroke-width="1.8"/></svg>',
 };
 const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 const TOOLS = [
-  { id: 'hand', nome: 'Mão' }, { id: 'hoe', nome: 'Enxada' }, { id: 'water', nome: 'Regar' },
+  { id: 'hand', nome: 'Mão' }, { id: 'hoe', nome: 'Rastelo' }, { id: 'water', nome: 'Regar' },
   { id: 'pest', nome: 'Inseticida' }, { id: 'seed', nome: 'Semente' },
   { id: 'fert', nome: 'Adubo' },
 ];
@@ -4126,7 +4126,7 @@ function renderPane() {
       if (upcoming.length > 2) html += `<p class="hint">Mais ${upcoming.length - 2} ${trees ? 'árvores' : 'plantações'} liberam nos próximos níveis, até o nível ${upcoming[upcoming.length - 1].nivel}.</p>`;
     } else if (shopSeg === 'adubo') {
       html += `<div class="row ${state.tools.enxada ? 'sel' : ''}"><div class="avatar" style="background:#8a5a33">${TOOL_ICONS.hoe}</div>
-        <div><div class="name">Enxada</div><div class="meta">100 moedas · arranca qualquer plantação ou árvore</div></div>
+        <div><div class="name">Rastelo</div><div class="meta">100 moedas · limpa a terra e arranca qualquer plantação ou árvore do canteiro</div></div>
         ${state.tools.enxada ? '<button class="btn ghost" disabled>Sua</button>' : `<button class="btn" data-buy-hoe ${state.coins < 100 ? 'disabled' : ''}>${moeda(100)}</button>`}</div>`;
       html += `<div class="row"><img alt="" src="${bowlIcon()}">
         <div><div class="name">Ração especial</div><div class="meta">${RACAO_ESP} moedas · a próxima produção do animal rende em dobro. É usada quando você alimenta um animal clicando nele. Você tem <b>${state.racaoEsp}</b></div></div>
@@ -4445,8 +4445,8 @@ $('#pane').addEventListener('click', e => {
     else { state.coins -= RACAO_ESP * n; state.racaoEsp += n; sfx('buy'); toast(`+${n} ração especial`, 'good'); done(); }
   }
   else if ('buyHoe' in d) {
-    if (state.coins < 100) toast('A enxada custa 100 moedas.', 'bad');
-    else { state.coins -= 100; state.tools.enxada = true; sfx('buy'); toast('Enxada comprada! Agora ela aparece nas ferramentas.', 'good'); renderTools(); done(); }
+    if (state.coins < 100) toast('O rastelo custa 100 moedas.', 'bad');
+    else { state.coins -= 100; state.tools.enxada = true; sfx('buy'); toast('Rastelo comprado! Agora ele aparece nas ferramentas.', 'good'); renderTools(); done(); }
   }
   else if (d.buyDog) buyDog(d.buyDog, d.slot);
   else if (d.dogFood) buyDogFood(Number(d.dogFood) || 1);
@@ -4534,7 +4534,7 @@ function tipPlot(i) {
     return home ? 'Pasto.' : null;
   }
   if (p.s === 'plowed') return home ? `<b>Terra arada</b><br>${state.tool === 'seed' ? `Clique para plantar ${CROP[state.seed].nome}.` : 'Clique para escolher uma semente na Loja.'}` : '<b>Terra arada</b>';
-  if (p.s === 'withered') return '<b>Planta seca</b><br>Use a Mão ou a enxada para limpar.';
+  if (p.s === 'withered') return '<b>Planta seca</b><br>Use a Mão ou o rastelo para limpar.';
   const crop = CROP[p.c], st = stageOf(p), T = phaseTempo(p), k = Math.min(1, p.g / T);
   if (p.podre) return `<b>${crop.nome} podre</b><br>Ficou mais de 24h sem colher.<br>${home ? `Clique para usar uma poção (você tem ${state.pocao || 0}) ou peça ajuda a um amigo.` : 'Clique para salvar a planta do seu amigo!'}`;
   if (p.poda) return `<b>${crop.nome}</b><br>Precisa de poda para voltar a produzir.<br>${home ? `Clique com a Mão para podar (${crop.poda} moedas).` : ''}`;
