@@ -295,7 +295,7 @@ function newState() {
   const novVisto = typeof NOVIDADES !== 'undefined' ? NOVIDADES.reduce((m, n) => Math.max(m, n.v), 0) - 1 : 0;
   START_LOTS.forEach(i => plots[i].s = 'plowed');
   return {
-    v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0, novVisto,
+    v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0, novVisto, boasVindas: true,
     tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
     animals: [], decor: {}, abrigos: { galinheiro: 1 }, racaoEsp: 0,
     enfeites: {}, objetos: { roca: [], animais: [] }, pos: {}, invNovos: 0, skins: {}, skin: null,
@@ -917,6 +917,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 81, txt: 'Pescaria nova 🎣: depois de fisgar, agora tem briga! Segure o botão (ou a tela) para subir a faixa verde e solte para ela descer, mantendo o peixe dentro dela até encher a barra. Peixe raro é mais bravo e a faixa fica menor; o domínio de pesca deixa a faixa maior.' },
   { v: 79, txt: 'Novo ponto de pesca: 🔄 Pesque e Solte (libera no nível 5, de graça)! Fica sempre aberto e não gasta isca: pesque quanto quiser. Mas é pesque e solte: cada peixe volta para o rio e dá só 10 moedas e 1 XP. Ele NÃO vai para o celeiro, o livro de peixes, as conquistas, as missões nem o domínio de pesca.' },
   { v: 78, txt: 'Peixes de Goiás 🐟: chegaram 15 espécies novas, como cará, piau, mandi, curimbatá, cascudo, piranha, corvina, matrinxã, peixe-cachorra, aruanã, barbado, tambaqui, pirarara, jaú e piraíba. Alguns só aparecem nos rios grandes: veja no 📖 Livro de peixes onde cada um morde.' },
@@ -1573,7 +1574,8 @@ function enterGame() {
   root.classList.remove('gated');
   resize(); setScene(scene);
   presentePioneiro(); checarNovidades();
-  setTimeout(() => { if (giftReady() && !isGated()) showGift(); }, 1500);
+  if (state.boasVindas && isHome()) setTimeout(abrirBoasVindas, 400);
+  else setTimeout(() => { if (giftReady() && !isGated()) showGift(); }, 1500);
 }
 // Recado para o jogador: na tela de entrada, vai no status; no jogo, vira aviso.
 function notify(msg, kind) {
@@ -4822,6 +4824,7 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gift').
 $('#settings').addEventListener('click', e => {
   if (e.target === $('#settings') || e.target.closest('[data-close]')) return closeSettings();
   if (avatarClick(e)) return;
+  if (e.target.closest('#verTutorial')) return iniciarTutorial();
   if (e.target.closest('[data-push-on]')) return ativarNotificacoes();
   if (e.target.closest('#verCopias')) return verCopias();
   const rc = e.target.closest('[data-restaurar]'); if (rc) return restaurarCopia(Number(rc.dataset.restaurar));
@@ -5742,13 +5745,13 @@ function drawAvatares(sc, t) {
   ['eu', 'dono'].sort((x, y) => fundo(x) - fundo(y)).forEach(q => drawAvatarWalk(sc, t, q));
 }
 // Prévia nas Configurações.
-function renderAvatarCfg() {
-  const box = $('#avatarCfg'); if (!box || !state) return;
+function renderAvatarCfg(sel = '#avatarCfg') {
+  const box = $(sel); if (!box || !state) return;
   const av = state.avatar = avatarOk(state.avatar);
   const linha = (k, nome) => `<div class="avrow"><span>${nome}</span><div class="seg small" role="radiogroup" aria-label="${nome}">${opcoesAvatar(av, k).map(([id, n]) => avTravado(k, id)
     ? `<button type="button" role="radio" disabled aria-checked="false" title="Libera no nível ${AV_NIVEL[id]}">🔒 ${n} <small>Nv ${AV_NIVEL[id]}</small></button>`
     : `<button type="button" role="radio" data-av="${k}:${id}" aria-checked="${av[k] === id}" aria-selected="${av[k] === id}">${n}</button>`).join('')}</div></div>`;
-  box.innerHTML = `<canvas id="avPrev" width="120" height="150" aria-label="Prévia do avatar"></canvas><div class="avopts">
+  box.innerHTML = `<canvas class="avprev" width="120" height="150" aria-label="Prévia do avatar"></canvas><div class="avopts">
     ${linha('sexo', 'Sexo')}
     <div class="avrow"><span>Pele</span><div class="peles" role="radiogroup" aria-label="Cor de pele">${AV_PELE.map((c, k) => `<button type="button" role="radio" class="pele" style="background:${c}" data-av="pele:${k}" aria-checked="${av.pele === k}" aria-label="Tom ${k + 1}"></button>`).join('')}</div></div>
     ${linha('cabelo', 'Cabelo')}
@@ -5757,24 +5760,104 @@ function renderAvatarCfg() {
   if (!avLoop) { avLoop = true; requestAnimationFrame(avPreview); }
 }
 let avLoop = false;
+// Anima as prévias do avatar que estiverem na tela (Configurações e boas-vindas).
 function avPreview() {
-  const c = $('#avPrev'); if (!c || $('#settings').hidden) { avLoop = false; return; }
-  const g = c.getContext('2d'), t = performance.now();
-  g.clearRect(0, 0, c.width, c.height);
-  g.fillStyle = '#bfe08a'; g.beginPath(); g.ellipse(60, 138, 44, 10, 0, 0, 7); g.fill();
-  g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(60, 138, 18, 5, 0, 0, 7); g.fill();
-  drawAvatar(g, 60, 138, 1.85, state.avatar, t, true, Math.sin(t / 1500) > 0 ? 1 : -1);
+  const vis = [...document.querySelectorAll('canvas.avprev')].filter(c => c.offsetParent);
+  if (!vis.length) { avLoop = false; return; }
+  const t = performance.now();
+  for (const c of vis) {
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    g.fillStyle = '#bfe08a'; g.beginPath(); g.ellipse(60, 138, 44, 10, 0, 0, 7); g.fill();
+    g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(60, 138, 18, 5, 0, 0, 7); g.fill();
+    drawAvatar(g, 60, 138, 1.85, state.avatar, t, true, Math.sin(t / 1500) > 0 ? 1 : -1);
+  }
   requestAnimationFrame(avPreview);
 }
 function avatarClick(e) {
-  const b = e.target.closest('#avatarCfg [data-av]'); if (!b) return false;
+  const b = e.target.closest('.avcfg [data-av]'); if (!b) return false;
+  const caixa = '#' + b.closest('.avcfg').id;
   const [k, v] = b.dataset.av.split(':');
   if (avTravado(k, v)) return false;
   state.avatar = avatarOk(Object.assign({}, state.avatar, { [k]: k === 'pele' || k === 'corCabelo' ? Number(v) : v }));
-  const run = document.querySelector('#avPrev') && true;
-  renderAvatarCfg(); done(); sfx('click');
+  const run = true;
+  renderAvatarCfg(caixa); done(); sfx('click');
   return run;
 }
+
+// ---------- Boas-vindas do jogador novo e tutorial rápido ----------
+// Na primeira vez: dar nome à fazenda e ao avatar, montar o avatar e escolher se quer o tutorial.
+function abrirBoasVindas() {
+  const m = $('#boasvindas'); if (!m || !state) return;
+  $('#bvFazenda').value = state.fazenda || '';
+  $('#bvAvatarNome').value = state.apelido || '';
+  $('#bvAvatarNome').placeholder = user ? firstName(user.name) : 'Seu nome';
+  mostrarPassoBV(1); m.hidden = false;
+  renderAvatarCfg('#bvAvatar'); if (!avLoop) { avLoop = true; requestAnimationFrame(avPreview); }
+  setTimeout(() => $('#bvFazenda').focus(), 50);
+}
+function mostrarPassoBV(n) {
+  $('#bvPasso1').hidden = n !== 1; $('#bvPasso2').hidden = n !== 2;
+  $('#bvTitulo').textContent = n === 1 ? 'Bem-vindo à Roça Feliz! 🌻' : 'Quer um tutorial rápido?';
+  if (n === 1) { renderAvatarCfg('#bvAvatar'); if (!avLoop) { avLoop = true; requestAnimationFrame(avPreview); } }
+}
+function salvarBoasVindas() {
+  const fz = limpaNome($('#bvFazenda').value), av = limpaNome($('#bvAvatarNome').value);
+  if (!fz) { sfx('error'); $('#bvFazenda').focus(); return toast('Dê um nome para a sua fazenda. 🌾', 'bad'); }
+  state.fazenda = fz; state.apelido = av; // o primeiro nome é de graça
+  done(); renderHUD(); renderSceneInfo(); sfx('collect');
+  $('#bvNomes').textContent = `${minhaFazenda()} de ${meuApelido()}`;
+  mostrarPassoBV(2);
+}
+function fecharBoasVindas(comTutorial) {
+  $('#boasvindas').hidden = true; delete state.boasVindas; done();
+  if (comTutorial) iniciarTutorial();
+  else { toast('Beleza! Se quiser o tutorial depois, é só abrir ⚙️ › Ajuda.', 'good'); setTimeout(() => { if (giftReady()) showGift(); }, 1200); }
+}
+$('#boasvindas').addEventListener('click', e => {
+  if (avatarClick(e)) return;
+  if (e.target.closest('#bvContinuar')) return salvarBoasVindas();
+  if (e.target.closest('#bvTutSim')) return fecharBoasVindas(true);
+  if (e.target.closest('#bvTutNao')) return fecharBoasVindas(false);
+  if (e.target.closest('#bvVoltar')) return mostrarPassoBV(1);
+});
+for (const id of ['#bvFazenda', '#bvAvatarNome']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); salvarBoasVindas(); } });
+
+const TUTORIAL = [
+  { alvo: '#tools', cena: 'roca', txt: '🌱 <b>Plantar:</b> com a ✋ Mão, clique numa terra arada. A Loja abre para você escolher a semente; depois clique na terra para plantar.' },
+  { alvo: '#tools', cena: 'roca', txt: '💧 <b>Cuidar:</b> use o Regador nas plantas com sede e o Inseticida quando aparecer praga. Planta cuidada cresce certinho.' },
+  { alvo: '[data-tab="celeiro"]', cena: 'roca', txt: '🧺 <b>Colher:</b> quando aparecer o ✔ em cima da planta, clique para colher. Tudo vai para o <b>Celeiro</b>, onde dá para vender.' },
+  { alvo: '[data-tab="loja"]', cena: 'roca', txt: '🏪 <b>Loja:</b> sementes, mudas, adubo, animais, abrigos, cachorros e enfeites. Coisas novas liberam a cada nível.' },
+  { alvo: '[data-scene="animais"]', cena: 'animais', txt: '🐔 <b>Rancho:</b> seus animais ficam aqui. Dê ração e recolha ovos, leite e mais. Clique num abrigo para ver quem mora nele.' },
+  { alvo: '[data-tab="fabrica"]', cena: 'roca', txt: '🏭 <b>Negócios:</b> na Fábrica você transforma o que colheu em produtos que valem mais; na Banca vende para outros jogadores; o Caminhão leva pedidos grandes.' },
+  { alvo: '[data-tab="missoes"]', cena: 'roca', txt: '📋 <b>Missões:</b> todo dia tem missões novas com prêmios. A vila também faz pedidos.' },
+  { alvo: '#stage', cena: 'roca', txt: '🎣 <b>Pescaria:</b> clique no pesqueiro (a plaquinha 🎣 perto da casinha do cachorro). Espere a boia afundar, puxe e brigue com o peixe!' },
+  { alvo: '[data-tab="amigos"]', cena: 'roca', txt: '👥 <b>Amigos:</b> adicione amigos, visite a roça deles, mande presentes e converse no chat.' },
+  { alvo: '#openSettings', cena: 'roca', txt: '⚙️ <b>Configurações:</b> troque o avatar, a música, ative as notificações e reveja este tutorial em Ajuda. Boa colheita! 🌻' },
+];
+let tut = -1;
+function iniciarTutorial() { tut = 0; if ($('#settings')) $('#settings').hidden = true; mostrarTutorial(); }
+function mostrarTutorial() {
+  document.querySelectorAll('.tutfoco').forEach(el => el.classList.remove('tutfoco'));
+  const box = $('#tutorial');
+  if (tut < 0 || tut >= TUTORIAL.length) { box.hidden = true; if (tut >= TUTORIAL.length) { state.tutorialFeito = true; done(); toast('Tutorial concluído! Boa colheita! 🌻', 'good'); sfx('level'); setTimeout(() => { if (giftReady()) showGift(); }, 1500); } tut = -1; return; }
+  const p = TUTORIAL[tut];
+  if (p.cena && scene !== p.cena && isHome()) setScene(p.cena);
+  const el = document.querySelector(p.alvo); if (el && el.id !== 'stage') el.classList.add('tutfoco');
+  $('#tutTxt').innerHTML = p.txt;
+  $('#tutPasso').textContent = `${tut + 1} de ${TUTORIAL.length}`;
+  $('#tutVoltar').disabled = tut === 0;
+  $('#tutProx').textContent = tut === TUTORIAL.length - 1 ? 'Concluir ✔' : 'Próximo ›';
+  box.hidden = false;
+  // o cartão não pode tapar o que está sendo mostrado: se o alvo está embaixo, o cartão sobe
+  const r = el && el.id !== 'stage' ? el.getBoundingClientRect() : null;
+  box.classList.toggle('topo', !!r && r.top > innerHeight * 0.5);
+}
+$('#tutorial').addEventListener('click', e => {
+  if (e.target.closest('#tutProx')) { tut++; sfx('click'); return mostrarTutorial(); }
+  if (e.target.closest('#tutVoltar')) { tut = Math.max(0, tut - 1); sfx('click'); return mostrarTutorial(); }
+  if (e.target.closest('#tutPular')) { tut = -1; return mostrarTutorial(); }
+});
 
 // ---------- Viagem de carroça (tela de carregamento) ----------
 let viagem = null;
@@ -7491,7 +7574,8 @@ function start(data) {
   ultimaChecagem = Date.now(); autoUpdate();
   // app instalável (celular, tablet e o app de Android): abre mesmo sem internet
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
-  if (!Cloud.available) setTimeout(() => { if (giftReady()) showGift(); }, 1500);
+  if (!Cloud.available && state.boasVindas) setTimeout(abrirBoasVindas, 600);
+  else if (!Cloud.available) setTimeout(() => { if (giftReady()) showGift(); }, 1500);
   requestAnimationFrame(t => { last = t; frame(t); });
   if (Cloud.available) {
     showGate('loading');
