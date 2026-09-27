@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="65">
-<script src="firebase-config.js?v=65"></script>
+<meta name="rf-version" content="66">
+<script src="firebase-config.js?v=66"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -769,6 +769,8 @@
       <div class="setrow"><label for="nomeFazenda">Nome da fazenda</label><input class="txtin" id="nomeFazenda" maxlength="24" placeholder="Roça Feliz" autocomplete="off"></div>
       <div class="setrow"><label for="nomeAvatar">Nome do avatar</label><input class="txtin" id="nomeAvatar" maxlength="24" autocomplete="off"></div>
       <p class="hint" style="margin:0;color:var(--muted);font-size:13px">Quem visitar vai ver: <b id="nomePrev"></b></p>
+      <p class="hint" id="nomesCusto" style="margin:0;color:var(--muted);font-size:13px"></p>
+      <div class="setrow" style="justify-content:flex-end"><button class="btn" id="nomesCancelar" type="button" hidden>Cancelar</button><button class="btn gold" id="nomesSalvar" type="button" hidden>Salvar</button></div>
     </section>
     <section>
       <h3>Seu avatar</h3>
@@ -814,8 +816,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=65"></script>
-<script src="js/cloud.js?v=65"></script>
-<script src="js/game.js?v=65"></script>
+<script src="js/audio.js?v=66"></script>
+<script src="js/cloud.js?v=66"></script>
+<script src="js/game.js?v=66"></script>
 </body>
 </html>

@@ -911,6 +911,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 66, txt: 'Nomes: dar o primeiro nome para a fazenda e para o avatar continua grátis; para trocar um nome depois, custa 100 moedas (em ⚙️ › Nomes).' },
   { v: 65, txt: 'Peixe novo ✨: quando pegar um peixe pela primeira vez, aparece o selo NOVO! e ele fica marcado no 📖 Livro de peixes. A dica da isca mostra com ✨ os que você ainda não pegou.' },
   { v: 63, txt: 'Agora são 5 missões diárias, com tipos novos: pescar, pegar peixe raro, cozinhar peixe, atender a vila, visitar roças e mais.' },
 ];
@@ -4460,22 +4461,39 @@ function saveSettings() {
   applySettings();
 }
 const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde'];
+// Nomes: dar o primeiro nome é de graça; trocar um nome que já existe custa 100 moedas (cada um).
+const CUSTO_NOME = 100;
+function custoNomes() {
+  const fz = limpaNome($('#nomeFazenda').value), av = limpaNome($('#nomeAvatar').value);
+  const muda = [[fz, state.fazenda || ''], [av, state.apelido || '']].filter(([novo, velho]) => novo !== velho);
+  return { fz, av, muda: muda.length, custo: muda.filter(([, velho]) => velho).length * CUSTO_NOME };
+}
 function renderNomes() {
   const fz = $('#nomeFazenda'), av = $('#nomeAvatar'); if (!fz || !state) return;
-  if (document.activeElement !== fz) fz.value = state.fazenda || '';
-  if (document.activeElement !== av) av.value = state.apelido || '';
+  if (document.activeElement !== fz && !fz.dataset.editado) fz.value = state.fazenda || '';
+  if (document.activeElement !== av && !av.dataset.editado) av.value = state.apelido || '';
   av.placeholder = user ? firstName(user.name) : 'Seu nome';
   $('#nomePrev').textContent = `${limpaNome(fz.value) || 'Roça Feliz'} de ${limpaNome(av.value) || av.placeholder}`;
+  const c = custoNomes(), btn = $('#nomesSalvar'), falta = c.custo > state.coins;
+  btn.hidden = !c.muda; $('#nomesCancelar').hidden = !c.muda;
+  btn.textContent = c.custo ? `Salvar · ${c.custo} moedas` : 'Salvar (grátis)';
+  btn.disabled = falta;
+  $('#nomesCusto').textContent = falta ? `Faltam ${c.custo - state.coins} moedas para trocar.` : 'Dar o primeiro nome é grátis. Trocar um nome custa 100 moedas.';
 }
+function limparEdicaoNomes() { delete $('#nomeFazenda').dataset.editado; delete $('#nomeAvatar').dataset.editado; }
 function salvarNomes() {
-  const fz = limpaNome($('#nomeFazenda').value), av = limpaNome($('#nomeAvatar').value);
-  if (fz === (state.fazenda || '') && av === (state.apelido || '')) return;
-  state.fazenda = fz; state.apelido = av; done(); renderHUD(); renderSceneInfo(); renderNomes();
-  toast(`Nomes salvos: ${minhaFazenda()} de ${meuApelido()}!`, 'good');
+  const c = custoNomes(); if (!c.muda) return;
+  if (c.custo > state.coins) { sfx('error'); return toast(`Trocar o nome custa ${c.custo} moedas. Faltam ${c.custo - state.coins}.`, 'bad'); }
+  state.coins -= c.custo; state.fazenda = c.fz; state.apelido = c.av; limparEdicaoNomes();
+  sfx(c.custo ? 'buy' : 'collect'); done(); renderHUD(); renderSceneInfo(); renderNomes();
+  toast(`Nomes salvos: ${minhaFazenda()} de ${meuApelido()}!${c.custo ? ` (−${c.custo} moedas)` : ''}`, 'good');
 }
-$('#nomeFazenda').addEventListener('input', renderNomes); $('#nomeAvatar').addEventListener('input', renderNomes);
-$('#nomeFazenda').addEventListener('change', salvarNomes); $('#nomeAvatar').addEventListener('change', salvarNomes);
-for (const id of ['#nomeFazenda', '#nomeAvatar']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+for (const id of ['#nomeFazenda', '#nomeAvatar']) {
+  $(id).addEventListener('input', e => { e.target.dataset.editado = '1'; renderNomes(); });
+  $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); salvarNomes(); } });
+}
+$('#nomesSalvar').addEventListener('click', salvarNomes);
+$('#nomesCancelar').addEventListener('click', () => { limparEdicaoNomes(); $('#nomeFazenda').value = state.fazenda || ''; $('#nomeAvatar').value = state.apelido || ''; renderNomes(); });
 function renderSettings() {
   renderNomes(); renderAvatarCfg(); renderPushCfg();
   $('#optMusic').checked = settings.music;
@@ -4692,7 +4710,7 @@ async function autoUpdate() {
 }
 let ultimaChecagem = 0;
 document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - ultimaChecagem > 30 * 60 * 1000) { ultimaChecagem = Date.now(); autoUpdate(); } });
-function openSettings() { if ($('#verTxt')) $('#verTxt').textContent = `Versão ${VERSION}`; if ($('#updStatus')) $('#updStatus').textContent = ''; if ($('#checkUpdate')) $('#checkUpdate').disabled = false; renderSettings(); $('#settings').hidden = false; $('#settings [data-close]').focus(); }
+function openSettings() { if ($('#verTxt')) $('#verTxt').textContent = `Versão ${VERSION}`; if ($('#updStatus')) $('#updStatus').textContent = ''; if ($('#checkUpdate')) $('#checkUpdate').disabled = false; limparEdicaoNomes(); renderSettings(); $('#settings').hidden = false; $('#settings [data-close]').focus(); }
 function closeSettings() { $('#settings').hidden = true; $('#openSettings').focus(); }
 $('#openSettings').addEventListener('click', openSettings);
 $('#giftBtn').addEventListener('click', showGift);
