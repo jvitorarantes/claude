@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="80">
-<script src="firebase-config.js?v=80"></script>
+<meta name="rf-version" content="81">
+<script src="firebase-config.js?v=81"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -410,6 +410,7 @@
   .iscabtn small { font-size: 11px; font-weight: 800; color: #2f2a1f; }
   .iscabtn[aria-pressed="true"] { border-color: #e0a800; background: #fff4c8; box-shadow: 0 0 0 2px #f2c14e; }
   .iscabtn:disabled { opacity: .45; cursor: default; }
+  #pescaCv, #pescaBtn { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .pontos { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px; scrollbar-width: thin; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; cursor: grab; }
   .dominio { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 0 12px 8px; font-size: 12.5px; color: var(--ink); }
   .dominio .dnv { font-weight: 800; } .dominio .dbar { flex: 1; min-width: 80px; height: 8px; border-radius: 6px; background: #e3dcc6; overflow: hidden; }
@@ -833,8 +834,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=80"></script>
-<script src="js/cloud.js?v=80"></script>
-<script src="js/game.js?v=80"></script>
+<script src="js/audio.js?v=81"></script>
+<script src="js/cloud.js?v=81"></script>
+<script src="js/game.js?v=81"></script>
 </body>
 </html>

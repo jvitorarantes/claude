@@ -917,6 +917,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 81, txt: 'Pescaria nova 🎣: depois de fisgar, agora tem briga! Segure o botão (ou a tela) para subir a faixa verde e solte para ela descer, mantendo o peixe dentro dela até encher a barra. Peixe raro é mais bravo e a faixa fica menor; o domínio de pesca deixa a faixa maior.' },
   { v: 79, txt: 'Novo ponto de pesca: 🔄 Pesque e Solte (libera no nível 5, de graça)! Fica sempre aberto e não gasta isca: pesque quanto quiser. Mas é pesque e solte: cada peixe volta para o rio e dá só 10 moedas e 1 XP. Ele NÃO vai para o celeiro, o livro de peixes, as conquistas, as missões nem o domínio de pesca.' },
   { v: 78, txt: 'Peixes de Goiás 🐟: chegaram 15 espécies novas, como cará, piau, mandi, curimbatá, cascudo, piranha, corvina, matrinxã, peixe-cachorra, aruanã, barbado, tambaqui, pirarara, jaú e piraíba. Alguns só aparecem nos rios grandes: veja no 📖 Livro de peixes onde cada um morde.' },
   { v: 77, txt: 'Mais pescaria: agora cada ponto de pesca dá 3 pescarias de vara antes de descansar (a tarrafa continua igual).' },
@@ -5213,14 +5214,29 @@ $('#pesca').addEventListener('click', e => {
   const pb = e.target.closest('[data-ponto]');
   if (pb && pontosArrastou) return;
   if (pb) {
-    if (pesca && (pesca.fase === 'esperando' || pesca.fase === 'fisgou' || pesca.fase === 'tarrafa')) return;
+    if (pesca && ['esperando', 'fisgou', 'tarrafa', 'brigando'].includes(pesca.fase)) return;
     if (!temPonto(pb.dataset.ponto)) return comprarPonto(pb.dataset.ponto);
     state.pontoSel = pb.dataset.ponto; save(); pesca = { fase: 'pronto', t0: performance.now() }; sfx('click'); return renderPesca();
   }
   if (e.target.closest('#pescaLivroBtn')) { if (pescaLivro) livroVisto(); pescaLivro = !pescaLivro; return renderPesca(); }
-  const ib = e.target.closest('[data-isca]'); if (ib && pesca && pesca.fase !== 'esperando' && pesca.fase !== 'fisgou') { state.iscaSel = ib.dataset.isca; save(); return renderPesca(); }
+  const ib = e.target.closest('[data-isca]'); if (ib && pesca && !['esperando', 'fisgou', 'brigando', 'tarrafa'].includes(pesca.fase)) { state.iscaSel = ib.dataset.isca; save(); return renderPesca(); }
 });
-window.addEventListener('keydown', e => { if (!$('#pesca').hidden && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); puxar(); } if (e.key === 'Escape' && !$('#pesca').hidden) fecharPesca(); });
+window.addEventListener('keydown', e => {
+  if (!$('#pesca').hidden && (e.key === ' ' || e.key === 'Enter')) {
+    e.preventDefault();
+    if (pesca && pesca.fase === 'brigando') { pescaSegura = true; return; }
+    if (!e.repeat) puxar();
+  }
+  if (e.key === 'Escape' && !$('#pesca').hidden) fecharPesca();
+});
+window.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') pescaSegura = false; });
+// Segurar o dedo/mouse na água ou no botão sobe a faixa verde durante a briga.
+for (const id of ['#pescaCv', '#pescaBtn']) {
+  $(id).addEventListener('pointerdown', e => { if (pesca && pesca.fase === 'brigando') { pescaSegura = true; e.preventDefault(); } });
+  $(id).addEventListener('contextmenu', e => e.preventDefault());
+}
+for (const ev of ['pointerup', 'pointercancel', 'blur']) window.addEventListener(ev, () => { pescaSegura = false; });
+if (location.protocol === 'file:') window.__pesca = () => pesca; // só para testes locais
 $('#chatForm').addEventListener('submit', e => { e.preventDefault(); enviarChat($('#chatTxt').value); });
 $('#chat').addEventListener('click', e => {
   if (e.target === $('#chat') || e.target.closest('[data-close]')) return fecharChat();
@@ -6165,7 +6181,7 @@ function guardarPeixe(p) {
 }
 // Tarrafa: joga a rede e pega 3 peixes de uma vez (sem isca), uma vez a cada 12 horas.
 function jogarTarrafa() {
-  if (!pesca || pesca.fase === 'esperando' || pesca.fase === 'fisgou' || pesca.fase === 'tarrafa') return;
+  if (!pesca || ['esperando', 'fisgou', 'tarrafa', 'brigando'].includes(pesca.fase)) return;
   if (PONTO[pontoSel()].solte) return toast('No Pesque e Solte não vale tarrafa: aqui é só vara, e o peixe volta para o rio.');
   if (faltaTarrafa()) return toast(`A tarrafa está secando: dá para jogar de novo em ${fmt(faltaTarrafa() / 1000)}.`);
   const sorte = PONTO[pontoSel()].sorte;
@@ -6205,8 +6221,50 @@ function puxar() {
   if (!pesca) return;
   if (pesca.fase === 'pronto' || pesca.fase === 'resultado') return lancar();
   if (pesca.fase === 'esperando') { pesca = { fase: 'resultado', t0: performance.now(), msg: 'Puxou cedo demais! O peixe fugiu.' }; sfx('error'); return renderPesca(); }
-  if (pesca.fase === 'fisgou') {
+  if (pesca.fase === 'brigando') return;
+  if (pesca.fase === 'fisgou') return iniciarBriga();
+}
+// ---------- A briga com o peixe ----------
+// Depois de fisgar, o peixe foge para cima e para baixo. Segure (dedo, mouse ou espaço) para subir a faixa verde;
+// solte para ela descer. Com o peixe dentro da faixa, a barra de captura enche; fora, esvazia.
+// Peixe mais raro: faixa menor, peixe mais rápido e agitado. O domínio de pesca alarga a faixa.
+const BRIGA = {
+  lixo:       { h: 0.2,   vel: 0.25, agito: 0.5, ganho: 0.45, perda: 0.15 },
+  comum:      { h: 0.16,  vel: 0.35, agito: 0.9, ganho: 0.34, perda: 0.2 },
+  incomum:    { h: 0.145, vel: 0.45, agito: 1.2, ganho: 0.3,  perda: 0.22 },
+  raro:       { h: 0.13,  vel: 0.6,  agito: 1.6, ganho: 0.26, perda: 0.24 },
+  'épico':    { h: 0.115, vel: 0.75, agito: 2,   ganho: 0.23, perda: 0.26 },
+  'lendário': { h: 0.1,   vel: 0.9,  agito: 2.5, ganho: 0.2,  perda: 0.28 },
+};
+let pescaSegura = false;
+function iniciarBriga() {
+  const agora = performance.now(), p = pesca.peixe, d = BRIGA[p.raro] || BRIGA.comum;
+  pesca = { fase: 'brigando', t0: agora, ultimo: agora, ponto: pesca.ponto, isca: pesca.isca, peixe: p,
+    h: d.h + 0.006 * (dominio().nv - 1), zy: 0.3, zv: 0, fy: 0.3, alvo: 0.6, prog: 0.35, dentro: false };
+  sfx('water'); renderPesca();
+}
+function passoBriga(t) {
+  const b = pesca, d = BRIGA[b.peixe.raro] || BRIGA.comum, dt = Math.min(0.05, (t - b.ultimo) / 1000); b.ultimo = t;
+  // a faixa: sobe segurando, cai soltando, quica nas pontas
+  b.zv = clamp(b.zv + (pescaSegura ? 2.8 : -2.4) * dt, -1.3, 1.3); b.zy += b.zv * dt;
+  if (b.zy < b.h) { b.zy = b.h; b.zv *= -0.3; } if (b.zy > 1 - b.h) { b.zy = 1 - b.h; b.zv *= -0.3; }
+  // o peixe: troca de rumo de vez em quando, com uns trancos
+  if (Math.random() < d.agito * dt) b.alvo = 0.06 + Math.random() * 0.88;
+  const passo = d.vel * dt * (0.7 + Math.random() * 0.6);
+  b.fy += clamp(b.alvo - b.fy, -passo, passo); b.fy = clamp(b.fy, 0.04, 0.96);
+  b.dentro = Math.abs(b.fy - b.zy) < b.h;
+  b.prog = clamp(b.prog + (b.dentro ? d.ganho : -d.perda) * dt, 0, 1);
+  if (b.prog >= 1) return concluirPesca();
+  if (b.prog <= 0) {
+    const p = b.peixe, um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''}`;
+    pesca = { fase: 'resultado', t0: t, msg: p.lixo ? 'A linha afrouxou e o enrosco escapou. 😅 Tente de novo!' : `A linha afrouxou e o peixe escapou… era ${um} ${p.nome}! 😩 Tente de novo.` };
+    sfx('error'); renderPesca();
+  }
+}
+function concluirPesca() {
+  {
     if (PONTO[pesca.ponto] && PONTO[pesca.ponto].solte) return soltarPeixe(pesca.peixe);
+    try { if (navigator.vibrate) navigator.vibrate(40); } catch (e) { /* sem vibração */ }
     const p = pesca.peixe, novo = guardarPeixe(p);
     const pp = pontosDe(), pid = pesca.ponto || 'casa';
     pp.usos[pid] = (pp.usos[pid] || 0) + 1;
@@ -6244,7 +6302,7 @@ function renderPesca() {
   if (!pesca) return;
   const btn = $('#pescaBtn'), msg = $('#pescaMsg');
   const pt = PONTO[pontoSel()], descansa = faltaPonto(pt.id), livre = pesca.fase === 'pronto' || pesca.fase === 'resultado';
-  btn.textContent = pesca.fase === 'esperando' ? 'Esperando…' : pesca.fase === 'fisgou' ? 'PUXA! 🎣' : pesca.fase === 'tarrafa' ? 'Puxando a rede…'
+  btn.textContent = pesca.fase === 'esperando' ? 'Esperando…' : pesca.fase === 'fisgou' ? 'PUXA! 🎣' : pesca.fase === 'brigando' ? 'SEGURE para puxar ⬆' : pesca.fase === 'tarrafa' ? 'Puxando a rede…'
     : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : `${pesca.fase === 'resultado' ? 'Lançar de novo' : 'Lançar a linha'}${pt.solte ? '' : ` (${restamVara(pt.id)}/${VARA_POR_VEZ})`}`;
   btn.disabled = livre && !!descansa;
   const tb = $('#pescaTarrafa'), ft = faltaTarrafa();
@@ -6262,7 +6320,9 @@ function renderPesca() {
   }).join(''));
   btn.classList.toggle('gold', pesca.fase === 'fisgou' || pesca.fase === 'pronto' || pesca.fase === 'resultado');
   btn.classList.toggle('pulsa', pesca.fase === 'fisgou');
+  btn.classList.toggle('gold', pesca.fase === 'fisgou' || pesca.fase === 'pronto' || pesca.fase === 'resultado' || pesca.fase === 'brigando');
   msg.textContent = pesca.fase === 'tarrafa' ? 'Lá vai a tarrafa… 🕸️'
+    : pesca.fase === 'brigando' ? 'Fisgou! 🐟 Segure o botão (ou a tela) para subir a faixa verde e solte para ela descer. Mantenha o peixe dentro da faixa até encher a barra!'
     : pesca.fase === 'pronto' && descansa ? `${pt.nome} está descansando. Escolha outro ponto ou jogue a tarrafa!`
     : pesca.fase === 'pronto' && pt.solte ? `🔄 Pesque e Solte: pesque quanto quiser, sem gastar isca! Cada peixe é solto de volta no rio e dá só ${SOLTE_MOEDAS} moedas e ${SOLTE_XP} XP — não vai para o celeiro, o livro, as conquistas nem as missões.`
     : pesca.fase === 'pronto' ? `${pt.emoji} ${pt.nome}: ${VARA_POR_VEZ} pescarias por vez. Toque em "Lançar a linha" e espere a boia afundar. Aí, puxe rápido!`
@@ -6305,6 +6365,7 @@ function desenharPesca(t) {
   if (pesca.fase === 'esperando' && t >= pesca.mordida) { pesca = { fase: 'fisgou', t0: t, ponto: pesca.ponto, peixe: sortearPeixe(pesca.isca, PONTO[pesca.ponto || 'casa'].sorte, !!PONTO[pesca.ponto || 'casa'].solte, pesca.ponto || 'casa') }; pesca.janela = { comum: 950, lixo: 1000, incomum: 850, raro: 720, 'épico': 620, 'lendário': 520 }[pesca.peixe.raro]; sfx('water'); renderPesca(); }
   if (pesca.fase === 'fisgou' && t - pesca.t0 > pesca.janela) { pesca = { fase: 'resultado', t0: t, msg: 'Ah, escapou… tente de novo!' }; renderPesca(); }
   if (pesca.fase === 'tarrafa' && t - pesca.t0 > 2200) recolherTarrafa();
+  if (pesca.fase === 'brigando') passoBriga(t);
   if (!pescaRelogio || t - pescaRelogio > 1000) { pescaRelogio = t; renderPesca(); } // contagem regressiva dos pontos e da tarrafa
   const PT = PONTO[pesca.ponto || pontoSel()];
   // céu, margem e água
@@ -6324,8 +6385,8 @@ function desenharPesca(t) {
   drawAvatar(g, ax, ay, 1.1 * esc, Object.assign({}, state.avatar, { mao: 'nada' }), t, false, 1);
   // vara e linha
   const mao = { x: ax + 13 * esc, y: ay - 26 * esc }, ponta = { x: ax + 70 * esc, y: ay - 95 * esc };
-  const fisgou = pesca.fase === 'fisgou';
-  const curva = fisgou ? 10 * esc : 0;
+  const fisgou = pesca.fase === 'fisgou', briga = pesca.fase === 'brigando';
+  const curva = fisgou ? 10 * esc : briga ? (pesca.dentro ? 14 : 22) * esc + Math.sin(t / 60) * 2 : 0;
   g.strokeStyle = '#7a4a24'; g.lineWidth = 2.5 * esc; g.lineCap = 'round';
   g.beginPath(); g.moveTo(mao.x, mao.y); g.quadraticCurveTo((mao.x + ponta.x) / 2, (mao.y + ponta.y) / 2 - curva, ponta.x, ponta.y + curva); g.stroke(); g.lineCap = 'butt';
   const naAgua = pesca.fase === 'esperando' || fisgou;
@@ -6339,6 +6400,30 @@ function desenharPesca(t) {
     g.fillStyle = '#d8402f'; g.beginPath(); g.arc(bx, boiaY - 4, 5, Math.PI, 0); g.fill();
     g.fillStyle = '#fff'; g.beginPath(); g.arc(bx, boiaY - 4, 5, 0, Math.PI); g.fill();
     if (fisgou) { g.font = `900 ${Math.round(34 * esc)}px system-ui, sans-serif`; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#6b1f14'; g.strokeText('!', bx, by - 30); g.fillStyle = '#ffe08a'; g.fillText('!', bx, by - 30); }
+  } else if (briga) {
+    // a linha esticada vai até onde o peixe está se debatendo
+    const px = cw * 0.45 + (1 - pesca.fy) * cw * 0.22, py = ch * 0.5 + pesca.fy * ch * 0.3;
+    g.strokeStyle = pesca.dentro ? 'rgba(40,40,40,.75)' : 'rgba(160,40,30,.85)'; g.lineWidth = pesca.dentro ? 1.2 : 1.8;
+    g.beginPath(); g.moveTo(ponta.x, ponta.y + curva); g.lineTo(px, py); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 2;
+    for (let k = 0; k < 3; k++) { const r = ((t / 280) + k / 3) % 1; g.globalAlpha = 1 - r; g.beginPath(); g.ellipse(px, py, 6 + r * 22, 2 + r * 7, 0, 0, 7); g.stroke(); }
+    g.globalAlpha = 1;
+    g.fillStyle = 'rgba(255,255,255,.8)'; for (let k = 0; k < 4; k++) { const a = t / 90 + k * 1.7; g.beginPath(); g.arc(px + Math.cos(a) * 9, py - Math.abs(Math.sin(a)) * 10, 1.8, 0, 7); g.fill(); }
+    // a barra da briga, à direita
+    const bw = 26 * esc, bh = ch * 0.8, bx0 = cw - bw - 22 * esc, by0 = ch * 0.1;
+    g.fillStyle = 'rgba(20,40,60,.55)'; g.beginPath(); g.roundRect(bx0, by0, bw, bh, 8); g.fill();
+    g.strokeStyle = '#6b4220'; g.lineWidth = 3; g.stroke();
+    const yDe = v => by0 + bh * (1 - v);
+    g.fillStyle = pesca.dentro ? 'rgba(120,220,90,.85)' : 'rgba(120,220,90,.55)';
+    g.beginPath(); g.roundRect(bx0 + 3, yDe(pesca.zy + pesca.h), bw - 6, bh * pesca.h * 2, 6); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 1.5; g.stroke();
+    drawPeixe(g, bx0 + bw / 2 - 2, yDe(pesca.fy), 1.05 * esc * cabePeixe(pesca.peixe), Object.assign({}, pesca.peixe, pesca.peixe.lixo ? {} : { cor: ['#3a4a5a', '#2a3440'], listras: false, pintas: false, barriga: false }));
+    // captura
+    const cx0 = bx0 - 14 * esc, cwid = 8 * esc;
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.roundRect(cx0, by0, cwid, bh, 4); g.fill();
+    const cor = pesca.prog > 0.66 ? '#4fb82f' : pesca.prog > 0.33 ? '#f2c14e' : '#e0503a';
+    g.fillStyle = cor; g.beginPath(); g.roundRect(cx0, by0 + bh * (1 - pesca.prog), cwid, bh * pesca.prog, 4); g.fill();
+    if (t - pesca.t0 < 2500) { g.font = `800 ${Math.round(13 * esc)}px system-ui, sans-serif`; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.55)'; g.fillStyle = '#fff'; const tx = cw * 0.52, ty = ch * 0.14; g.strokeText('Segure para subir a faixa verde!', tx, ty); g.fillText('Segure para subir a faixa verde!', tx, ty); }
   } else {
     g.strokeStyle = 'rgba(40,40,40,.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(ponta.x, ponta.y); g.lineTo(ponta.x + 4, ponta.y + 40); g.stroke();
   }
