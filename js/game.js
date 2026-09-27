@@ -947,6 +947,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
+  { v: 104, txt: 'Pomar ainda mais barato: enxada 50, motosserra 100 e frutíferas que rendem mais de 2,5× o preço. E chegou o 🌳 Domínio do pomar: colher frutas (e ajudar as dos amigos) sobe o nível, que dá mais frutas por colheita, mais colheitas antes de secar e trevos para resgatar.' },
   { v: 103, txt: 'Na Loja, "Mudas" virou Horta e o Pomar ficou do lado. Os montes de folhas brilham e têm o rastelo em cima. E o botão 🆘 Precisa de ajuda leva direto para a roça (ou o rancho) do amigo, com a frutífera marcada.' },
   { v: 102, txt: 'Pomar mais barato 🍊: frutíferas e ferramentas custam bem menos, e cada frutífera agora dá 3 colheitas (não morre mais por dias). Depois da última, ela seca: toque nela e ponha a 🪧 placa de ajuda. Todos os seus amigos são avisados e, quando um ajudar, ela volta a dar frutas. Na lista de Amigos, o botão 🆘 Precisa de ajuda fica colorido quando um amigo está pedindo. Ajudar frutífera não conta no limite do dia.' },
   { v: 101, txt: 'Canteiros e cercas 🚧: no botão Mover agora dá para mudar os canteiros de lugar (vão com o que estiver plantado). A cerca em volta da roça saiu: compre pedaços de cerca na Loja › Enfeites e ponha onde quiser (quem já jogava ganhou 40 de presente, estão no Inventário). O estilo da cerca segue o tema da roça. O rancho continua igual.' },
@@ -1425,7 +1426,7 @@ function applyVisits(list) {
       const sc = v.sc === 'animais' ? 'animais' : 'roca', l = objetosDe(state, sc);
       const o = l.find(x => v.fid && x.fid === v.fid) || (!v.fid && Number.isInteger(v.idx) ? l[v.idx] : null);
       if (o && ENFEITE[o.id] && ENFEITE[o.id].fruteira && estadoFruteira(o).morta) {
-        o.colhidas = 0; o.ult = Date.now(); o.placa = 0;
+        o.colhidas = 0; o.ult = Date.now(); o.placa = 0; o.seca = 0;
         note(`ajudou no seu pomar (${ENFEITE[o.id].nome.toLowerCase()} voltou a dar frutas)`); helpedBy(v.from, who);
       }
       continue;
@@ -4443,6 +4444,7 @@ $('#pane').addEventListener('click', e => {
   if (d.trevoConq) { resgatarConquista(d.trevoConq); return renderPane(); }
   if (d.trevoTodos) { resgatarTodosPeixes(); return renderPane(); }
   if (d.trevoDominio) { resgatarDominio(); return renderPane(); }
+  if (d.trevoPomar) { resgatarPomar(); return renderPane(); }
   if (d.trevoComprar) return comprarTrevoItem(d.trevoComprar);
   if (d.abrirTrevos) { missSeg = 'trevos'; return openPanel('missoes'); }
   if (d.irLojaTrevo) return openPanel('loja', 'trevo');
@@ -7710,13 +7712,13 @@ const ENFEITES = [
   { id: 'peixedourado', nome: 'Estátua do Peixe Dourado', especial: true, trevo: true, conforto: 3 },
   // Pomar: frutíferas. Dão frutas de tempos em tempos e secam depois da última colheita.
   // Seca: um amigo ajuda (volta a dar frutas) ou sai com enxada (arbusto) / motosserra (árvore).
-  { id: 'pitangueira',   nome: 'Pitangueira',    fruteira: 'arbusto', fruta: 'pitanga',    nivel: 3,  custo: 120,  tempo: 6 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#4f9a2f' },
-  { id: 'amoreira',      nome: 'Amoreira',       fruteira: 'arbusto', fruta: 'amora',      nivel: 5,  custo: 180,  tempo: 7 * 3600,  rende: 4, colheitas: 3, conforto: 1, copa: '#3f8a2a' },
-  { id: 'maracujazeiro', nome: 'Maracujazeiro',  fruteira: 'arbusto', fruta: 'maracuja',   nivel: 8,  custo: 220,  tempo: 8 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#5aa03a' },
-  { id: 'jabuticabeira', nome: 'Jabuticabeira',  fruteira: 'arvore',  fruta: 'jabuticaba', nivel: 7,  custo: 320,  tempo: 10 * 3600, rende: 6, colheitas: 3, conforto: 2, copa: '#3f7a2a' },
-  { id: 'mangueira',     nome: 'Mangueira',      fruteira: 'arvore',  fruta: 'manga',      nivel: 10, custo: 380,  tempo: 12 * 3600, rende: 4, colheitas: 3, conforto: 2, copa: '#2f6a22' },
-  { id: 'cajueiro',      nome: 'Cajueiro',       fruteira: 'arvore',  fruta: 'caju',       nivel: 12, custo: 360,  tempo: 12 * 3600, rende: 4, colheitas: 3, conforto: 2, copa: '#4f8a2a' },
-  { id: 'pequizeiro',    nome: 'Pequizeiro',     fruteira: 'arvore',  fruta: 'pequi',      nivel: 15, custo: 450,  tempo: 16 * 3600, rende: 3, colheitas: 3, conforto: 2, copa: '#5a8a3a' },
+  { id: 'pitangueira',   nome: 'Pitangueira',    fruteira: 'arbusto', fruta: 'pitanga',    nivel: 3,  custo: 80,   tempo: 6 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#4f9a2f' },
+  { id: 'amoreira',      nome: 'Amoreira',       fruteira: 'arbusto', fruta: 'amora',      nivel: 5,  custo: 130,  tempo: 7 * 3600,  rende: 4, colheitas: 3, conforto: 1, copa: '#3f8a2a' },
+  { id: 'maracujazeiro', nome: 'Maracujazeiro',  fruteira: 'arbusto', fruta: 'maracuja',   nivel: 8,  custo: 150,  tempo: 8 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#5aa03a' },
+  { id: 'jabuticabeira', nome: 'Jabuticabeira',  fruteira: 'arvore',  fruta: 'jabuticaba', nivel: 7,  custo: 230,  tempo: 10 * 3600, rende: 6, colheitas: 3, conforto: 2, copa: '#3f7a2a' },
+  { id: 'mangueira',     nome: 'Mangueira',      fruteira: 'arvore',  fruta: 'manga',      nivel: 10, custo: 260,  tempo: 12 * 3600, rende: 4, colheitas: 3, conforto: 2, copa: '#2f6a22' },
+  { id: 'cajueiro',      nome: 'Cajueiro',       fruteira: 'arvore',  fruta: 'caju',       nivel: 12, custo: 240,  tempo: 12 * 3600, rende: 4, colheitas: 3, conforto: 2, copa: '#4f8a2a' },
+  { id: 'pequizeiro',    nome: 'Pequizeiro',     fruteira: 'arvore',  fruta: 'pequi',      nivel: 15, custo: 300,  tempo: 16 * 3600, rende: 3, colheitas: 3, conforto: 2, copa: '#5a8a3a' },
   { id: 'arcoflores',   nome: 'Arco de flores',            especial: true, trevo: true, conforto: 2 },
   { id: 'ipe',          nome: 'Ipê-amarelo',               especial: true, trevo: true, conforto: 3 },
   { id: 'fogueira',     nome: 'Fogueira de São João',      especial: true, trevo: true, conforto: 2 },
@@ -8287,27 +8289,49 @@ const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, EN
 // e secam depois de uns dias. Arbusto seco sai com a enxada de arrancar; árvore seca, com a motosserra.
 // As ferramentas de derrubar se compram na Loja › Pomar, ganham-se completando missões e vêm de amigos.
 // ============================================================
-const FERR_DERRUBAR = { enxada: { nome: 'Enxada de arrancar', emoji: '🪓', custo: 80, para: 'arbusto' }, motosserra: { nome: 'Motosserra', emoji: '🪚', custo: 200, para: 'arvore' } };
+const FERR_DERRUBAR = { enxada: { nome: 'Enxada de arrancar', emoji: '🪓', custo: 50, para: 'arbusto' }, motosserra: { nome: 'Motosserra', emoji: '🪚', custo: 100, para: 'arvore' } };
 function derrubarDe() { const d = state.derrubar || (state.derrubar = {}); d.enxada = d.enxada || 0; d.motosserra = d.motosserra || 0; return d; }
 const ferramentaIcon = id => makeIcon('ferr:' + id, () => { ctx.font = '60px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(FERR_DERRUBAR[id].emoji, 48, 52); });
 // Cada frutífera dá um número de colheitas (e.colheitas). Depois da última, seca: aí dá para pôr
 // a placa de ajuda (um amigo que ajudar faz ela voltar a dar frutas) ou derrubar com a ferramenta.
+// Domínio do pomar: cada colheita de frutífera dá pontos (árvore vale 2) e ajudar a de um amigo, 1.
+// Cada nível dá mais frutas por colheita (+1 nos níveis 3, 5, 7 e 9) e mais colheitas antes de secar
+// (+1 nos níveis 4, 7 e 10). Cada nível também dá trevos para resgatar.
+const POMAR_NV = [0, 5, 12, 22, 35, 52, 75, 105, 145, 200];
+function dominioPomar() {
+  const xp = (state && state.pomarXP) || 0; let nv = 1;
+  while (nv < POMAR_NV.length && xp >= POMAR_NV[nv]) nv++;
+  return { nv, xp, ini: POMAR_NV[nv - 1], fim: POMAR_NV[nv], max: nv >= POMAR_NV.length, frutas: Math.floor((nv - 1) / 2), colheitas: [4, 7, 10].filter(n => nv >= n).length };
+}
+const rendeDe = e => e.rende + (isHome() ? dominioPomar().frutas : 0);
+const colheitasDe = e => e.colheitas + (isHome() ? dominioPomar().colheitas : 0);
+function ganharPomar(pts) {
+  const antes = dominioPomar().nv; state.pomarXP = (state.pomarXP || 0) + pts;
+  const d = dominioPomar();
+  if (d.nv > antes) { sfx('level'); toast(`🌳 Domínio do pomar nível ${d.nv}! ${d.frutas ? `+${d.frutas} fruta${d.frutas > 1 ? 's' : ''} por colheita · ` : ''}${colheitasDe(ENFEITE.pitangueira)} colheitas antes de secar. Resgate os trevos em Missões › Trevos.`, 'good'); renderTabs(); }
+}
+function dominioPomarHTML() {
+  const d = dominioPomar(), pct = d.max ? 100 : Math.round((d.xp - d.ini) / (d.fim - d.ini) * 100);
+  return `<div class="dominio"><span class="dnv">🌳 Domínio do pomar <b>Nv ${d.nv}</b></span><span class="dbar"><i style="width:${pct}%"></i></span>
+    ${pomarAResgatar().length ? `<button class="btn gold dresg" type="button" data-trevo-pomar="1">Resgatar 🍀${pomarAResgatar().reduce((t, n) => t + (TREVO_DOMINIO[n] || 0), 0)}</button>` : ''}
+    <span class="dinfo">+${d.frutas} fruta${d.frutas === 1 ? '' : 's'} por colheita · ${colheitasDe(ENFEITE.pitangueira)} colheitas antes de secar${d.max ? ' · máximo!' : ` · ${d.fim - d.xp} pts p/ Nv ${d.nv + 1} (colher arbusto 1, árvore 2, ajudar amigo 1)`}</span></div>`;
+}
 function estadoFruteira(o) {
   const e = ENFEITE[o.id], agora = Date.now(), t0 = o.t0 || agora, ult = o.ult || t0;
-  const restam = Math.max(0, e.colheitas - (o.colhidas || 0)), morta = restam <= 0, pronto = !morta && agora - ult >= e.tempo * 1000;
+  const restam = o.seca ? 0 : Math.max(0, colheitasDe(e) - (o.colhidas || 0)), morta = restam <= 0, pronto = !morta && agora - ult >= e.tempo * 1000;
   const falta = Math.max(0, ult + e.tempo * 1000 - agora);
   const f = FRUTA[e.fruta], resto = `${restam} colheita${restam > 1 ? 's' : ''} até secar`;
   const txt = morta ? (o.placa ? 'Secou 🥀 · placa de ajuda posta: esperando um amigo ajudar 🤝' : `Secou 🥀. Ponha a placa de ajuda para um amigo reviver, ou derrube com ${e.fruteira === 'arvore' ? 'a motosserra' : 'a enxada de arrancar'}.`)
-    : pronto ? `Pronta! ${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} para colher · ${resto}`
+    : pronto ? `Pronta! ${rendeDe(e)} ${f.nome.toLowerCase()}s para colher · ${resto}`
     : `Próxima colheita em ${fmt(falta / 1000)} · ${resto}`;
   return { morta, pronto, falta, restam, txt };
 }
 // Frutíferas dos amigos (na roça e no rancho) com a placa de ajuda.
-const pedidosAjuda = s => ['roca', 'animais'].reduce((n, sc) => n + (s && s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && o.placa && ENFEITE[o.id] && ENFEITE[o.id].fruteira && (o.colhidas || 0) >= ENFEITE[o.id].colheitas).length, 0);
+const pedidosAjuda = s => ['roca', 'animais'].reduce((n, sc) => n + (s && s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && o.placa && ENFEITE[o.id] && ENFEITE[o.id].fruteira && (o.seca || (o.colhidas || 0) >= ENFEITE[o.id].colheitas)).length, 0);
 // Põe a placa e avisa todos os amigos (aviso no celular e o botão "Precisa de ajuda" na lista de amigos).
 function pedirAjudaFruteira(sc, i) {
   const o = objetosDe(state, sc)[i]; if (!o || !estadoFruteira(o).morta || o.placa) return;
-  o.placa = Date.now(); o.fid = o.fid || newId();
+  o.placa = Date.now(); o.seca = 1; o.fid = o.fid || newId();
   const e = ENFEITE[o.id];
   for (const uid of state.friends) avisarAmigo(uid, 'ajuda', `${meuApelido()} precisa de ajuda: ${e.nome.toLowerCase()} secou no pomar 🥀 Passe lá para ajudar!`);
   sfx('buy'); done(); if (user) cloudSave();
@@ -8344,8 +8368,8 @@ function actFruteira(sc, i) {
       if (state.log[key]) return toast('Você já ajudou esta. Obrigado! 🤝');
       state.log[key] = Date.now();
       const q = iso(o.u, o.v), pos = { x: q.x, y: q.y - L.W * 0.4 };
-      o.placa = 0; o.colhidas = 0; o.ult = Date.now();
-      help(pos); addXP(3, pos); sfx('level'); popupAt(pos, 'Reviveu! 🌱', '#8fd16a');
+      o.placa = 0; o.seca = 0; o.colhidas = 0; o.ult = Date.now();
+      help(pos); ganharPomar(1); addXP(3, pos); sfx('level'); popupAt(pos, 'Reviveu! 🌱', '#8fd16a');
       sendVisit({ t: 'help', what: 'fruteira', sc, fid: o.fid || '', idx: i });
       toast(`🤝 Você ajudou ${view.nome}: ${e.nome.toLowerCase()} voltou a dar frutas!`, 'good');
       return done();
@@ -8353,12 +8377,15 @@ function actFruteira(sc, i) {
     return toast(`${e.nome} de ${view.nome}: ${st.morta ? (o.placa ? 'secou e está pedindo ajuda.' : 'secou.') : st.txt}`);
   }
   if (st.pronto) {
-    state.barn[f.id] = (state.barn[f.id] || 0) + e.rende;
-    for (let k = 0; k < e.rende; k++) collect(f.id, null);
+    const rende = rendeDe(e);
+    state.barn[f.id] = (state.barn[f.id] || 0) + rende;
+    for (let k = 0; k < rende; k++) collect(f.id, null);
     o.ult = Date.now(); o.colhidas = (o.colhidas || 0) + 1; state.stats.colheitas = (state.stats.colheitas || 0) + 1; track('colher');
     addXP(e.fruteira === 'arvore' ? 6 : 3, null); sfx('collect');
-    const acabou = o.colhidas >= e.colheitas;
-    toast(`🧺 +${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} no celeiro!${acabou ? ` Foi a última: ${e.nome.toLowerCase()} secou. Toque nela para pedir ajuda aos amigos (ela volta a dar frutas) ou derrubar.` : ` Falta${e.colheitas - o.colhidas > 1 ? 'm' : ''} ${e.colheitas - o.colhidas} colheita${e.colheitas - o.colhidas > 1 ? 's' : ''}.`}`, 'good');
+    const max = colheitasDe(e), acabou = o.colhidas >= max, resta = max - o.colhidas;
+    if (acabou) o.seca = 1;
+    toast(`🧺 +${rende} ${f.nome.toLowerCase()}s no celeiro!${acabou ? ` Foi a última: ${e.nome.toLowerCase()} secou. Toque nela para pedir ajuda aos amigos (ela volta a dar frutas) ou derrubar.` : ` Falta${resta > 1 ? 'm' : ''} ${resta} colheita${resta > 1 ? 's' : ''}.`}`, 'good');
+    ganharPomar(e.fruteira === 'arvore' ? 2 : 1);
     return done();
   }
   if (st.morta) return menuFruteira(sc, i);
@@ -8423,7 +8450,7 @@ function drawFruteira(o, x, y, s, t, home) {
 }
 function pomarLojaHTML() {
   const d = derrubarDe();
-  let html = `<p class="hint">Plante frutíferas no gramado da roça ou do rancho (fora dos canteiros). Cada uma dá 3 colheitas e depois seca. Seca, você escolhe: pôr a 🪧 placa de ajuda (todos os seus amigos são avisados e, quando um ajudar, ela volta a dar mais 3 colheitas) ou derrubar (arbusto com a 🪓 enxada de arrancar; árvore com a 🪚 motosserra). Ganhe as ferramentas completando todas as missões (dia: enxada, semana: motosserra), de presente de amigos ou compre aqui.</p>`;
+  let html = dominioPomarHTML() + `<p class="hint">Plante frutíferas no gramado da roça ou do rancho (fora dos canteiros). Cada uma dá ${colheitasDe(ENFEITE.pitangueira)} colheitas e depois seca. Seca, você escolhe: pôr a 🪧 placa de ajuda (todos os seus amigos são avisados e, quando um ajudar, ela volta a dar frutas) ou derrubar (arbusto com a 🪓 enxada de arrancar; árvore com a 🪚 motosserra). Ganhe as ferramentas completando todas as missões (dia: enxada, semana: motosserra), de presente de amigos ou compre aqui.</p>`;
   html += `<h3>Ferramentas de derrubar</h3>`;
   for (const [id, F] of Object.entries(FERR_DERRUBAR)) html += `<div class="row"><img alt="" src="${ferramentaIcon(id)}"><div><div class="name">${F.nome}</div><div class="meta">Tira um${F.para === 'arvore' ? 'a árvore' : ' arbusto'} seco · você tem <b>${d[id]}</b></div></div>
     <button class="btn" data-comprar-ferr="${id}" ${state.coins < F.custo ? 'disabled' : ''}>${moeda(F.custo)}</button></div>`;
@@ -8432,7 +8459,7 @@ function pomarLojaHTML() {
     for (const e of ENFEITES.filter(x => x.fruteira === tipo)) {
       const f = FRUTA[e.fruta], locked = e.nivel > state.level, tem = state.enfeites[e.id] || 0;
       html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div>
-        <div class="meta">${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} (vale ${f.preco}) a cada ${fmt(e.tempo)} · ${e.colheitas} colheitas (rende ${(e.rende * f.preco * e.colheitas).toLocaleString('pt-BR')} moedas)${tem ? ` · no inventário: <b>${tem}</b>` : ''}</div></div>
+        <div class="meta">${rendeDe(e)} ${f.nome.toLowerCase()}s (vale ${f.preco}) a cada ${fmt(e.tempo)} · ${colheitasDe(e)} colheitas: rende ${(rendeDe(e) * f.preco * colheitasDe(e)).toLocaleString('pt-BR')} moedas (${(rendeDe(e) * f.preco * colheitasDe(e) / e.custo).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}× o preço)${tem ? ` · no inventário: <b>${tem}</b>` : ''}</div></div>
         ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
     }
   }
@@ -8493,9 +8520,15 @@ function trevosDoPeixe(p) {
   return n;
 }
 const peixesAResgatar = () => PEIXES_REAIS().filter(p => trevosDoPeixe(p) > 0);
+const pomarAResgatar = () => { const nv = dominioPomar().nv, t = trevosDe(), r = []; t.pomar = t.pomar || {}; for (let n = 2; n <= nv; n++) if (!t.pomar[n]) r.push(n); return r; };
+function resgatarPomar() {
+  const l = pomarAResgatar(), t = trevosDe(); if (!l.length) return;
+  let n = 0; for (const nv of l) { t.pomar[nv] = true; n += TREVO_DOMINIO[nv] || 0; }
+  ganharTrevos(n, `Domínio do pomar ${l.length > 1 ? `níveis ${l[0]} a ${l[l.length - 1]}` : `nível ${l[0]}`}.`);
+}
 const dominioAResgatar = () => { const nv = dominio().nv, r = []; for (let n = 2; n <= nv; n++) if (!trevosDe().dominio[n]) r.push(n); return r; };
 // conta as linhas de "Para resgatar" (todos os peixes juntos são uma linha, o domínio é outra, e cada conquista)
-const trevosPendentes = () => !state ? 0 : (peixesAResgatar().length ? 1 : 0) + (dominioAResgatar().length ? 1 : 0) + CONQUISTAS.filter(conqPronta).length;
+const trevosPendentes = () => !state ? 0 : (peixesAResgatar().length ? 1 : 0) + (dominioAResgatar().length ? 1 : 0) + (pomarAResgatar().length ? 1 : 0) + CONQUISTAS.filter(conqPronta).length;
 function ganharTrevos(n, motivo) {
   if (!n) { done(); renderTabs(); return; }
   trevosDe().saldo += n; sfx('level');
@@ -8603,6 +8636,10 @@ function trevosHTML() {
   if (dd.length) html += `<div class="row sel"><div class="avatar" style="background:#e0a800;font-size:24px">🎖️</div><div><div class="name">Domínio de pesca</div>
       <div class="meta">Nível ${dd.length > 1 ? `${dd[0]} a ${dd[dd.length - 1]}` : dd[0]}</div></div>
       <button class="btn gold" data-trevo-dominio="1">Resgatar 🍀${dd.reduce((n, x) => n + (TREVO_DOMINIO[x] || 0), 0)}</button></div>`;
+  const pa = pomarAResgatar();
+  if (pa.length) html += `<div class="row sel"><div class="avatar" style="background:#4f9a2f;font-size:24px">🌳</div><div><div class="name">Domínio do pomar</div>
+      <div class="meta">Nível ${pa.length > 1 ? `${pa[0]} a ${pa[pa.length - 1]}` : pa[0]}</div></div>
+      <button class="btn gold" data-trevo-pomar="1">Resgatar 🍀${pa.reduce((n, x) => n + (TREVO_DOMINIO[x] || 0), 0)}</button></div>`;
   const linhaConq = c => {
     const alvo = alvoDe(c), v = Math.min(alvo, c.valor()), feita = trevosDe().conq[c.id], pronta = conqPronta(c);
     return `<div class="row ${pronta ? 'sel' : ''}"><div class="avatar" style="background:${feita ? '#b7b39c' : '#2f8a2f'};font-size:20px">${feita ? '✔' : '🏅'}</div>
