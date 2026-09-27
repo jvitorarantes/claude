@@ -948,6 +948,7 @@ const NOVIDADES = [
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
   { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
+  { v: 110, txt: 'Chegou a CAÇADA 🎯 (a partir do nível 4)! Clique na trilha do mato na sua roça. Cace pragas com o estilingue e a espingarda (rato, pombo, pardal, lebre-europeia, javali, javaporco… e o lendário CHUPA-CABRA, que anda pela Serra Dourada e pela Chapada, mais à noite 👀). Arme a 🪤 arapuca com milho para pegar bichos do mato (preá, tatu, paca, mutum…): eles vão para o Livro da caçada e são soltos. Tem lugares para comprar, domínio de caçada, trevos, missões e conquistas.' },
   { v: 108, txt: 'A motosserra ganhou desenho de motosserra de verdade (antes aparecia um serrote).' },
   { v: 107, txt: 'Correio: agora dá para apagar cada carta (✕) ou todas de uma vez, e as cartas somem sozinhas depois de 7 dias. Na conversa com amigos tem o botão 🧹 Limpar.' },
   { v: 106, txt: 'Canteiros se mudam como o resto: segure o dedo (ou botão direito) em cima de um e escolha Mover. A placa de terras à venda agora fica no lugar dela, e também dá para mudar de lugar.' },
@@ -2722,6 +2723,14 @@ function drawProduct(id, x, y, s) {
   if (RECEITA[id]) return drawGood(id, x, y, s);
   if (PEIXE[id]) return drawPeixe(ctx, x, y, s * 0.85 * cabePeixe(PEIXE[id]), PEIXE[id]);
   if (FRUTA[id]) return drawFruta(id, x, y, s);
+  if (id === 'carnejavali') {
+    ctx.fillStyle = '#b8403a'; ctx.strokeStyle = '#7a2420'; ctx.lineWidth = Math.max(1, 0.6 * s);
+    ctx.beginPath(); ctx.ellipse(x - 1 * s, y + 1 * s, 6.5 * s, 5 * s, -0.3, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#f4d8c8'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.ellipse(x - 1 * s, y + 1 * s, 4.2 * s, 3 * s, -0.3, 0.4, 2.8); ctx.stroke();
+    ctx.fillStyle = '#f4efe2'; ctx.beginPath(); ctx.roundRect(x + 4 * s, y - 5 * s, 5 * s, 2.4 * s, 1 * s); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 9 * s, y - 4.8 * s, 1.5 * s, 0, 7); ctx.arc(x + 9 * s, y - 2.8 * s, 1.5 * s, 0, 7); ctx.fill();
+    return;
+  }
   ctx.lineWidth = Math.max(1, 0.6 * s);
   if (id === 'ovo') {
     ctx.fillStyle = '#fff6df'; ctx.strokeStyle = '#cdb88c';
@@ -4456,6 +4465,8 @@ $('#pane').addEventListener('click', e => {
   if (d.trevoTodos) { resgatarTodosPeixes(); return renderPane(); }
   if (d.trevoDominio) { resgatarDominio(); return renderPane(); }
   if (d.trevoPomar) { resgatarPomar(); return renderPane(); }
+  if (d.trevoBichos) { resgatarBichos(); return renderPane(); }
+  if (d.trevoDomcaca) { resgatarDomCaca(); return renderPane(); }
   if (d.newsDel) { state.news = state.news.filter(n => String(n.at) !== d.newsDel); sfx('click'); save(); renderTabs(); return renderPane(); }
   if (d.newsLimpar) return confirmTwice('news-limpar', 'Apagar todas as cartas do correio? Toque de novo para confirmar.', () => { state.news = []; sfx('water'); toast('Correio limpo! 📭', 'good'); save(); renderTabs(); renderPane(); });
   if (d.trevoComprar) return comprarTrevoItem(d.trevoComprar);
@@ -4678,7 +4689,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'folhas' ? '<b>🍂 Monte de folhas</b><br>Clique e o avatar vai rastelar (+XP e umas moedinhas).' : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'caca' ? (state.level >= CACA_NIVEL ? '<b>🎯 Trilha da caçada</b><br>Clique para caçar pragas com o estilingue ou a espingarda, e armar a arapuca.' : `<b>🎯 Trilha da caçada</b><br>Libera no nível ${CACA_NIVEL}.`) : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'folhas' ? '<b>🍂 Monte de folhas</b><br>Clique e o avatar vai rastelar (+XP e umas moedinhas).' : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4757,7 +4768,7 @@ let holdTimer = null, holdFired = false;
 function objAt(x, y) {
   if (!isHome() || scene === 'casa') return null;
   // a área de clique cobre o desenho inteiro (largura para cada lado e altura, em casas da grade)
-  const CAIXA = { placa: [0.5, 0.95], casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05], pesqueiro: [0.5, 0.3] };
+  const CAIXA = { mata: [0.6, 0.8], placa: [0.5, 0.95], casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05], pesqueiro: [0.5, 0.3] };
   let best = null, bd = Infinity;
   for (const o of objList(state, scene)) {
     if (o.key === 'placa' && !landSignText()) continue;
@@ -4847,6 +4858,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'caminha') { if (isHome()) trocarNome({ animal: target.id }); else { const g = S().animals.find(x => x.id === target.id); if (g) toast(`Caminha do ${g.nome || 'gato'}.`); } }
   else if (target.kind === 'abrigo') actAbrigo(target.id);
   else if (target.kind === 'land') openPanel('terreno');
+  else if (target.kind === 'caca') abrirCaca();
   else if (target.kind === 'bicho') actBicho(target.i);
   else if (target.kind === 'lago') abrirPesca();
   else if (target.kind === 'folhas') rastelarFolhas(target.id);
@@ -5241,6 +5253,7 @@ const MISSOES_DIA = [
   { ev: 'entregar', txt: 'Entregue {n} pedidos do caminhão', alvo: [1, 2, 3] },
   { ev: 'pescar', txt: 'Pesque {n} peixes', alvo: [3, 5, 8] },
   { ev: 'raro', txt: 'Pesque {n} peixe raro (ou melhor)', alvo: [1, 1, 2], need: () => state.level >= 6 },
+  { ev: 'cacar', txt: 'Cace ou pegue na arapuca {n} bichos', alvo: [2, 3, 5], need: () => state.level >= CACA_NIVEL },
   { ev: 'cozinhar', txt: 'Prepare {n} prato de peixe na fábrica', alvo: [1, 2, 3], need: () => state.level >= 3 },
   { ev: 'vila', txt: 'Atenda {n} pedido da vila', alvo: [1, 1, 2] },
   { ev: 'visitar', txt: 'Visite {n} roças (amigos ou vizinhos)', alvo: [1, 2, 3] },
@@ -5262,6 +5275,7 @@ const MISSOES_SEMANA = [
   { ev: 'entregar', txt: 'Entregue {n} pedidos do caminhão', alvo: [8, 15, 25] },
   { ev: 'vila', txt: 'Atenda {n} pedidos da vila', alvo: [3, 5, 8] },
   { ev: 'pescar', txt: 'Pesque {n} peixes', alvo: [10, 20, 30] },
+  { ev: 'cacar', txt: 'Cace ou pegue na arapuca {n} bichos', alvo: [10, 20, 30], need: () => state.level >= CACA_NIVEL },
 ];
 const faixaNivel = () => state.level < 5 ? 0 : state.level < 15 ? 1 : 2;
 function sortear(pool, n) {
@@ -5618,7 +5632,7 @@ for (const id of ['#pescaCv', '#pescaBtn']) {
   $(id).addEventListener('contextmenu', e => e.preventDefault());
 }
 if (location.protocol === 'file:') window.__pesca = () => pesca; // só para testes locais
-if (location.protocol === 'file:') window.__rf = { iso: (u, v) => iso(u, v), st: () => state, mov: () => moving }; // só para testes locais
+if (location.protocol === 'file:') window.__rf = { iso: (u, v) => iso(u, v), st: () => state, mov: () => moving, bicho: id => bichoIcon(id) }; // só para testes locais
 $('#chatForm').addEventListener('submit', e => { e.preventDefault(); enviarChat($('#chatTxt').value); });
 $('#chat').addEventListener('click', e => {
   if (e.target === $('#chat') || e.target.closest('[data-close]')) return fecharChat();
@@ -7755,9 +7769,10 @@ const ENFEITES = [
   { id: 'fogueira',     nome: 'Fogueira de São João',      especial: true, trevo: true, conforto: 2 },
   { id: 'balanco',      nome: 'Balanço de madeira',        especial: true, trevo: true, conforto: 2 },
   { id: 'carrodeboi',   nome: 'Carro de boi',              especial: true, trevo: true, conforto: 3 },
+  { id: 'trofeuchupa',  nome: 'Troféu do Chupa-cabra',     especial: true, caca: true, conforto: 3 },
 ];
 // Etiqueta de onde veio um item especial.
-const origemEnfeite = (e, s) => e.trevo ? 'Exclusivo da Loja do Trevo 🍀' : e.vila ? 'Presente da vila' : `Especial dos pioneiros · ${obtidoEm(s)}`;
+const origemEnfeite = (e, s) => e.caca ? 'Troféu da caçada 🎯' : e.trevo ? 'Exclusivo da Loja do Trevo 🍀' : e.vila ? 'Presente da vila' : `Especial dos pioneiros · ${obtidoEm(s)}`;
 const ENFEITE = Object.fromEntries(ENFEITES.map(e => [e.id, e]));
 // Lugares antigos (saves de antes do modo Mover): viram posições livres.
 const LUGARES = {
@@ -7768,11 +7783,11 @@ const LUGARES = {
 // Posição padrão de cada coisa, em coordenadas da grade da cena.
 const POS_PADRAO = {
   // (as árvores de enfeite saíram: agora as árvores são as frutíferas do Pomar, compradas na Loja)
-  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], pesqueiro: [-1.05, 4.85], placa: [-0.1, 1.1] },
+  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], pesqueiro: [-1.05, 4.85], placa: [-0.1, 1.1], mata: [1.6, 6.9] },
   animais: { canil: [-1.65, 3.65] },
 };
 const LAGO_POS = [3.55, -1.95];
-const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 }, placa: { nome: 'Placa de terras', r: 0.45 } };
+const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 }, placa: { nome: 'Placa de terras', r: 0.45 }, mata: { nome: 'Trilha da caçada', r: 1.0 } };
 function posOf(s, sc, key) {
   const p = s.pos && s.pos[sc] && s.pos[sc][key];
   if (Array.isArray(p)) return p;
@@ -7984,6 +7999,14 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       hits.push({ kind: 'obj', key: o.key, nome: o.id ? ENFEITE[o.id].nome : OBJ_INFO[o.key].nome, x: q.x, y: q.y - W * 0.3, r: W * Math.max(0.35, o.r * 0.5) });
     }
     if (o.key === 'placa') { drawLandSign(q.x, q.y); continue; }
+    if (o.key === 'mata') {
+      drawMataCaca(q.x, q.y, W);
+      if (!moveMode && home) {
+        if (hover && hover.kind === 'caca') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.62, W * 0.2, 0, 0, 7); ctx.stroke(); }
+        hits.push({ kind: 'caca', x: q.x, y: q.y - W * 0.3, r: W * 0.5 });
+      }
+      continue;
+    }
     if (o.key === 'casa') {
       drawHouse(q.x, q.y, W * 0.95, home ? '#f1dcae' : view.casa, s.skin);
       if (!moveMode) {
@@ -8063,6 +8086,7 @@ function drawMoving(sc, t) {
   else if (k === 'canil') drawKennel(q.x, q.y, L.W * 0.85, s.skin);
   else if (k === 'pesqueiro') drawLake(q.x, q.y, W * 0.48, t);
   else if (k === 'placa') drawLandSign(q.x, q.y, true);
+  else if (k === 'mata') drawMataCaca(q.x, q.y, W);
   else drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro);
   ctx.globalAlpha = 1;
 }
@@ -8158,6 +8182,14 @@ function drawEnfeite(id, x, y, s, t) {
   if (ENFEITE[id] && ENFEITE[id].fruteira) return drawFruteira({ id }, x, y, s, t, false);
   ctx.lineWidth = Math.max(1, 1.2 * s); ctx.strokeStyle = 'rgba(60,30,10,.5)';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, 26 * s, 8 * s, 0, 0, 7); ctx.fill();
+  if (id === 'trofeuchupa') {
+    // plaquinha de madeira com a cabeça do Chupa-cabra
+    ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - 2 * s, y - 30 * s, 4 * s, 30 * s);
+    ctx.fillStyle = '#a8703a'; ctx.strokeStyle = '#5a3414'; ctx.lineWidth = 2 * s; ctx.beginPath(); ctx.moveTo(x, y - 62 * s); ctx.lineTo(x + 18 * s, y - 50 * s); ctx.lineTo(x + 14 * s, y - 28 * s); ctx.lineTo(x - 14 * s, y - 28 * s); ctx.lineTo(x - 18 * s, y - 50 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    drawBicho(ctx, x - 12 * s, y - 24 * s, s * 0.95, CACA_BICHO.chupacabra, 0, false);
+    ctx.fillStyle = '#f2c14e'; ctx.font = `900 ${Math.round(7 * s)}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText('★', x, y - 54 * s);
+    return;
+  }
   if (id === 'cerca') {
     // pedacinho de cerca de madeira (no ícone, sem o tema)
     ctx.fillStyle = '#b98050'; ctx.fillRect(x - 24 * s, y - 16 * s, 48 * s, 5 * s); ctx.fillRect(x - 24 * s, y - 30 * s, 48 * s, 5 * s);
@@ -8546,6 +8578,490 @@ function comprarFerramenta(id) {
 }
 
 // ============================================================
+// Caçada 🎯: um modo de jogo parecido com a pesca. Tem lugares para caçar (liberam por nível e se
+// compram), armas (estilingue e espingarda, com munição), a arapuca, o Livro da caçada e o domínio.
+// Pragas (rato, pombo, pardal, lebre-europeia, javali…) se caçam com estilingue ou espingarda e dão
+// recompensa (e carne, no caso do javali). Os bichos nativos só caem na arapuca: são registrados no
+// livro e soltos de volta no mato. O lendário é o Chupa-cabra: aparece na serra e na chapada, mais à noite.
+// ============================================================
+const CACA_NIVEL = 4, CACA_POR_VEZ = 3, CACA_MS = 2 * 3600e3, ARAPUCA_MS = 4 * 3600e3;
+const LUGARES_CACA = [
+  { id: 'capoeira', nome: 'Capoeira do fundo',     emoji: '🌿', nivel: 4,  custo: 0,     sorte: 1,   chao: '#86c050', mato: '#3f8a2a', morro: '#9ccf6a' },
+  { id: 'mata',     nome: 'Mata ciliar',           emoji: '🌳', nivel: 8,  custo: 2500,  sorte: 1.3, chao: '#6fae44', mato: '#2f6f22', morro: '#7fb85a' },
+  { id: 'cerrado',  nome: 'Cerrado',               emoji: '🌾', nivel: 12, custo: 6000,  sorte: 1.6, chao: '#bdb466', mato: '#7a8a3a', morro: '#c9b877' },
+  { id: 'serra',    nome: 'Serra Dourada',         emoji: '⛰️', nivel: 18, custo: 12000, sorte: 2,   chao: '#c8a466', mato: '#6a7a3a', morro: '#b89a6a' },
+  { id: 'chapada',  nome: 'Chapada dos Veadeiros', emoji: '🏞️', nivel: 25, custo: 25000, sorte: 2.6, chao: '#a8a456', mato: '#4a6a2a', morro: '#9a8a6a' },
+];
+const LUGAR_CACA = Object.fromEntries(LUGARES_CACA.map(l => [l.id, l]));
+// lug = a partir de qual lugar aparece (0 = capoeira… 4 = chapada)
+const CACA_BICHOS = [
+  // pragas: estilingue (pequenas) e espingarda (grandes)
+  { id: 'rato',       nome: 'Rato do paiol',   raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 4,  lug: 0, forma: 'rato',  cor: '#8a8078', tam: 0.7,  vel: 1.1, hp: 1, moedas: 15,  peso: 10 },
+  { id: 'pombo',      nome: 'Pombo',           raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 4,  lug: 0, forma: 'ave',   cor: '#9aa3ad', tam: 0.75, vel: 1.1, hp: 1, moedas: 12,  peso: 10, voa: true },
+  { id: 'pardal',     nome: 'Pardal',          raro: 'incomum',  praga: true, armas: ['estilingue'], nivel: 4,  lug: 0, forma: 'ave',   cor: '#a07a4a', tam: 0.6,  vel: 1.45, hp: 1, moedas: 22, peso: 5, voa: true },
+  { id: 'lebre',      nome: 'Lebre-europeia',  raro: 'incomum',  praga: true, armas: ['estilingue', 'espingarda'], nivel: 6, lug: 0, forma: 'lebre', cor: '#b08a5a', tam: 0.9, vel: 1.55, hp: 1, moedas: 40, peso: 6 },
+  { id: 'javali',     nome: 'Javali',          raro: 'raro',     praga: true, armas: ['espingarda'], nivel: 12, lug: 1, forma: 'porco', cor: '#5a4a3a', tam: 1.3,  vel: 1.0, hp: 2, moedas: 90,  carne: 2, peso: 7 },
+  { id: 'javaporco',  nome: 'Javaporco',       raro: 'épico',    praga: true, armas: ['espingarda'], nivel: 15, lug: 2, forma: 'porco', cor: '#7a5a44', tam: 1.5,  vel: 1.15, hp: 3, moedas: 160, carne: 3, peso: 2.5, pintas: true },
+  { id: 'chupacabra', nome: 'Chupa-cabra',     raro: 'lendário', praga: true, armas: ['espingarda'], nivel: 20, lug: 3, forma: 'chupa', cor: '#6a7a6a', tam: 1.25, vel: 1.75, hp: 4, moedas: 1000, peso: 0.6 },
+  // nativos: só na arapuca, e voltam para o mato
+  { id: 'rolinha',    nome: 'Rolinha',         raro: 'comum',    armas: ['arapuca'], nivel: 6,  lug: 0, forma: 'ave',   cor: '#c89a7a', tam: 0.6,  moedas: 5,  peso: 10 },
+  { id: 'prea',       nome: 'Preá',            raro: 'comum',    armas: ['arapuca'], nivel: 6,  lug: 0, forma: 'rato',  cor: '#8a6a4a', tam: 0.7,  moedas: 5,  peso: 10, semRabo: true },
+  { id: 'codorna',    nome: 'Codorna',         raro: 'comum',    armas: ['arapuca'], nivel: 6,  lug: 0, forma: 'ave',   cor: '#9a7a52', tam: 0.65, moedas: 5,  peso: 8, gorda: true },
+  { id: 'inhambu',    nome: 'Inhambu',         raro: 'incomum',  armas: ['arapuca'], nivel: 8,  lug: 1, forma: 'ave',   cor: '#7a6a4a', tam: 0.75, moedas: 10, peso: 6, gorda: true },
+  { id: 'tatu',       nome: 'Tatu-galinha',    raro: 'incomum',  armas: ['arapuca'], nivel: 8,  lug: 1, forma: 'tatu',  cor: '#a09080', tam: 0.9,  moedas: 10, peso: 6 },
+  { id: 'cutia',      nome: 'Cutia',           raro: 'incomum',  armas: ['arapuca'], nivel: 10, lug: 1, forma: 'rato',  cor: '#c8843a', tam: 0.9,  moedas: 10, peso: 5, semRabo: true },
+  { id: 'paca',       nome: 'Paca',            raro: 'raro',     armas: ['arapuca'], nivel: 12, lug: 2, forma: 'rato',  cor: '#7a5230', tam: 1,    moedas: 20, peso: 3, semRabo: true, pintas: true },
+  { id: 'jacu',       nome: 'Jacu',            raro: 'raro',     armas: ['arapuca'], nivel: 14, lug: 2, forma: 'ave',   cor: '#2e2a2a', tam: 0.95, moedas: 20, peso: 3, papo: true },
+  { id: 'mutum',      nome: 'Mutum',           raro: 'épico',    armas: ['arapuca'], nivel: 18, lug: 3, forma: 'ave',   cor: '#1e1e22', tam: 1.05, moedas: 40, peso: 1.2, crista: true },
+];
+const CACA_BICHO = Object.fromEntries(CACA_BICHOS.map(b => [b.id, b]));
+const ARMAS_CACA = {
+  estilingue: { nome: 'Estilingue', nivel: 4,  custo: 0,    mun: 'pedra',    munNome: 'pedrinhas', pacote: 10, munCusto: 20 },
+  espingarda: { nome: 'Espingarda', nivel: 12, custo: 2500, mun: 'cartucho', munNome: 'cartuchos', pacote: 5,  munCusto: 120 },
+};
+const ARAPUCA = { nivel: 6, custo: 400 };
+PRODUCT.carnejavali = { id: 'carnejavali', nome: 'Carne de javali', preco: 60, caca: true };
+
+function cacaDe() {
+  const c = state.caca || (state.caca = {});
+  c.lugares = Array.isArray(c.lugares) ? c.lugares : ['capoeira'];
+  if (!c.lugares.includes('capoeira')) c.lugares.unshift('capoeira');
+  c.prox = c.prox || {}; c.usos = c.usos || {}; c.col = c.col || {}; c.novos = c.novos || [];
+  c.armas = c.armas || { estilingue: true }; c.mun = c.mun || {};
+  if (!c.presente) { c.presente = 1; c.mun.pedra = (c.mun.pedra || 0) + 10; } // começa com 10 pedrinhas
+  if (!LUGAR_CACA[c.lugar] || !temLugarCaca(c.lugar)) c.lugar = 'capoeira';
+  if (!ARMAS_CACA[c.arma] || !c.armas[c.arma]) c.arma = 'estilingue';
+  return c;
+}
+const temLugarCaca = id => { const l = LUGAR_CACA[id]; return !!l && (l.custo === 0 ? state.level >= l.nivel : (state.caca && state.caca.lugares || []).includes(id)); };
+const faltaLugarCaca = id => Math.max(0, (cacaDe().prox[id] || 0) - Date.now());
+const restamCaca = id => faltaLugarCaca(id) ? 0 : Math.max(0, CACA_POR_VEZ - (cacaDe().usos[id] || 0));
+const munDe = arma => cacaDe().mun[ARMAS_CACA[arma].mun] || 0;
+// Domínio de caçada: pontos por bicho (mais para os raros); cada nível corta 5% da espera e aumenta a mira.
+const dominioCacaXP = () => CACA_BICHOS.reduce((t, b) => t + (cacaDe().col[b.id] || 0) * DOMINIO_PTS[b.raro], 0);
+function dominioCaca() {
+  const xp = dominioCacaXP(); let nv = 1;
+  while (nv < DOMINIO_NV.length && xp >= DOMINIO_NV[nv]) nv++;
+  return { nv, xp, ini: DOMINIO_NV[nv - 1], fim: DOMINIO_NV[nv], max: nv >= DOMINIO_NV.length, corte: (nv - 1) * DOMINIO_CORTE, mira: 1 + (nv - 1) * 0.05 };
+}
+const esperaCaca = () => Math.round(CACA_MS * (1 - dominioCaca().corte));
+const esperaArapuca = () => Math.round(ARAPUCA_MS * (1 - dominioCaca().corte));
+const cacaDomAResgatar = () => { const nv = dominioCaca().nv, t = trevosDe(), r = []; t.domCaca = t.domCaca || {}; for (let n = 2; n <= nv; n++) if (!t.domCaca[n]) r.push(n); return r; };
+const bichosAResgatar = () => { const t = trevosDe(); t.caca = t.caca || {}; return CACA_BICHOS.filter(b => cacaDe().col[b.id] && !t.caca[b.id]); };
+function resgatarBichos() {
+  const l = bichosAResgatar(), t = trevosDe(); if (!l.length) return;
+  let n = 0; for (const b of l) { t.caca[b.id] = true; n += TREVO_PEIXE[b.raro] || 1; }
+  ganharTrevos(n, `${l.length} bicho${l.length > 1 ? 's' : ''} do Livro da caçada.`);
+}
+function resgatarDomCaca() {
+  const l = cacaDomAResgatar(), t = trevosDe(); if (!l.length) return;
+  let n = 0; for (const nv of l) { t.domCaca[nv] = true; n += TREVO_DOMINIO[nv] || 0; }
+  ganharTrevos(n, `Domínio de caçada ${l.length > 1 ? `níveis ${l[0]} a ${l[l.length - 1]}` : `nível ${l[0]}`}.`);
+}
+function dominioCacaHTML() {
+  const d = dominioCaca(), pct = d.max ? 100 : Math.round((d.xp - d.ini) / (d.fim - d.ini) * 100), r = cacaDomAResgatar();
+  return `<span class="dnv">🎖️ Domínio de caçada <b>Nv ${d.nv}</b></span><span class="dbar"><i style="width:${pct}%"></i></span>
+    ${r.length ? `<button class="btn gold dresg" type="button" data-trevo-domcaca="1">Resgatar 🍀${r.reduce((t, n) => t + (TREVO_DOMINIO[n] || 0), 0)}</button>` : ''}
+    <span class="dinfo">${d.corte ? `−${Math.round(d.corte * 100)}% de espera · mira +${Math.round((d.mira - 1) * 100)}% · ` : ''}mato ${fmt(esperaCaca() / 1000)} · arapuca ${fmt(esperaArapuca() / 1000)}${d.max ? ' · máximo!' : ` · ${d.fim - d.xp} pts p/ Nv ${d.nv + 1}`}</span>`;
+}
+function sortearBicho(arma, lugar) {
+  const li = LUGARES_CACA.findIndex(l => l.id === lugar), L0 = LUGAR_CACA[lugar], noite = timeOfDay() === 'noite';
+  let ok = CACA_BICHOS.filter(b => b.armas.includes(arma) && b.nivel <= state.level && b.lug <= li);
+  if (!ok.length) ok = [CACA_BICHO[arma === 'arapuca' ? 'rolinha' : arma === 'espingarda' ? 'lebre' : 'rato']];
+  const peso = b => b.peso * (['raro', 'épico', 'lendário'].includes(b.raro) ? L0.sorte : b.raro === 'incomum' ? Math.sqrt(L0.sorte) : 1) * (b.id === 'chupacabra' && noite ? 3 : 1);
+  let r = Math.random() * ok.reduce((t, b) => t + peso(b), 0);
+  for (const b of ok) { r -= peso(b); if (r <= 0) return b; }
+  return ok[0];
+}
+// Guarda no livro (e no domínio). Diz se era novo.
+function registrarBicho(b) {
+  const c = cacaDe(), antes = dominioCaca().nv, novo = !c.col[b.id];
+  c.col[b.id] = (c.col[b.id] || 0) + 1;
+  if (novo && !c.novos.includes(b.id)) c.novos.push(b.id);
+  addXP({ comum: 3, incomum: 6, raro: 12, 'épico': 20, 'lendário': 60 }[b.raro], null);
+  state.stats.caca = (state.stats.caca || 0) + 1; track('cacar');
+  const d = dominioCaca();
+  if (d.nv > antes) setTimeout(() => { sfx('level'); toast(`🎖️ Domínio de caçada nível ${d.nv}! Espera ${Math.round(d.corte * 100)}% menor e mira melhor. Resgate os trevos.`, 'good'); }, 900);
+  return novo;
+}
+function comprarLugarCaca(id) {
+  const l = LUGAR_CACA[id]; if (!l || temLugarCaca(id)) return;
+  if (state.level < l.nivel) return toast(`${l.emoji} ${l.nome}: libera no nível ${l.nivel} e custa ${l.custo.toLocaleString('pt-BR')} moedas.`);
+  if (state.coins < l.custo) return toast(`${l.nome} custa ${l.custo.toLocaleString('pt-BR')} moedas. Faltam ${(l.custo - state.coins).toLocaleString('pt-BR')}.`, 'bad');
+  confirmTwice('lugarcaca' + id, `Comprar ${l.nome} por ${l.custo.toLocaleString('pt-BR')} moedas? Toque de novo para confirmar.`, () => {
+    state.coins -= l.custo; cacaDe().lugares.push(id); cacaDe().lugar = id; sfx('buy');
+    toast(`${l.emoji} ${l.nome} é seu! Bicho raro aparece mais por lá.`, 'good'); caca = { fase: 'pronto' }; done(); renderCaca();
+  });
+}
+function comprarArma(id) {
+  const a = ARMAS_CACA[id], c = cacaDe(); if (!a || c.armas[id]) return;
+  if (state.level < a.nivel) return toast(`${a.nome}: libera no nível ${a.nivel}.`);
+  if (state.coins < a.custo) return toast(`${a.nome} custa ${a.custo.toLocaleString('pt-BR')} moedas.`, 'bad');
+  confirmTwice('arma' + id, `Comprar ${a.nome.toLowerCase()} por ${a.custo.toLocaleString('pt-BR')} moedas? Toque de novo para confirmar.`, () => {
+    state.coins -= a.custo; c.armas[id] = true; c.arma = id; c.mun[a.mun] = (c.mun[a.mun] || 0) + a.pacote; sfx('buy');
+    toast(`${a.nome} é sua! Veio com ${a.pacote} ${a.munNome}. Pega javali, javaporco… e dizem que até o Chupa-cabra.`, 'good'); done(); renderCaca();
+  });
+}
+function comprarMunicao() {
+  const a = ARMAS_CACA[cacaDe().arma];
+  if (state.coins < a.munCusto) return toast(`${a.pacote} ${a.munNome} custam ${a.munCusto} moedas.`, 'bad');
+  state.coins -= a.munCusto; cacaDe().mun[a.mun] = (cacaDe().mun[a.mun] || 0) + a.pacote; sfx('buy');
+  toast(`+${a.pacote} ${a.munNome}!`, 'good'); done(); renderCaca();
+}
+// ---------- Arapuca: arma com 1 milho de isca, volta depois de umas horas e vê o que caiu ----------
+function arapucaAcao() {
+  const c = cacaDe();
+  if (!c.arapuca && !c.temArapuca) {
+    if (state.level < ARAPUCA.nivel) return toast(`🪤 A arapuca libera no nível ${ARAPUCA.nivel}.`);
+    if (state.coins < ARAPUCA.custo) return toast(`A arapuca custa ${ARAPUCA.custo} moedas.`, 'bad');
+    return confirmTwice('arapuca', `Comprar a arapuca por ${ARAPUCA.custo} moedas? Toque de novo para confirmar.`, () => {
+      state.coins -= ARAPUCA.custo; c.temArapuca = true; sfx('buy'); toast('🪤 Arapuca comprada! Arme com 1 milho do celeiro e volte depois.', 'good'); done(); renderCaca();
+    });
+  }
+  if (!c.arapuca) {
+    if (!(state.barn.milho > 0)) return toast('🌽 A arapuca precisa de 1 milho do celeiro de isca. Plante e colha milho!', 'bad');
+    state.barn.milho--; if (!state.barn.milho) delete state.barn.milho;
+    c.arapuca = { lugar: c.lugar, pronta: Date.now() + esperaArapuca() }; sfx('hoe');
+    toast(`🪤 Arapuca armada em ${LUGAR_CACA[c.lugar].nome}! Volte em ${fmt(esperaArapuca() / 1000)}.`, 'good'); done(); return renderCaca();
+  }
+  const falta = c.arapuca.pronta - Date.now();
+  if (falta > 0) return toast(`🪤 A arapuca ainda está armada: volte em ${fmt(falta / 1000)}.`);
+  const lugar = c.arapuca.lugar; c.arapuca = null;
+  if (Math.random() < 0.15) { caca = { fase: 'resultado', msg: '🪤 A arapuca desarmou e comeram o milho… nada desta vez. Arme de novo!' }; sfx('error'); done(); return renderCaca(); }
+  const b = sortearBicho('arapuca', lugar), novo = registrarBicho(b);
+  addCoins(b.moedas, null);
+  caca = { fase: 'resultado', bicho: b, solto: true, novo,
+    msg: `🪤 Caiu ${um(b)} ${b.nome} na arapuca!${novo ? ' ✨ Novo no livro!' : ''} Anotou no livro e soltou de volta no mato 🌿 (+${b.moedas} moedas).` };
+  sfx(novo ? 'level' : 'collect'); if (novo) toast(`✨ Bicho novo no livro: ${b.nome}!`, 'good');
+  done(); renderCaca();
+}
+const BICHO_FEM = ['rolinha', 'prea', 'codorna', 'cutia', 'paca', 'lebre'];
+const um = b => BICHO_FEM.includes(b.id) ? 'uma' : 'um';
+
+// ---------- A caçada no mato: o bicho corre (ou voa) e você toca nele para atirar ----------
+let caca = null, cacaRaf = 0, cacaLivro = false, cacaRelogio = 0;
+function abrirCaca() {
+  if (!isHome()) return;
+  if (state.level < CACA_NIVEL) return toast(`🎯 A caçada libera no nível ${CACA_NIVEL}.`);
+  cacaDe(); cacaLivro = false; caca = { fase: 'pronto' };
+  $('#caca').hidden = false; renderCaca();
+  if (!cacaRaf) cacaRaf = requestAnimationFrame(desenharCaca);
+}
+function fecharCaca() { if (cacaLivro) cacaLivroVisto(); $('#caca').hidden = true; caca = null; }
+function cacaLivroVisto() { if (cacaDe().novos.length) { cacaDe().novos = []; save(); } }
+function entrarNoMato() {
+  if (!caca || !['pronto', 'resultado'].includes(caca.fase)) return;
+  const c = cacaDe(), l = LUGAR_CACA[c.lugar], a = ARMAS_CACA[c.arma];
+  if (faltaLugarCaca(l.id)) return toast(`${l.nome} está sossegado: os bichos voltam em ${fmt(faltaLugarCaca(l.id) / 1000)}. Tente outro lugar ou a arapuca!`);
+  if (munDe(c.arma) <= 0) { caca = { fase: 'pronto', aviso: `Acabou a munição! Compre mais ${a.munNome} aqui embaixo.` }; sfx('error'); return renderCaca(); }
+  c.usos[l.id] = (c.usos[l.id] || 0) + 1;
+  if (c.usos[l.id] >= CACA_POR_VEZ) { c.usos[l.id] = 0; c.prox[l.id] = Date.now() + esperaCaca(); }
+  save();
+  const t = performance.now();
+  caca = { fase: 'procurando', t0: t, aparece: t + 1200 + Math.random() * 1600, arma: c.arma, lugar: l.id, bicho: sortearBicho(c.arma, l.id) };
+  sfx('weed'); renderCaca();
+}
+// O bicho entra por um lado, atravessa e sai; dá até 3 passadas. Às vezes se esconde numa moita.
+function soltarBicho(t, cw, ch) {
+  const b = caca.bicho, dir = Math.random() < 0.5 ? 1 : -1, faixas = b.voa ? [0.2, 0.3, 0.4] : [0.6, 0.72, 0.84];
+  caca.fase = 'mira';
+  caca.a = { x: dir > 0 ? -40 : cw + 40, y: ch * faixas[Math.floor(Math.random() * 3)], dir, vel: (70 + Math.random() * 25) * b.vel * (cw / 420), hp: b.hp, passes: 0, pausa: 0, esconde: 0, flash: 0, ult: t, faixas };
+  sfx(b.id === 'chupacabra' ? 'uivo' : 'weed');
+  renderCaca();
+}
+function moverBicho(t, cw, ch) {
+  const a = caca.a, dt = Math.min(0.05, (t - a.ult) / 1000); a.ult = t;
+  if (a.pausa > t || a.esconde > t) return;
+  a.x += a.dir * a.vel * dt;
+  // moitas: de vez em quando o bicho de chão para escondido atrás de uma
+  if (!caca.bicho.voa && !a.escondeu) for (const mx of MOITAS) if (Math.abs(a.x - mx * cw) < 6 && Math.random() < 0.45) { a.esconde = t + 500 + Math.random() * 700; a.escondeu = true; }
+  if ((a.dir > 0 && a.x > cw + 50) || (a.dir < 0 && a.x < -50)) {
+    a.passes++; a.escondeu = false;
+    if (a.passes >= 3) { caca = { fase: 'resultado', msg: `${um(caca.bicho) === 'uma' ? 'A' : 'O'} ${caca.bicho.nome.toLowerCase()} sumiu no mato… 😩 Tente de novo!` }; sfx('error'); return renderCaca(); }
+    a.dir *= -1; a.y = ch * a.faixas[Math.floor(Math.random() * 3)]; a.pausa = t + 400 + Math.random() * 700;
+  }
+}
+const MOITAS = [0.16, 0.42, 0.68, 0.9];
+const posBicho = (a, t) => ({ x: a.x, y: a.y + (caca.bicho.voa ? Math.sin(t / 180) * 8 : 0) });
+function atirar(x, y) {
+  if (!caca || caca.fase !== 'mira') return;
+  const c = cacaDe(), a = ARMAS_CACA[caca.arma];
+  if (munDe(caca.arma) <= 0) { caca = { fase: 'resultado', msg: `Acabou a munição e o bicho fugiu! Compre mais ${a.munNome} aqui embaixo.` }; sfx('error'); return renderCaca(); }
+  c.mun[a.mun]--; save();
+  const t = performance.now(), cv = $('#cacaCv'), cw = cv.clientWidth, ch = cv.clientHeight;
+  if (caca.arma === 'espingarda') { sfx('tiro'); caca.tiro = { x, y, t }; return acertou(x, y, t); }
+  // estilingue: a pedrinha voa até o ponto tocado; vale onde o bicho estiver quando ela chegar
+  sfx('estilingue');
+  caca.pedra = { x0: cw / 2, y0: ch - 18, x, y, t0: t, dur: 240 };
+  renderCaca();
+}
+function acertou(x, y, t) {
+  const a = caca.a, b = caca.bicho, p = posBicho(a, t), cv = $('#cacaCv'), escala = cv.clientWidth / 420;
+  const raio = 24 * b.tam * escala * dominioCaca().mira * (caca.arma === 'espingarda' ? 1.15 : 1);
+  if (a.esconde > t || Math.hypot(x - p.x, y - (p.y - 10 * b.tam * escala)) > raio) { caca.fala = { txt: 'Errou!', cor: '#e0503a', t, x, y }; sfx('error'); return renderCaca(); }
+  a.hp--; a.flash = t + 250;
+  if (a.hp <= 0) return pegouBicho();
+  caca.fala = { txt: ['Acertou!', 'Mais um!', 'Tá ferido!'][Math.floor(Math.random() * 3)], cor: '#4fb82f', t, x, y };
+  a.vel *= 1.25; a.dir *= Math.random() < 0.5 ? -1 : 1; sfx('hoe');
+  try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) { /* sem vibração */ }
+  renderCaca();
+}
+function pegouBicho() {
+  const b = caca.bicho, novo = registrarBicho(b);
+  addCoins(b.moedas, null);
+  if (b.carne) { state.barn.carnejavali = (state.barn.carnejavali || 0) + b.carne; }
+  let extra = '';
+  if (b.id === 'chupacabra' && !cacaDe().trofeu) { cacaDe().trofeu = 1; state.enfeites.trofeuchupa = (state.enfeites.trofeuchupa || 0) + 1; state.invNovos = (state.invNovos || 0) + 1; extra = ' 🏆 Ganhou o Troféu do Chupa-cabra (está no Inventário)!'; addNews('🏆 Você pegou o lendário Chupa-cabra! O troféu está no Inventário.'); }
+  caca = { fase: 'resultado', bicho: b, novo,
+    msg: `🎯 Pegou ${um(b)} ${b.nome}! (${b.raro}) +${b.moedas.toLocaleString('pt-BR')} moedas de recompensa por tirar a praga${b.carne ? ` e ${b.carne} carnes de javali no celeiro` : ''}.${novo ? ' ✨ Novo no livro!' : ''}${extra}` };
+  sfx(novo || ['raro', 'épico', 'lendário'].includes(b.raro) ? 'level' : 'collect');
+  try { if (navigator.vibrate) navigator.vibrate(50); } catch (e) { /* sem vibração */ }
+  if (novo) toast(`✨ Bicho novo no livro: ${b.nome}!`, 'good');
+  done(); renderCaca();
+}
+function renderCaca() {
+  if (!caca) return;
+  const c = cacaDe(), l = LUGAR_CACA[c.lugar], a = ARMAS_CACA[c.arma], btn = $('#cacaBtn');
+  const livre = caca.fase === 'pronto' || caca.fase === 'resultado', descansa = faltaLugarCaca(l.id);
+  btn.textContent = caca.fase === 'procurando' ? 'Procurando… 👀' : caca.fase === 'mira' ? `🎯 Toque no bicho! (${munDe(caca.arma)} ${ARMAS_CACA[caca.arma].munNome})`
+    : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : munDe(c.arma) <= 0 ? `Sem ${a.munNome}` : `${caca.fase === 'resultado' ? 'Caçar de novo' : 'Entrar no mato'} (${restamCaca(l.id)}/${CACA_POR_VEZ})`;
+  btn.disabled = (livre && !!descansa) || caca.fase === 'mira' || caca.fase === 'procurando';
+  // arapuca
+  const ab = $('#cacaArapuca'), ar = c.arapuca, falta = ar ? ar.pronta - Date.now() : 0;
+  setHtml(ab, !c.temArapuca ? (state.level < ARAPUCA.nivel ? `🪤 Arapuca<br><small>🔒 Nv ${ARAPUCA.nivel}</small>` : `🪤 Arapuca<br><small>${moeda(ARAPUCA.custo)}</small>`)
+    : !ar ? `🪤 Armar arapuca<br><small>isca: 1 milho 🌽</small>` : falta > 0 ? `🪤 Arapuca armada<br><small>em ${fmt(falta / 1000)}</small>` : `🪤 Ver a arapuca!<br><small>caiu alguma coisa?</small>`);
+  ab.classList.toggle('gold', !!ar && falta <= 0); ab.classList.toggle('pulsa', !!ar && falta <= 0);
+  ab.disabled = !livre;
+  setHtml($('#cacaDominio'), dominioCacaHTML());
+  setHtml($('#cacaLugares'), LUGARES_CACA.map(d => {
+    const meu = temLugarCaca(d.id), trava = d.nivel > state.level, f = meu ? faltaLugarCaca(d.id) : 0;
+    const st = meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎯 ${restamCaca(d.id)}/${CACA_POR_VEZ}`) : trava ? `🔒 Nv ${d.nivel} · ${d.custo ? moeda(d.custo) : 'grátis'}` : moeda(d.custo);
+    return `<button type="button" class="pontobtn ${meu ? '' : trava ? 'trava' : 'loja'} ${f ? 'descansa' : ''}" data-lugar-caca="${d.id}" aria-pressed="${meu && d.id === l.id}"><b>${d.emoji} ${d.nome}</b><small>${st}</small></button>`;
+  }).join(''));
+  setHtml($('#cacaArmas'), Object.entries(ARMAS_CACA).map(([id, d]) => {
+    const tem = c.armas[id], trava = d.nivel > state.level;
+    return `<button type="button" class="iscabtn armabtn" data-arma="${id}" aria-pressed="${c.arma === id}" title="${d.nome}"><img alt="" src="${armaIcon(id)}"><small>${tem ? `${munDe(id)} ${id === 'estilingue' ? '🪨' : '🧨'}` : trava ? `Nv ${d.nivel}` : d.custo.toLocaleString('pt-BR')}</small></button>`;
+  }).join(''));
+  const cb = $('#cacaComprar'); setHtml(cb, `Comprar ${a.pacote} ${a.munNome} · ${moeda(a.munCusto)}`); cb.disabled = state.coins < a.munCusto;
+  const alvos = CACA_BICHOS.filter(b => b.armas.includes(c.arma) && b.lug <= LUGARES_CACA.findIndex(x => x.id === l.id));
+  $('#cacaDica').textContent = `${a.nome}: ${alvos.map(b => b.nivel > state.level ? '???' : b.nome + (c.col[b.id] ? '' : ' ✨')).join(', ')}.${c.arma === 'estilingue' ? ' A pedrinha demora um tiquinho: mire um pouco na frente do bicho!' : ' Bicho grande aguenta mais de um tiro.'} Os bichos nativos (preá, tatu, paca…) só caem na 🪤 arapuca e são soltos.`;
+  $('#cacaMsg').textContent = caca.fase === 'procurando' ? 'Shhh… andando devagar pelo mato 👀'
+    : caca.fase === 'mira' ? `Olha ${um(caca.bicho) === 'uma' ? 'a' : 'o'} ${caca.bicho.nome}! Toque nele para atirar${caca.bicho.hp > 1 ? ` (aguenta ${caca.bicho.hp} tiros)` : ''}.`
+    : caca.fase === 'pronto' && caca.aviso ? caca.aviso
+    : caca.fase === 'pronto' && descansa ? `${l.nome} está sossegado. Escolha outro lugar ou arme a arapuca!`
+    : caca.fase === 'pronto' ? `${l.emoji} ${l.nome}: ${CACA_POR_VEZ} entradas no mato por vez. Quando o bicho aparecer, toque nele!${l.id === 'serra' || l.id === 'chapada' ? ' Dizem que à noite o Chupa-cabra anda por aqui… 👀' : ''}`
+    : caca.msg || '';
+  $('#cacaLivro').hidden = !cacaLivro; $('#cacaCv').hidden = cacaLivro;
+  const nn = c.novos.length;
+  $('#cacaLivroBtn').textContent = cacaLivro ? '🎯 Voltar a caçar' : `📖 Livro da caçada${nn ? ` · ✨ ${nn} novo${nn > 1 ? 's' : ''}` : ''}`;
+  if (cacaLivro) setHtml($('#cacaLivro'), livroCaca());
+}
+function livroCaca() {
+  const c = cacaDe(), pegos = CACA_BICHOS.filter(b => c.col[b.id]).length, pend = bichosAResgatar(), soma = pend.reduce((t, b) => t + (TREVO_PEIXE[b.raro] || 1), 0);
+  const card = b => { const n = c.col[b.id] || 0, novo = c.novos.includes(b.id);
+    return `<div class="lvcard ${n ? '' : 'falta'}">${novo ? '<span class="lvnovo">NOVO!</span>' : ''}<img alt="" src="${n ? bichoIcon(b.id) : bichoSombra(b.id)}">
+      <b>${n ? esc(b.nome) : '???'}</b><span class="raro" style="color:${COR_RARO[b.raro]}">${b.raro}</span>
+      <small>${n ? `${b.praga ? 'Pegou' : 'Registrou'} ${n}×` : b.nivel > state.level ? `Nível ${b.nivel}` : `${b.armas.map(x => x === 'arapuca' ? 'arapuca' : ARMAS_CACA[x].nome.toLowerCase()).join(' ou ')} · ${LUGARES_CACA[b.lug].nome}${b.lug < 4 ? ' ou além' : ''}`}</small></div>`; };
+  return `<p class="hint" style="margin:0 0 8px">Você já tem <b>${pegos} de ${CACA_BICHOS.length}</b> bichos no livro. Cada bicho novo vale trevos 🍀 (comum 1, incomum 2, raro 3, épico 5, lendário 10).</p>
+    ${pend.length ? `<p style="margin:0 0 8px;text-align:center"><button class="btn gold" type="button" data-trevo-bichos="1">Resgatar tudo · 🍀 ${soma}</button></p>` : ''}
+    <h3 style="margin:4px 0">🎯 Pragas (estilingue e espingarda)</h3><div class="livro">${CACA_BICHOS.filter(b => b.praga).map(card).join('')}</div>
+    <h3 style="margin:10px 0 4px">🪤 Bichos do mato (arapuca, soltos depois)</h3><div class="livro">${CACA_BICHOS.filter(b => !b.praga).map(card).join('')}</div>`;
+}
+// ---------- Desenhos: bichos, armas e a cena do mato ----------
+// Bicho de frente para a direita, com os pés em (x, y). s = escala (1 = bicho médio).
+function drawBicho(g, x, y, s, b, t, correndo) {
+  const k = s * b.tam, pe = correndo ? Math.sin(t / 60) * 3 * k : 0, cor = b.cor, esc = tomCor(cor, -0.25), cla = tomCor(cor, 0.25);
+  g.save(); g.translate(x, y); g.lineJoin = 'round'; g.lineCap = 'round';
+  const olho = (ox, oy, r = 1.6, c = '#111') => { g.fillStyle = c; g.beginPath(); g.arc(ox * k, oy * k, r * k, 0, 7); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc((ox + 0.4) * k, (oy - 0.5) * k, r * 0.35 * k, 0, 7); g.fill(); };
+  const perna = (px, dy) => { g.strokeStyle = esc; g.lineWidth = 2.6 * k; g.beginPath(); g.moveTo(px * k, -6 * k); g.lineTo(px * k + dy, 0); g.stroke(); };
+  g.fillStyle = 'rgba(0,0,0,.18)'; if (!b.voa || !correndo) { g.beginPath(); g.ellipse(0, 0, 14 * k, 3 * k, 0, 0, 7); g.fill(); }
+  if (b.forma === 'rato') {
+    perna(-6, pe); perna(6, -pe);
+    if (!b.semRabo) { g.strokeStyle = '#c89a8a'; g.lineWidth = 1.4 * k; g.beginPath(); g.moveTo(-11 * k, -7 * k); g.quadraticCurveTo(-20 * k, -4 * k, -24 * k, -10 * k); g.stroke(); }
+    g.fillStyle = cor; g.beginPath(); g.ellipse(0, -9 * k, 12 * k, 7 * k, 0, 0, 7); g.fill();
+    if (b.pintas) { g.fillStyle = '#f4ead8'; for (let r = 0; r < 2; r++) for (let q = 0; q < 4; q++) { g.beginPath(); g.arc((-7 + q * 4.5) * k, (-10 + r * 3.5) * k, 1.1 * k, 0, 7); g.fill(); } }
+    g.fillStyle = cor; g.beginPath(); g.ellipse(11 * k, -11 * k, 6 * k, 5 * k, 0.2, 0, 7); g.fill();
+    g.fillStyle = cla; g.beginPath(); g.arc(9 * k, -16 * k, 2.6 * k, 0, 7); g.fill();
+    g.fillStyle = '#e88a9a'; g.beginPath(); g.arc(17 * k, -10 * k, 1.2 * k, 0, 7); g.fill();
+    olho(13, -12.5, 1.3);
+  } else if (b.forma === 'lebre') {
+    perna(-7, pe * 1.4); perna(7, -pe * 1.4);
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(-13 * k, -12 * k, 3 * k, 0, 7); g.fill();
+    g.fillStyle = cor; g.beginPath(); g.ellipse(0, -11 * k, 13 * k, 7.5 * k, -0.1, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(12 * k, -16 * k, 5.5 * k, 4.5 * k, 0.3, 0, 7); g.fill();
+    for (const [ex, ang] of [[9, -0.5], [12, -0.2]]) { g.fillStyle = cor; g.beginPath(); g.ellipse(ex * k, -25 * k, 2 * k, 7.5 * k, ang, 0, 7); g.fill(); g.fillStyle = '#e8a0a8'; g.beginPath(); g.ellipse(ex * k, -25 * k, 0.9 * k, 5.5 * k, ang, 0, 7); g.fill(); }
+    olho(14, -17, 1.4);
+  } else if (b.forma === 'tatu') {
+    perna(-6, pe); perna(6, -pe);
+    g.strokeStyle = esc; g.lineWidth = 2.5 * k; g.beginPath(); g.moveTo(-12 * k, -5 * k); g.lineTo(-20 * k, -2 * k); g.stroke();
+    g.fillStyle = cor; g.beginPath(); g.ellipse(0, -6 * k, 13 * k, 9 * k, 0, Math.PI, 0); g.fill();
+    g.strokeStyle = esc; g.lineWidth = 1 * k; for (let q = -2; q <= 2; q++) { g.beginPath(); g.moveTo(q * 4 * k, -6 * k); g.quadraticCurveTo(q * 4.4 * k, -12 * k, q * 3.6 * k, -14.5 * k); g.stroke(); }
+    g.fillStyle = cla; g.beginPath(); g.moveTo(11 * k, -9 * k); g.lineTo(21 * k, -5 * k); g.lineTo(11 * k, -3 * k); g.fill();
+    g.fillStyle = cor; g.beginPath(); g.ellipse(11 * k, -12 * k, 1.6 * k, 3.4 * k, 0.3, 0, 7); g.fill();
+    olho(15, -6.5, 1);
+  } else if (b.forma === 'porco') {
+    perna(-8, pe); perna(-3, -pe); perna(5, pe); perna(10, -pe);
+    g.strokeStyle = esc; g.lineWidth = 1.5 * k; g.beginPath(); g.moveTo(-14 * k, -12 * k); g.quadraticCurveTo(-19 * k, -16 * k, -17 * k, -10 * k); g.stroke();
+    g.fillStyle = cor; g.beginPath(); g.ellipse(0, -12 * k, 15 * k, 9 * k, 0, 0, 7); g.fill();
+    // crina no lombo
+    g.fillStyle = esc; g.beginPath(); for (let q = -10; q <= 8; q += 3) { g.moveTo(q * k, -19 * k); g.lineTo((q + 1.5) * k, -24 * k); g.lineTo((q + 3) * k, -19 * k); } g.fill();
+    if (b.pintas) { g.fillStyle = 'rgba(240,200,170,.55)'; for (const [px, py, r] of [[-6, -12, 3.2], [3, -9, 2.6], [-1, -15, 2]]) { g.beginPath(); g.arc(px * k, py * k, r * k, 0, 7); g.fill(); } }
+    g.fillStyle = cor; g.beginPath(); g.ellipse(15 * k, -12 * k, 7 * k, 6 * k, 0.15, 0, 7); g.fill();
+    g.fillStyle = esc; g.beginPath(); g.ellipse(21.5 * k, -10.5 * k, 2.4 * k, 3 * k, 0, 0, 7); g.fill();
+    g.fillStyle = '#f4efe2'; g.beginPath(); g.moveTo(19 * k, -8 * k); g.quadraticCurveTo(22 * k, -13 * k, 20 * k, -16 * k); g.lineTo(18.6 * k, -9 * k); g.fill(); // presa
+    g.fillStyle = esc; g.beginPath(); g.moveTo(11 * k, -17 * k); g.lineTo(13 * k, -22 * k); g.lineTo(15 * k, -17 * k); g.fill();
+    olho(16, -14, 1.2, '#1a0a0a');
+  } else if (b.forma === 'chupa') {
+    // Chupa-cabra: corcunda cinza-esverdeada com espinhos, pernas compridas, olhos vermelhos e presas
+    const brilho = 0.5 + 0.5 * Math.sin(t / 200);
+    g.fillStyle = `rgba(160,255,120,${0.12 + brilho * 0.1})`; g.beginPath(); g.ellipse(0, -16 * k, 24 * k, 18 * k, 0, 0, 7); g.fill();
+    g.strokeStyle = esc; g.lineWidth = 3 * k;
+    for (const [px, d] of [[-8, pe], [-3, -pe], [6, pe], [11, -pe]]) { g.beginPath(); g.moveTo(px * k, -12 * k); g.lineTo(px * k + d, -5 * k); g.lineTo(px * k + d * 1.5 + 2 * k, 0); g.stroke(); }
+    g.strokeStyle = esc; g.lineWidth = 1.6 * k; g.beginPath(); g.moveTo(-13 * k, -15 * k); g.quadraticCurveTo(-24 * k, -12 * k, -26 * k, -20 * k); g.stroke();
+    g.fillStyle = cor; g.beginPath(); g.moveTo(-14 * k, -12 * k); g.quadraticCurveTo(-10 * k, -30 * k, 4 * k, -26 * k); g.quadraticCurveTo(14 * k, -22 * k, 14 * k, -14 * k); g.quadraticCurveTo(0, -8 * k, -14 * k, -12 * k); g.fill();
+    g.fillStyle = '#3a4a3a'; g.beginPath(); for (let q = -10; q <= 6; q += 4) { const yy = -28 + Math.abs(q + 2) * 0.35; g.moveTo(q * k, (yy + 2) * k); g.lineTo((q + 2) * k, (yy - 5) * k); g.lineTo((q + 4) * k, (yy + 2) * k); } g.fill();
+    g.fillStyle = cla; g.beginPath(); g.ellipse(17 * k, -20 * k, 7 * k, 5.5 * k, 0.25, 0, 7); g.fill();
+    g.fillStyle = cor; g.beginPath(); g.moveTo(13 * k, -24 * k); g.lineTo(11 * k, -33 * k); g.lineTo(17 * k, -25 * k); g.fill();
+    g.fillStyle = `rgb(${200 + brilho * 55},20,20)`; g.beginPath(); g.ellipse(19 * k, -22 * k, 2.4 * k, 1.6 * k, 0.3, 0, 7); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.moveTo(20 * k, -17 * k); g.lineTo(21 * k, -13 * k); g.lineTo(22 * k, -17 * k); g.moveTo(17 * k, -16.5 * k); g.lineTo(17.8 * k, -13.5 * k); g.lineTo(18.6 * k, -16.5 * k); g.fill();
+  } else { // ave
+    const asa = correndo && b.voa ? Math.sin(t / 50) : 0.2;
+    if (!b.voa || !correndo) { g.strokeStyle = '#c8783a'; g.lineWidth = 1.3 * k; g.beginPath(); g.moveTo(-2 * k, -5 * k); g.lineTo(-2 * k + pe * 0.5, 0); g.moveTo(3 * k, -5 * k); g.lineTo(3 * k - pe * 0.5, 0); g.stroke(); }
+    g.fillStyle = esc; g.beginPath(); g.moveTo(-9 * k, -11 * k); g.lineTo(-17 * k, -14 * k); g.lineTo(-16 * k, -8 * k); g.fill();
+    g.fillStyle = cor; g.beginPath(); g.ellipse(0, -11 * k, (b.gorda ? 10 : 9) * k, (b.gorda ? 7.5 : 6) * k, -0.1, 0, 7); g.fill();
+    g.fillStyle = esc; g.beginPath(); g.ellipse(-1 * k, (-12 - asa * 6) * k, 7 * k, (2.6 + Math.abs(asa) * 2.5) * k, -0.2 - asa * 0.4, 0, 7); g.fill();
+    g.fillStyle = cor; g.beginPath(); g.arc(8 * k, -17 * k, 4.6 * k, 0, 7); g.fill();
+    if (b.papo) { g.fillStyle = '#d8352a'; g.beginPath(); g.ellipse(9 * k, -12 * k, 2 * k, 2.8 * k, 0, 0, 7); g.fill(); }
+    if (b.crista) { g.fillStyle = '#111'; g.beginPath(); for (let q = 0; q < 4; q++) { g.moveTo((5 + q) * k, -20 * k); g.lineTo((4 + q * 1.4) * k, -26 * k); g.lineTo((6.5 + q) * k, -20.5 * k); } g.fill(); }
+    g.fillStyle = b.crista ? '#f2c02a' : '#e8a040'; g.beginPath(); g.moveTo(12 * k, -18 * k); g.lineTo(16.5 * k, -16.5 * k); g.lineTo(12 * k, -15 * k); g.fill();
+    olho(9.5, -18, 1.2);
+  }
+  g.restore();
+}
+const escBicho = id => id === 'chupacabra' ? [44, 84, 1.3] : CACA_BICHO[id].forma === 'porco' ? [40, 76, 2.05 / CACA_BICHO[id].tam] : [46, 74, 2.3 / Math.max(0.9, CACA_BICHO[id].tam)];
+const bichoIcon = id => makeIcon('bicho2:' + id, () => { const [x, y, e] = escBicho(id); drawBicho(ctx, x, y, e, CACA_BICHO[id], 0, false); });
+const bichoSombra = id => makeIcon('bichos2:' + id, () => { ctx.globalAlpha = 0.85; const [x, y, e] = escBicho(id); drawBicho(ctx, x, y, e, Object.assign({}, CACA_BICHO[id], { cor: '#5b6470', pintas: false, papo: false }), 0, false); ctx.globalAlpha = 1; });
+function drawArma(g, id, x, y, s) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.lineCap = 'round'; g.lineJoin = 'round';
+  if (id === 'estilingue') {
+    g.strokeStyle = '#8a5a2b'; g.lineWidth = 6; g.beginPath(); g.moveTo(0, 22); g.lineTo(0, 2); g.lineTo(-11, -16); g.moveTo(0, 2); g.lineTo(11, -16); g.stroke();
+    g.strokeStyle = '#6b4220'; g.lineWidth = 2; g.beginPath(); g.moveTo(-2, 20); g.lineTo(-2, 4); g.stroke();
+    g.strokeStyle = '#c8402f'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(-11, -15); g.quadraticCurveTo(0, -4, 11, -15); g.stroke();
+    g.fillStyle = '#7a4a22'; g.beginPath(); g.ellipse(0, -8, 4, 2.6, 0, 0, 7); g.fill();
+  } else {
+    g.rotate(-0.45);
+    g.fillStyle = '#8a5a2b'; g.strokeStyle = '#4a2a10'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(-30, 2); g.lineTo(-14, -3); g.lineTo(-6, -3); g.lineTo(-6, 4); g.lineTo(-16, 5); g.lineTo(-30, 10); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#3a3f44'; g.beginPath(); g.roundRect(-8, -5, 40, 5, 2); g.fill(); g.beginPath(); g.roundRect(-8, -1, 36, 4, 2); g.fill();
+    g.strokeStyle = '#3a3f44'; g.lineWidth = 1.6; g.beginPath(); g.arc(-8, 6, 3.5, 0, Math.PI); g.stroke();
+  }
+  g.restore();
+}
+const armaIcon = id => makeIcon('arma:' + id, () => drawArma(ctx, id, 48, 50, id === 'estilingue' ? 1.9 : 1.6));
+function desenharCaca(t) {
+  cacaRaf = 0;
+  const cv = $('#cacaCv'); if (!cv || !caca || $('#caca').hidden) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1), cw = cv.clientWidth, ch = cv.clientHeight;
+  if (cv.width !== Math.round(cw * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (caca.fase === 'procurando' && t >= caca.aparece) soltarBicho(t, cw, ch);
+  if (caca.fase === 'mira') moverBicho(t, cw, ch);
+  if (caca.fase === 'mira' && caca.pedra && t - caca.pedra.t0 >= caca.pedra.dur) { const p = caca.pedra; caca.pedra = null; acertou(p.x, p.y, t); }
+  if (!cacaRelogio || t - cacaRelogio > 1000) { cacaRelogio = t; renderCaca(); }
+  const Lg = LUGAR_CACA[(caca.lugar) || cacaDe().lugar], noite = timeOfDay() === 'noite', escala = cw / 420;
+  // céu, morros e mata ao fundo
+  const ceu = g.createLinearGradient(0, 0, 0, ch * 0.45); ceu.addColorStop(0, noite ? '#1d2a4a' : '#8fd0f5'); ceu.addColorStop(1, noite ? '#3a4a6a' : '#e3f4ff');
+  g.fillStyle = ceu; g.fillRect(0, 0, cw, ch * 0.45);
+  if (noite) { g.fillStyle = '#fff6c8'; g.beginPath(); g.arc(cw * 0.82, ch * 0.12, 12, 0, 7); g.fill(); }
+  g.fillStyle = Lg.morro; g.beginPath(); g.moveTo(0, ch * 0.45); for (let x = 0; x <= cw; x += 30) g.lineTo(x, ch * 0.3 - Math.sin(x / 70 + 1) * ch * 0.06 - (Lg.id === 'serra' || Lg.id === 'chapada' ? Math.abs(Math.sin(x / 45)) * ch * 0.08 : 0)); g.lineTo(cw, ch * 0.45); g.fill();
+  for (let k = 0; k < 9; k++) { const x = (k + 0.3) * cw / 8.5, r = (14 + (k * 7) % 10) * escala; g.fillStyle = tomCor(Lg.mato, -0.1 + (k % 3) * 0.06); g.fillRect(x - 2, ch * 0.4 - r, 4, r); g.beginPath(); g.arc(x, ch * 0.4 - r, r, 0, 7); g.fill(); }
+  const chao = g.createLinearGradient(0, ch * 0.42, 0, ch); chao.addColorStop(0, Lg.chao); chao.addColorStop(1, tomCor(Lg.chao, -0.2));
+  g.fillStyle = chao; g.fillRect(0, ch * 0.42, cw, ch);
+  g.strokeStyle = tomCor(Lg.chao, -0.3); g.lineWidth = 1.2;
+  for (let k = 0; k < 40; k++) { const x = (k * 97) % cw, y = ch * 0.5 + ((k * 53) % (ch * 0.48)); g.beginPath(); g.moveTo(x, y); g.lineTo(x - 2, y - 6); g.moveTo(x, y); g.lineTo(x + 2, y - 5); g.stroke(); }
+  // o bicho (atrás das moitas quando está escondido)
+  const a = caca.a, b = caca.bicho;
+  const desenhaMoitas = () => { for (const [k, mx] of MOITAS.entries()) { const y = ch * (0.6 + (k % 3) * 0.12) + 4, r = 20 * escala, mexe = caca.fase === 'procurando' ? Math.sin(t / 70 + k) * 2 : 0; g.fillStyle = tomCor(Lg.mato, 0.05); for (const [dx, dy, rr] of [[-r * 0.7, 0, r * 0.8], [r * 0.7, 0, r * 0.8], [0, -r * 0.5, r]]) { g.beginPath(); g.arc(mx * cw + dx + mexe, y + dy - r * 0.4, rr, 0, 7); g.fill(); } } };
+  if (caca.fase === 'mira' && a) {
+    const p = posBicho(a, t), escondido = a.esconde > t;
+    if (escondido) { desenhaMoitas(); g.globalAlpha = 0.5; drawBicho(g, p.x, p.y, escala * 1.4, b, t, false); g.globalAlpha = 1; }
+    else {
+      desenhaMoitas();
+      g.save(); if (a.dir < 0) { g.translate(p.x * 2, 0); g.scale(-1, 1); }
+      if (a.flash > t) g.globalAlpha = 0.5 + 0.5 * Math.sin(t / 25);
+      drawBicho(g, p.x, p.y, escala * 1.4, b, t, a.pausa <= t);
+      g.restore(); g.globalAlpha = 1;
+    }
+  } else desenhaMoitas();
+  // arma na parte de baixo, a pedrinha voando, o tiro e o "Errou!/Acertou!"
+  const arma = caca.arma || cacaDe().arma;
+  drawArma(g, arma, cw / 2, ch - 22 * escala, 1.3 * escala);
+  if (caca.pedra) { const p = caca.pedra, q = Math.min(1, (t - p.t0) / p.dur); g.fillStyle = '#6a625a'; g.beginPath(); g.arc(p.x0 + (p.x - p.x0) * q, p.y0 + (p.y - p.y0) * q - Math.sin(q * Math.PI) * 20, 4 * (1.2 - q * 0.5), 0, 7); g.fill(); }
+  if (caca.tiro && t - caca.tiro.t < 180) { const q = (t - caca.tiro.t) / 180; g.fillStyle = `rgba(255,220,120,${1 - q})`; g.beginPath(); g.arc(caca.tiro.x, caca.tiro.y, 10 + q * 16, 0, 7); g.fill(); g.fillStyle = `rgba(255,255,255,${0.35 * (1 - q)})`; g.fillRect(0, 0, cw, ch); }
+  if (caca.fala && t - caca.fala.t < 700) { const f = caca.fala, q = (t - f.t) / 700; g.globalAlpha = 1 - q; g.fillStyle = f.cor; g.font = `900 ${Math.round(18 * Math.max(0.8, escala))}px system-ui`; g.textAlign = 'center'; g.fillText(f.txt, f.x, f.y - 16 - q * 20); g.globalAlpha = 1; }
+  if (caca.fase === 'mira' && pointer.cacaMira) { const m = pointer.cacaMira; g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2; g.beginPath(); g.arc(m.x, m.y, 12, 0, 7); g.moveTo(m.x - 18, m.y); g.lineTo(m.x - 6, m.y); g.moveTo(m.x + 6, m.y); g.lineTo(m.x + 18, m.y); g.moveTo(m.x, m.y - 18); g.lineTo(m.x, m.y - 6); g.moveTo(m.x, m.y + 6); g.lineTo(m.x, m.y + 18); g.stroke(); }
+  // resultado: o bicho pego aparece no meio
+  if (caca.fase === 'resultado' && caca.bicho) { const q = Math.min(1, (t - (caca.tr || (caca.tr = t))) / 300); drawBicho(g, cw / 2, ch * 0.62, escala * 1.6 * (0.6 + 0.4 * q), caca.bicho, t, false); }
+  if (noite) { g.fillStyle = 'rgba(20,30,70,.28)'; g.fillRect(0, 0, cw, ch); }
+  cacaRaf = requestAnimationFrame(desenharCaca);
+}
+$('#caca').addEventListener('click', e => {
+  if (e.target === $('#caca') || e.target.closest('[data-close]')) return fecharCaca();
+  if (e.target.closest('#cacaBtn')) return entrarNoMato();
+  if (e.target.closest('#cacaArapuca')) return arapucaAcao();
+  if (e.target.closest('#cacaComprar')) return comprarMunicao();
+  if (e.target.closest('[data-trevo-bichos]')) { resgatarBichos(); return renderCaca(); }
+  if (e.target.closest('[data-trevo-domcaca]')) { resgatarDomCaca(); return renderCaca(); }
+  if (e.target.closest('#cacaLivroBtn')) { if (cacaLivro) cacaLivroVisto(); cacaLivro = !cacaLivro; return renderCaca(); }
+  const lb = e.target.closest('[data-lugar-caca]');
+  if (lb) {
+    if (caca && ['procurando', 'mira'].includes(caca.fase)) return;
+    if (!temLugarCaca(lb.dataset.lugarCaca)) return comprarLugarCaca(lb.dataset.lugarCaca);
+    cacaDe().lugar = lb.dataset.lugarCaca; save(); caca = { fase: 'pronto' }; sfx('click'); return renderCaca();
+  }
+  const ab = e.target.closest('[data-arma]');
+  if (ab) {
+    if (caca && ['procurando', 'mira'].includes(caca.fase)) return;
+    const id = ab.dataset.arma;
+    if (!cacaDe().armas[id]) return comprarArma(id);
+    cacaDe().arma = id; save(); caca = { fase: 'pronto' }; sfx('click'); return renderCaca();
+  }
+});
+// o tiro vale no instante do toque
+$('#cacaCv').addEventListener('pointerdown', e => {
+  if (!caca || caca.fase !== 'mira') return;
+  e.preventDefault(); const r = $('#cacaCv').getBoundingClientRect();
+  atirar(e.clientX - r.left, e.clientY - r.top);
+});
+$('#cacaCv').addEventListener('pointermove', e => { const r = $('#cacaCv').getBoundingClientRect(); pointer.cacaMira = e.pointerType === 'mouse' ? { x: e.clientX - r.left, y: e.clientY - r.top } : null; });
+$('#cacaCv').addEventListener('pointerleave', () => { pointer.cacaMira = null; });
+$('#cacaCv').addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('keydown', e => {
+  if ($('#caca').hidden) return;
+  if (e.key === 'Escape') fecharCaca();
+  else if ((e.key === ' ' || e.key === 'Enter') && !e.repeat && caca && ['pronto', 'resultado'].includes(caca.fase)) { e.preventDefault(); entrarNoMato(); }
+});
+if (location.protocol === 'file:') window.__caca = () => caca; // só para testes locais
+// A entrada da caçada na roça: uma trilha para o mato, com árvores e a plaquinha com o alvo.
+function drawMataCaca(x, y, W) {
+  const s = W / 100;
+  ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(x, y, 60 * s, 18 * s, 0, 0, 7); ctx.fill();
+  for (const [dx, dy, r, c] of [[-30, -6, 22, '#2f6f22'], [22, -10, 26, '#3a7f2a'], [-4, -18, 20, '#2a5f1e']]) {
+    ctx.fillStyle = '#6b4a2a'; ctx.fillRect(x + (dx - 3) * s, y + (dy - r * 1.2) * s, 6 * s, r * 1.2 * s);
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + dx * s, y + (dy - r * 1.4) * s, r * s, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.beginPath(); ctx.arc(x + (dx - r * 0.3) * s, y + (dy - r * 1.7) * s, r * 0.4 * s, 0, 7); ctx.fill();
+  }
+  for (const [dx, dy] of [[-44, 4], [40, 6], [8, 8]]) { ctx.fillStyle = '#4f9a2f'; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s - 6 * s, 9 * s, 0, 7); ctx.arc(x + (dx + 8) * s, y + dy * s - 4 * s, 7 * s, 0, 7); ctx.fill(); }
+  // trilha de terra
+  ctx.fillStyle = '#c9a36a'; ctx.beginPath(); ctx.ellipse(x - 4 * s, y + 10 * s, 12 * s, 5 * s, 0, 0, 7); ctx.fill();
+  // plaquinha com o alvo
+  const px = x + 30 * s, py = y + 14 * s;
+  ctx.fillStyle = '#7a4a22'; ctx.fillRect(px - 2 * s, py - 30 * s, 4 * s, 30 * s);
+  ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 1.5 * s; ctx.beginPath(); ctx.roundRect(px - 16 * s, py - 44 * s, 32 * s, 18 * s, 3 * s); ctx.fill(); ctx.stroke();
+  for (const [r, c] of [[7, '#c8402f'], [5, '#fff'], [3, '#c8402f']]) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(px, py - 35 * s, r * s, 0, 7); ctx.fill(); }
+}
+
+// ============================================================
 // Trevos 🍀: a moeda verde. Não se compra: ganha resgatando peixes novos (no Livro de peixes),
 // níveis do domínio de pesca e conquistas. Serve para a Loja do Trevo, com itens exclusivos.
 // Tudo o que já foi feito antes (peixes, níveis, conquistas) também pode ser resgatado.
@@ -8563,6 +9079,8 @@ function trevosDe() {
 const temTrevoItem = id => !!(state && state.trevos && state.trevos.itens && state.trevos.itens[id]);
 const PEIXES_REAIS = () => PEIXES.filter(p => !p.lixo);
 const CONQUISTAS = [
+  { id: 'caca30',     nome: 'Mateiro',               desc: 'Caçar ou pegar na arapuca 30 bichos',   alvo: 30,    valor: () => (state.caca && state.stats.caca) || 0, trevos: 5 },
+  { id: 'chupacabra', nome: 'Caçador de lendas',     desc: 'Pegar o Chupa-cabra',                   alvo: 1,     valor: () => (state.caca && state.caca.col && state.caca.col.chupacabra) || 0, trevos: 10 },
   { id: 'colher100',  nome: 'Mão na terra',          desc: 'Colher 100 vezes',                      alvo: 100,   valor: () => state.stats.colheitas || 0, trevos: 3 },
   { id: 'colher1000', nome: 'Lavrador de mão cheia', desc: 'Colher 1.000 vezes',                    alvo: 1000,  valor: () => state.stats.colheitas || 0, trevos: 10 },
   { id: 'coletas200', nome: 'Cuidador do rancho',    desc: 'Recolher 200 produtos dos animais',     alvo: 200,   valor: () => state.stats.coletas || 0, trevos: 5 },
@@ -8602,7 +9120,7 @@ function resgatarPomar() {
 }
 const dominioAResgatar = () => { const nv = dominio().nv, r = []; for (let n = 2; n <= nv; n++) if (!trevosDe().dominio[n]) r.push(n); return r; };
 // conta as linhas de "Para resgatar" (todos os peixes juntos são uma linha, o domínio é outra, e cada conquista)
-const trevosPendentes = () => !state ? 0 : (peixesAResgatar().length ? 1 : 0) + (dominioAResgatar().length ? 1 : 0) + (pomarAResgatar().length ? 1 : 0) + CONQUISTAS.filter(conqPronta).length;
+const trevosPendentes = () => !state ? 0 : (peixesAResgatar().length ? 1 : 0) + (dominioAResgatar().length ? 1 : 0) + (pomarAResgatar().length ? 1 : 0) + (state.level >= CACA_NIVEL && bichosAResgatar().length ? 1 : 0) + (state.level >= CACA_NIVEL && cacaDomAResgatar().length ? 1 : 0) + CONQUISTAS.filter(conqPronta).length;
 function ganharTrevos(n, motivo) {
   if (!n) { done(); renderTabs(); return; }
   trevosDe().saldo += n; sfx('level');
@@ -8712,6 +9230,13 @@ function trevosHTML() {
   if (dd.length) html += `<div class="row sel"><div class="avatar" style="background:#e0a800;font-size:24px">🎖️</div><div><div class="name">Domínio de pesca</div>
       <div class="meta">Nível ${dd.length > 1 ? `${dd[0]} a ${dd[dd.length - 1]}` : dd[0]}</div></div>
       <button class="btn gold" data-trevo-dominio="1">Resgatar 🍀${dd.reduce((n, x) => n + (TREVO_DOMINIO[x] || 0), 0)}</button></div>`;
+  if (state.level >= CACA_NIVEL) {
+    const bb = bichosAResgatar(), dc = cacaDomAResgatar();
+    if (bb.length) html += `<div class="row sel"><div class="avatar" style="background:#6b8a3a;font-size:24px">🎯</div><div><div class="name">Livro da caçada</div>
+      <div class="meta">${bb.map(b => esc(b.nome)).join(', ')}</div></div><button class="btn gold" data-trevo-bichos="1">Resgatar 🍀${bb.reduce((n, b) => n + (TREVO_PEIXE[b.raro] || 1), 0)}</button></div>`;
+    if (dc.length) html += `<div class="row sel"><div class="avatar" style="background:#e0a800;font-size:24px">🎖️</div><div><div class="name">Domínio de caçada</div>
+      <div class="meta">Nível ${dc.length > 1 ? `${dc[0]} a ${dc[dc.length - 1]}` : dc[0]}</div></div><button class="btn gold" data-trevo-domcaca="1">Resgatar 🍀${dc.reduce((n, x) => n + (TREVO_DOMINIO[x] || 0), 0)}</button></div>`;
+  }
   const pa = pomarAResgatar();
   if (pa.length) html += `<div class="row sel"><div class="avatar" style="background:#4f9a2f;font-size:24px">🌳</div><div><div class="name">Domínio do pomar</div>
       <div class="meta">Nível ${pa.length > 1 ? `${pa[0]} a ${pa[pa.length - 1]}` : pa[0]}</div></div>

@@ -388,6 +388,10 @@
     pest: t => noise(t, 0.35, 'highpass', 5000, 3000, 0.16),
     weed: t => { noise(t, 0.2, 'bandpass', 400, 2200, 0.2, 1.5); blip(t + 0.17, 'sine', 400, 800, 0.06, 0.15); },
     fert: t => { noise(t, 0.3, 'bandpass', 800, 3000, 0.1); for (let k = 0; k < 6; k++) blip(t + 0.05 + k * 0.05, 'sine', 1500 + k * 250, 2200 + k * 250, 0.07, 0.07); },
+    // caçada: tiro de espingarda (estouro grave) e o estalo do estilingue
+    tiro: t => { noise(t, 0.4, 'lowpass', 3200, 180, 0.55); blip(t, 'sine', 140, 40, 0.3, 0.5); },
+    estilingue: t => { blip(t, 'triangle', 280, 950, 0.09, 0.16); noise(t + 0.02, 0.07, 'highpass', 3000, 5200, 0.06); },
+    uivo: t => voz(t, { f: [[0, 300], [0.4, 700], [1.2, 420]], dur: 1.3, vel: 0.22, filtro: 1200, q: 2, vib: 6, vibD: 25 }),
     coin: t => { blip(t, 'square', 988, 988, 0.07, 0.06); blip(t + 0.07, 'square', 1319, 1319, 0.18, 0.06); },
     buy: t => { blip(t, 'sine', 180, 90, 0.15, 0.3); SFX.coin(t + 0.05); },
     level: t => { [60, 64, 67, 72, 76].forEach((m, k) => pluck(sfxBus, t + k * 0.09, m + 12, 0.4, 0.16, 4500)); },
