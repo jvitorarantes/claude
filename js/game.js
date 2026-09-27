@@ -917,8 +917,9 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 75, txt: 'Domínio de pesca 🎖️: cada peixe pego dá pontos (os raros valem mais). A cada nível de domínio, a espera da vara e da tarrafa cai 5%, até 45% no nível 10. Os peixes que você já pegou contam!' },
   { v: 74, txt: 'Os pontos de pesca ganharam nomes de verdade: Córrego Cascavel (nível 5), Rio Meia Ponte (10), Ribeirão João Leite (15), Rio dos Bois (20), Rio Araguaia (25) e Rio Amazonas (30), cada um com seu cenário.' },
-  { v: 71, txt: 'Pontos de pesca 🎣: cada ponto dá uma pescaria a cada 2 horas. Além do pesqueiro de casa, compre o Riacho das Pedras (nível 5), a Represa Velha (10), o Rio Grande (16) e a Lagoa Encantada (22): quanto mais longe, mais peixe raro. E chegou a tarrafa 🕸️: pega 3 peixes de uma vez, uma vez a cada 12 horas.' },
+  { v: 71, txt: 'Pontos de pesca 🎣: cada ponto dá uma pescaria a cada 2 horas. Além do pesqueiro de casa, compre o Córrego Cascavel (nível 5), o Rio Meia Ponte (10), o Ribeirão João Leite (15), o Rio dos Bois (20), o Rio Araguaia (25) e o Rio Amazonas (30): quanto mais longe, mais peixe raro. E chegou a tarrafa 🕸️: pega 3 peixes de uma vez, uma vez a cada 12 horas.' },
   { v: 70, txt: 'Clique na casinha do cachorro para trocar o nome dele. E o gato ganhou uma caminha na sala: clique nela para trocar o nome do bichano.' },
   { v: 69, txt: 'Venda animais direto no abrigo: clique na casa deles, e cada bicho da lista tem o botão Vender.' },
   { v: 69, txt: 'Itens novos para o avatar que liberam por nível: facão (5), foice (10), laço (15), viola (20) e machado (25). Escolha em ⚙️ › Seu avatar › Na mão.' },
@@ -6054,6 +6055,25 @@ function livroVisto() { if ((state.peixesNovos || []).length) { state.peixesNovo
 // Cada ponto dá uma pescaria a cada 2 horas. O pesqueiro de casa já vem; os outros liberam por nível e se compram.
 // Quanto mais longe, mais "sorte": peixe raro morde mais e vem menos lixo.
 const PONTO_MS = 2 * 3600e3, TARRAFA_MS = 12 * 3600e3, TARRAFA_N = 3;
+// Domínio de pesca: cada peixe pego dá pontos (mais para os raros). A cada nível de domínio,
+// a espera da vara e da tarrafa cai 5% (até 45% no nível 10). Conta também os peixes de antes.
+const DOMINIO_PTS = { comum: 1, incomum: 2, raro: 4, 'épico': 8, 'lendário': 20 };
+const DOMINIO_NV = [0, 10, 25, 50, 90, 150, 240, 360, 520, 750];
+const DOMINIO_CORTE = 0.05;
+const dominioXP = () => PEIXES.reduce((t, p) => t + (p.lixo ? 0 : (state.col[p.id] || 0) * DOMINIO_PTS[p.raro]), 0);
+function dominio() {
+  const xp = dominioXP(); let nv = 1;
+  while (nv < DOMINIO_NV.length && xp >= DOMINIO_NV[nv]) nv++;
+  const ini = DOMINIO_NV[nv - 1], fim = DOMINIO_NV[nv];
+  return { nv, xp, ini, fim, max: nv >= DOMINIO_NV.length, corte: (nv - 1) * DOMINIO_CORTE };
+}
+const esperaVara = () => Math.round(PONTO_MS * (1 - dominio().corte));
+const esperaTarrafa = () => Math.round(TARRAFA_MS * (1 - dominio().corte));
+function dominioHTML() {
+  const d = dominio(), pct = d.max ? 100 : Math.round((d.xp - d.ini) / (d.fim - d.ini) * 100);
+  return `<span class="dnv">🎖️ Domínio de pesca <b>Nv ${d.nv}</b></span><span class="dbar"><i style="width:${pct}%"></i></span>
+    <span class="dinfo">${d.corte ? `−${Math.round(d.corte * 100)}% de espera · ` : ''}vara ${fmt(esperaVara() / 1000)} · tarrafa ${fmt(esperaTarrafa() / 1000)}${d.max ? ' · máximo!' : ` · ${d.fim - d.xp} pts p/ Nv ${d.nv + 1}`}</span>`;
+}
 const PONTOS = [
   { id: 'casa',    nome: 'Pesqueiro de casa', emoji: '🏡', nivel: 1,  custo: 0,     sorte: 1,    agua: ['#6cb6e8', '#2f7ab8'], margem: '#7dbb48' },
   // (os ids ficam os mesmos de antes para quem já tinha comprado; o "cena" diz o que desenhar)
@@ -6096,12 +6116,18 @@ function sortearPeixe(isca, sorte = 1, semLixo = false) {
 }
 // Guarda o peixe pego: celeiro, coleção, livro, missões e XP. Diz se era novo.
 function guardarPeixe(p) {
+  const antes = dominio().nv;
   const novo = !p.lixo && !(state.col[p.id] > 0);
   state.barn[p.id] = (state.barn[p.id] || 0) + 1;
   if (novo) { state.peixesNovos = state.peixesNovos || []; if (!state.peixesNovos.includes(p.id)) state.peixesNovos.push(p.id); }
   if (!p.lixo) { collect(p.id, null); track('pescar'); if (['raro', 'épico', 'lendário'].includes(p.raro)) track('raro'); }
   addXP({ lixo: 0, comum: 2, incomum: 4, raro: 8, 'épico': 15, 'lendário': 40 }[p.raro], null);
   state.stats.peixes = (state.stats.peixes || 0) + (p.lixo ? 0 : 1);
+  const d = dominio();
+  if (d.nv > antes) {
+    setTimeout(() => { sfx('level'); toast(`🎖️ Domínio de pesca nível ${d.nv}! Agora a espera é ${Math.round(d.corte * 100)}% menor: vara ${fmt(esperaVara() / 1000)}, tarrafa ${fmt(esperaTarrafa() / 1000)}.`, 'good'); }, 900);
+    addNews(`🎖️ Seu domínio de pesca subiu para o nível ${d.nv}: a espera da vara e da tarrafa caiu ${Math.round(d.corte * 100)}%.`);
+  }
   return novo;
 }
 // Tarrafa: joga a rede e pega 3 peixes de uma vez (sem isca), uma vez a cada 12 horas.
@@ -6110,7 +6136,7 @@ function jogarTarrafa() {
   if (faltaTarrafa()) return toast(`A tarrafa está secando: dá para jogar de novo em ${fmt(faltaTarrafa() / 1000)}.`);
   const sorte = PONTO[pontoSel()].sorte;
   const peixes = Array.from({ length: TARRAFA_N }, () => sortearPeixe(null, sorte, true));
-  state.tarrafaEm = Date.now() + TARRAFA_MS; save();
+  state.tarrafaEm = Date.now() + esperaTarrafa(); save();
   if (pescaLivro) livroVisto(); pescaLivro = false;
   pesca = { fase: 'tarrafa', t0: performance.now(), peixes };
   sfx('water'); renderPesca();
@@ -6142,7 +6168,7 @@ function puxar() {
   if (pesca.fase === 'esperando') { pesca = { fase: 'resultado', t0: performance.now(), msg: 'Puxou cedo demais! O peixe fugiu.' }; sfx('error'); return renderPesca(); }
   if (pesca.fase === 'fisgou') {
     const p = pesca.peixe, novo = guardarPeixe(p);
-    pontosDe().prox[pesca.ponto || 'casa'] = Date.now() + PONTO_MS; // o ponto descansa 2 horas
+    pontosDe().prox[pesca.ponto || 'casa'] = Date.now() + esperaVara(); // o ponto descansa (2 horas, menos com domínio)
     const um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''}`;
     pesca = { fase: 'resultado', t0: performance.now(), peixe: p, novo, msg: p.lixo ? `Ih… veio uma ${p.nome.toLowerCase()}. 😅`
       : novo ? `✨ Peixe novo! Pegou ${um} ${p.nome} pela primeira vez (${p.raro}) — já está no 📖 Livro de peixes!` : `Pegou ${um} ${p.nome}! (${p.raro})` };
@@ -6173,6 +6199,7 @@ function renderPesca() {
   const tb = $('#pescaTarrafa'), ft = faltaTarrafa();
   tb.innerHTML = ft ? `🕸️ Tarrafa<br><small>em ${fmt(ft / 1000)}</small>` : `🕸️ Tarrafa<br><small>pega ${TARRAFA_N} peixes</small>`;
   tb.disabled = !!ft || !livre;
+  setHtml($('#pescaDominio'), dominioHTML());
   const pp = pontosDe();
   setHtml($('#pescaPontos'), PONTOS.map(d => {
     const meu = pp.meus.includes(d.id), trava = d.nivel > state.level, f = meu ? faltaPonto(d.id) : 0;
