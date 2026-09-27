@@ -947,6 +947,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
+  { v: 103, txt: 'Na Loja, "Mudas" virou Horta e o Pomar ficou do lado. Os montes de folhas brilham e têm o rastelo em cima. E o botão 🆘 Precisa de ajuda leva direto para a roça (ou o rancho) do amigo, com a frutífera marcada.' },
   { v: 102, txt: 'Pomar mais barato 🍊: frutíferas e ferramentas custam bem menos, e cada frutífera agora dá 3 colheitas (não morre mais por dias). Depois da última, ela seca: toque nela e ponha a 🪧 placa de ajuda. Todos os seus amigos são avisados e, quando um ajudar, ela volta a dar frutas. Na lista de Amigos, o botão 🆘 Precisa de ajuda fica colorido quando um amigo está pedindo. Ajudar frutífera não conta no limite do dia.' },
   { v: 101, txt: 'Canteiros e cercas 🚧: no botão Mover agora dá para mudar os canteiros de lugar (vão com o que estiver plantado). A cerca em volta da roça saiu: compre pedaços de cerca na Loja › Enfeites e ponha onde quiser (quem já jogava ganhou 40 de presente, estão no Inventário). O estilo da cerca segue o tema da roça. O rancho continua igual.' },
   { v: 100, txt: 'Montes de folhas 🍂: de vez em quando cai um monte de folhas no gramado (no outono, bem mais). Clique nele e o seu avatar vai lá rastelar: ganha XP e umas moedinhas!' },
@@ -1253,7 +1254,7 @@ function visitNpc(id) {
   save();
 }
 
-async function visitFriend(uid) {
+async function visitFriend(uid, ajudar) {
   if (!user) return;
   const amigo = friendInfo[uid];
   const nomeAmigo = amigo && amigo.name && !amigo.erro ? amigo.name : 'Amigo', fazAmigo = (amigo && amigo.fazenda) || 'Roça Feliz';
@@ -1266,6 +1267,12 @@ async function visitFriend(uid) {
     const nome = limpaNome(f.apelido || data.apelido) || (firstName(f.name) === 'Você' ? 'Amigo' : firstName(f.name));
     view = { kind: 'friend', uid, nome, fazenda: limpaNome(f.fazenda || data.fazenda) || 'Roça Feliz', cao: 'Bidu', pega: 0.12, casa: '#7aa35a', data, nivel: data.level || f.level || 1, avatar: avatarOk(data.avatar) };
     afterVisit();
+    // veio pelo botão "Precisa de ajuda": vai para onde está a frutífera com a placa
+    const onde = ['roca', 'animais'].find(sc => pedidosAjuda({ objetos: { [sc]: data.objetos && data.objetos[sc] } }));
+    if (onde) {
+      if (onde !== 'roca') setScene(onde);
+      toast(`🆘 Procure a frutífera com a placa AJUDA! (tem uma setinha 🤝 em cima) ${onde === 'animais' ? 'aqui no rancho ' : ''}e toque nela para ajudar.`, 'good');
+    } else if (ajudar) toast(`${nome} já foi ajudado por alguém. Obrigado mesmo assim! 🤝`);
   } catch (e) {
     console.warn(e);
     if (e && e.code === 'permission-denied') reatarAmizade(uid);
@@ -3038,6 +3045,7 @@ function drawBubbleAt(x, y, kind, obj, t, seed) {
     ctx.fillStyle = '#3aa0e8'; ctx.beginPath(); ctx.moveTo(x, y - 7 * s);
     ctx.bezierCurveTo(x + 6 * s, y, x + 5 * s, y + 6 * s, x, y + 6 * s); ctx.bezierCurveTo(x - 5 * s, y + 6 * s, x - 6 * s, y, x, y - 7 * s); ctx.fill();
   } else if (kind === 'pest') drawBug(x, y, s * 1.3, 0, 0);
+  else if (kind === 'rastelo') { const im = toolImg('hoe'); if (im) ctx.drawImage(im, x - 8.5 * s, y - 8.5 * s, 17 * s, 17 * s); }
   else if (kind === 'weed') drawWeed(x, y + 5 * s, s * 1.1);
   else if (kind === 'hoe') {
     line({ x: x - 6 * s, y: y + 6 * s }, { x: x + 4 * s, y: y - 5 * s }, '#8a5a2b', 2 * s);
@@ -4135,7 +4143,7 @@ function renderPane() {
   else if (tab === 'missoes') html = missoesHTML();
   else if (tab === 'fabrica') html = fabricaHTML();
   else if (tab === 'loja') {
-    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['pomar', 'Pomar'], ['enfeites', 'Enfeites'], ['temas', 'Temas'], ['trevo', '🍀 Trevo']];
+    const segs = [['sementes', 'Sementes'], ['mudas', 'Horta'], ['pomar', 'Pomar'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['enfeites', 'Enfeites'], ['temas', 'Temas'], ['trevo', '🍀 Trevo']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
     if (shopSeg === 'sementes' || shopSeg === 'mudas') {
       const trees = shopSeg === 'mudas';
@@ -4371,7 +4379,7 @@ function renderPane() {
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
           <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${bolinhaStatus(uid)} · ${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `${esc(f.fazenda || 'Roça Feliz')} · nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : (f && f.erro ? `<button class="btn" data-reatar="${esc(uid)}">Reatar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`)}
-          ${here ? '' : `<button class="btn ${pedeAjuda(uid) ? 'socorro' : 'ghost'}" data-visit-friend="${esc(uid)}" ${pedeAjuda(uid) ? '' : 'disabled title="Nenhuma frutífera pedindo ajuda agora"'}>🆘 Precisa de ajuda${pedeAjuda(uid) > 1 ? ` (${pedeAjuda(uid)})` : ''}</button>`}
+          ${here ? '' : `<button class="btn ${pedeAjuda(uid) ? 'socorro' : 'ghost'}" data-ajudar-friend="${esc(uid)}" ${pedeAjuda(uid) ? '' : 'disabled title="Nenhuma frutífera pedindo ajuda agora"'}>🆘 Precisa de ajuda${pedeAjuda(uid) > 1 ? ` (${pedeAjuda(uid)})` : ''}</button>`}
           <button class="btn" data-chat="${esc(uid)}" ${f && !f.erro ? '' : 'disabled'}>💬 Conversar${naoLidas(uid) ? ` <span class="badge" aria-label="${naoLidas(uid)} mensagens novas">${naoLidas(uid)}</span>` : ''}</button>
           ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && !f.erro && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
           ${armed ? `<span class="meta">Excluir ${esc(firstName(name))}?</span><button class="btn ghost" data-unfriend-cancel>Cancelar</button><button class="btn danger" data-unfriend="${esc(uid)}">Confirmar</button>`
@@ -4497,6 +4505,7 @@ $('#pane').addEventListener('click', e => {
   else if (d.useFert) { state.fertSel = d.useFert; if (!isHome()) goHome(); setScene('roca'); setTool('fert'); closePanel(); save(); }
   else if (d.visit) { visitNpc(d.visit); closePanel(); }
   else if (d.visitFriend) { visitFriend(d.visitFriend); closePanel(); }
+  else if (d.ajudarFriend) { visitFriend(d.ajudarFriend, true); closePanel(); }
   else if (d.reatar) reatarAmizade(d.reatar);
   else if (d.chat) abrirChat(d.chat);
   else if (d.accept) acceptRequest(d.accept);
@@ -6179,7 +6188,9 @@ function novaFolha() {
 function drawFolhas(t) {
   const W = L.W;
   for (const f of folhasDe()) {
-    const q = iso(f.u, f.v), s = W / 100, bal = Math.sin(t / 900 + f.u) * 0.6;
+    const q = iso(f.u, f.v), s = W / 100 * 1.3, bal = Math.sin(t / 900 + f.u) * 0.6;
+    // brilho dourado pulsando no chão, para chamar atenção
+    if (!f.alvo) { const pu = 0.5 + 0.5 * Math.sin(t / 350 + f.u); ctx.fillStyle = `rgba(255,214,90,${0.25 + pu * 0.25})`; ctx.beginPath(); ctx.ellipse(q.x, q.y, (26 + pu * 6) * s, (9 + pu * 2) * s, 0, 0, 7); ctx.fill(); }
     if (hover && hover.kind === 'folhas' && hover.id === f.id) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.26, W * 0.09, 0, 0, 7); ctx.stroke(); }
     ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(q.x, q.y, 20 * s, 6 * s, 0, 0, 7); ctx.fill();
     const cores = ['#d9822b', '#c8402f', '#e8b020', '#9a5a2a', '#e06a2a'];
@@ -6188,7 +6199,10 @@ function drawFolhas(t) {
       const a = k * 2.4, r = (k % 4) * 4 + 2, lx = q.x + Math.cos(a) * r * 1.3 * s, ly = q.y - 5 * s - Math.abs(Math.sin(a)) * (10 - r * 0.9) * s - (k > 12 ? 6 * s : 0);
       ctx.fillStyle = cores[k % cores.length]; ctx.beginPath(); ctx.ellipse(lx, ly, 3.4 * s, 1.8 * s, a + bal * 0.2, 0, 7); ctx.fill();
     }
-    if (!f.alvo) hits.push({ kind: 'folhas', id: f.id, x: q.x, y: q.y - 6 * s, r: Math.max(W * 0.28, 18) });
+    if (!f.alvo) {
+      drawBubbleAt(q.x, q.y - 30 * s, 'rastelo', null, t, f.u * 3);
+      hits.push({ kind: 'folhas', id: f.id, x: q.x, y: q.y - 14 * s, r: Math.max(W * 0.34, 22) });
+    }
   }
 }
 function rastelarFolhas(id) {
@@ -6203,6 +6217,7 @@ function rastelarFolhas(id) {
   const dist = Math.hypot(w.tu - w.fu, w.tv - w.fv), sx = (w.tu - w.fu) - (w.tv - w.fv);
   w.dir = sx > 0 ? 1 : -1; w.t0 = t; w.dur = dist / 1.4 * 1000; w.tarefa = { id, ini: 0 };
   f.alvo = true; sfx('click');
+  const q = iso(f.u, f.v); useFx('hoe', { x: q.x, y: q.y });
 }
 // Chegou no monte: fica rastelando um pouquinho, com folhas voando, e depois o monte some.
 function rastelando(w, sc, t) {
@@ -8394,6 +8409,8 @@ function drawFruteira(o, x, y, s, t, home) {
   }
   // balãozinho em cima: pronta (cesta), seca (ferramenta) ou, na roça do amigo, pedindo ajuda (🤝)
   if (!home && o.t0 && st.morta && o.placa && view.kind === 'friend') {
+    const pu = 0.5 + 0.5 * Math.sin(t / 300);
+    ctx.strokeStyle = `rgba(230,70,40,${0.5 + pu * 0.4})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x, y, (arv ? 34 : 26) * s * (1 + pu * 0.15), (arv ? 11 : 9) * s * (1 + pu * 0.15), 0, 0, 7); ctx.stroke();
     const by = y - (arv ? 72 : 36) * s + Math.sin(t / 250) * 3 * s, r = 10 * s;
     ctx.fillStyle = '#fff3c4'; ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, by, r, 0, 7); ctx.fill(); ctx.stroke();
     ctx.font = `${Math.round(12 * s)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🤝', x, by + 0.5); ctx.textBaseline = 'alphabetic';
