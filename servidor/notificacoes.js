@@ -62,9 +62,10 @@ async function avisos() {
     if (p.prefs && p.prefs.amigos === false) continue;
     lista = lista.filter(a => a.tipo !== 'teste'); if (!lista.length) continue;
     lista.sort((a, b) => (a.at || 0) - (b.at || 0));
-    const x = lista[lista.length - 1];
+    // pedido de ajuda (frutífera seca de um amigo) vem na frente das outras novidades
+    const x = [...lista].reverse().find(a => a.tipo === 'ajuda') || lista[lista.length - 1];
     const body = lista.length > 1 ? `${x.txt} (e mais ${lista.length - 1} novidade${lista.length > 2 ? 's' : ''} dos amigos)` : x.txt;
-    n += await enviar(uid, p.tokens, '👋 Roça Feliz', body, 'amigos');
+    n += await enviar(uid, p.tokens, x.tipo === 'ajuda' ? '🆘 Roça Feliz' : '👋 Roça Feliz', body, 'amigos');
   }
   // entregues (ou sem aparelho para entregar): apaga
   const lote = db.batch(); snap.docs.forEach(d => lote.delete(d.ref)); if (snap.size) await lote.commit();

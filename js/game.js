@@ -310,7 +310,7 @@ function newState() {
     v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0, novVisto, boasVindas: true,
     tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
     animals: [], decor: {}, abrigos: { galinheiro: 1 }, racaoEsp: 0,
-    enfeites: {}, objetos: { roca: [], animais: [] }, pos: {}, invNovos: 0, skins: {}, skin: null,
+    enfeites: { cerca: 40 }, cercaDada: 1, objetos: { roca: [], animais: [] }, pos: {}, invNovos: 0, skins: {}, skin: null,
     missions: null, gift: { i: 0, ciclo: 0, last: -1 }, owe: {}, col: {}, stamps: {}, temas: { classico: true }, tema: 'classico', helpDay: -1,
     friends: [], sent: {}, code: null, owner: null, log: {},
     fert: { basico: 2 }, fertSel: 'basico',
@@ -400,6 +400,10 @@ function migrate(s) {
   s.owned = s.plots.filter(p => p.s !== 'locked').length;
   if (!CROP[s.seed]) s.seed = 'nabo';
   if (!s.tool || s.tool === 'weed') s.tool = 'hand';
+  // frutíferas ganham um id (para os amigos ajudarem) e passam a viver por colheitas
+  for (const sc of ['roca', 'animais']) for (const o of (s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : [])) if (o && ENFEITE[o.id] && ENFEITE[o.id].fruteira) { if (!o.fid) o.fid = newId(); if (typeof o.colhidas !== 'number') o.colhidas = 0; }
+  // a cerca em volta da roça saiu: quem já jogava ganha 40 pedaços de cerca para pôr onde quiser
+  if (!s.cercaDada) { s.cercaDada = 1; s.enfeites = s.enfeites && typeof s.enfeites === 'object' ? s.enfeites : {}; s.enfeites.cerca = (s.enfeites.cerca || 0) + 40; s.invNovos = (s.invNovos || 0) + 1; }
   return s;
 }
 
@@ -475,6 +479,10 @@ const CLOUD_MS = 30 * 1000; // intervalo mínimo entre salvamentos automáticos 
 let unsubVisits = null, unsubRequests = null, unsubChat = null;
 let requests = [];                  // pedidos de amizade recebidos (ao vivo)
 const friendInfo = {};
+const pedeAjuda = uid => { const f = friendInfo[uid]; return f && typeof f === 'object' && !f.erro ? f.ajuda || 0 : 0; };
+const amigosPedindo = () => (state && user ? state.friends.filter(pedeAjuda) : []);
+// De tempos em tempos vê quem está pedindo ajuda (para o número no botão Amigos)
+setInterval(() => { if (user && state && !document.hidden) state.friends.forEach(uid => fetchFriendInfo(uid)); }, 150e3);
 
 const $ = s => document.querySelector(s);
 const cv = $('#cv'), mainCtx = cv.getContext('2d');
@@ -533,7 +541,7 @@ const canBuy = i => freeLots() > 0 && touches(i) && !objetoNaCelula(i); // lote 
 // Tem enfeite ou frutífera em cima deste pedaço de terra? (aí não dá para virar canteiro)
 function objetoNaCelula(i) {
   const c = i % COLS + 0.5, r = Math.floor(i / COLS) + 0.5;
-  return objetosDe(state, 'roca').some(o => Math.abs(o.u - c) < 0.5 + 0.35 && Math.abs(o.v - r) < 0.5 + 0.35);
+  return objetosDe(state, 'roca').some(o => !ehCerca(o.id) && Math.abs(o.u - c) < 0.5 + 0.35 && Math.abs(o.v - r) < 0.5 + 0.35);
 }
 let buyPending = null; // lote clicado uma vez, esperando o segundo clique para confirmar
 const sfx = name => { if (window.RFAudio) window.RFAudio.play(name); };
@@ -939,6 +947,8 @@ const NOVIDADES = [
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
+  { v: 102, txt: 'Pomar mais barato 🍊: frutíferas e ferramentas custam bem menos, e cada frutífera agora dá 3 colheitas (não morre mais por dias). Depois da última, ela seca: toque nela e ponha a 🪧 placa de ajuda. Todos os seus amigos são avisados e, quando um ajudar, ela volta a dar frutas. Na lista de Amigos, o botão 🆘 Precisa de ajuda fica colorido quando um amigo está pedindo. Ajudar frutífera não conta no limite do dia.' },
+  { v: 101, txt: 'Canteiros e cercas 🚧: no botão Mover agora dá para mudar os canteiros de lugar (vão com o que estiver plantado). A cerca em volta da roça saiu: compre pedaços de cerca na Loja › Enfeites e ponha onde quiser (quem já jogava ganhou 40 de presente, estão no Inventário). O estilo da cerca segue o tema da roça. O rancho continua igual.' },
   { v: 100, txt: 'Montes de folhas 🍂: de vez em quando cai um monte de folhas no gramado (no outono, bem mais). Clique nele e o seu avatar vai lá rastelar: ganha XP e umas moedinhas!' },
   { v: 97, txt: 'Pomar 🌳: as árvores de enfeite saíram e chegaram as frutíferas! Compre na Loja › Pomar pitangueira, amoreira, maracujazeiro, jabuticabeira, mangueira, cajueiro e pequizeiro, e plante no gramado (agora dá para pôr enfeites e frutíferas no gramado dentro da cerca, fora da terra comprada). Elas dão frutas e secam depois de uns dias: arbusto seco sai com a 🪓 enxada de arrancar e árvore seca com a 🪚 motosserra, que você ganha completando missões, de amigos ou comprando.' },
   { v: 93, txt: 'O tema da casa agora vale também para a casinha do cachorro e para os abrigos dos bichos no rancho: tudo combinando!' },
@@ -1404,6 +1414,15 @@ function applyVisits(list) {
       addNews(msg); toast(msg, 'good');
       continue;
     }
+    if (v.t === 'help' && v.what === 'fruteira') {
+      const sc = v.sc === 'animais' ? 'animais' : 'roca', l = objetosDe(state, sc);
+      const o = l.find(x => v.fid && x.fid === v.fid) || (!v.fid && Number.isInteger(v.idx) ? l[v.idx] : null);
+      if (o && ENFEITE[o.id] && ENFEITE[o.id].fruteira && estadoFruteira(o).morta) {
+        o.colhidas = 0; o.ult = Date.now(); o.placa = 0;
+        note(`ajudou no seu pomar (${ENFEITE[o.id].nome.toLowerCase()} voltou a dar frutas)`); helpedBy(v.from, who);
+      }
+      continue;
+    }
     if (v.t === 'help' && p && p.id === v.pid) {
       if (v.what === 'w') p.w = Math.max(0, p.w - 1);
       if (v.what === 'b') p.b = Math.max(0, p.b - 1);
@@ -1748,11 +1767,14 @@ async function checkSent() {
   if (changed) { done(); cloudSave(); }
 }
 
-function fetchFriendInfo(uid) {
-  if (!user || friendInfo[uid] !== undefined) return;
-  friendInfo[uid] = 'loading';
+// (a cada 2 min lê de novo, para o botão "Precisa de ajuda" ficar em dia)
+function fetchFriendInfo(uid, forca) {
+  const fi = friendInfo[uid];
+  if (!user || (fi !== undefined && !(fi && fi.at && !fi.buscando && (forca || Date.now() - fi.at > 120e3)))) return;
+  if (fi && fi.at) fi.buscando = true; else friendInfo[uid] = 'loading';
   Cloud.loadFarm(uid).then(f => {
-    friendInfo[uid] = f ? { name: limpaNome(f.apelido) || firstName(f.name || 'Amigo'), fazenda: limpaNome(f.fazenda) || 'Roça Feliz', photo: f.photo || '', level: f.level || 1 } : null;
+    friendInfo[uid] = f ? { name: limpaNome(f.apelido) || firstName(f.name || 'Amigo'), fazenda: limpaNome(f.fazenda) || 'Roça Feliz', photo: f.photo || '', level: f.level || 1, ajuda: pedidosAjuda(f), at: Date.now() } : null;
+    renderTabs();
   }).catch(e => {
     // Não conseguiu ler (sem internet, login ainda carregando, ou a pessoa desfez a amizade):
     // NUNCA apaga o amigo sozinho. Um erro passageiro apagava amigos de verdade.
@@ -3232,14 +3254,24 @@ function drawRoca(s, t, home) {
       if (hover && hover.kind === 'lago') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.75, W * 0.3, 0, 0, 7); ctx.stroke(); } } }
   // casa, celeiro, casinha, árvores e enfeites: cada um no seu lugar (dá para mudar no modo Mover)
   const cachorroDepois = drawObjetos(s, 'roca', t, home, 'tras');
-  drawFence(COLS, ROWS, 'back');
+  // (a roça não tem mais cerca em volta: as cercas agora são compradas e postas onde quiser)
   if (cachorroDepois) drawDogSpot('roca', s, t, home);
   if (home) drawLandSign();
-  for (let sum = 0; sum <= COLS + ROWS - 2; sum++)
-    for (let c = 0; c < COLS; c++) { const r = sum - c; if (r >= 0 && r < ROWS) drawPlot(r * COLS + c, s.plots[r * COLS + c], t, home); }
+  // canteiros e o que está no gramado entre eles, do fundo para a frente
+  const mov = home && moveMode && moving && moving.plot !== undefined ? moving.plot : -1;
+  let d0 = -Infinity;
+  for (let sum = 0; sum <= COLS + ROWS - 2; sum++) {
+    drawObjetos(s, 'roca', t, home, 'frente', d0, sum + 1); d0 = sum + 1;
+    for (let c = 0; c < COLS; c++) {
+      const r = sum - c, i = r * COLS + c; if (r < 0 || r >= ROWS) continue;
+      if (i === mov) continue; // está na mão do jogador
+      drawPlot(i, s.plots[i], t, home);
+      if (home && moveMode && !moving && s.plots[i].s !== 'locked') { const [p1, p2, p3, p4] = diamond(c, r, 0.05); ctx.setLineDash([5, 5]); quad(p1, p2, p3, p4, null, 'rgba(255,255,255,.85)', 2); ctx.setLineDash([]); }
+    }
+  }
   if (home) drawFolhas(t);
   drawAvatares('roca', t);
-  drawObjetos(s, 'roca', t, home, 'frente');
+  drawObjetos(s, 'roca', t, home, 'frente', d0);
   drawMoving('roca', t);
   drawCritters(t, tod);
   nightOverlay(tod);
@@ -4000,7 +4032,7 @@ function renderTabs() {
     if (n) el.insertAdjacentHTML('beforeend', `<span class="badge" aria-label="${n} ${label}">${n}</span>`);
   };
   const unread = state ? state.news.filter(n => n.at > state.newsSeen).length : 0;
-  setBadge(document.querySelector('.tab[data-tab="amigos"]'), requests.length + naoLidas(), 'pedidos de amizade e mensagens');
+  setBadge(document.querySelector('.tab[data-tab="amigos"]'), requests.length + naoLidas() + amigosPedindo().length, 'pedidos de amizade, mensagens e amigos pedindo ajuda');
   setBadge(document.querySelector('.tab[data-tab="correio"]'), unread, 'cartas novas');
   if (state) {
     setBadge(document.querySelector('.tab[data-tab="celeiro"]'), avisoItens('celeiro') ? Object.values(state.barn).reduce((t, q) => t + (q > 0 ? q : 0), 0) : 0, 'itens no celeiro');
@@ -4215,7 +4247,12 @@ function renderPane() {
       }
     } else if (shopSeg === 'enfeites') {
       html += `<p class="hint">Enfeites vão para o Inventário. De lá você escolhe onde pôr, na roça ou no rancho, fora dos canteiros e cercados. Cada um dá conforto (+XP).</p>`;
-      for (const e of ENFEITES.filter(x => !x.especial && !x.fruteira)) {
+      {
+        const tem = state.enfeites.cerca || 0, postos = objetosDe(state, 'roca').filter(o => o.id === 'cerca').length, e = ENFEITE.cerca;
+        html += `<h3>Cercas</h3><div class="row wide"><img alt="" src="${enfeiteIcon('cerca')}"><div><div class="name">Cerca</div><div class="meta">Pedaço de cerca para a roça, no estilo do tema (Loja › Temas). Ponha quantos quiser seguidos, girando para fechar os cantos.${tem ? ` · no inventário: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
+          <div class="actions"><button class="btn" data-enfeite-comprar="cerca" ${state.coins < e.custo ? 'disabled' : ''}>1 · ${moeda(e.custo)}</button><button class="btn" data-enfeite-comprar="cerca" data-qtd="10" ${state.coins < e.custo * 10 ? 'disabled' : ''}>10 · ${moeda(e.custo * 10)}</button></div></div><h3>Enfeites</h3>`;
+      }
+      for (const e of ENFEITES.filter(x => !x.especial && !x.fruteira && !x.cerca)) {
         const tem = state.enfeites[e.id] || 0, postos = ['roca', 'animais'].reduce((t, sc) => t + objetosDe(state, sc).filter(o => o.id === e.id).length, 0);
         const locked = e.nivel > state.level;
         html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}">
@@ -4227,7 +4264,7 @@ function renderPane() {
     } else if (shopSeg === 'trevo') {
       html += trevoLojaHTML();
     } else if (shopSeg === 'temas') {
-      html += `<p class="hint">Os temas mudam a cerca e o jeito da sua roça. Os amigos veem o seu tema quando visitam.</p>`;
+      html += `<p class="hint">Os temas mudam o estilo das cercas que você põe (Loja › Enfeites) e o jeito da sua roça. Os amigos veem o seu tema quando visitam.</p>`;
       html += `<h3>Casa e celeiro</h3>` + casaTemasHTML() + `<h3>Cerca e roça</h3>`;
       for (const t of TEMAS) {
         const locked = t.nivel > state.level, owned = !!state.temas[t.id], using = state.tema === t.id;
@@ -4323,7 +4360,8 @@ function renderPane() {
       html += `<h3>Seus amigos</h3>`;
       if (state.friends.length) html += `<p class="hint">Mande um presente por dia para até ${PRESENTE_MAX} amigos (hoje: ${giftsToday().to.length} de ${PRESENTE_MAX}). Não custa nada!</p>`;
       if (!state.friends.length) html += `<div class="empty">Mande seu código para um amigo e peça o dele. A amizade começa quando um aceitar o pedido do outro.</div>`;
-      for (const uid of state.friends) {
+      if (amigosPedindo().length) html += `<p class="hint pedeajuda">🆘 ${amigosPedindo().length === 1 ? 'Um amigo precisa' : `${amigosPedindo().length} amigos precisam`} de ajuda no pomar! Visite e toque na frutífera com a placa (🤝). Ajudar frutífera não conta no limite do dia.</p>`;
+      for (const uid of [...state.friends].sort((a, b) => (pedeAjuda(b) ? 1 : 0) - (pedeAjuda(a) ? 1 : 0))) {
         fetchFriendInfo(uid);
         const f = friendInfo[uid];
         const here = view.kind === 'friend' && view.uid === uid;
@@ -4333,6 +4371,7 @@ function renderPane() {
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
           <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${bolinhaStatus(uid)} · ${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `${esc(f.fazenda || 'Roça Feliz')} · nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : (f && f.erro ? `<button class="btn" data-reatar="${esc(uid)}">Reatar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`)}
+          ${here ? '' : `<button class="btn ${pedeAjuda(uid) ? 'socorro' : 'ghost'}" data-visit-friend="${esc(uid)}" ${pedeAjuda(uid) ? '' : 'disabled title="Nenhuma frutífera pedindo ajuda agora"'}>🆘 Precisa de ajuda${pedeAjuda(uid) > 1 ? ` (${pedeAjuda(uid)})` : ''}</button>`}
           <button class="btn" data-chat="${esc(uid)}" ${f && !f.erro ? '' : 'disabled'}>💬 Conversar${naoLidas(uid) ? ` <span class="badge" aria-label="${naoLidas(uid)} mensagens novas">${naoLidas(uid)}</span>` : ''}</button>
           ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && !f.erro && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
           ${armed ? `<span class="meta">Excluir ${esc(firstName(name))}?</span><button class="btn ghost" data-unfriend-cancel>Cancelar</button><button class="btn danger" data-unfriend="${esc(uid)}">Confirmar</button>`
@@ -4402,9 +4441,10 @@ $('#pane').addEventListener('click', e => {
   if (d.abrirLivro) { closePanel(); if (!isHome()) goHome(); abrirPesca(); pescaLivro = true; return renderPesca(); }
   if (d.entrarCasa) { closePanel(); return setScene('casa'); }
   if ('skin' in d) { state.skin = d.skin || null; toast(d.skin ? 'Celeiro e casa dos Pioneiros!' : 'Celeiro e casa clássicos.', 'good'); if (isHome()) setScene('roca'); return done(); }
-  if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar);
+  if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar, Number(d.qtd) || 1);
   if (d.invPor) return invPor(d.invPor, d.sc);
   if (d.venderDec) return venderDecoracao(d.venderDec);
+  if (d.invGuardarCercas) { const sc = d.invGuardarCercas, l = objetosDe(state, sc), n = l.filter(o => ehCerca(o.id)).length; state.objetos[sc] = l.filter(o => !ehCerca(o.id)); state.enfeites.cerca = (state.enfeites.cerca || 0) + n; toast(`${n} pedaços de cerca guardados no inventário.`); return done(); }
   if (d.invGuardar) { const [sc, i] = d.invGuardar.split(':'); return invGuardar(sc, Number(i)); }
   if (d.pocao) {
     const n = Number(d.pocao) || 1;
@@ -4677,7 +4717,7 @@ cv.addEventListener('pointermove', e => {
   if (drag && drag.item) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) > 4) { drag.moved = true; try { cv.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ } }
-    if (drag.moved) { const [u, v] = screenToWorld(q.x, q.y); moving.u = Math.round((u + drag.item.du) * 20) / 20; moving.v = Math.round((v + drag.item.dv) * 20) / 20; hover = null; }
+    if (drag.moved) { const [u, v] = screenToWorld(q.x, q.y); moving.u = Math.round((u + drag.item.du) * 20) / 20; moving.v = Math.round((v + drag.item.dv) * 20) / 20; if (movCerca()) [moving.u, moving.v] = encaixaCerca(moving.u, moving.v, moving.rot || 0); hover = null; }
     return;
   }
   if (drag && L.canPan) {
@@ -4696,7 +4736,7 @@ function objAt(x, y) {
   const CAIXA = { casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05], pesqueiro: [0.5, 0.3] };
   let best = null, bd = Infinity;
   for (const o of objList(state, scene)) {
-    const q = iso(o.u, o.v), [w, h] = o.id ? [0.32, 0.7] : CAIXA[o.key];
+    const q = iso(o.u, o.v), [w, h] = o.cerca ? [0.2, 0.25] : o.id ? [0.32, 0.7] : CAIXA[o.key];
     if (Math.abs(x - q.x) > w * L.W || y > q.y + 0.12 * L.W || y < q.y - h * L.W) continue;
     const d = Math.hypot(x - q.x, y - (q.y - h * L.W / 2));
     if (d < bd) { best = o; bd = d; }
@@ -4718,9 +4758,11 @@ $('#ctxMenu').addEventListener('click', e => {
   const key = $('#ctxMenu').dataset.key; fecharMenuObj();
   if (b.dataset.ctx === 'mover') {
     const o = objList(state, scene).find(x => x.key === key);
-    moveMode = true; moving = { key, uma: true, u: o ? o.u : 0, v: o ? o.v : 0 }; renderMoveBtn(); renderTools();
+    moveMode = true; moving = { key, uma: true, u: o ? o.u : 0, v: o ? o.v : 0, rot: o && o.rot }; renderMoveBtn(); renderTools();
     toast(moveDica(o && o.id ? ENFEITE[o.id].nome : OBJ_INFO[key] ? OBJ_INFO[key].nome : 'Pronto'));
   } else if (b.dataset.ctx === 'guardar' && key.startsWith('enf:')) invGuardar(scene, Number(key.slice(4)));
+  else if (b.dataset.ctx === 'placa') pedirAjudaFruteira($('#ctxMenu').dataset.sc || scene, Number(key.slice(4)));
+  else if (b.dataset.ctx === 'derrubar') derrubarFruteira($('#ctxMenu').dataset.sc || scene, Number(key.slice(4)));
 });
 cv.addEventListener('contextmenu', e => {
   const q = localPos(e), o = objAt(q.x, q.y);
@@ -4753,7 +4795,7 @@ cv.addEventListener('pointerup', () => clearTimeout(holdTimer));
 cv.addEventListener('pointerup', e => {
   endTouch(e);
   // soltou o item num lugar ruim? encaixa no lugar livre mais perto (se tiver um bem pertinho)
-  if (drag && drag.item && drag.moved && moving) [moving.u, moving.v] = pontoLivre(scene, moving.u, moving.v, moving.key, raioMov(), 1.5);
+  if (drag && drag.item && drag.moved && moving && moving.plot === undefined && !movCerca()) [moving.u, moving.v] = pontoLivre(scene, moving.u, moving.v, moving.key, raioMov(), 1.5);
   if (drag && !drag.moved) drag = null;
   else if (drag && drag.dead && !fingers.size) setTimeout(() => { if (drag && drag.dead) drag = null; }, 0);
 });
@@ -4983,6 +5025,7 @@ function avisarAmigo(para, tipo, txt) {
   if (!user || !Cloud.mandarAviso || !para) return;
   const k = para + ':' + tipo;
   if (tipo === 'visita' && avisoFeito[k] && Date.now() - avisoFeito[k] < 30 * 60e3) return;
+  if (tipo === 'ajuda' && avisoFeito[k] && Date.now() - avisoFeito[k] < 10 * 60e3) return;
   if (tipo === 'chat' && avisoFeito[k] && Date.now() - avisoFeito[k] < 2 * 60e3) return;
   avisoFeito[k] = Date.now();
   Cloud.mandarAviso({ para, de: user.uid, tipo, txt, at: Date.now() }).catch(e => console.warn('aviso:', e));
@@ -5533,6 +5576,7 @@ for (const id of ['#pescaCv', '#pescaBtn']) {
   $(id).addEventListener('contextmenu', e => e.preventDefault());
 }
 if (location.protocol === 'file:') window.__pesca = () => pesca; // só para testes locais
+if (location.protocol === 'file:') window.__rf = { iso: (u, v) => iso(u, v), st: () => state, mov: () => moving }; // só para testes locais
 $('#chatForm').addEventListener('submit', e => { e.preventDefault(); enviarChat($('#chatTxt').value); });
 $('#chat').addEventListener('click', e => {
   if (e.target === $('#chat') || e.target.closest('[data-close]')) return fecharChat();
@@ -7642,20 +7686,22 @@ const ENFEITES = [
   { id: 'poco',       nome: 'Poço',                   nivel: 6,  custo: 1500, conforto: 2 },
   { id: 'fonte',      nome: 'Fonte',                  nivel: 10, custo: 3000, conforto: 2 },
   { id: 'moinho',     nome: 'Cata-vento',             nivel: 14, custo: 5000, conforto: 3 },
+  // Cerca: um pedaço de uma casa de comprimento, no estilo do tema da roça. Só enfeita (não dá XP).
+  { id: 'cerca',      nome: 'Cerca',                  nivel: 1,  custo: 40,   conforto: 0, cerca: true },
   { id: 'bandeira',   nome: 'Bandeira dos Pioneiros', especial: true, conforto: 2 },
   { id: 'bolo',       nome: 'Bolo de boas-vindas',    especial: true, conforto: 2 },
   { id: 'carroca',    nome: 'Carroça de feno do Seu Zé',    especial: true, vila: true, conforto: 3 },
   { id: 'roseira',    nome: 'Roseira da Dona Maria',         especial: true, vila: true, conforto: 3 },
   { id: 'peixedourado', nome: 'Estátua do Peixe Dourado', especial: true, trevo: true, conforto: 3 },
-  // Pomar: frutíferas. Dão frutas de tempos em tempos e secam depois de uns dias.
-  // Arbusto seco sai com enxada; árvore seca, com motosserra.
-  { id: 'pitangueira',   nome: 'Pitangueira',    fruteira: 'arbusto', fruta: 'pitanga',    nivel: 3,  custo: 900,  tempo: 6 * 3600,  rende: 3, vida: 10, conforto: 1, copa: '#4f9a2f' },
-  { id: 'amoreira',      nome: 'Amoreira',       fruteira: 'arbusto', fruta: 'amora',      nivel: 5,  custo: 1200, tempo: 7 * 3600,  rende: 4, vida: 10, conforto: 1, copa: '#3f8a2a' },
-  { id: 'maracujazeiro', nome: 'Maracujazeiro',  fruteira: 'arbusto', fruta: 'maracuja',   nivel: 8,  custo: 1600, tempo: 8 * 3600,  rende: 3, vida: 12, conforto: 1, copa: '#5aa03a' },
-  { id: 'jabuticabeira', nome: 'Jabuticabeira',  fruteira: 'arvore',  fruta: 'jabuticaba', nivel: 7,  custo: 2500, tempo: 10 * 3600, rende: 6, vida: 20, conforto: 2, copa: '#3f7a2a' },
-  { id: 'mangueira',     nome: 'Mangueira',      fruteira: 'arvore',  fruta: 'manga',      nivel: 10, custo: 3500, tempo: 12 * 3600, rende: 4, vida: 20, conforto: 2, copa: '#2f6a22' },
-  { id: 'cajueiro',      nome: 'Cajueiro',       fruteira: 'arvore',  fruta: 'caju',       nivel: 12, custo: 4000, tempo: 12 * 3600, rende: 4, vida: 20, conforto: 2, copa: '#4f8a2a' },
-  { id: 'pequizeiro',    nome: 'Pequizeiro',     fruteira: 'arvore',  fruta: 'pequi',      nivel: 15, custo: 5000, tempo: 16 * 3600, rende: 3, vida: 25, conforto: 2, copa: '#5a8a3a' },
+  // Pomar: frutíferas. Dão frutas de tempos em tempos e secam depois da última colheita.
+  // Seca: um amigo ajuda (volta a dar frutas) ou sai com enxada (arbusto) / motosserra (árvore).
+  { id: 'pitangueira',   nome: 'Pitangueira',    fruteira: 'arbusto', fruta: 'pitanga',    nivel: 3,  custo: 120,  tempo: 6 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#4f9a2f' },
+  { id: 'amoreira',      nome: 'Amoreira',       fruteira: 'arbusto', fruta: 'amora',      nivel: 5,  custo: 180,  tempo: 7 * 3600,  rende: 4, colheitas: 3, conforto: 1, copa: '#3f8a2a' },
+  { id: 'maracujazeiro', nome: 'Maracujazeiro',  fruteira: 'arbusto', fruta: 'maracuja',   nivel: 8,  custo: 220,  tempo: 8 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#5aa03a' },
+  { id: 'jabuticabeira', nome: 'Jabuticabeira',  fruteira: 'arvore',  fruta: 'jabuticaba', nivel: 7,  custo: 320,  tempo: 10 * 3600, rende: 6, colheitas: 3, conforto: 2, copa: '#3f7a2a' },
+  { id: 'mangueira',     nome: 'Mangueira',      fruteira: 'arvore',  fruta: 'manga',      nivel: 10, custo: 380,  tempo: 12 * 3600, rende: 4, colheitas: 3, conforto: 2, copa: '#2f6a22' },
+  { id: 'cajueiro',      nome: 'Cajueiro',       fruteira: 'arvore',  fruta: 'caju',       nivel: 12, custo: 360,  tempo: 12 * 3600, rende: 4, colheitas: 3, conforto: 2, copa: '#4f8a2a' },
+  { id: 'pequizeiro',    nome: 'Pequizeiro',     fruteira: 'arvore',  fruta: 'pequi',      nivel: 15, custo: 450,  tempo: 16 * 3600, rende: 3, colheitas: 3, conforto: 2, copa: '#5a8a3a' },
   { id: 'arcoflores',   nome: 'Arco de flores',            especial: true, trevo: true, conforto: 2 },
   { id: 'ipe',          nome: 'Ipê-amarelo',               especial: true, trevo: true, conforto: 3 },
   { id: 'fogueira',     nome: 'Fogueira de São João',      especial: true, trevo: true, conforto: 2 },
@@ -7688,26 +7734,67 @@ function posOf(s, sc, key) {
 const objetosDe = (s, sc) => (s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && ENFEITE[o.id]);
 function objList(s, sc) {
   const l = Object.keys(POS_PADRAO[sc]).map(key => { const [u, v] = posOf(s, sc, key); return { key, u, v, r: OBJ_INFO[key].r }; });
-  objetosDe(s, sc).forEach((o, i) => l.push({ key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: ENFEITE[o.id].fruteira === 'arvore' ? 0.65 : 0.55, obj: o }));
+  objetosDe(s, sc).forEach((o, i) => l.push(ehCerca(o.id) ? { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: 0.3, obj: o, cerca: true, rot: o.rot ? 1 : 0 }
+    : { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: ENFEITE[o.id].fruteira === 'arvore' ? 0.65 : 0.55, obj: o }));
   return l;
 }
 const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + objetosDe(s, sc).reduce((u, o) => u + ENFEITE[o.id].conforto, 0), 0);
 // Dá para pôr fora dos canteiros e dos cercados, sem encostar em outra coisa.
 function validSpot(sc, u, v, ignora, raio = 0.55) {
   const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R];
-  if (u > -0.5 && u < B[0] + 0.5 && v > -0.5 && v < B[1] + 0.5) {
-    if (sc !== 'roca') return false; // no rancho, os cercados ocupam tudo
-    // na roça dá para pôr no gramado dentro da cerca, desde que não encoste em terra comprada
-    if (u < 0.4 || v < 0.4 || u > COLS - 0.4 || v > ROWS - 0.4) return false;
+  if (sc === 'roca') {
+    // na roça dá para pôr em qualquer lugar do gramado, desde que não encoste em canteiro
     const m = raio * 0.7;
     for (let c = Math.floor(u - m); c <= Math.floor(u + m); c++) for (let r = Math.floor(v - m); r <= Math.floor(v + m); r++) {
       if (c < 0 || r < 0 || c >= COLS || r >= ROWS) continue;
       if (state.plots[r * COLS + c].s !== 'locked') return false;
     }
-  }
+  } else if (u > -0.5 && u < B[0] + 0.5 && v > -0.5 && v < B[1] + 0.5) return false; // no rancho, os cercados ocupam tudo
   if (u < -6 || v < -6 || u > B[0] + 6 || v > B[1] + 6) return false;
   if (sc === 'roca' && temaDe(state).lago && Math.hypot(u - LAGO_POS[0], v - LAGO_POS[1]) < 1.4) return false;
-  return objList(state, sc).every(o => o.key === ignora || Math.hypot(o.u - u, o.v - v) >= (o.r + raio) * 0.75);
+  return objList(state, sc).every(o => o.key === ignora || (o.cerca ? distCerca(u, v, o) >= raio * 0.75 : Math.hypot(o.u - u, o.v - v) >= (o.r + raio) * 0.75));
+}
+// ---------- Cercas: cada pedaço tem uma casa de comprimento e encaixa na beirada da grade ----------
+const ehCerca = id => !!(ENFEITE[id] && ENFEITE[id].cerca);
+// rot 0: corre no sentido u, de (u-0.5, v) a (u+0.5, v); rot 1: no sentido v.
+const pontasCerca = (u, v, rot) => rot ? [[u, v - 0.5], [u, v + 0.5]] : [[u - 0.5, v], [u + 0.5, v]];
+const encaixaCerca = (u, v, rot) => rot ? [Math.round(u), Math.floor(v) + 0.5] : [Math.floor(u) + 0.5, Math.round(v)];
+function distCerca(u, v, o) {
+  const [[a, b], [c, d]] = pontasCerca(o.u, o.v, o.rot), k = clamp(((u - a) * (c - a) + (v - b) * (d - b)) / ((c - a) ** 2 + (d - b) ** 2), 0, 1);
+  return Math.hypot(u - (a + (c - a) * k), v - (b + (d - b) * k));
+}
+function validCerca(u, v, rot, ignora) {
+  if (u < -6 || v < -6 || u > COLS + 6 || v > ROWS + 6) return false;
+  // não fica no meio de dois canteiros (na beirada de um canteiro pode)
+  const dono = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS && state.plots[r * COLS + c].s !== 'locked';
+  if (rot ? dono(u - 1, Math.floor(v)) && dono(u, Math.floor(v)) : dono(Math.floor(u), v - 1) && dono(Math.floor(u), v)) return false;
+  if (temaDe(state).lago && Math.hypot(u - LAGO_POS[0], v - LAGO_POS[1]) < 1.3) return false;
+  const [a, b] = pontasCerca(u, v, rot);
+  return objList(state, 'roca').every(o => o.key === ignora || (o.cerca ? !(o.u === u && o.v === v && o.rot === rot)
+    : [0.15, 0.5, 0.85].every(k => Math.hypot(a[0] + (b[0] - a[0]) * k - o.u, a[1] + (b[1] - a[1]) * k - o.v) >= o.r * 0.7)));
+}
+function drawCercaSeg(u, v, rot, s) { const [a, b] = pontasCerca(u, v, rot); fenceRun(iso(...a), iso(...b), 2, false, temaDe(s)); }
+// O que está sendo movido é uma cerca? (devolve o objeto guardado, se for um já colocado)
+const movCerca = () => moving && (moving.novo ? ehCerca(moving.novo) : moving.key && moving.key.startsWith('enf:') && ehCerca((objetosDe(state, scene)[Number(moving.key.slice(4))] || {}).id));
+// Um canteiro só vai para um pedaço de terra livre (sem canteiro, enfeite ou folhas em cima).
+const celulaMov = () => { const c = Math.floor(moving.u), r = Math.floor(moving.v); return c >= 0 && r >= 0 && c < COLS && r < ROWS ? r * COLS + c : -1; };
+function validCanteiro(i, j) {
+  if (j < 0) return false;
+  if (j === i) return true;
+  const c = j % COLS + 0.5, r = Math.floor(j / COLS) + 0.5;
+  return state.plots[j].s === 'locked' && !objetoNaCelula(j) && !folhasDe().some(f => Math.abs(f.u - c) < 0.75 && Math.abs(f.v - r) < 0.75);
+}
+// O lugar onde está o item na mão serve?
+function movOk() {
+  if (!moving) return false;
+  if (moving.plot !== undefined) return validCanteiro(moving.plot, celulaMov());
+  if (movCerca()) return scene === 'roca' && validCerca(moving.u, moving.v, moving.rot || 0, moving.key);
+  return validSpot(scene, moving.u, moving.v, moving.key, raioMov());
+}
+function girarCerca() {
+  if (!movCerca()) return;
+  moving.rot = moving.rot ? 0 : 1; [moving.u, moving.v] = encaixaCerca(moving.u + (moving.rot ? 0.5 : -0.5), moving.v + (moving.rot ? -0.5 : 0.5), moving.rot);
+  sfx('click'); renderMoveBar();
 }
 function screenToWorld(x, y) {
   const a = (x - L.ox) / (L.W / 2), b = (y - L.oy) / (L.W / 4);
@@ -7717,7 +7804,7 @@ let moveMode = false, moving = null; // moving: { key } para mover, { novo: id }
 function setMoveMode(on) {
   moveMode = on; moving = null;
   renderMoveBtn(); renderTools(); renderMoveBar();
-  if (on) toast(pointer.touch ? 'Modo Mover: toque numa casa, árvore ou enfeite, arraste até o lugar novo e toque em "Salvar aqui".' : 'Modo Mover: clique numa casa, árvore ou enfeite e depois no lugar novo.');
+  if (on) toast(pointer.touch ? 'Modo Mover: toque numa casa, árvore, enfeite, cerca ou canteiro, arraste até o lugar novo e toque em "Salvar aqui".' : 'Modo Mover: clique numa casa, árvore, enfeite, cerca ou canteiro e depois no lugar novo.');
 }
 function renderMoveBtn() {
   renderMoveBar();
@@ -7740,32 +7827,58 @@ function pontoLivre(sc, u, v, key, raio, max = 6) {
 }
 function moveClick(x, y) {
   if (!moving) {
-    const alvo = pick(x, y);
-    if (!alvo || alvo.kind !== 'obj') return toast(pointer.touch ? 'Toque numa casa, árvore ou enfeite para mudar de lugar.' : 'Clique numa casa, árvore ou enfeite para mudar de lugar.');
+    const alvo = pick(x, y), cel = scene === 'roca' ? cellAt(x, y) : -1;
+    if ((!alvo || alvo.kind !== 'obj') && cel >= 0 && state.plots[cel].s !== 'locked') {
+      // canteiro: vai inteiro para outro pedaço de terra, com o que estiver plantado
+      moving = { plot: cel, u: cel % COLS + 0.5, v: Math.floor(cel / COLS) + 0.5 };
+      renderMoveBar();
+      return toast(moveDica('Canteiro'));
+    }
+    if (!alvo || alvo.kind !== 'obj') return toast(pointer.touch ? 'Toque numa casa, árvore, enfeite, cerca ou canteiro para mudar de lugar.' : 'Clique numa casa, árvore, enfeite, cerca ou canteiro para mudar de lugar.');
     const o = objList(state, scene).find(k => k.key === alvo.key);
-    moving = { key: alvo.key, u: o ? o.u : 0, v: o ? o.v : 0 };
+    moving = { key: alvo.key, u: o ? o.u : 0, v: o ? o.v : 0, rot: o && o.rot };
     renderMoveBar();
     return toast(moveDica(alvo.nome || 'Pronto'));
   }
-  const [u, v] = screenToWorld(x, y);
+  let [u, v] = screenToWorld(x, y);
+  if (movCerca()) [u, v] = encaixaCerca(u, v, moving.rot || 0);
   if (pointer.touch) { moving.u = u; moving.v = v; return renderMoveBar(); } // toque só leva o item até lá
   moving.u = u; moving.v = v;
   salvarMove();
 }
 function salvarMove() {
   if (!moving) return;
-  const { u, v } = moving;
-  if (!validSpot(scene, u, v, moving.key, raioMov())) return toast('Aqui não dá: tem que ser no gramado, fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
+  const { u, v } = moving, cerca = movCerca();
+  if (!movOk()) return toast(moving.plot !== undefined ? 'Aqui não dá: o canteiro vai para um pedaço de gramado livre (sem enfeite nem folhas).'
+    : cerca ? 'Aqui não dá: a cerca não pode ficar entre dois canteiros nem em cima de outra coisa.' : 'Aqui não dá: tem que ser no gramado, fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
+  if (moving.plot !== undefined) {
+    const i = moving.plot, j = celulaMov();
+    if (j !== i) { [state.plots[i], state.plots[j]] = [state.plots[j], state.plots[i]]; if (hover && hover.kind === 'plot') hover = null; }
+    moving = null; sfx('buy'); done(); renderMoveBar();
+    return toast(pointer.touch ? 'Canteiro no lugar novo! Toque em outro para mudar, ou em Concluir.' : 'Canteiro no lugar novo! Clique em outro para mudar, ou Esc para sair.', 'good');
+  }
+  if (cerca && moving.novo) {
+    // cerca: põe um pedaço e já vem o próximo, seguindo na mesma direção
+    if (!(state.enfeites.cerca > 0)) { moving = null; return; }
+    (state.objetos.roca = objetosDe(state, 'roca')).push({ id: 'cerca', u, v, rot: moving.rot || 0 });
+    state.enfeites.cerca--; sfx('buy'); done();
+    if (state.enfeites.cerca > 0) {
+      const r = moving.rot || 0; moving.u = r ? u : u + 1; moving.v = r ? v + 1 : v;
+      renderMoveBar(); return toast(`Cerca colocada! Sobram ${state.enfeites.cerca}.`, 'good');
+    }
+    moving = null; moveMode = false; renderMoveBtn(); renderTools();
+    return toast('Cerca colocada! Acabaram os pedaços de cerca (compre mais na Loja › Enfeites).', 'good');
+  }
   if (moving.novo) {
     if (!(state.enfeites[moving.novo] > 0)) { moving = null; return; }
     const novo = { id: moving.novo, u, v };
-    if (ENFEITE[moving.novo].fruteira) { novo.t0 = Date.now(); novo.ult = Date.now(); } // frutífera: começa a contar ao plantar
+    if (ENFEITE[moving.novo].fruteira) { novo.t0 = Date.now(); novo.ult = Date.now(); novo.colhidas = 0; novo.fid = newId(); } // frutífera: começa a contar ao plantar
     (state.objetos[scene] = objetosDe(state, scene)).push(novo);
     state.enfeites[moving.novo]--;
     toast(`${ENFEITE[moving.novo].nome} colocado! +${ENFEITE[moving.novo].conforto}% de XP.`, 'good');
     moveMode = false; renderMoveBtn(); // pôr um item do inventário termina o modo
   } else if (moving.key.startsWith('enf:')) {
-    const o = objetosDe(state, scene)[Number(moving.key.slice(4))]; if (o) { o.u = u; o.v = v; }
+    const o = objetosDe(state, scene)[Number(moving.key.slice(4))]; if (o) { o.u = u; o.v = v; if (cerca) o.rot = moving.rot || 0; }
   } else {
     state.pos = state.pos || {}; (state.pos[scene] = state.pos[scene] || {})[moving.key] = [u, v];
   }
@@ -7783,24 +7896,37 @@ function renderMoveBar() {
   const bar = $('#moveBar'); if (!bar) return;
   const on = moveMode && isHome() && scene !== 'casa';
   bar.hidden = !on; document.body.classList.toggle('movendo', on); if (!on) return;
-  const ok = !!moving && validSpot(scene, moving.u, moving.v, moving.key, raioMov());
+  const ok = movOk();
   const txt = !moving ? (pointer.touch ? 'Toque no item que quer mudar de lugar' : 'Clique no item que quer mudar de lugar')
-    : !ok ? 'Aqui não dá: fora dos canteiros e cercados' : pointer.touch ? 'Arraste o item e salve' : 'Clique para soltar aqui';
+    : !ok ? (moving.plot !== undefined ? 'Aqui não dá: escolha um gramado livre' : movCerca() ? 'Aqui não dá: entre canteiros ou em cima de algo' : 'Aqui não dá: fora dos canteiros e cercados')
+    : movCerca() ? (pointer.touch ? 'Arraste a cerca e salve (Girar muda o lado)' : 'Clique para pôr a cerca · R gira') : pointer.touch ? 'Arraste o item e salve' : 'Clique para soltar aqui';
   if (bar.dataset.txt !== txt) { bar.dataset.txt = txt; $('#moveMsg').textContent = txt; }
   $('#moveOk').hidden = !moving; $('#moveOk').disabled = !ok;
+  const gira = $('#moveRot'); if (gira) gira.hidden = !movCerca();
   $('#moveCancel').textContent = moving ? 'Cancelar' : 'Concluir';
   moveBarOk = ok;
 }
 $('#moveOk')?.addEventListener('click', salvarMove);
+$('#moveRot')?.addEventListener('click', girarCerca);
+window.addEventListener('keydown', e => { if ((e.key === 'r' || e.key === 'R') && moveMode && movCerca() && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) girarCerca(); });
 $('#moveCancel')?.addEventListener('click', cancelarMove);
 // Desenha os objetos da cena. "tras": os que ficam atrás da cerca (u ou v negativos); "frente": o resto.
-function drawObjetos(s, sc, t, home, stage) {
+// d0/d1 (opcional): só os que estão nessa faixa de profundidade (u + v), para intercalar com os canteiros.
+function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
   const W = L.W, tm = temaDe(s);
   let cachorroDepois = false;
-  const l = objList(s, sc).filter(o => (o.u < 0 || o.v < 0) === (stage === 'tras')).sort((a, b) => (a.u + a.v) - (b.u + b.v));
+  const l = objList(s, sc).filter(o => (o.u < 0 || o.v < 0) === (stage === 'tras') && o.u + o.v >= d0 && o.u + o.v < d1).sort((a, b) => (a.u + a.v) - (b.u + b.v));
   for (const o of l) {
     if (moving && !moving.novo && moving.key === o.key) continue; // está na mão do jogador
     const q = iso(o.u, o.v);
+    if (o.cerca) {
+      drawCercaSeg(o.u, o.v, o.rot, s);
+      if (moveMode && home) {
+        ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(q.x, q.y - W * 0.12, W * 0.035, 0, 7); ctx.fill();
+        hits.push({ kind: 'obj', key: o.key, nome: 'Cerca', x: q.x, y: q.y - W * 0.12, r: W * 0.16 });
+      }
+      continue;
+    }
     if (moveMode && home) {
       ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.ellipse(q.x, q.y, W * o.r * 0.55, W * o.r * 0.2, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]);
@@ -7851,6 +7977,22 @@ function drawMoving(sc, t) {
   if (!moveMode || !moving || !isHome()) return;
   // com o mouse em cima da cena, o item segue o mouse; no toque, fica onde foi arrastado
   if (!pointer.touch && pointer.inside) [moving.u, moving.v] = screenToWorld(pointer.x, pointer.y);
+  if (movCerca()) [moving.u, moving.v] = encaixaCerca(moving.u, moving.v, moving.rot || 0);
+  if (moving.plot !== undefined) {
+    // canteiro: o pedaço de terra de destino fica verde (pode) ou vermelho (não pode)
+    const j = celulaMov(), ok = validCanteiro(moving.plot, j);
+    if (j < 0) return;
+    const [p1, p2, p3, p4] = diamond(j % COLS, Math.floor(j / COLS), 0.02);
+    ctx.globalAlpha = 0.8; drawPlot(j, state.plots[moving.plot], t, false); ctx.globalAlpha = 1;
+    quad(p1, p2, p3, p4, ok ? 'rgba(80,200,80,.3)' : 'rgba(220,60,50,.35)', ok ? 'rgba(255,255,255,.9)' : 'rgba(255,200,200,.9)', 2.5);
+    return;
+  }
+  if (movCerca()) {
+    const ok = movOk(), [a, b] = pontasCerca(moving.u, moving.v, moving.rot || 0), qa = iso(...a), qb = iso(...b);
+    line(qa, qb, ok ? 'rgba(80,200,80,.55)' : 'rgba(220,60,50,.55)', L.W * 0.12);
+    ctx.globalAlpha = 0.8; drawCercaSeg(moving.u, moving.v, moving.rot || 0, state); ctx.globalAlpha = 1;
+    return;
+  }
   const W = L.W, u = moving.u, v = moving.v, q = iso(u, v);
   const raio = raioMov(), ok = validSpot(sc, u, v, moving.key, raio);
   // setinhas em volta mostram que dá para arrastar
@@ -7899,14 +8041,14 @@ function venderDecoracao(key) {
   toast(`Vendeu ${nome.toLowerCase()} por ${preco.toLocaleString('pt-BR')} moedas.`, 'good');
   done();
 }
-function comprarEnfeite(id) {
+function comprarEnfeite(id, qtd = 1) {
   const e = ENFEITE[id];
   if (e.especial) return;
   if (state.level < e.nivel) return toast(`${e.nome} libera no nível ${e.nivel}.`);
-  if (state.coins < e.custo) return toast(`${e.nome} custa ${e.custo.toLocaleString('pt-BR')} moedas.`, 'bad');
-  state.coins -= e.custo; state.enfeites[id] = (state.enfeites[id] || 0) + 1; state.invNovos = (state.invNovos || 0) + 1;
-  sfx('buy'); addXP(3, null);
-  toast(`${e.nome} comprado! Está no Inventário.`, 'good');
+  if (state.coins < e.custo * qtd) return toast(`${qtd > 1 ? qtd + ' × ' : ''}${e.nome} custa ${(e.custo * qtd).toLocaleString('pt-BR')} moedas.`, 'bad');
+  state.coins -= e.custo * qtd; state.enfeites[id] = (state.enfeites[id] || 0) + qtd; state.invNovos = (state.invNovos || 0) + 1;
+  sfx('buy'); if (!e.cerca) addXP(3, null);
+  toast(e.cerca ? `${qtd} pedaço${qtd > 1 ? 's' : ''} de cerca comprado${qtd > 1 ? 's' : ''}! Está no Inventário (Pôr na roça).` : `${e.nome} comprado! Está no Inventário.`, 'good');
   renderTabs(); done();
 }
 function actEnfeite(id, key, sc) {
@@ -7922,16 +8064,19 @@ function inventarioHTML() {
   html += `<h3>Guardados</h3>`;
   if (!guardados.length) html += `<div class="empty">Nada guardado. Compre enfeites na Loja › Enfeites.</div>`;
   for (const e of guardados) {
-    html += `<div class="row wide ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome} × ${state.enfeites[e.id]}${e.especial ? ` <span class="tag">${e.vila ? '🏡 vila' : '⭐ pioneiros'}</span>` : ''}</div><div class="meta">+${e.conforto}% de XP quando está na roça ou no rancho${e.especial ? `<br>${origemEnfeite(e, state)}` : ''}</div></div>
-      <div class="actions"><button class="btn gold" data-inv-por="${e.id}" data-sc="roca">Pôr na roça</button><button class="btn gold" data-inv-por="${e.id}" data-sc="animais">Pôr no rancho</button>
+    html += `<div class="row wide ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome} × ${state.enfeites[e.id]}${e.especial ? ` <span class="tag">${e.vila ? '🏡 vila' : '⭐ pioneiros'}</span>` : ''}</div><div class="meta">${e.cerca ? 'Um pedaço de cerca para a roça. Depois de pôr um, já vem o próximo (dá para girar).' : `+${e.conforto}% de XP quando está na roça ou no rancho`}${e.especial ? `<br>${origemEnfeite(e, state)}` : ''}</div></div>
+      <div class="actions"><button class="btn gold" data-inv-por="${e.id}" data-sc="roca">Pôr na roça</button>${e.cerca ? '' : `<button class="btn gold" data-inv-por="${e.id}" data-sc="animais">Pôr no rancho</button>`}
       ${e.especial ? '' : venderBtn('enf:' + e.id, Math.floor(e.custo / 2))}</div></div>`;
   }
   for (const sc of ['roca', 'animais']) {
     const l = objetosDe(state, sc);
     if (!l.length) continue;
     html += `<h3>${sc === 'roca' ? 'Na roça' : 'No rancho'}</h3>`;
+    const cercas = l.filter(o => ehCerca(o.id)).length;
+    if (cercas) html += `<div class="row"><img alt="" src="${enfeiteIcon('cerca')}"><div><div class="name">Cerca × ${cercas}</div><div class="meta">Para mudar uma de lugar ou girar, use o botão Mover</div></div><button class="btn ghost" data-inv-guardar-cercas="${sc}">Guardar todas</button></div>`;
     l.forEach((o, i) => {
       const e = ENFEITE[o.id];
+      if (e.cerca) return;
       html += e.fruteira ? `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">${estadoFruteira(o).txt}</div></div><div></div></div>`
         : `<div class="row"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${e.especial ? ` · ${origemEnfeite(e, state)}` : ''}</div></div><button class="btn ghost" data-inv-guardar="${sc}:${i}">Guardar</button></div>`;
     });
@@ -7941,8 +8086,8 @@ function inventarioHTML() {
 function invPor(id, sc) {
   if (!(state.enfeites[id] > 0)) return;
   closePanel(); if (!isHome()) goHome(); setScene(sc);
-  const [u0, v0] = screenToWorld(L.cw / 2, L.ch * 0.55), [u, v] = pontoLivre(sc, u0, v0, null, 0.55);
-  moveMode = true; moving = { novo: id, u, v }; renderMoveBtn(); renderTools();
+  const [u0, v0] = screenToWorld(L.cw / 2, L.ch * 0.55), [u, v] = ehCerca(id) ? encaixaCerca(u0, v0, 0) : pontoLivre(sc, u0, v0, null, 0.55);
+  moveMode = true; moving = { novo: id, u, v, rot: 0 }; renderMoveBtn(); renderTools();
   toast(moveDica(ENFEITE[id].nome));
 }
 function invGuardar(sc, i) {
@@ -7956,6 +8101,12 @@ function drawEnfeite(id, x, y, s, t) {
   if (ENFEITE[id] && ENFEITE[id].fruteira) return drawFruteira({ id }, x, y, s, t, false);
   ctx.lineWidth = Math.max(1, 1.2 * s); ctx.strokeStyle = 'rgba(60,30,10,.5)';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, 26 * s, 8 * s, 0, 0, 7); ctx.fill();
+  if (id === 'cerca') {
+    // pedacinho de cerca de madeira (no ícone, sem o tema)
+    ctx.fillStyle = '#b98050'; ctx.fillRect(x - 24 * s, y - 16 * s, 48 * s, 5 * s); ctx.fillRect(x - 24 * s, y - 30 * s, 48 * s, 5 * s);
+    for (const dx of [-20, 0, 20]) { ctx.fillStyle = '#a4703f'; ctx.fillRect(x + (dx - 3) * s, y - 38 * s, 6 * s, 38 * s); ctx.fillStyle = '#c99260'; ctx.fillRect(x + (dx - 3) * s, y - 38 * s, 6 * s, 4 * s); }
+    return;
+  }
   if (id === 'carroca') {
     // carroça de feno (presente do Seu Zé)
     ctx.strokeStyle = '#7a4a24'; ctx.lineWidth = 2.5 * s; ctx.beginPath(); ctx.moveTo(x + 14 * s, y - 10 * s); ctx.lineTo(x + 30 * s, y - 4 * s); ctx.stroke();
@@ -8121,18 +8272,48 @@ const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, EN
 // e secam depois de uns dias. Arbusto seco sai com a enxada de arrancar; árvore seca, com a motosserra.
 // As ferramentas de derrubar se compram na Loja › Pomar, ganham-se completando missões e vêm de amigos.
 // ============================================================
-const FERR_DERRUBAR = { enxada: { nome: 'Enxada de arrancar', emoji: '🪓', custo: 250, para: 'arbusto' }, motosserra: { nome: 'Motosserra', emoji: '🪚', custo: 600, para: 'arvore' } };
+const FERR_DERRUBAR = { enxada: { nome: 'Enxada de arrancar', emoji: '🪓', custo: 80, para: 'arbusto' }, motosserra: { nome: 'Motosserra', emoji: '🪚', custo: 200, para: 'arvore' } };
 function derrubarDe() { const d = state.derrubar || (state.derrubar = {}); d.enxada = d.enxada || 0; d.motosserra = d.motosserra || 0; return d; }
 const ferramentaIcon = id => makeIcon('ferr:' + id, () => { ctx.font = '60px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(FERR_DERRUBAR[id].emoji, 48, 52); });
+// Cada frutífera dá um número de colheitas (e.colheitas). Depois da última, seca: aí dá para pôr
+// a placa de ajuda (um amigo que ajudar faz ela voltar a dar frutas) ou derrubar com a ferramenta.
 function estadoFruteira(o) {
   const e = ENFEITE[o.id], agora = Date.now(), t0 = o.t0 || agora, ult = o.ult || t0;
-  const morre = t0 + e.vida * 86400e3, morta = agora >= morre, pronto = !morta && agora - ult >= e.tempo * 1000;
-  const falta = Math.max(0, ult + e.tempo * 1000 - agora), dias = Math.max(0, Math.ceil((morre - agora) / 86400e3));
-  const f = FRUTA[e.fruta];
-  const txt = morta ? `Secou 🥀. Derrube com ${e.fruteira === 'arvore' ? 'a motosserra' : 'a enxada de arrancar'}.`
-    : pronto ? `Pronta! ${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} para colher · vive mais ${dias} dia${dias > 1 ? 's' : ''}`
-    : `Próxima colheita em ${fmt(falta / 1000)} · vive mais ${dias} dia${dias > 1 ? 's' : ''}`;
-  return { morta, pronto, falta, dias, txt };
+  const restam = Math.max(0, e.colheitas - (o.colhidas || 0)), morta = restam <= 0, pronto = !morta && agora - ult >= e.tempo * 1000;
+  const falta = Math.max(0, ult + e.tempo * 1000 - agora);
+  const f = FRUTA[e.fruta], resto = `${restam} colheita${restam > 1 ? 's' : ''} até secar`;
+  const txt = morta ? (o.placa ? 'Secou 🥀 · placa de ajuda posta: esperando um amigo ajudar 🤝' : `Secou 🥀. Ponha a placa de ajuda para um amigo reviver, ou derrube com ${e.fruteira === 'arvore' ? 'a motosserra' : 'a enxada de arrancar'}.`)
+    : pronto ? `Pronta! ${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} para colher · ${resto}`
+    : `Próxima colheita em ${fmt(falta / 1000)} · ${resto}`;
+  return { morta, pronto, falta, restam, txt };
+}
+// Frutíferas dos amigos (na roça e no rancho) com a placa de ajuda.
+const pedidosAjuda = s => ['roca', 'animais'].reduce((n, sc) => n + (s && s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && o.placa && ENFEITE[o.id] && ENFEITE[o.id].fruteira && (o.colhidas || 0) >= ENFEITE[o.id].colheitas).length, 0);
+// Põe a placa e avisa todos os amigos (aviso no celular e o botão "Precisa de ajuda" na lista de amigos).
+function pedirAjudaFruteira(sc, i) {
+  const o = objetosDe(state, sc)[i]; if (!o || !estadoFruteira(o).morta || o.placa) return;
+  o.placa = Date.now(); o.fid = o.fid || newId();
+  const e = ENFEITE[o.id];
+  for (const uid of state.friends) avisarAmigo(uid, 'ajuda', `${meuApelido()} precisa de ajuda: ${e.nome.toLowerCase()} secou no pomar 🥀 Passe lá para ajudar!`);
+  sfx('buy'); done(); if (user) cloudSave();
+  toast(state.friends.length ? `🪧 Placa posta! Seus amigos foram avisados. Quando um ajudar, ${e.nome.toLowerCase()} volta a dar frutas.` : '🪧 Placa posta! Mas você ainda não tem amigos: adicione alguém em Amigos para ele poder ajudar.', 'good');
+}
+function derrubarFruteira(sc, i) {
+  const o = objetosDe(state, sc)[i]; if (!o) return;
+  const e = ENFEITE[o.id], fer = e.fruteira === 'arvore' ? 'motosserra' : 'enxada', F = FERR_DERRUBAR[fer], d = derrubarDe();
+  if (!d[fer]) { toast(`Precisa de ${F.emoji} ${F.nome.toLowerCase()} para derrubar: compre na Loja › Pomar, ganhe completando as missões ou peça a um amigo.`, 'bad'); return openPanel('loja', 'pomar'); }
+  d[fer]--; const l = objetosDe(state, sc); l.splice(i, 1); state.objetos[sc] = l;
+  sfx('water'); toast(`${F.emoji} ${e.nome} derrubada. O lugar ficou livre para plantar outra!`, 'good'); done();
+}
+// Menu da frutífera seca: pedir ajuda ou derrubar.
+function menuFruteira(sc, i) {
+  const o = objetosDe(state, sc)[i]; if (!o) return;
+  const e = ENFEITE[o.id], fer = e.fruteira === 'arvore' ? 'motosserra' : 'enxada', F = FERR_DERRUBAR[fer], m = $('#ctxMenu'), q = iso(o.u, o.v);
+  m.innerHTML = `<b>${esc(e.nome)} secou 🥀</b>${o.placa ? '<span class="meta" style="display:block;margin:2px 0 6px">Placa posta: esperando um amigo ajudar</span>' : '<button type="button" data-ctx="placa">🪧 Pedir ajuda aos amigos</button>'}<button type="button" data-ctx="derrubar">${F.emoji} Derrubar (você tem ${derrubarDe()[fer]})</button><button type="button" data-ctx="fechar">Cancelar</button>`;
+  m.dataset.key = 'enf:' + i; m.dataset.sc = sc; m.hidden = false;
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = `${clamp(q.x - w / 2, 6, L.cw - w - 6)}px`; m.style.top = `${clamp(q.y - L.W * 0.5 - h, 6, L.ch - h - 6)}px`;
+  sfx('click');
 }
 function tipFruteira(o) {
   const e = ENFEITE[o.id], st = estadoFruteira(o);
@@ -8141,23 +8322,31 @@ function tipFruteira(o) {
 function actFruteira(sc, i) {
   const o = objetosDe(S(), sc)[i]; if (!o) return;
   const e = ENFEITE[o.id], st = estadoFruteira(o), f = FRUTA[e.fruta];
-  if (!isHome()) return toast(`${e.nome} de ${view.nome}: ${st.txt}`);
+  if (!isHome()) {
+    if (st.morta && o.placa && view.kind === 'friend') {
+      // ajudar a frutífera do amigo: não conta no limite do dia
+      const key = visitKey('fr:' + (o.fid || i) + ':' + o.placa);
+      if (state.log[key]) return toast('Você já ajudou esta. Obrigado! 🤝');
+      state.log[key] = Date.now();
+      const q = iso(o.u, o.v), pos = { x: q.x, y: q.y - L.W * 0.4 };
+      o.placa = 0; o.colhidas = 0; o.ult = Date.now();
+      help(pos); addXP(3, pos); sfx('level'); popupAt(pos, 'Reviveu! 🌱', '#8fd16a');
+      sendVisit({ t: 'help', what: 'fruteira', sc, fid: o.fid || '', idx: i });
+      toast(`🤝 Você ajudou ${view.nome}: ${e.nome.toLowerCase()} voltou a dar frutas!`, 'good');
+      return done();
+    }
+    return toast(`${e.nome} de ${view.nome}: ${st.morta ? (o.placa ? 'secou e está pedindo ajuda.' : 'secou.') : st.txt}`);
+  }
   if (st.pronto) {
     state.barn[f.id] = (state.barn[f.id] || 0) + e.rende;
     for (let k = 0; k < e.rende; k++) collect(f.id, null);
-    o.ult = Date.now(); state.stats.colheitas = (state.stats.colheitas || 0) + 1; track('colher');
+    o.ult = Date.now(); o.colhidas = (o.colhidas || 0) + 1; state.stats.colheitas = (state.stats.colheitas || 0) + 1; track('colher');
     addXP(e.fruteira === 'arvore' ? 6 : 3, null); sfx('collect');
-    toast(`🧺 +${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} no celeiro!`, 'good');
+    const acabou = o.colhidas >= e.colheitas;
+    toast(`🧺 +${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} no celeiro!${acabou ? ` Foi a última: ${e.nome.toLowerCase()} secou. Toque nela para pedir ajuda aos amigos (ela volta a dar frutas) ou derrubar.` : ` Falta${e.colheitas - o.colhidas > 1 ? 'm' : ''} ${e.colheitas - o.colhidas} colheita${e.colheitas - o.colhidas > 1 ? 's' : ''}.`}`, 'good');
     return done();
   }
-  if (st.morta) {
-    const fer = e.fruteira === 'arvore' ? 'motosserra' : 'enxada', F = FERR_DERRUBAR[fer], d = derrubarDe();
-    if (!d[fer]) { toast(`${e.nome} secou. Precisa de ${F.emoji} ${F.nome.toLowerCase()} para derrubar: compre na Loja › Pomar, ganhe completando as missões ou peça a um amigo.`, 'bad'); return openPanel('loja', 'pomar'); }
-    return confirmTwice('derrubar' + sc + i, `Usar ${F.emoji} 1 ${F.nome.toLowerCase()} para tirar ${e.nome.toLowerCase()} seca? Toque de novo.`, () => {
-      d[fer]--; const l = objetosDe(state, sc); l.splice(i, 1); state.objetos[sc] = l;
-      sfx('water'); toast(`${F.emoji} ${e.nome} derrubada. O lugar ficou livre para plantar outra!`, 'good'); done();
-    });
-  }
+  if (st.morta) return menuFruteira(sc, i);
   toast(`${e.nome}: ${st.txt}`);
 }
 function drawFruta(id, x, y, s) {
@@ -8196,16 +8385,28 @@ function drawFruteira(o, x, y, s, t, home) {
     const pos = arv ? [[-15, -44], [-6, -52], [8, -50], [16, -42], [2, -42], [-10, -38]] : [[-10, -12], [9, -13], [0, -20], [-3, -9], [6, -8]];
     for (const [dx, dy] of pos) { ctx.fillStyle = f.cor; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, (arv ? 3 : 2.4) * s, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.arc(x + (dx - 0.8) * s, y + (dy - 0.8) * s, 0.8 * s, 0, 7); ctx.fill(); }
   }
-  // balãozinho em cima: pronta (cesta) ou seca (ferramenta)
+  // placa de ajuda fincada do lado
+  if (seca && o.placa) {
+    const px = x + (arv ? 22 : 18) * s, py = y + 2 * s;
+    ctx.fillStyle = '#7a4a22'; ctx.fillRect(px - 1.5 * s, py - 24 * s, 3 * s, 24 * s);
+    ctx.fillStyle = '#e8c07a'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.roundRect(px - 13 * s, py - 32 * s, 26 * s, 12 * s, 2 * s); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#b3261e'; ctx.font = `800 ${Math.round(7 * s)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('AJUDA!', px, py - 25.6 * s); ctx.textBaseline = 'alphabetic';
+  }
+  // balãozinho em cima: pronta (cesta), seca (ferramenta) ou, na roça do amigo, pedindo ajuda (🤝)
+  if (!home && o.t0 && st.morta && o.placa && view.kind === 'friend') {
+    const by = y - (arv ? 72 : 36) * s + Math.sin(t / 250) * 3 * s, r = 10 * s;
+    ctx.fillStyle = '#fff3c4'; ctx.strokeStyle = '#b3261e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, by, r, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.font = `${Math.round(12 * s)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🤝', x, by + 0.5); ctx.textBaseline = 'alphabetic';
+  }
   if (home && o.t0 && (st.pronto || st.morta)) {
     const by = y - (arv ? 72 : 36) * s + Math.sin(t / 300) * 2 * s, r = 9 * s;
     ctx.fillStyle = 'rgba(255,253,242,.95)'; ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, by, r, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.font = `${Math.round(11 * s)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(st.morta ? (arv ? '🪚' : '🪓') : '🧺', x, by + 0.5); ctx.textBaseline = 'alphabetic';
+    ctx.font = `${Math.round(11 * s)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(st.morta ? (o.placa ? '🪧' : '🥀') : '🧺', x, by + 0.5); ctx.textBaseline = 'alphabetic';
   }
 }
 function pomarLojaHTML() {
   const d = derrubarDe();
-  let html = `<p class="hint">Plante frutíferas no gramado da roça ou do rancho (fora dos canteiros). Elas dão frutas de tempos em tempos e, depois de uns dias, secam. Arbusto seco sai com a 🪓 enxada de arrancar; árvore seca, com a 🪚 motosserra. Ganhe essas ferramentas completando todas as missões (dia: enxada, semana: motosserra), de presente de amigos ou compre aqui.</p>`;
+  let html = `<p class="hint">Plante frutíferas no gramado da roça ou do rancho (fora dos canteiros). Cada uma dá 3 colheitas e depois seca. Seca, você escolhe: pôr a 🪧 placa de ajuda (todos os seus amigos são avisados e, quando um ajudar, ela volta a dar mais 3 colheitas) ou derrubar (arbusto com a 🪓 enxada de arrancar; árvore com a 🪚 motosserra). Ganhe as ferramentas completando todas as missões (dia: enxada, semana: motosserra), de presente de amigos ou compre aqui.</p>`;
   html += `<h3>Ferramentas de derrubar</h3>`;
   for (const [id, F] of Object.entries(FERR_DERRUBAR)) html += `<div class="row"><img alt="" src="${ferramentaIcon(id)}"><div><div class="name">${F.nome}</div><div class="meta">Tira um${F.para === 'arvore' ? 'a árvore' : ' arbusto'} seco · você tem <b>${d[id]}</b></div></div>
     <button class="btn" data-comprar-ferr="${id}" ${state.coins < F.custo ? 'disabled' : ''}>${moeda(F.custo)}</button></div>`;
@@ -8214,7 +8415,7 @@ function pomarLojaHTML() {
     for (const e of ENFEITES.filter(x => x.fruteira === tipo)) {
       const f = FRUTA[e.fruta], locked = e.nivel > state.level, tem = state.enfeites[e.id] || 0;
       html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div>
-        <div class="meta">${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} (vale ${f.preco}) a cada ${fmt(e.tempo)} · vive ${e.vida} dias${tem ? ` · no inventário: <b>${tem}</b>` : ''}</div></div>
+        <div class="meta">${e.rende} ${f.nome.toLowerCase()}${e.rende > 1 ? 's' : ''} (vale ${f.preco}) a cada ${fmt(e.tempo)} · ${e.colheitas} colheitas (rende ${(e.rende * f.preco * e.colheitas).toLocaleString('pt-BR')} moedas)${tem ? ` · no inventário: <b>${tem}</b>` : ''}</div></div>
         ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
     }
   }

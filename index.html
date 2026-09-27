@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="100">
-<script src="firebase-config.js?v=100"></script>
+<meta name="rf-version" content="102">
+<script src="firebase-config.js?v=102"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -625,6 +625,10 @@
     .gday img { width: 30px; height: 30px; }
   }
   @media (prefers-reduced-motion: reduce) { .toast, .panel { animation: none; } .xpbar i { transition: none; } .row.flash { animation: none; } }
+  .btn.socorro{background:linear-gradient(#ff7a4a,#e0442a);color:#fff;border-color:#a8321e;animation:socorro 1.4s ease-in-out infinite}
+  @keyframes socorro{50%{box-shadow:0 0 0 4px rgba(255,120,70,.35)}}
+  .hint.pedeajuda{background:#fff0e0;border:2px solid #e0772a;border-radius:10px;padding:8px 10px;color:#7a3a12;font-weight:700}
+  #ctxMenu .meta{font-size:12px;color:#7a5a3a}
 </style>
 </head>
 <body>
@@ -702,7 +706,7 @@
     </div>
     <div class="movebar over" id="moveBar" hidden>
       <span id="moveMsg"></span>
-      <div class="mvbtns"><button class="btn" type="button" id="moveCancel">Cancelar</button><button class="btn gold" type="button" id="moveOk">✔ Salvar aqui</button></div>
+      <div class="mvbtns"><button class="btn" type="button" id="moveCancel">Cancelar</button><button class="btn" type="button" id="moveRot" hidden>⟳ Girar</button><button class="btn gold" type="button" id="moveOk">✔ Salvar aqui</button></div>
     </div>
     <div class="bottombar over">
       <div class="hintline" id="sceneHint" hidden></div>
@@ -880,8 +884,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=100"></script>
-<script src="js/cloud.js?v=100"></script>
-<script src="js/game.js?v=100"></script>
+<script src="js/audio.js?v=102"></script>
+<script src="js/cloud.js?v=102"></script>
+<script src="js/game.js?v=102"></script>
 </body>
 </html>
