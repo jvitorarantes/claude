@@ -12,4 +12,4 @@ window.FIREBASE_CONFIG = {
 
 // Chave pública das notificações (Firebase › Configurações do projeto › Cloud Messaging ›
 // Certificados push da Web › Par de chaves). Pode ficar pública. Vazia = notificações desligadas.
-window.FIREBASE_VAPID_KEY = "";
+window.FIREBASE_VAPID_KEY = "BNAgJF7S33edCtRrAyXmnr1KPy8aESpVONu18QUerQnDUgh4zrU8Fdc3ajkyP_eCrWifwqfJH076ndN0TxTWDyE";
