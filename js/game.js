@@ -235,8 +235,10 @@ const STAGE_NAMES = ['Semente', 'Broto', 'Crescendo', 'Quase lá', 'Maduro'];
 
 // Vizinhos da vila (não são amigos de verdade). "acima": quantos níveis a roça deles tem a mais que a sua.
 const NEIGHBORS = [
-  { id: 'ze',    nome: 'Seu Zé',     fazenda: 'Sítio Boa Vista',    cao: 'Rex',    casa: '#d9a441', pega: 0.16, acima: 2 },
-  { id: 'maria', nome: 'Dona Maria', fazenda: 'Chácara das Flores', cao: 'Pipoca', casa: '#c7658f', pega: 0.08, acima: 5 },
+  { id: 'ze',    nome: 'Seu Zé',     fazenda: 'Sítio Boa Vista',    cao: 'Rex',    casa: '#d9a441', pega: 0.16, acima: 2,
+    avatar: { sexo: 'm', pele: 2, cabelo: 'curto', corCabelo: 4, chapeu: 'palha', camisa: 'xadrez', calca: 'macacao', sapato: 'bota', mao: 'enxada' } },
+  { id: 'maria', nome: 'Dona Maria', fazenda: 'Chácara das Flores', cao: 'Pipoca', casa: '#c7658f', pega: 0.08, acima: 5,
+    avatar: { sexo: 'f', pele: 1, cabelo: 'rabo', corCabelo: 4, chapeu: 'palha', camisa: 'florida', calca: 'saia', sapato: 'sapatilha', mao: 'nada' } },
 ];
 // Nomes escolhidos pelo jogador: da fazenda e do avatar. Quem visita vê "[fazenda] de [avatar]".
 const NOME_MAX = 24;
@@ -836,6 +838,7 @@ const dogAwake = d => dogAlive(d) && d.fedUntil > Date.now();
 const sorteia = l => l[Math.floor(Math.random() * l.length)];
 const FALAS_CAO = ['Au au! 🐶', 'Au! Tô de olho!', 'Cadê meu osso? 🦴', 'Aqui ninguém pega nada!', 'Au au! Brinca comigo?', 'Grrr… quem vem lá?', 'Au! Bora passear?', '*abana o rabo*'];
 const FALAS_AVATAR = ['Cê tá bão?', 'Ô trem bão!', 'Bora trabaiá!', 'Que dia bonito, sô!', 'Essa roça tá uma belezura!', 'Uai, cadê meu chapéu?', 'Hoje tem colheita boa!', 'Vou tomar um cafezin ☕', 'Nó, que calor!', 'Bão demais da conta!'];
+const FALAS_DONO = ['Seja bem-vindo na minha roça!', 'Fique à vontade, sô!', 'Aceita um cafezinho?', 'Dá uma ajudinha na horta?', 'Que bom que cê veio!', 'Repara na bagunça não!'];
 const latir = (slot, nome) => { falar('dog:' + slot, nome, sorteia(FALAS_CAO)); sfx('bark'); };
 function actDog(slot) {
   const d = S().dogs && S().dogs[slot];
@@ -911,6 +914,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 67, txt: 'Visitas mais vivas: na roça dos amigos (e do Seu Zé e da Dona Maria), o avatar do dono também passeia. Clique nele para ouvir o que ele tem a dizer!' },
   { v: 66, txt: 'Nomes: dar o primeiro nome para a fazenda e para o avatar continua grátis; para trocar um nome depois, custa 100 moedas (em ⚙️ › Nomes).' },
   { v: 65, txt: 'Peixe novo ✨: quando pegar um peixe pela primeira vez, aparece o selo NOVO! e ele fica marcado no 📖 Livro de peixes. A dica da isca mostra com ✨ os que você ainda não pegou.' },
   { v: 63, txt: 'Agora são 5 missões diárias, com tipos novos: pescar, pegar peixe raro, cozinhar peixe, atender a vila, visitar roças e mais.' },
@@ -1150,7 +1154,7 @@ function visitNpc(id) {
   telaCarregando(`Indo até ${nb.fazenda} de ${nb.nome}…`, CARREGA_MS, nb.fazenda);
   const cur = state.nb[id];
   if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry)) || !cur.plots.some(p => 'podre' in p) || !cur.banca) state.nb[id] = genNeighbor();
-  view = { kind: 'npc', id, nome: nb.nome, fazenda: nb.fazenda, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima };
+  view = { kind: 'npc', id, nome: nb.nome, fazenda: nb.fazenda, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima, avatar: avatarOk(nb.avatar) };
   afterVisit();
   save();
 }
@@ -1166,7 +1170,7 @@ async function visitFriend(uid) {
     if (!data) return toast('Essa roça ainda não existe na nuvem.', 'bad');
     catchUp(data, (Date.now() - (f.updatedAt || Date.now())) / 1000);
     const nome = limpaNome(f.apelido || data.apelido) || (firstName(f.name) === 'Você' ? 'Amigo' : firstName(f.name));
-    view = { kind: 'friend', uid, nome, fazenda: limpaNome(f.fazenda || data.fazenda) || 'Roça Feliz', cao: 'Bidu', pega: 0.12, casa: '#7aa35a', data, nivel: data.level || f.level || 1 };
+    view = { kind: 'friend', uid, nome, fazenda: limpaNome(f.fazenda || data.fazenda) || 'Roça Feliz', cao: 'Bidu', pega: 0.12, casa: '#7aa35a', data, nivel: data.level || f.level || 1, avatar: avatarOk(data.avatar) };
     afterVisit();
   } catch (e) {
     console.warn(e);
@@ -3007,7 +3011,7 @@ function drawRoca(s, t, home) {
   if (home) drawLandSign();
   for (let sum = 0; sum <= COLS + ROWS - 2; sum++)
     for (let c = 0; c < COLS; c++) { const r = sum - c; if (r >= 0 && r < ROWS) drawPlot(r * COLS + c, s.plots[r * COLS + c], t, home); }
-  drawAvatarWalk('roca', t);
+  drawAvatares('roca', t);
   drawObjetos(s, 'roca', t, home, 'frente');
   drawMoving('roca', t);
   drawCritters(t, tod);
@@ -3162,7 +3166,7 @@ function drawPen(s, t, home, dt) {
   const bubbles = [];
   const order = ABRIGOS.slice().sort((a, b) => { const p = yardOf(a.id), q = yardOf(b.id); return (p.u0 + p.v0) - (q.u0 + q.v0); });
   for (const b of order) drawYard(b, s, t, home, dt, bubbles);
-  drawAvatarWalk('animais', t);
+  drawAvatares('animais', t);
   drawObjetos(s, 'animais', t, home, 'frente');
   drawMoving('animais', t);
   drawCritters(t, tod);
@@ -3410,7 +3414,7 @@ function drawCursorTool() {
 let falas = [];
 function falar(alvo, nome, txt) { falas = falas.filter(f => f.alvo !== alvo); falas.push({ alvo, nome, txt, t0: performance.now() }); }
 function posFala(alvo) {
-  if (alvo === 'avatar') { const w = avWalk[scene]; return w && w.tela; }
+  if (alvo === 'avatar' || alvo === 'avatar:dono') { const w = avWalk[scene + ':' + (alvo === 'avatar' ? 'eu' : 'dono')]; return w && w.tela; }
   if (alvo.startsWith('animal:')) { const m = amb[alvo.slice(7)]; return m && m.topo; }
   if (alvo.startsWith('dog:')) return dogPos(alvo.slice(4));
   return null;
@@ -4274,7 +4278,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? `<b>${esc(meuApelido())}</b><br>Clique para dar um oi.` : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4434,6 +4438,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'land') openPanel('terreno');
   else if (target.kind === 'bicho') actBicho(target.i);
   else if (target.kind === 'lago') abrirPesca();
+  else if (target.kind === 'avatar' && target.quem === 'dono') { falar('avatar:dono', view.nome, sorteia(FALAS_DONO.concat(FALAS_AVATAR))); sfx('fala'); }
   else if (target.kind === 'avatar') { falar('avatar', meuApelido(), sorteia(FALAS_AVATAR)); sfx('fala'); }
   else if (target.kind === 'enfeite') actEnfeite(target.id);
   else if (target.kind === 'casa') setScene('casa');
@@ -5561,12 +5566,13 @@ function avatarArea(sc) {
   if (c1 <= c0) { c0 = 0; c1 = 3; r0 = 0; r1 = 3; }
   return { u0: c0 + 0.3, u1: Math.min(COLS, c1 + 0.8) - 0.3, v0: r0 + 0.3, v1: Math.min(ROWS, r1 + 0.8) - 0.3 };
 }
-function drawAvatarWalk(sc, t) {
-  const a = avatarArea(sc);
-  let w = avWalk[sc];
+// quem: 'eu' (o seu avatar, que vai junto nas visitas) ou 'dono' (o avatar do dono da roça visitada).
+function drawAvatarWalk(sc, t, quem = 'eu') {
+  const a = avatarArea(sc), chave = sc + ':' + quem;
+  let w = avWalk[chave];
   if (!w || w.dono !== view.kind + (view.id || view.uid || '')) {
     const u = a.u0 + Math.random() * (a.u1 - a.u0), v = a.v0 + Math.random() * (a.v1 - a.v0);
-    w = avWalk[sc] = { dono: view.kind + (view.id || view.uid || ''), fu: u, fv: v, tu: u, tv: v, t0: t, dur: 0, wait: 1500, dir: 1 };
+    w = avWalk[chave] = { dono: view.kind + (view.id || view.uid || ''), fu: u, fv: v, tu: u, tv: v, t0: t, dur: 0, wait: 1500, dir: 1 };
   }
   let k = w.dur ? Math.min(1, (t - w.t0) / w.dur) : 1;
   if (k >= 1 && t - w.t0 > w.dur + w.wait) {
@@ -5579,10 +5585,16 @@ function drawAvatarWalk(sc, t) {
   const u = w.fu + (w.tu - w.fu) * k, v = w.fv + (w.tv - w.fv) * k, q = iso(u, v), W = L.W;
   const esc = W / 95 * (sc === 'animais' ? 1.25 : 1);
   w.tela = { x: q.x, y: q.y - 70 * esc };
-  hits.push({ kind: 'avatar', x: q.x, y: q.y - 34 * esc, r: Math.max(26 * esc, 16) });
-  if (hover && hover.kind === 'avatar') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.17, W * 0.06, 0, 0, 7); ctx.stroke(); }
+  hits.push({ kind: 'avatar', quem, x: q.x, y: q.y - 34 * esc, r: Math.max(26 * esc, 16) });
+  if (hover && hover.kind === 'avatar' && (hover.quem || 'eu') === quem) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.17, W * 0.06, 0, 0, 7); ctx.stroke(); }
   ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.13, W * 0.045, 0, 0, 7); ctx.fill();
-  drawAvatar(ctx, q.x, q.y, esc, state.avatar, t, k < 1, w.dir);
+  drawAvatar(ctx, q.x, q.y, esc, quem === 'dono' ? view.avatar : state.avatar, t, k < 1, w.dir);
+}
+// Na roça dos outros, o dono também passeia (desenha antes o que está mais ao fundo).
+function drawAvatares(sc, t) {
+  if (isHome() || !view.avatar) return drawAvatarWalk(sc, t);
+  const fundo = q => { const w = avWalk[sc + ':' + q]; return w ? w.fu + (w.tu - w.fu) * Math.min(1, w.dur ? (t - w.t0) / w.dur : 1) + w.fv + (w.tv - w.fv) * Math.min(1, w.dur ? (t - w.t0) / w.dur : 1) : 0; };
+  ['eu', 'dono'].sort((x, y) => fundo(x) - fundo(y)).forEach(q => drawAvatarWalk(sc, t, q));
 }
 // Prévia nas Configurações.
 function renderAvatarCfg() {
