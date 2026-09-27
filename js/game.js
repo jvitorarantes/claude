@@ -2137,8 +2137,14 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
     return;
   }
   if (stage === 0) {
-    ctx.fillStyle = '#4a2c14';
-    for (const [dx, dy] of [[-4, 0], [3, -1], [0, 2]]) { ctx.beginPath(); ctx.ellipse(x + dx * s, y + dy * s, 1.6 * s, 1.1 * s, 0, 0, 7); ctx.fill(); }
+    // recém-plantado: covinha de terra fofa (mais clara) com um brotinho verde saindo
+    ctx.fillStyle = 'rgba(40,20,5,.35)'; ctx.beginPath(); ctx.ellipse(x, y + 1 * s, 7.5 * s, 3 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#b67a45'; ctx.beginPath(); ctx.ellipse(x, y - 0.5 * s, 6.5 * s, 3.4 * s, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#c98f57'; ctx.beginPath(); ctx.ellipse(x - 1.5 * s, y - 1.5 * s, 3 * s, 1.4 * s, 0, 0, 7); ctx.fill();
+    const k = 0.85 + 0.15 * Math.sin(t / 900 + x * 0.1);
+    ctx.strokeStyle = GD; ctx.lineWidth = 1.2 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y - 2 * s); ctx.lineTo(x, y - 5 * s * k); ctx.stroke(); ctx.lineCap = 'butt';
+    leaf(x, y - 4.6 * s * k, 4.2 * s, 1.9 * s, -0.9 + sway, GL); leaf(x, y - 4.6 * s * k, 4.2 * s, 1.9 * s, 0.9 + sway, GL);
   } else if (stage === 1) {
     ctx.strokeStyle = GD; ctx.lineWidth = 1.4 * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 5 * s); ctx.stroke();
     leaf(x, y - 4 * s, 8 * s, 3 * s, -0.8 + sway, GL); leaf(x, y - 4 * s, 8 * s, 3 * s, 0.8 + sway, GL);
