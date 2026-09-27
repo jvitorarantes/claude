@@ -523,7 +523,7 @@ const sfx = name => { if (window.RFAudio) window.RFAudio.play(name); };
 const comfort = s => DECOR.reduce((t, d) => t + (emUso(s, d.id) ? emUso(s, d.id).conforto : 0), 0) + confortoEnfeites(s);
 const firstName = n => (n || '').split(' ')[0] || 'Você';
 
-$('#trevosHud').addEventListener('click', () => { missSeg = 'trevos'; openPanel('missoes'); });
+$('#trevosHud').addEventListener('click', () => { if (trevosPendentes()) { missSeg = 'trevos'; openPanel('missoes'); } else openPanel('loja', 'trevo'); });
 // A caixa de avisos fica no topo da página (por cima das janelas abertas, como a pescaria).
 (() => { const t = document.getElementById('toasts'); if (t && t.parentElement !== document.body) document.body.appendChild(t); })();
 function toast(msg, kind = '') {
@@ -4031,7 +4031,7 @@ function usarCasaTema(id) {
   const tem = id === 'classico' || state.skins[id];
   if (!tem) {
     if (t.especial) return;
-    if (t.trevo) { missSeg = 'trevos'; return openPanel('missoes'); }
+    if (t.trevo) return openPanel('loja', 'trevo');
     if (state.level < t.nivel) return toast(`${t.nome} libera no nível ${t.nivel}.`, 'bad');
     if (state.coins < t.custo) { sfx('error'); return toast(`${t.nome} custa ${t.custo.toLocaleString('pt-BR')} moedas.`, 'bad'); }
     return confirmTwice('casatema' + id, `Comprar o tema ${t.nome} por ${t.custo.toLocaleString('pt-BR')} moedas? Toque de novo para confirmar.`, () => {
@@ -4071,7 +4071,7 @@ function renderPane() {
   else if (tab === 'missoes') html = missoesHTML();
   else if (tab === 'fabrica') html = fabricaHTML();
   else if (tab === 'loja') {
-    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['enfeites', 'Enfeites'], ['temas', 'Temas']];
+    const segs = [['sementes', 'Sementes'], ['mudas', 'Mudas'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['enfeites', 'Enfeites'], ['temas', 'Temas'], ['trevo', '🍀 Trevo']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
     if (shopSeg === 'sementes' || shopSeg === 'mudas') {
       const trees = shopSeg === 'mudas';
@@ -4117,6 +4117,8 @@ function renderPane() {
           <div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${tem ? ` · no inventário: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
           ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
       }
+    } else if (shopSeg === 'trevo') {
+      html += trevoLojaHTML();
     } else if (shopSeg === 'temas') {
       html += `<p class="hint">Os temas mudam a cerca e o jeito da sua roça. Os amigos veem o seu tema quando visitam.</p>`;
       html += `<h3>Casa e celeiro</h3>` + casaTemasHTML() + `<h3>Cerca e roça</h3>`;
@@ -4271,6 +4273,7 @@ $('#pane').addEventListener('click', e => {
   if (d.trevoConq) { resgatarConquista(d.trevoConq); return renderPane(); }
   if (d.trevoComprar) return comprarTrevoItem(d.trevoComprar);
   if (d.abrirTrevos) { missSeg = 'trevos'; return openPanel('missoes'); }
+  if (d.irLojaTrevo) return openPanel('loja', 'trevo');
   if (d.abrirLivro) { closePanel(); if (!isHome()) goHome(); abrirPesca(); pescaLivro = true; return renderPesca(); }
   if (d.entrarCasa) { closePanel(); return setScene('casa'); }
   if ('skin' in d) { state.skin = d.skin || null; toast(d.skin ? 'Celeiro e casa dos Pioneiros!' : 'Celeiro e casa clássicos.', 'good'); if (isHome()) setScene('roca'); return done(); }
@@ -4718,7 +4721,7 @@ function renderSettings() {
   const names = window.RFAudio ? window.RFAudio.tracks : ['Música 1', 'Música 2', 'Música 3'];
   $('#tracks').innerHTML = names.map((n, k) => musicaLiberada(k) ? `<button type="button" class="track" role="radio" aria-checked="${settings.track === k}" data-track="${k}">
     <span class="dot"></span><span>${esc(n)}<small>${TRACK_INFO[k] || ''}</small></span></button>`
-    : `<button type="button" class="track" role="radio" aria-checked="false" disabled data-abrir-trevos-set="1"><span class="dot"></span><span>🍀 ${esc(n)}<small>Exclusiva da Loja do Trevo (Missões › 🍀 Trevos)</small></span></button>`).join('');
+    : `<button type="button" class="track" role="radio" aria-checked="false" disabled data-abrir-trevos-set="1"><span class="dot"></span><span>🍀 ${esc(n)}<small>Exclusiva da Loja do Trevo (Loja › 🍀 Trevo)</small></span></button>`).join('');
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.tema === settings.tema)));
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tema === settings.tema)));
 }
@@ -6411,7 +6414,7 @@ const esperaTarrafa = () => Math.round(TARRAFA_MS * (1 - dominio().corte));
 function dominioHTML() {
   const d = dominio(), pct = d.max ? 100 : Math.round((d.xp - d.ini) / (d.fim - d.ini) * 100);
   return `<span class="dnv">🎖️ Domínio de pesca <b>Nv ${d.nv}</b></span><span class="dbar"><i style="width:${pct}%"></i></span>
-    ${dominioAResgatar().length ? `<button class="btn gold dresg" type="button" data-trevo-dominio="1">Resgatar 🍀${dominioAResgatar().reduce((t, n) => t + (TREVO_DOMINIO[n - 1] || 0), 0)}</button>` : ''}
+    ${dominioAResgatar().length ? `<button class="btn gold dresg" type="button" data-trevo-dominio="1">Resgatar 🍀${dominioAResgatar().reduce((t, n) => t + (TREVO_DOMINIO[n] || 0), 0)}</button>` : ''}
     <span class="dinfo">${d.corte ? `−${Math.round(d.corte * 100)}% de espera · ` : ''}vara ${fmt(esperaVara() / 1000)} · tarrafa ${fmt(esperaTarrafa() / 1000)}${d.max ? ' · máximo!' : ` · ${d.fim - d.xp} pts p/ Nv ${d.nv + 1}`}</span>`;
 }
 const PONTOS = [
@@ -7862,11 +7865,14 @@ const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, { 
 // Tudo o que já foi feito antes (peixes, níveis, conquistas) também pode ser resgatado.
 // ============================================================
 const TREVO_PEIXE = { comum: 1, incomum: 2, raro: 3, 'épico': 5, 'lendário': 10 };
-const TREVO_DOMINIO = [0, 0, 2, 2, 3, 3, 4, 4, 5, 10]; // ao chegar em cada nível (índice = nível - 1)
+const TREVO_DOMINIO = [0, 0, 2, 2, 3, 3, 4, 4, 5, 5, 10]; // ao chegar em cada nível (índice = nível)
 function trevosDe() {
   const t = state.trevos || (state.trevos = { saldo: 0, peixes: {}, dominio: {}, conq: {}, itens: {} });
   for (const k of ['peixes', 'dominio', 'conq', 'itens']) t[k] = t[k] || {};
-  t.saldo = t.saldo || 0; return t;
+  t.saldo = t.saldo || 0;
+  // conserto: na primeira versão o nível 2 do domínio pagava 0 e os outros um nível atrasado; paga a diferença
+  if (!t.domFix) { t.domFix = 1; const antigo = [0, 0, 2, 2, 3, 3, 4, 4, 5, 10]; for (const nv of Object.keys(t.dominio)) t.saldo += Math.max(0, (TREVO_DOMINIO[nv] || 0) - (antigo[nv - 1] || 0)); }
+  return t;
 }
 const temTrevoItem = id => !!(state && state.trevos && state.trevos.itens && state.trevos.itens[id]);
 const PEIXES_REAIS = () => PEIXES.filter(p => !p.lixo);
@@ -7892,7 +7898,7 @@ const peixesAResgatar = () => PEIXES_REAIS().filter(p => state.col[p.id] && !tre
 const dominioAResgatar = () => { const nv = dominio().nv, r = []; for (let n = 2; n <= nv; n++) if (!trevosDe().dominio[n]) r.push(n); return r; };
 const trevosPendentes = () => !state ? 0 : peixesAResgatar().length + dominioAResgatar().length + CONQUISTAS.filter(conqPronta).length;
 function ganharTrevos(n, motivo) {
-  if (!n) return;
+  if (!n) { done(); renderTabs(); return; }
   trevosDe().saldo += n; sfx('level');
   toast(`🍀 +${n} trevo${n > 1 ? 's' : ''}! ${motivo}`, 'good');
   done(); renderTabs(); renderHUD();
@@ -7908,7 +7914,7 @@ function resgatarTodosPeixes() {
 }
 function resgatarDominio() {
   const l = dominioAResgatar(), t = trevosDe(); if (!l.length) return;
-  let n = 0; for (const nv of l) { t.dominio[nv] = true; n += TREVO_DOMINIO[nv - 1] || 0; }
+  let n = 0; for (const nv of l) { t.dominio[nv] = true; n += TREVO_DOMINIO[nv] || 0; }
   ganharTrevos(n, `Domínio de pesca ${l.length > 1 ? `níveis ${l[0]} a ${l[l.length - 1]}` : `nível ${l[0]}`}.`);
 }
 function resgatarConquista(id) {
@@ -7991,7 +7997,13 @@ function trevosHTML() {
       <div><div class="name">${c.nome}</div><div class="meta">${c.desc} · ${v.toLocaleString('pt-BR')}/${alvo.toLocaleString('pt-BR')}</div><div class="mbar"><i style="width:${Math.round(v / alvo * 100)}%"></i></div></div>
       ${feita ? '<button class="btn ghost" disabled>Resgatado</button>' : pronta ? `<button class="btn gold" data-trevo-conq="${c.id}">Resgatar 🍀${c.trevos}</button>` : `<button class="btn ghost" disabled>🍀 ${c.trevos}</button>`}</div>`;
   }
-  html += `<h3>Loja do Trevo 🍀</h3><p class="hint">Itens exclusivos: só se conseguem com trevos. Os úteis dá para trocar quantas vezes quiser.</p>`;
+  html += `<div class="row"><div class="avatar" style="background:#2f8a2f;font-size:24px">🛍️</div><div><div class="name">Loja do Trevo</div><div class="meta">Os itens exclusivos ficam na Loja, na aba 🍀 Trevo.</div></div><button class="btn gold" data-ir-loja-trevo="1">Abrir</button></div>`;
+  return html;
+}
+function trevoLojaHTML() {
+  const t = trevosDe();
+  let html = `<div class="row sel"><div class="avatar" style="background:#2f8a2f;font-size:26px">🍀</div><div><div class="name">Você tem ${t.saldo} trevo${t.saldo === 1 ? '' : 's'}</div><div class="meta">Ganhe resgatando peixes, domínio de pesca e conquistas em Missões › 🍀 Trevos.</div></div><button class="btn ghost" data-abrir-trevos="1">Ganhar</button></div>
+    <p class="hint">Itens exclusivos: só se conseguem com trevos. Os úteis dá para trocar quantas vezes quiser.</p>`;
   for (const it of TREVO_TIPOS.flatMap(tp => { const l = TREVO_LOJA.filter(x => x.tipo === tp); return l.length ? [{ cab: tp }, ...l] : []; })) {
     if (it.cab) { html += `<p class="trevocab">${{ 'Útil': '🧺 Úteis', Avatar: '🧑‍🌾 Para o avatar', Enfeite: '🌼 Enfeites', Tema: '🏡 Temas da casa', 'Música': '🎵 Músicas' }[it.cab]}</p>`; continue; }
     const tem = t.itens[it.id] && !it.repete;
