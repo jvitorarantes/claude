@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="58">
-<script src="firebase-config.js?v=58"></script>
+<meta name="rf-version" content="59">
+<script src="firebase-config.js?v=59"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -387,6 +387,12 @@
     background: var(--panel); color: var(--ink); border: 5px solid var(--wood); border-radius: 20px;
     box-shadow: 0 8px 0 rgba(0,0,0,.2);
   }
+  .status { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #8a8672; }
+  .status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #b9b4ac; }
+  .status.on { color: #3d8a24; }
+  .status.on::before { background: #4fc03a; box-shadow: 0 0 0 2px rgba(79,192,58,.25); }
+  .modal-head .status { margin-right: auto; margin-left: 10px; color: #f4e1c6; }
+  .modal-head .status.on { color: #b9f0a0; }
   .chatcard { display: flex; flex-direction: column; height: min(640px, calc(100dvh - 32px)); overflow: hidden; }
   .chatlista { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; background: #eaf3dc; overscroll-behavior: contain; }
   .chatlista .vazio { margin: auto; color: #6a6a52; text-align: center; font-size: 14px; }
@@ -687,7 +693,7 @@
 
 <div class="modal" id="chat" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
   <div class="modal-card chatcard">
-    <div class="modal-head"><h2 id="chatTitle">Conversa</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-head"><h2 id="chatTitle">Conversa</h2><span class="status" id="chatStatus"></span><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="chatlista" id="chatLista" role="log" aria-live="polite"></div>
     <div class="chatrapidas" id="chatRapidas"></div>
     <form class="chatform" id="chatForm"><input id="chatTxt" maxlength="300" placeholder="Escreva uma mensagem…" autocomplete="off" aria-label="Mensagem"><button class="btn gold" type="submit">Enviar</button></form>
@@ -768,8 +774,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=58"></script>
-<script src="js/cloud.js?v=58"></script>
-<script src="js/game.js?v=58"></script>
+<script src="js/audio.js?v=59"></script>
+<script src="js/cloud.js?v=59"></script>
+<script src="js/game.js?v=59"></script>
 </body>
 </html>

@@ -83,6 +83,12 @@ service cloud.firestore {
                     && request.resource.data.size() < 8;
     }
 
+    // Presença: só "online" e a hora da última vez visto. Qualquer jogador logado pode ler; cada um só grava o seu.
+    match /presenca/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && me() == uid && request.resource.data.size() <= 2;
+    }
+
     // Códigos de amigo (6 letras) apontando para o jogador. Não podem ser trocados depois.
     match /codes/{code} {
       allow read: if signedIn();

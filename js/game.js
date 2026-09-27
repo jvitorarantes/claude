@@ -1381,6 +1381,7 @@ function kick(sess) {
 async function onUser(u) {
   if (unsubVisits) { unsubVisits(); unsubVisits = null; }
   if (unsubChat) { unsubChat(); unsubChat = null; } chatMsgs = [];
+  if (unsubPresenca) { unsubPresenca(); unsubPresenca = null; } presencaDe = '';
   if (unsubRequests) { unsubRequests(); unsubRequests = null; }
   if (unsubFarm) { unsubFarm(); unsubFarm = null; }
   user = u; requests = [];
@@ -1444,6 +1445,7 @@ async function onUser(u) {
     });
     unsubVisits = Cloud.watchVisits(u.uid, applyVisits);
     if (Cloud.watchChat) unsubChat = Cloud.watchChat(u.uid, onChat);
+    marcarPresenca(!document.hidden); presencaDe = ''; vigiarPresenca();
     unsubRequests = Cloud.watchRequests(u.uid, onRequests);
     checkSent(); recuperarAmigos();
     enterGame();
@@ -3713,7 +3715,7 @@ function openPanel(t, seg, focus) {
   tab = t; if (seg) shopSeg = seg;
   $('#panel').hidden = false;
   renderPane(); $('#pane').scrollTop = 0;
-  if (t === 'amigos') { checkSent(); if (Date.now() - ultimaRecup > 60000) { ultimaRecup = Date.now(); recuperarAmigos(); } }
+  if (t === 'amigos') { vigiarPresenca(); checkSent(); if (Date.now() - ultimaRecup > 60000) { ultimaRecup = Date.now(); recuperarAmigos(); } }
   if (focus) focusRow('abrigo-' + focus);
 }
 function closePanel() { $('#panel').hidden = true; renderPane(); }
@@ -3967,7 +3969,7 @@ function renderPane() {
         const name = f ? f.name : 'Amigo';
         const armed = unfriendArmed === uid;
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
-          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `${esc(f.fazenda || 'Roça Feliz')} · nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
+          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${bolinhaStatus(uid)} · ${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `${esc(f.fazenda || 'Roça Feliz')} · nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : (f && f.erro ? `<button class="btn" data-reatar="${esc(uid)}">Reatar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`)}
           <button class="btn" data-chat="${esc(uid)}" ${f && !f.erro ? '' : 'disabled'}>💬 Conversar${naoLidas(uid) ? ` <span class="badge" aria-label="${naoLidas(uid)} mensagens novas">${naoLidas(uid)}</span>` : ''}</button>
           ${giftsToday().to.includes(uid) ? '<button class="btn ghost" disabled>🎁 Enviado</button>' : `<button class="btn gold" data-send-gift="${esc(uid)}" ${f && !f.erro && giftsToday().to.length < PRESENTE_MAX ? '' : 'disabled'}>🎁 Presentear</button>`}
@@ -4914,6 +4916,38 @@ async function sendFriendGift(uid, escolha) {
   }
 }
 
+// ---------- Presença dos amigos (online / offline) ----------
+// Enquanto o jogo está aberto e na tela, marca "online" a cada 2 minutos. Ao sair, marca offline.
+const PRESENCA_MS = 2 * 60e3, ONLINE_ATE = 5 * 60e3;
+const presenca = {};
+let presencaTimer = 0, unsubPresenca = null, presencaDe = '';
+function marcarPresenca(online) {
+  if (!user || !Cloud.marcarPresenca) return;
+  Cloud.marcarPresenca(user.uid, online).catch(e => console.warn('presença:', e));
+  clearTimeout(presencaTimer);
+  if (online) presencaTimer = setTimeout(() => marcarPresenca(!document.hidden), PRESENCA_MS);
+}
+function vigiarPresenca() {
+  if (!user || !Cloud.watchPresenca) return;
+  const lista = state.friends.slice().sort(), chave = lista.join(',');
+  if (chave === presencaDe) return;
+  presencaDe = chave; if (unsubPresenca) unsubPresenca(); unsubPresenca = null;
+  if (lista.length) unsubPresenca = Cloud.watchPresenca(lista, (uid, p) => {
+    presenca[uid] = p; if (tab === 'amigos') renderPane(); if (chatCom === uid) renderChatStatus();
+  });
+}
+function statusAmigo(uid) {
+  const p = presenca[uid];
+  if (!p || !p.visto) return { on: false, txt: 'Offline' };
+  const idade = Date.now() - p.visto;
+  if (p.online && idade < ONLINE_ATE) return { on: true, txt: 'Online' };
+  const min = Math.max(1, Math.round(idade / 60e3));
+  return { on: false, txt: min < 60 ? `Visto há ${min} min` : min < 60 * 24 ? `Visto há ${Math.round(min / 60)} h` : `Visto há ${Math.round(min / 1440)} dia${min >= 2880 ? 's' : ''}` };
+}
+const bolinhaStatus = uid => { const st = statusAmigo(uid); return `<span class="status ${st.on ? 'on' : ''}" title="${st.txt}">${st.txt}</span>`; };
+document.addEventListener('visibilitychange', () => { if (user) marcarPresenca(!document.hidden); });
+window.addEventListener('pagehide', () => { if (user) marcarPresenca(false); });
+
 // ---------- Chat com amigos ----------
 let chatMsgs = [], chatCom = null, chatUltimoEnvio = 0, chatPrimeira = true;
 const CHAT_RAPIDAS = ['Oi! 👋', 'Obrigado pela ajuda! 🙏', 'Me visita? 🏡', 'Te mandei um presente! 🎁', 'Suas plantas estão lindas! 🌽', 'Boa colheita! 🍀', '😂', '❤️'];
@@ -4927,7 +4961,11 @@ function onChat(lista) {
   chatMsgs = lista.filter(m => m && typeof m.txt === 'string' && typeof m.de === 'string');
   if (!chatPrimeira) for (const m of chatMsgs) if (!antes.has(m.id) && m.de !== user.uid && m.de !== chatCom && state.friends.includes(m.de)) {
     const f = friendInfo[m.de]; fetchFriendInfo(m.de);
-    toast(`💬 ${f && f.name && !f.erro ? f.name : 'Amigo'}: ${m.txt.slice(0, 80)}`, 'good'); sfx('click');
+    const quem = f && f.name && !f.erro ? f.name : (m.nome || 'Amigo');
+    toast(`💬 ${quem}: ${m.txt.slice(0, 80)}`, 'good'); sfx('click');
+    // jogo minimizado ou em outra aba: aviso do celular/computador na hora
+    if (document.hidden && 'Notification' in window && Notification.permission === 'granted' && navigator.serviceWorker)
+      navigator.serviceWorker.ready.then(reg => reg.showNotification(`💬 ${quem}`, { body: m.txt.slice(0, 120), icon: 'icons/icon-192.png', tag: 'chat-' + m.de, renotify: true, data: { link: './' } })).catch(() => {});
   }
   chatPrimeira = false;
   if (chatCom) { renderChat(); marcarLido(chatCom); }
@@ -4945,9 +4983,14 @@ function abrirChat(uid) {
   chatCom = uid; fetchFriendInfo(uid);
   const f = friendInfo[uid];
   $('#chatTitle').textContent = f && f.name && !f.erro ? f.name : 'Conversa';
+  renderChatStatus();
   $('#chatRapidas').innerHTML = CHAT_RAPIDAS.map(t => `<button type="button" data-rapida="${esc(t)}">${esc(t)}</button>`).join('');
   $('#chat').hidden = false; renderChat(); marcarLido(uid);
   setTimeout(() => { if (!pointer.touch) $('#chatTxt').focus(); }, 50);
+}
+function renderChatStatus() {
+  const el = $('#chatStatus'); if (!el || !chatCom) return;
+  const st = statusAmigo(chatCom); el.textContent = st.txt; el.className = 'status' + (st.on ? ' on' : '');
 }
 function fecharChat() { $('#chat').hidden = true; chatCom = null; }
 function renderChat() {

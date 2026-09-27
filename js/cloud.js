@@ -152,7 +152,20 @@
   }
   const apagarMsg = (uid, id) => farm(uid).collection('chat').doc(id).delete();
 
+  // Presença (online/offline): documento pequenininho presenca/{uid}, separado da roça.
+  const marcarPresenca = (uid, online) => db.collection('presenca').doc(uid).set({ online: !!online, visto: Date.now() });
+  function watchPresenca(uids, cb) {
+    const unsubs = [];
+    for (let i = 0; i < uids.length; i += 30) {
+      const lote = uids.slice(i, i + 30);
+      unsubs.push(db.collection('presenca').where(firebase.firestore.FieldPath.documentId(), 'in', lote)
+        .onSnapshot(qs => qs.docs.forEach(d => cb(d.id, d.data())), e => console.warn('presença:', e)));
+    }
+    return () => unsubs.forEach(u => u());
+  }
+
   window.RFCloud = {
+    marcarPresenca, watchPresenca,
     enviarMsg, watchChat, apagarMsg,
     ativarPush, desativarPush, salvarPush, mandarAviso, saveFarmSeguro, salvarBackup, listarBackups, apagarBackup,
     available, init, signIn, signOut, loadFarm, saveFarm, claimSession, watchFarm, claimCode, findCode, normalizeCode,
