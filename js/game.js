@@ -1543,7 +1543,7 @@ async function onUser(u) {
     if (Cloud.watchChat) unsubChat = Cloud.watchChat(u.uid, onChat);
     marcarPresenca(!document.hidden); presencaDe = ''; vigiarPresenca();
     unsubRequests = Cloud.watchRequests(u.uid, onRequests);
-    checkSent(); recuperarAmigos(); setTimeout(premioRanking, 4000);
+    checkSent(); recuperarAmigos(); setTimeout(premioRanking, 4000); setTimeout(renovarPush, 5000);
     enterGame();
     toast(`Olá, ${firstName(u.name)}! Bom te ver na roça.`, 'good');
   } catch (e) {
@@ -4674,6 +4674,22 @@ async function ativarNotificacoes() {
   renderPushCfg();
 }
 let pushErro = '';
+// A cada entrada: se este aparelho já tem permissão, registra de novo o "endereço" dele (token).
+// O endereço muda de vez em quando (atualização do app, limpeza do navegador) e o servidor apaga os
+// que pararam de funcionar; sem isso, o aparelho parava de receber avisos sem ninguém perceber.
+async function renovarPush() {
+  try {
+    if (!user || !pushOk() || Notification.permission !== 'granted') return;
+    let tinha = null; try { tinha = localStorage.getItem('rf-push-token'); } catch (e) { /* tanto faz */ }
+    if (!tinha && !(state.push && state.push.on)) return; // nunca ligou as notificações
+    const reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+    const token = await Cloud.ativarPush(user.uid, VAPID(), reg);
+    try { localStorage.setItem('rf-push-token', token); } catch (e) { /* tanto faz */ }
+    if (tinha && tinha !== token && Cloud.desativarPush) Cloud.desativarPush(user.uid, tinha).catch(() => {});
+    pushCfg().on = true; sincronizarPush(true);
+  } catch (e) { console.warn('renovar notificações:', e); }
+}
+const pushNesteAparelho = () => { try { return !!localStorage.getItem('rf-push-token') && 'Notification' in window && Notification.permission === 'granted'; } catch (e) { return false; } };
 // Testes: "neste aparelho" mostra um aviso na hora (confere permissão e o service worker);
 // "pelo servidor" pede para o programinha do GitHub mandar um aviso (chega em até ~15 min).
 async function testarAvisoAqui() {
@@ -4689,7 +4705,7 @@ async function testarAvisoServidor() {
   if (!user) return (st.textContent = 'Entre com a conta Google primeiro.');
   try {
     await Cloud.mandarAviso({ para: user.uid, de: user.uid, tipo: 'teste', txt: 'Teste do servidor: os avisos estão funcionando! 🎉', at: Date.now() });
-    st.textContent = 'Pedido de teste enviado. Feche o jogo: o aviso chega na próxima rodada do servidor (até uns 15–20 min).';
+    st.textContent = 'Pedido de teste enviado. Feche o jogo: o aviso chega na próxima rodada do servidor (1 a 2 minutos com o despertador do cron-job.org ligado).';
   } catch (e) { st.textContent = (e && e.code) === 'permission-denied' ? 'O Firebase recusou: publique as regras novas do firestore.rules.' : `Erro: ${(e && e.message) || e}`; }
 }
 async function desligarNotificacoes() {
@@ -5170,6 +5186,7 @@ function abrirChat(uid) {
   $('#chatTitle').textContent = f && f.name && !f.erro ? f.name : 'Conversa';
   renderChatStatus();
   $('#chatRapidas').innerHTML = CHAT_RAPIDAS.map(t => `<button type="button" data-rapida="${esc(t)}">${esc(t)}</button>`).join('');
+  $('#chatAviso').hidden = pushNesteAparelho() || !pushOk();
   $('#chat').hidden = false; renderChat(); marcarLido(uid);
   setTimeout(() => { if (!pointer.touch) $('#chatTxt').focus(); }, 50);
 }
