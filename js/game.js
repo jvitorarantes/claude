@@ -917,6 +917,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 74, txt: 'Os pontos de pesca ganharam nomes de verdade: Córrego Cascavel (nível 5), Rio Meia Ponte (10), Ribeirão João Leite (15), Rio dos Bois (20), Rio Araguaia (25) e Rio Amazonas (30), cada um com seu cenário.' },
   { v: 71, txt: 'Pontos de pesca 🎣: cada ponto dá uma pescaria a cada 2 horas. Além do pesqueiro de casa, compre o Riacho das Pedras (nível 5), a Represa Velha (10), o Rio Grande (16) e a Lagoa Encantada (22): quanto mais longe, mais peixe raro. E chegou a tarrafa 🕸️: pega 3 peixes de uma vez, uma vez a cada 12 horas.' },
   { v: 70, txt: 'Clique na casinha do cachorro para trocar o nome dele. E o gato ganhou uma caminha na sala: clique nela para trocar o nome do bichano.' },
   { v: 69, txt: 'Venda animais direto no abrigo: clique na casa deles, e cada bicho da lista tem o botão Vender.' },
@@ -6055,10 +6056,13 @@ function livroVisto() { if ((state.peixesNovos || []).length) { state.peixesNovo
 const PONTO_MS = 2 * 3600e3, TARRAFA_MS = 12 * 3600e3, TARRAFA_N = 3;
 const PONTOS = [
   { id: 'casa',    nome: 'Pesqueiro de casa', emoji: '🏡', nivel: 1,  custo: 0,     sorte: 1,    agua: ['#6cb6e8', '#2f7ab8'], margem: '#7dbb48' },
-  { id: 'riacho',  nome: 'Riacho das Pedras', emoji: '🪨', nivel: 5,  custo: 1500,  sorte: 1.2,  agua: ['#8ad4e0', '#3a8ea6'], margem: '#86c050' },
-  { id: 'represa', nome: 'Represa Velha',     emoji: '🧱', nivel: 10, custo: 5000,  sorte: 1.45, agua: ['#5d9fca', '#22598a'], margem: '#6fae44' },
-  { id: 'rio',     nome: 'Rio Grande',        emoji: '🌳', nivel: 16, custo: 12000, sorte: 1.75, agua: ['#9aae72', '#56703f'], margem: '#5e9e3a' },
-  { id: 'lagoa',   nome: 'Lagoa Encantada',   emoji: '✨', nivel: 22, custo: 25000, sorte: 2.2,  agua: ['#74d8c6', '#1d7d8e'], margem: '#79c25a' },
+  // (os ids ficam os mesmos de antes para quem já tinha comprado; o "cena" diz o que desenhar)
+  { id: 'riacho',   nome: 'Córrego Cascavel',     emoji: '🪨', nivel: 5,  custo: 1500,  sorte: 1.2,  cena: 'pedras',  agua: ['#8ad4e0', '#3a8ea6'], margem: '#86c050' },
+  { id: 'represa',  nome: 'Rio Meia Ponte',       emoji: '🌉', nivel: 10, custo: 5000,  sorte: 1.45, cena: 'ponte',   agua: ['#7fb0c8', '#3a6f8a'], margem: '#6fae44' },
+  { id: 'rio',      nome: 'Ribeirão João Leite',  emoji: '🧱', nivel: 15, custo: 12000, sorte: 1.75, cena: 'represa', agua: ['#5d9fca', '#22598a'], margem: '#5e9e3a' },
+  { id: 'lagoa',    nome: 'Rio dos Bois',         emoji: '🐂', nivel: 20, custo: 25000, sorte: 2.1,  cena: 'mata',    agua: ['#9aae72', '#56703f'], margem: '#66a844' },
+  { id: 'araguaia', nome: 'Rio Araguaia',         emoji: '🏖️', nivel: 25, custo: 45000, sorte: 2.5,  cena: 'praia',   agua: ['#6fc0d8', '#1f7a9a'], margem: '#7cb850' },
+  { id: 'amazonas', nome: 'Rio Amazonas',         emoji: '🌴', nivel: 30, custo: 80000, sorte: 3,    cena: 'amazonas', agua: ['#a08a5a', '#5a4a2a'], margem: '#3f8a2a' },
 ];
 const PONTO = Object.fromEntries(PONTOS.map(p => [p.id, p]));
 function pontosDe() {
@@ -6318,25 +6322,43 @@ function desenharPesca(t) {
 let pescaRelogio = 0;
 // Detalhes de cada ponto: pedras no riacho, o paredão da represa, as árvores do rio, as vitórias-régias da lagoa.
 function desenharFundoPonto(g, PT, cw, ch, t) {
-  if (PT.id === 'represa') {
+  const c = PT.cena;
+  if (c === 'represa') {
     g.fillStyle = '#b9b3a3'; g.fillRect(cw * 0.45, ch * 0.28, cw * 0.55, ch * 0.13);
     g.fillStyle = '#9a9384'; for (let x = cw * 0.47; x < cw; x += cw * 0.08) g.fillRect(x, ch * 0.28, 3, ch * 0.13);
     g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(cw * 0.45, ch * 0.28, cw * 0.55, 3);
-  } else if (PT.id === 'rio') {
-    for (let x = cw * 0.35; x < cw; x += cw * 0.11) { g.fillStyle = '#6b4a2a'; g.fillRect(x - 2, ch * 0.3, 4, ch * 0.08); g.fillStyle = x % 2 ? '#3f7a2a' : '#4f8e34'; g.beginPath(); g.arc(x, ch * 0.28, cw * 0.045, 0, 7); g.fill(); }
-  } else if (PT.id === 'lagoa') {
-    for (let k = 0; k < 7; k++) { const x = (k * 97 + 40) % cw, y = ch * (0.08 + (k % 3) * 0.08), a = 0.5 + Math.sin(t / 300 + k) * 0.5; g.fillStyle = `rgba(255,240,160,${a})`; g.beginPath(); g.arc(x, y, 2.2, 0, 7); g.fill(); }
+  } else if (c === 'ponte') {
+    // meia ponte: começa na margem e para no meio do rio
+    const y = ch * 0.3, x0 = cw * 0.55;
+    g.fillStyle = '#8a6a44'; g.fillRect(x0, y, cw - x0, 6);
+    g.fillStyle = '#6b4f30'; for (let x = x0 + 8; x < cw; x += 26) g.fillRect(x, y + 6, 5, ch * 0.12);
+    g.strokeStyle = '#6b4f30'; g.lineWidth = 2; g.beginPath(); g.moveTo(x0, y - 8); g.lineTo(cw, y - 8); g.stroke();
+    for (let x = x0; x < cw; x += 13) { g.beginPath(); g.moveTo(x, y - 8); g.lineTo(x, y); g.stroke(); }
+  } else if (c === 'mata') {
+    for (let x = cw * 0.35; x < cw; x += cw * 0.11) { g.fillStyle = '#6b4a2a'; g.fillRect(x - 2, ch * 0.3, 4, ch * 0.08); g.fillStyle = Math.round(x) % 2 ? '#3f7a2a' : '#4f8e34'; g.beginPath(); g.arc(x, ch * 0.28, cw * 0.045, 0, 7); g.fill(); }
+  } else if (c === 'praia') {
+    g.fillStyle = '#f0dca0'; g.beginPath(); g.moveTo(cw * 0.3, ch * 0.41); g.quadraticCurveTo(cw * 0.65, ch * 0.3, cw, ch * 0.36); g.lineTo(cw, ch * 0.42); g.fill();
+    for (const x of [0.6, 0.78]) { const px = cw * x, py = ch * 0.34; g.fillStyle = '#e84a3a'; g.beginPath(); g.moveTo(px - 14, py - 14); g.quadraticCurveTo(px, py - 24, px + 14, py - 14); g.fill(); g.strokeStyle = '#6b4f30'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(px, py - 18); g.lineTo(px, py + 2); g.stroke(); }
+  } else if (c === 'amazonas') {
+    for (let x = cw * 0.25; x < cw + 20; x += cw * 0.07) {
+      g.fillStyle = '#2f6a22'; g.beginPath(); g.arc(x, ch * 0.3, cw * 0.05, 0, 7); g.fill();
+      g.fillStyle = '#3f7f2a'; g.beginPath(); g.arc(x + cw * 0.03, ch * 0.25, cw * 0.04, 0, 7); g.fill();
+    }
+    g.strokeStyle = '#5a3a1a'; g.lineWidth = 2; for (const x of [0.4, 0.72]) { g.beginPath(); g.moveTo(cw * x, ch * 0.4); g.quadraticCurveTo(cw * x + 6, ch * 0.2, cw * x - 4, ch * 0.08); g.stroke(); g.fillStyle = '#3f8a2a'; for (let k = 0; k < 5; k++) { g.beginPath(); g.ellipse(cw * x - 4, ch * 0.08, 16, 4, k * 1.25, 0, 7); g.fill(); } }
   }
 }
 function desenharAguaPonto(g, PT, cw, ch, t) {
-  if (PT.id === 'riacho') {
-    g.fillStyle = '#8f949a'; for (const [x, y, r] of [[0.42, 0.5, 12], [0.8, 0.56, 16], [0.52, 0.88, 14], [0.92, 0.8, 10]]) { g.beginPath(); g.ellipse(cw * x, ch * y, r, r * 0.55, 0, 0, 7); g.fill(); g.fillStyle = '#b3b8bd'; g.beginPath(); g.ellipse(cw * x - 2, ch * y - 3, r * 0.6, r * 0.28, 0, 0, 7); g.fill(); g.fillStyle = '#8f949a'; }
-  } else if (PT.id === 'lagoa') {
-    for (const [x, y] of [[0.45, 0.55], [0.85, 0.5], [0.75, 0.85], [0.4, 0.8]]) {
-      g.fillStyle = '#3f9a4a'; g.beginPath(); g.ellipse(cw * x, ch * y, 13, 6, 0, 0.3, Math.PI * 2 - 0.3); g.lineTo(cw * x, ch * y); g.fill();
-      g.fillStyle = '#f7a8c8'; g.beginPath(); g.arc(cw * x + 3, ch * y - 3, 3.2, 0, 7); g.fill();
+  const c = PT.cena;
+  if (c === 'pedras') {
+    for (const [x, y, r] of [[0.42, 0.5, 12], [0.8, 0.56, 16], [0.52, 0.88, 14], [0.92, 0.8, 10]]) { g.fillStyle = '#8f949a'; g.beginPath(); g.ellipse(cw * x, ch * y, r, r * 0.55, 0, 0, 7); g.fill(); g.fillStyle = '#b3b8bd'; g.beginPath(); g.ellipse(cw * x - 2, ch * y - 3, r * 0.6, r * 0.28, 0, 0, 7); g.fill(); }
+  } else if (c === 'amazonas') {
+    // vitórias-régias
+    for (const [x, y, r] of [[0.45, 0.55, 16], [0.85, 0.5, 20], [0.75, 0.86, 18], [0.42, 0.82, 13]]) {
+      g.fillStyle = '#3f8a3a'; g.beginPath(); g.ellipse(cw * x, ch * y, r, r * 0.42, 0, 0, 7); g.fill();
+      g.strokeStyle = '#6b9a3a'; g.lineWidth = 2; g.beginPath(); g.ellipse(cw * x, ch * y, r, r * 0.42, 0, 0, 7); g.stroke();
     }
-  } else if (PT.id === 'rio') {
+    g.fillStyle = '#f7c8dc'; g.beginPath(); g.arc(cw * 0.85 + 5, ch * 0.5 - 4, 4, 0, 7); g.fill();
+  } else if (c === 'mata') {
     g.fillStyle = '#4f7a34'; for (const x of [0.36, 0.39, 0.95, 0.97]) { g.beginPath(); g.moveTo(cw * x, ch * 0.46); g.lineTo(cw * x - 2, ch * 0.4); g.lineTo(cw * x + 2, ch * 0.4); g.fill(); g.fillRect(cw * x - 1, ch * 0.38, 2, ch * 0.08); }
   }
 }
