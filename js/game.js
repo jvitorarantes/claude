@@ -909,6 +909,9 @@ const NOVIDADES = [
   { v: 60, txt: 'Pedidos da vila: Seu Zé e Dona Maria pedem coisas da sua roça em Missões › Vila. Entregue, ganhe corações ❤️ e presentes exclusivos.' },
   { v: 60, txt: 'Ranking semanal 🏆: na aba Amigos, veja quem fez mais pontos na semana. Os 3 primeiros ganham moedas toda segunda!' },
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
+  { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
+  { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 63, txt: 'Agora são 5 missões diárias, com tipos novos: pescar, pegar peixe raro, cozinhar peixe, atender a vila, visitar roças e mais.' },
 ];
 const VERSAO_NUM = Number(document.querySelector('meta[name="rf-version"]')?.content) || 0;
 function checarNovidades() {
@@ -1171,6 +1174,7 @@ async function visitFriend(uid) {
 }
 
 function afterVisit() {
+  track('visitar');
   hover = null; setScene('roca');
   if (['seed', 'hoe', 'fert'].includes(state.tool)) state.tool = 'hand';
   $('#bannerTxt').textContent = `Você está em ${deQuem(view)} (nível ${view.nivel}). Veja a banca em Negócios. Regue, tire as pragas, alimente os animais ou pegue um pouquinho da colheita… cuidado com ${view.cao}!`;
@@ -4265,7 +4269,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? `<b>${esc(meuApelido())}</b><br>Clique para dar um oi.` : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${state.iscas == null ? 10 : state.iscas} iscas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? `<b>${esc(meuApelido())}</b><br>Clique para dar um oi.` : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4772,7 +4776,16 @@ const MISSOES_DIA = [
   { ev: 'presentear', txt: 'Mande presente para {n} amigos', alvo: [1, 2, 3], need: () => state.friends.length > 0 },
   { ev: 'fabricar', txt: 'Faça {n} coisas na fábrica', alvo: [2, 4, 6], need: () => state.level >= 2 },
   { ev: 'entregar', txt: 'Entregue {n} pedidos do caminhão', alvo: [1, 2, 3] },
+  { ev: 'pescar', txt: 'Pesque {n} peixes', alvo: [3, 5, 8] },
+  { ev: 'raro', txt: 'Pesque {n} peixe raro (ou melhor)', alvo: [1, 1, 2], need: () => state.level >= 6 },
+  { ev: 'cozinhar', txt: 'Prepare {n} prato de peixe na fábrica', alvo: [1, 2, 3], need: () => state.level >= 3 },
+  { ev: 'vila', txt: 'Atenda {n} pedido da vila', alvo: [1, 1, 2] },
+  { ev: 'visitar', txt: 'Visite {n} roças (amigos ou vizinhos)', alvo: [1, 2, 3] },
+  { ev: 'praga', txt: 'Acabe com {n} pragas', alvo: [2, 4, 6] },
+  { ev: 'carinho', txt: 'Faça carinho nos bichinhos {n} vezes', alvo: [3, 5, 8], need: () => state.animals.some(a => ANIMAL[a.k].tipo === 'pet') },
+  { ev: 'coletar', txt: 'Recolha {n} produtos dos animais', alvo: [8, 15, 25], need: temProd },
 ];
+const MISSOES_DIARIAS_N = 5;
 const MISSOES_SEMANA = [
   { ev: 'colher', txt: 'Colha {n} vezes', alvo: [100, 200, 350] },
   { ev: 'plantar', txt: 'Plante {n} sementes', alvo: [100, 200, 350] },
@@ -4800,10 +4813,14 @@ function rollPeriods() {
   const d = localDay(), w = thisWeek();
   const m = state.missions || (state.missions = { d: -1, w: -1, dia: [], semana: [] });
   const novoDia = m.d !== d;
-  if (novoDia) { m.d = d; m.dia = sortear(MISSOES_DIA, 3); }
+  if (novoDia) { m.d = d; m.dia = sortear(MISSOES_DIA, MISSOES_DIARIAS_N); }
+  else if (m.dia.length < MISSOES_DIARIAS_N) { // quem já tinha só 3 hoje ganha as que faltam
+    const tem = new Set(m.dia.map(x => x.ev));
+    m.dia.push(...sortear(MISSOES_DIA.filter(x => !tem.has(x.ev)), MISSOES_DIARIAS_N - m.dia.length));
+  }
   if (m.w !== w) { m.w = w; m.semana = sortear(MISSOES_SEMANA, 3); }
   if (novoDia && state.helpDay !== d) { state.helpDay = d; npcHelps(); }
-  if (novoDia) state.iscas = Math.max(state.iscas == null ? 10 : state.iscas, ISCA.gratisDia); // 5 iscas grátis por dia
+  if (novoDia) iscasDe().minhoca = Math.max(iscasDe().minhoca || 0, ISCA_GRATIS_DIA); // 5 minhocas grátis por dia
   rankAtual();
 }
 function track(ev, n = 1) {
@@ -5080,6 +5097,8 @@ $('#pesca').addEventListener('click', e => {
   if (e.target === $('#pesca') || e.target.closest('[data-close]')) return fecharPesca();
   if (e.target.closest('#pescaBtn') || e.target.closest('#pescaCv')) return puxar();
   if (e.target.closest('#pescaComprar')) return comprarIscas();
+  if (e.target.closest('#pescaLivroBtn')) { pescaLivro = !pescaLivro; return renderPesca(); }
+  const ib = e.target.closest('[data-isca]'); if (ib && pesca && pesca.fase !== 'esperando' && pesca.fase !== 'fisgou') { state.iscaSel = ib.dataset.isca; save(); return renderPesca(); }
 });
 window.addEventListener('keydown', e => { if (!$('#pesca').hidden && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); puxar(); } if (e.key === 'Escape' && !$('#pesca').hidden) fecharPesca(); });
 $('#chatForm').addEventListener('submit', e => { e.preventDefault(); enviarChat($('#chatTxt').value); });
@@ -5809,21 +5828,35 @@ function drawCritters(t, tod) {
 // Pescaria: lago da roça, isca, minijogo de fisgar e livro de peixes
 // ============================================================
 const PEIXES = [
-  { id: 'lata',     nome: 'Lata velha', preco: 2,    raro: 'lixo',     peso: 5,   nivel: 1, lixo: true },
-  { id: 'bota',     nome: 'Bota velha', preco: 5,    raro: 'lixo',     peso: 4,   nivel: 1, lixo: true },
-  { id: 'lambari',  nome: 'Lambari',    preco: 30,   raro: 'comum',    peso: 30,  nivel: 1,  cor: ['#c9d3dc', '#8fa3b5'], tam: 0.7 },
-  { id: 'tilapia',  nome: 'Tilápia',    preco: 50,   raro: 'comum',    peso: 25,  nivel: 1,  cor: ['#9aa88f', '#6f7d64'], tam: 0.85 },
-  { id: 'traira',   nome: 'Traíra',     preco: 70,   raro: 'comum',    peso: 15,  nivel: 3,  cor: ['#7a6a4a', '#4f4430'], tam: 0.95 },
-  { id: 'pacu',     nome: 'Pacu',       preco: 90,   raro: 'incomum',  peso: 10,  nivel: 4,  cor: ['#8a8f99', '#e07a3a'], tam: 0.95, alto: true },
-  { id: 'tucunare', nome: 'Tucunaré',   preco: 160,  raro: 'raro',     peso: 6,   nivel: 6,  cor: ['#e3bf3a', '#4f7a2a'], tam: 1, listras: true },
-  { id: 'pintado',  nome: 'Pintado',    preco: 220,  raro: 'raro',     peso: 4,   nivel: 9,  cor: ['#c7c1b3', '#4a4a4a'], tam: 1.1, pintas: true },
-  { id: 'dourado',  nome: 'Dourado',    preco: 400,  raro: 'épico',    peso: 2,   nivel: 12, cor: ['#f2b705', '#d9822b'], tam: 1.1 },
-  { id: 'pirarucu', nome: 'Pirarucu',   preco: 1000, raro: 'lendário', peso: 0.6, nivel: 18, cor: ['#6b5a4a', '#c8402f'], tam: 1.3 },
+  { id: 'lata',     nome: 'Lata velha', preco: 2,    raro: 'lixo',     peso: 5,   nivel: 1, lixo: true, iscas: ['minhoca', 'milho'] },
+  { id: 'bota',     nome: 'Bota velha', preco: 5,    raro: 'lixo',     peso: 4,   nivel: 1, lixo: true, iscas: ['minhoca', 'milho'] },
+  { id: 'lambari',  nome: 'Lambari',    preco: 30,   raro: 'comum',    peso: 30,  nivel: 1,  iscas: ['minhoca', 'milho'], cor: ['#c9d3dc', '#8fa3b5'], tam: 0.7 },
+  { id: 'tilapia',  nome: 'Tilápia',    preco: 50,   raro: 'comum',    peso: 25,  nivel: 1,  iscas: ['minhoca', 'milho'], cor: ['#9aa88f', '#6f7d64'], tam: 0.85 },
+  { id: 'traira',   nome: 'Traíra',     preco: 70,   raro: 'comum',    peso: 15,  nivel: 3,  iscas: ['minhoca', 'camarao'], cor: ['#7a6a4a', '#4f4430'], tam: 0.95 },
+  { id: 'pacu',     nome: 'Pacu',       preco: 90,   raro: 'incomum',  peso: 12,  nivel: 4,  iscas: ['milho'], cor: ['#8a8f99', '#e07a3a'], tam: 0.95, alto: true },
+  { id: 'tucunare', nome: 'Tucunaré',   preco: 160,  raro: 'raro',     peso: 8,   nivel: 6,  iscas: ['camarao', 'artificial'], cor: ['#e3bf3a', '#4f7a2a'], tam: 1, listras: true },
+  { id: 'pintado',  nome: 'Pintado',    preco: 220,  raro: 'raro',     peso: 6,   nivel: 9,  iscas: ['camarao'], cor: ['#c7c1b3', '#4a4a4a'], tam: 1.1, pintas: true },
+  { id: 'dourado',  nome: 'Dourado',    preco: 400,  raro: 'épico',    peso: 3,   nivel: 12, iscas: ['camarao', 'artificial'], cor: ['#f2b705', '#d9822b'], tam: 1.1 },
+  { id: 'pirarucu', nome: 'Pirarucu',   preco: 1000, raro: 'lendário', peso: 1,   nivel: 18, iscas: ['artificial'], cor: ['#6b5a4a', '#c8402f'], tam: 1.3 },
 ];
 const PEIXE = Object.fromEntries(PEIXES.map(p => [p.id, p]));
 for (const p of PEIXES) PRODUCT[p.id] = { id: p.id, nome: p.nome, preco: p.preco, peixe: true };
 const COR_RARO = { lixo: '#8a8672', comum: '#6a8a4a', incomum: '#3f8ac8', raro: '#8a4fc8', 'épico': '#d9822b', 'lendário': '#c8402f' };
-const ISCA = { pacote: 10, custo: 60, gratisDia: 5 };
+// Iscas: cada peixe só morde algumas. O milho sai do seu celeiro; as outras se compram aqui.
+const ISCAS = [
+  { id: 'minhoca',    nome: 'Minhoca',         emoji: '🪱', nivel: 1,  pacote: 10, custo: 60, plural: 'minhocas' },
+  { id: 'milho',      nome: 'Milho',           emoji: '🌽', nivel: 1,  doCeleiro: 'milho' },
+  { id: 'camarao',    nome: 'Camarão',         emoji: '🦐', nivel: 6,  pacote: 10, custo: 180, plural: 'camarões' },
+  { id: 'artificial', nome: 'Isca artificial', emoji: '🎏', nivel: 12, pacote: 5,  custo: 400, plural: 'iscas artificiais' },
+];
+const ISCA = Object.fromEntries(ISCAS.map(i => [i.id, i]));
+const ISCA_GRATIS_DIA = 5;
+function iscasDe() {
+  const t = state.iscasT || (state.iscasT = { minhoca: state.iscas == null ? 10 : state.iscas, camarao: 0, artificial: 0 });
+  delete state.iscas; return t;
+}
+const qtdIsca = id => ISCA[id].doCeleiro ? (state.barn[ISCA[id].doCeleiro] || 0) : (iscasDe()[id] || 0);
+const iscaSel = () => { const id = state.iscaSel; return ISCA[id] && ISCA[id].nivel <= state.level ? id : 'minhoca'; };
 function drawPeixe(g, x, y, s, p) {
   g.save(); g.translate(x, y); g.scale(s, s);
   if (p.id === 'bota') {
@@ -5847,24 +5880,28 @@ function drawPeixe(g, x, y, s, p) {
 let pesca = null, pescaRaf = 0;
 function abrirPesca() {
   if (!isHome()) return;
-  if (state.iscas == null) state.iscas = 10;
+  iscasDe(); pescaLivro = false;
   pesca = { fase: 'pronto', t0: performance.now() };
   $('#pesca').hidden = false; renderPesca();
   if (!pescaRaf) pescaRaf = requestAnimationFrame(desenharPesca);
 }
 function fecharPesca() { $('#pesca').hidden = true; pesca = null; }
-function sortearPeixe() {
-  const ok = PEIXES.filter(p => p.nivel <= state.level), tot = ok.reduce((t, p) => t + p.peso, 0);
+function sortearPeixe(isca) {
+  let ok = PEIXES.filter(p => p.nivel <= state.level && p.iscas.includes(isca));
+  if (!ok.length) ok = PEIXES.filter(p => p.id === 'lambari');
+  const tot = ok.reduce((t, p) => t + p.peso, 0);
   let r = Math.random() * tot;
   for (const p of ok) { r -= p.peso; if (r <= 0) return p; }
   return ok[0];
 }
 function lancar() {
   if (!pesca || (pesca.fase !== 'pronto' && pesca.fase !== 'resultado')) return;
-  if ((state.iscas || 0) <= 0) return toast('Acabaram as iscas! Compre mais aqui embaixo (ou ganhe 5 grátis amanhã).', 'bad');
-  state.iscas--; save();
+  const isca = iscaSel(), def = ISCA[isca];
+  if (qtdIsca(isca) <= 0) return toast(def.doCeleiro ? 'Sem milho no celeiro! Colha milho para usar de isca.' : `Acabou a isca de ${def.nome.toLowerCase()}! Compre mais aqui embaixo${isca === 'minhoca' ? ' (ou ganhe 5 grátis amanhã)' : ''}.`, 'bad');
+  if (def.doCeleiro) { state.barn[def.doCeleiro]--; if (!state.barn[def.doCeleiro]) delete state.barn[def.doCeleiro]; } else iscasDe()[isca]--;
+  save();
   const agora = performance.now();
-  pesca = { fase: 'esperando', t0: agora, mordida: agora + 1800 + Math.random() * 3800, beliscos: [agora + 700 + Math.random() * 900] };
+  pesca = { fase: 'esperando', t0: agora, isca, mordida: agora + 1800 + Math.random() * 3800, beliscos: [agora + 700 + Math.random() * 900] };
   sfx('water'); renderPesca();
 }
 function puxar() {
@@ -5874,7 +5911,7 @@ function puxar() {
   if (pesca.fase === 'fisgou') {
     const p = pesca.peixe;
     state.barn[p.id] = (state.barn[p.id] || 0) + 1;
-    if (!p.lixo) { collect(p.id, null); track('pescar'); }
+    if (!p.lixo) { collect(p.id, null); track('pescar'); if (['raro', 'épico', 'lendário'].includes(p.raro)) track('raro'); }
     addXP({ lixo: 0, comum: 2, incomum: 4, raro: 8, 'épico': 15, 'lendário': 40 }[p.raro], null);
     state.stats.peixes = (state.stats.peixes || 0) + (p.lixo ? 0 : 1);
     pesca = { fase: 'resultado', t0: performance.now(), peixe: p, msg: p.lixo ? `Ih… veio uma ${p.nome.toLowerCase()}. 😅` : `Pegou um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''} ${p.nome}! (${p.raro})` };
@@ -5890,8 +5927,32 @@ function renderPesca() {
   btn.classList.toggle('pulsa', pesca.fase === 'fisgou');
   msg.textContent = pesca.fase === 'pronto' ? 'Toque em "Lançar a linha" e espere a boia afundar. Aí, puxe rápido!'
     : pesca.fase === 'esperando' ? 'Shhh… espere a boia afundar de verdade.' : pesca.fase === 'fisgou' ? 'Afundou! Puxa agora!' : pesca.msg || '';
-  $('#pescaIscas').textContent = `🪱 ${state.iscas || 0} iscas`;
-  $('#pescaComprar').disabled = state.coins < ISCA.custo;
+  // escolha da isca
+  const sel = iscaSel();
+  $('#pescaIscas').innerHTML = ISCAS.map(i => {
+    const trava = i.nivel > state.level;
+    return `<button type="button" class="iscabtn" data-isca="${i.id}" aria-pressed="${sel === i.id}" ${trava ? 'disabled' : ''} title="${i.nome}">${i.emoji}<small>${trava ? `Nv ${i.nivel}` : qtdIsca(i.id)}</small></button>`;
+  }).join('');
+  const d = ISCA[sel], cb = $('#pescaComprar');
+  cb.hidden = !!d.doCeleiro;
+  if (!d.doCeleiro) { cb.textContent = `Comprar ${d.pacote} ${d.plural} · ${d.custo}`; cb.disabled = state.coins < d.custo; }
+  $('#pescaDica').textContent = `${d.emoji} ${d.nome}${d.doCeleiro ? ' (do celeiro)' : ''}: atrai ${PEIXES.filter(p => !p.lixo && p.iscas.includes(sel)).map(p => p.nivel <= state.level ? p.nome : '???').join(', ')}.`;
+  $('#pescaLivro').hidden = !pescaLivro; $('#pescaCv').hidden = pescaLivro;
+  $('#pescaLivroBtn').textContent = pescaLivro ? '🎣 Voltar a pescar' : '📖 Livro de peixes';
+  if (pescaLivro) $('#pescaLivro').innerHTML = livroPeixes();
+}
+// Livro de peixes: o que já pegou (com figura), o que falta (sombra), raridade, quantos e do que precisa.
+let pescaLivro = false;
+const peixeSombra = id => makeIcon('ps:' + id, () => { ctx.globalAlpha = 0.85; drawPeixe(ctx, 48, 48, 4.7, Object.assign({}, PEIXE[id], { cor: ['#5b6470', '#4a525c'], listras: false, pintas: false })); ctx.globalAlpha = 1; });
+function livroPeixes() {
+  const lista = PEIXES.filter(p => !p.lixo), pegos = lista.filter(p => state.col[p.id]).length;
+  return `<p class="hint" style="margin:0 0 8px">Você já pegou <b>${pegos} de ${lista.length}</b> peixes.</p><div class="livro">${lista.map(p => {
+    const n = state.col[p.id] || 0;
+    return `<div class="lvcard ${n ? '' : 'falta'}"><img alt="" src="${n ? productIcon(p.id) : peixeSombra(p.id)}">
+      <b>${n ? esc(p.nome) : '???'}</b><span class="raro" style="color:${COR_RARO[p.raro]}">${p.raro}</span>
+      <small>${n ? `Pegou ${n}× · vale ${p.preco}` : 'Ainda não pegou'}</small>
+      <small class="req">Nível ${p.nivel}${p.nivel > state.level ? ' 🔒' : ''} · ${p.iscas.map(i => ISCA[i].emoji).join(' ')}</small></div>`;
+  }).join('')}</div>`;
 }
 function desenharPesca(t) {
   pescaRaf = 0;
@@ -5900,7 +5961,7 @@ function desenharPesca(t) {
   if (c.width !== Math.round(cw * dpr)) { c.width = Math.round(cw * dpr); c.height = Math.round(ch * dpr); }
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   // fases que mudam com o tempo
-  if (pesca.fase === 'esperando' && t >= pesca.mordida) { pesca = { fase: 'fisgou', t0: t, peixe: sortearPeixe() }; pesca.janela = { comum: 950, lixo: 1000, incomum: 850, raro: 720, 'épico': 620, 'lendário': 520 }[pesca.peixe.raro]; sfx('water'); renderPesca(); }
+  if (pesca.fase === 'esperando' && t >= pesca.mordida) { pesca = { fase: 'fisgou', t0: t, peixe: sortearPeixe(pesca.isca) }; pesca.janela = { comum: 950, lixo: 1000, incomum: 850, raro: 720, 'épico': 620, 'lendário': 520 }[pesca.peixe.raro]; sfx('water'); renderPesca(); }
   if (pesca.fase === 'fisgou' && t - pesca.t0 > pesca.janela) { pesca = { fase: 'resultado', t0: t, msg: 'Ah, escapou… tente de novo!' }; renderPesca(); }
   // céu, margem e água
   const ceu = g.createLinearGradient(0, 0, 0, ch * 0.4); ceu.addColorStop(0, '#8fd0f5'); ceu.addColorStop(1, '#d9f1ff');
@@ -5948,9 +6009,10 @@ function desenharPesca(t) {
   pescaRaf = requestAnimationFrame(desenharPesca);
 }
 function comprarIscas() {
-  if (state.coins < ISCA.custo) return toast('Faltam moedas para as iscas.', 'bad');
-  state.coins -= ISCA.custo; state.iscas = (state.iscas || 0) + ISCA.pacote; sfx('buy');
-  toast(`+${ISCA.pacote} iscas!`, 'good'); done(); renderPesca();
+  const d = ISCA[iscaSel()]; if (d.doCeleiro) return;
+  if (state.coins < d.custo) return toast('Faltam moedas para as iscas.', 'bad');
+  state.coins -= d.custo; iscasDe()[d.id] = (iscasDe()[d.id] || 0) + d.pacote; sfx('buy');
+  toast(`+${d.pacote} ${d.plural}!`, 'good'); done(); renderPesca();
 }
 
 // ============================================================
@@ -5963,7 +6025,7 @@ const VILA_FALAS = {
 };
 const VILA_MARCOS = [
   { c: 1, txt: '300 moedas', dar: () => { state.coins += 300; } },
-  { c: 2, txt: '10 iscas', dar: () => { state.iscas = (state.iscas || 0) + 10; } },
+  { c: 2, txt: '10 camarões para pescar', dar: () => { iscasDe().camarao = (iscasDe().camarao || 0) + 10; } },
   { c: 3, txt: 'um enfeite exclusivo', dar: npc => { const id = npc === 'ze' ? 'carroca' : 'roseira'; state.enfeites[id] = (state.enfeites[id] || 0) + 1; state.invNovos = (state.invNovos || 0) + 1; } },
   { c: 4, txt: '+10% nas recompensas dos pedidos' , dar: () => {} },
   { c: 5, txt: '2.000 moedas e o título de melhor vizinho(a)', dar: () => { state.coins += 2000; } },
@@ -5974,12 +6036,14 @@ function vilaDe(npc) {
   if (!state.vila[npc]) { state.vila[npc] = { amz: 0, pedidos: [], novoEm: 0 }; for (let k = 0; k < VILA_MAX; k++) state.vila[npc].pedidos.push(novoPedidoVila(npc)); }
   return state.vila[npc];
 }
+// Prato de peixe só entra em pedidos se a pessoa já pescou aquele peixe alguma vez.
+const receitaPossivel = r => Object.keys(r.in).every(id => !PEIXE[id] || (state.col && state.col[id] > 0));
 function itensDaVila() {
   const lista = [];
   for (const c of CROPS) if (c.nivel <= state.level && !c.arvore) lista.push({ id: c.prod, min: 4, max: 12 });
   const temAnimal = new Set(state.animals.map(a => ANIMAL[a.k].prod).filter(Boolean));
   for (const p of PRODUCTS) if (temAnimal.has(p.id)) lista.push({ id: p.id, min: 2, max: 5 });
-  for (const r of RECEITAS) if (r.nivel <= state.level && state.level >= r.nivel + 2) lista.push({ id: r.id, min: 1, max: 2 });
+  for (const r of RECEITAS) if (r.nivel <= state.level && state.level >= r.nivel + 2 && receitaPossivel(r)) lista.push({ id: r.id, min: 1, max: 2 });
   return lista;
 }
 function novoPedidoVila(npc) {
@@ -6147,6 +6211,13 @@ const RECEITAS = [
   { id: 'queijo',   nome: 'Queijo',              nivel: 10, in: { leite: 2 },                           tempo: HOUR,     forma: 'queijo',   cor: '#f7d046' },
   { id: 'sucouva',  nome: 'Suco de uva',         nivel: 15, in: { uva: 4 },                             tempo: 30 * MIN, forma: 'garrafa',  cor: '#6b3a8a' },
   { id: 'sucolar',  nome: 'Suco de laranja',     nivel: 19, in: { laranja: 4 },                         tempo: 30 * MIN, forma: 'garrafa',  cor: '#f28c1b' },
+  // pratos com peixe (os peixes vêm da pescaria)
+  { id: 'peixefrito',  nome: 'Lambari frito',       nivel: 3,  in: { lambari: 3, farofa: 1 },            tempo: 20 * MIN, forma: 'prato',  cor: '#d9a441', peixe: 'lambari' },
+  { id: 'caldo',       nome: 'Caldo de tilápia',    nivel: 4,  in: { tilapia: 2, mandioca: 2 },          tempo: 40 * MIN, forma: 'panela', cor: '#e8c65a' },
+  { id: 'moqueca',     nome: 'Moqueca de tucunaré', nivel: 7,  in: { tucunare: 1, tomate: 2, cebola: 1 }, tempo: HOUR,     forma: 'panela', cor: '#d9622a' },
+  { id: 'pintadoass',  nome: 'Pintado assado',      nivel: 10, in: { pintado: 1, molho: 1 },             tempo: HOUR,     forma: 'prato',  cor: '#c7c1b3', peixe: 'pintado' },
+  { id: 'douradobr',   nome: 'Dourado na brasa',    nivel: 13, in: { dourado: 1, cebola: 2 },            tempo: 90 * MIN, forma: 'prato',  cor: '#f2b705', peixe: 'dourado' },
+  { id: 'casaca',      nome: 'Pirarucu de casaca',  nivel: 18, in: { pirarucu: 1, farofa: 2, banana: 3 }, tempo: 2 * HOUR, forma: 'prato',  cor: '#6b5a4a', peixe: 'pirarucu' },
 ];
 const RECEITA = Object.fromEntries(RECEITAS.map(r => [r.id, r]));
 // O produto vale 50% a mais que os ingredientes, e um pouco pelo tempo de fábrica.
@@ -6178,7 +6249,7 @@ function recolherFab() {
   const f = fab(), agora = Date.now(), prontos = f.fila.filter(x => x.fim <= agora);
   if (!prontos.length) return;
   f.fila = f.fila.filter(x => x.fim > agora);
-  for (const x of prontos) { const r = RECEITA[x.r]; state.barn[r.id] = (state.barn[r.id] || 0) + 1; addXP(Math.max(2, Math.round(r.tempo / 600)), null); track('fabricar'); }
+  for (const x of prontos) { const r = RECEITA[x.r]; state.barn[r.id] = (state.barn[r.id] || 0) + 1; addXP(Math.max(2, Math.round(r.tempo / 600)), null); track('fabricar'); if (Object.keys(r.in).some(id => PEIXE[id])) track('cozinhar'); }
   sfx('collect');
   toast(`Recolheu da fábrica: ${prontos.map(x => RECEITA[x.r].nome.toLowerCase()).join(', ')}.`, 'good');
   done();
@@ -6304,7 +6375,7 @@ const blocoCaminhao = () => Math.floor(Date.now() / CAMINHAO_BLOCO);
 function itensPossiveis() {
   const l = CROPS.filter(c => c.nivel <= state.level).map(c => c.prod);
   const bichos = new Set(state.animals.filter(a => ANIMAL[a.k].tipo === 'prod' && ANIMAL[a.k].prod !== 'leitao').map(a => ANIMAL[a.k].prod));
-  return [...l, ...bichos, ...RECEITAS.filter(r => r.nivel <= state.level).map(r => r.id)];
+  return [...l, ...bichos, ...RECEITAS.filter(r => r.nivel <= state.level && receitaPossivel(r)).map(r => r.id)];
 }
 function novoPedido() {
   const pool = itensPossiveis(), n = 1 + Math.floor(Math.random() * Math.min(3, 1 + state.level / 6)), itens = {};
@@ -6431,6 +6502,20 @@ function drawGood(id, x, y, s) {
   } else if (f === 'queijo') {
     ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - 7 * s, y + 5 * s); ctx.lineTo(x + 7 * s, y + 5 * s); ctx.lineTo(x + 7 * s, y - 1 * s); ctx.lineTo(x - 7 * s, y - 4 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#d9a82a'; for (const [dx, dy, rr] of [[-3, 1, 1.4], [2, 2.5, 1.1], [4, -0.2, 0.9]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, rr * s, 0, 7); ctx.fill(); }
+  } else if (f === 'prato') {
+    ctx.fillStyle = '#fbfbf7'; ctx.beginPath(); ctx.ellipse(x, y + 3 * s, 8 * s, 3.6 * s, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(80,120,180,.5)'; ctx.beginPath(); ctx.ellipse(x, y + 3 * s, 6.5 * s, 2.7 * s, 0, 0, 7); ctx.stroke();
+    const px = PEIXE[r.peixe] || PEIXE.lambari;
+    drawPeixe(ctx, x - 0.5 * s, y + 1.2 * s, s * 0.45, Object.assign({}, px, { cor: [c, '#a86b38'] }));
+    ctx.fillStyle = '#9bd35a'; ctx.beginPath(); ctx.arc(x + 5 * s, y + 3.5 * s, 1.4 * s, 0, 7); ctx.fill(); // limão
+    ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.arc(x - 5.2 * s, y + 3.6 * s, 1.2 * s, 0, 7); ctx.fill();
+  } else if (f === 'panela') {
+    ctx.fillStyle = '#8a4a2a'; ctx.beginPath(); ctx.ellipse(x, y + 2 * s, 7.5 * s, 4.5 * s, 0, 0, Math.PI); ctx.lineTo(x - 7.5 * s, y + 2 * s); ctx.fill(); ctx.stroke();
+    ctx.fillRect(x - 9.5 * s, y + 1 * s, 2.5 * s, 1.6 * s); ctx.fillRect(x + 7 * s, y + 1 * s, 2.5 * s, 1.6 * s);
+    ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y + 2 * s, 7 * s, 2.4 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; for (const [dx, dy] of [[-3, 1.5], [2, 2.5], [4, 1.4]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 0.9 * s, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#4f9a2f'; ctx.beginPath(); ctx.arc(x - 1 * s, y + 1.4 * s, 1 * s, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 0.7 * s; for (const dx of [-2, 2]) { ctx.beginPath(); ctx.moveTo(x + dx * s, y - 1 * s); ctx.quadraticCurveTo(x + dx * s + 1.5 * s, y - 4 * s, x + dx * s, y - 6 * s); ctx.stroke(); }
   } else if (f === 'garrafa') {
     ctx.fillStyle = 'rgba(230,245,255,.9)'; ctx.fillRect(x - 3.5 * s, y - 3 * s, 7 * s, 10 * s); ctx.strokeRect(x - 3.5 * s, y - 3 * s, 7 * s, 10 * s);
     ctx.fillStyle = c; ctx.fillRect(x - 3 * s, y, 6 * s, 6.5 * s);
