@@ -4358,6 +4358,21 @@ function renderPane() {
   pane.innerHTML = html;
 }
 
+// Botão desativado (bloqueado) não recebe toque: aqui o jogo explica por quê.
+// (o CSS deixa o toque "atravessar" o botão desativado e chegar até aqui)
+function explicarBloqueado(e) {
+  const b = [...document.querySelectorAll('#pane button:disabled, #settings button:disabled')].find(x => { const r = x.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
+  if (!b) return false;
+  const txt = b.textContent.replace(/\s+/g, ' ').trim();
+  let msg = '';
+  if (/^n[íi]vel\s*\d+/i.test(txt)) msg = `🔒 Libera no ${txt.toLowerCase()}. Continue jogando para subir de nível!`;
+  else if (/🍀/.test(txt)) msg = `🍀 Faltam trevos: custa ${txt.replace(/[^0-9]/g, '')}. Ganhe resgatando peixes, domínio e conquistas em Missões › 🍀 Trevos.`;
+  else if (/^\d|moedas|^×/.test(txt) || b.querySelector('.coin')) msg = `🪙 Moedas insuficientes: custa ${txt.replace(/^×\d+/, '').replace(/[^0-9.]/g, '')} moedas.`;
+  else if (/cheio|cheia/i.test(txt)) msg = 'Não cabe mais: aumente o abrigo na aba Abrigos.';
+  if (!msg) return false;
+  sfx('error'); toast(msg, 'bad'); return true;
+}
+$('#pane').addEventListener('click', e => { if (e.target.closest('#pane') && !e.target.closest('button:not(:disabled)')) explicarBloqueado(e); }, true);
 $('#pane').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   const d = b.dataset;
@@ -4830,7 +4845,7 @@ function renderSettings() {
   const names = window.RFAudio ? window.RFAudio.tracks : ['Música 1', 'Música 2', 'Música 3'];
   $('#tracks').innerHTML = names.map((n, k) => musicaLiberada(k) ? `<button type="button" class="track" role="radio" aria-checked="${settings.track === k}" data-track="${k}">
     <span class="dot"></span><span>${esc(n)}<small>${TRACK_INFO[k] || ''}</small></span></button>`
-    : `<button type="button" class="track" role="radio" aria-checked="false" disabled data-abrir-trevos-set="1"><span class="dot"></span><span>🍀 ${esc(n)}<small>Exclusiva da Loja do Trevo (Loja › 🍀 Trevo)</small></span></button>`).join('');
+    : `<button type="button" class="track trava" role="radio" aria-checked="false" aria-disabled="true" data-musica-trava="${esc(n)}"><span class="dot"></span><span>🍀 ${esc(n)}<small>Exclusiva da Loja do Trevo (Loja › 🍀 Trevo)</small></span></button>`).join('');
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.tema === settings.tema)));
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tema === settings.tema)));
 }
@@ -5083,6 +5098,10 @@ $('#settings').addEventListener('click', e => {
   if (e.target.closest('[data-push-teste-aqui]')) return testarAvisoAqui();
   if (e.target.closest('[data-push-teste-servidor]')) return testarAvisoServidor();
   // Só os botões de dentro da janela (a página inteira também tem data-tema).
+  const mt = e.target.closest('[data-musica-trava]');
+  if (mt) { sfx('error'); return toast(`🍀 "${mt.dataset.musicaTrava}" é exclusiva da Loja do Trevo. Troque trevos por ela em Loja › 🍀 Trevo.`, 'bad'); }
+  const at = e.target.closest('[data-av-trava]');
+  if (at) { sfx('error'); return toast(at.dataset.avTrava, 'bad'); }
   const tr = e.target.closest('#tracks [data-track]');
   if (tr) { settings.track = Number(tr.dataset.track); settings.music = true; saveSettings(); renderSettings(); }
   const tm = e.target.closest('#temaSeg [data-tema]');
@@ -6085,8 +6104,8 @@ function renderAvatarCfg(sel = '#avatarCfg') {
   const box = $(sel); if (!box || !state) return;
   const av = state.avatar = avatarOk(state.avatar);
   const linha = (k, nome) => `<div class="avrow"><span>${nome}</span><div class="seg small" role="radiogroup" aria-label="${nome}">${opcoesAvatar(av, k).map(([id, n]) => avTravado(k, id)
-    ? (AV_TREVO[id] ? `<button type="button" role="radio" disabled aria-checked="false" title="Exclusivo da Loja do Trevo">🍀 ${n}</button>`
-      : `<button type="button" role="radio" disabled aria-checked="false" title="Libera no nível ${AV_NIVEL[id]}">🔒 ${n} <small>Nv ${AV_NIVEL[id]}</small></button>`)
+    ? (AV_TREVO[id] ? `<button type="button" role="radio" class="trava" aria-disabled="true" aria-checked="false" data-av-trava="🍀 ${n} é exclusivo da Loja do Trevo. Troque trevos por ele em Loja › 🍀 Trevo.">🍀 ${n}</button>`
+      : `<button type="button" role="radio" class="trava" aria-disabled="true" aria-checked="false" data-av-trava="🔒 ${n} libera no nível ${AV_NIVEL[id]}.">🔒 ${n} <small>Nv ${AV_NIVEL[id]}</small></button>`)
     : `<button type="button" role="radio" data-av="${k}:${id}" aria-checked="${av[k] === id}" aria-selected="${av[k] === id}">${n}</button>`).join('')}</div></div>`;
   box.innerHTML = `<canvas class="avprev" width="120" height="150" aria-label="Prévia do avatar"></canvas><div class="avopts">
     ${linha('sexo', 'Sexo')}
@@ -6153,6 +6172,7 @@ function fecharBoasVindas(comTutorial) {
 }
 $('#boasvindas').addEventListener('click', e => {
   if (avatarClick(e)) return;
+  const at = e.target.closest('[data-av-trava]'); if (at) { sfx('error'); return toast(at.dataset.avTrava, 'bad'); }
   if (e.target.closest('#bvContinuar')) return salvarBoasVindas();
   if (e.target.closest('#bvTutSim')) return fecharBoasVindas(true);
   if (e.target.closest('#bvTutNao')) return fecharBoasVindas(false);
