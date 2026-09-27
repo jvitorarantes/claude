@@ -947,6 +947,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
+  { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
   { v: 108, txt: 'A motosserra ganhou desenho de motosserra de verdade (antes aparecia um serrote).' },
   { v: 107, txt: 'Correio: agora dá para apagar cada carta (✕) ou todas de uma vez, e as cartas somem sozinhas depois de 7 dias. Na conversa com amigos tem o botão 🧹 Limpar.' },
   { v: 106, txt: 'Canteiros se mudam como o resto: segure o dedo (ou botão direito) em cima de um e escolha Mover. A placa de terras à venda agora fica no lugar dela, e também dá para mudar de lugar.' },
@@ -5312,7 +5313,7 @@ function claimMission(tipo, k) {
     ms['trevo_' + tipo] = ms[marca];
     setTimeout(() => ganharTrevos(TREVO_MISSOES[tipo], tipo === 'dia' ? 'Todas as missões do dia!' : 'Todas as missões da semana!'), 700);
     const fer = tipo === 'dia' ? 'enxada' : 'motosserra'; derrubarDe()[fer]++;
-    setTimeout(() => toast(`${tipo === 'dia' ? '🪓 +1 enxada de arrancar' : '⛓️ +1 motosserra'} de prêmio!`, 'good'), 1500);
+    setTimeout(() => toast(`${tipo === 'dia' ? '🌱 +1 enxada de arrancar' : '⛓️ +1 motosserra'} de prêmio!`, 'good'), 1500);
   }
   renderTabs(); done();
 }
@@ -7380,7 +7381,7 @@ function missoesHTML() {
     return html + '</div>';
   }
   const tipo = missSeg, lista = state.missions[tipo], p = tipo === 'dia' ? premioDia() : premioSemana();
-  html += `<p class="hint">${tipo === 'dia' ? 'Missões novas todo dia à meia-noite.' : 'Missões novas toda segunda-feira à meia-noite.'} Cada uma dá ${p.moedas.toLocaleString('pt-BR')} moedas e ${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}. ${state.missions['trevo_' + tipo] === state.missions[tipo === 'dia' ? 'd' : 'w'] ? `<b>🍀 +${TREVO_MISSOES[tipo]} trevos já ganhos!</b>` : `Pegue o prêmio de todas e ganhe <b>🍀 ${TREVO_MISSOES[tipo]} trevos</b> e ${tipo === 'dia' ? '🪓 1 enxada de arrancar' : '<img class="emo" alt="" src="' + ferramentaIcon('motosserra') + '"> 1 motosserra'}.`}</p>`;
+  html += `<p class="hint">${tipo === 'dia' ? 'Missões novas todo dia à meia-noite.' : 'Missões novas toda segunda-feira à meia-noite.'} Cada uma dá ${p.moedas.toLocaleString('pt-BR')} moedas e ${p.xp} XP${p.racao ? ' e 1 ração especial' : ''}. ${state.missions['trevo_' + tipo] === state.missions[tipo === 'dia' ? 'd' : 'w'] ? `<b>🍀 +${TREVO_MISSOES[tipo]} trevos já ganhos!</b>` : `Pegue o prêmio de todas e ganhe <b>🍀 ${TREVO_MISSOES[tipo]} trevos</b> e ${tipo === 'dia' ? '<img class="emo" alt="" src="' + ferramentaIcon('enxada') + '"> 1 enxada de arrancar' : '<img class="emo" alt="" src="' + ferramentaIcon('motosserra') + '"> 1 motosserra'}.`}</p>`;
   lista.forEach((m, k) => {
     const ok = m.feito >= m.alvo;
     html += `<div class="row ${m.pego ? 'locked' : ok ? 'sel' : ''}"><div class="avatar" style="background:${ok ? '#4f9a2f' : '#d39a5c'}">${ok ? '✓' : k + 1}</div>
@@ -8328,7 +8329,7 @@ const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, EN
 // e secam depois de uns dias. Arbusto seco sai com a enxada de arrancar; árvore seca, com a motosserra.
 // As ferramentas de derrubar se compram na Loja › Pomar, ganham-se completando missões e vêm de amigos.
 // ============================================================
-const FERR_DERRUBAR = { enxada: { nome: 'Enxada de arrancar', emoji: '🪓', custo: 50, para: 'arbusto' }, motosserra: { nome: 'Motosserra', emoji: '⛓️', custo: 100, para: 'arvore' } };
+const FERR_DERRUBAR = { enxada: { nome: 'Enxada de arrancar', emoji: '🌱', custo: 50, para: 'arbusto' }, motosserra: { nome: 'Motosserra', emoji: '⛓️', custo: 100, para: 'arvore' } };
 function derrubarDe() { const d = state.derrubar || (state.derrubar = {}); d.enxada = d.enxada || 0; d.motosserra = d.motosserra || 0; return d; }
 // Motosserra desenhada (o emoji de serra é um serrote): corpo laranja com alça, sabre cinza e a corrente.
 function drawMotosserra(x, y, s) {
@@ -8349,7 +8350,22 @@ function drawMotosserra(x, y, s) {
   ctx.beginPath(); ctx.moveTo(-30, 2); ctx.lineTo(-40, 4); ctx.lineTo(-40, 12); ctx.lineTo(-28, 12); ctx.stroke();
   ctx.lineCap = 'butt'; ctx.restore();
 }
-const ferramentaIcon = id => id === 'motosserra' ? makeIcon('ferr:motosserra2', () => drawMotosserra(52, 54, 0.95)) : makeIcon('ferr:' + id, () => { ctx.font = '60px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(FERR_DERRUBAR[id].emoji, 48, 52); });
+// Enxada: cabo comprido de madeira e a lâmina larga de ferro, em ângulo reto com o cabo.
+function drawEnxada(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(0.5); ctx.lineJoin = 'round';
+  // cabo comprido de madeira
+  ctx.fillStyle = '#b77a3e'; ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(-3.5, -38, 7, 82, 3.5); ctx.fill(); ctx.stroke();
+  // pescoço de ferro no alto do cabo e a lâmina larga dobrada para baixo, virada para o cabo (formato de "7")
+  ctx.fillStyle = '#6c7780'; ctx.strokeStyle = '#2f363c'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(-5, -44, 18, 9, 3); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#9aa6af';
+  ctx.beginPath(); ctx.moveTo(9, -42); ctx.lineTo(19, -42); ctx.lineTo(34, -8); ctx.lineTo(14, -2); ctx.lineTo(8, -34); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#e4eaee'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(31, -8); ctx.lineTo(16, -4); ctx.stroke(); // fio brilhando
+  ctx.restore();
+}
+const ferrEmo = id => `<img class="emo" alt="" src="${ferramentaIcon(id)}">`;
+const ferramentaIcon = id => id === 'motosserra' ? makeIcon('ferr:motosserra2', () => drawMotosserra(52, 54, 0.95)) : id === 'enxada' ? makeIcon('ferr:enxada4', () => drawEnxada(38, 54, 0.9)) : makeIcon('ferr:' + id, () => { ctx.font = '60px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(FERR_DERRUBAR[id].emoji, 48, 52); });
 // Cada frutífera dá um número de colheitas (e.colheitas). Depois da última, seca: aí dá para pôr
 // a placa de ajuda (um amigo que ajudar faz ela voltar a dar frutas) ou derrubar com a ferramenta.
 // Domínio do pomar: cada colheita de frutífera dá pontos (árvore vale 2) e ajudar a de um amigo, 1.
@@ -8406,7 +8422,7 @@ function derrubarFruteira(sc, i) {
 function menuFruteira(sc, i) {
   const o = objetosDe(state, sc)[i]; if (!o) return;
   const e = ENFEITE[o.id], fer = e.fruteira === 'arvore' ? 'motosserra' : 'enxada', F = FERR_DERRUBAR[fer], m = $('#ctxMenu'), q = iso(o.u, o.v);
-  m.innerHTML = `<b>${esc(e.nome)} secou 🥀</b>${o.placa ? '<span class="meta" style="display:block;margin:2px 0 6px">Placa posta: esperando um amigo ajudar</span>' : '<button type="button" data-ctx="placa">🪧 Pedir ajuda aos amigos</button>'}<button type="button" data-ctx="derrubar">${fer === 'motosserra' ? `<img class="emo" alt="" src="${ferramentaIcon('motosserra')}">` : F.emoji} Derrubar (você tem ${derrubarDe()[fer]})</button><button type="button" data-ctx="fechar">Cancelar</button>`;
+  m.innerHTML = `<b>${esc(e.nome)} secou 🥀</b>${o.placa ? '<span class="meta" style="display:block;margin:2px 0 6px">Placa posta: esperando um amigo ajudar</span>' : '<button type="button" data-ctx="placa">🪧 Pedir ajuda aos amigos</button>'}<button type="button" data-ctx="derrubar">${ferrEmo(fer)} Derrubar (você tem ${derrubarDe()[fer]})</button><button type="button" data-ctx="fechar">Cancelar</button>`;
   m.dataset.key = 'enf:' + i; m.dataset.sc = sc; m.hidden = false;
   const w = m.offsetWidth, h = m.offsetHeight;
   m.style.left = `${clamp(q.x - w / 2, 6, L.cw - w - 6)}px`; m.style.top = `${clamp(q.y - L.W * 0.5 - h, 6, L.ch - h - 6)}px`;
@@ -8508,7 +8524,7 @@ function drawFruteira(o, x, y, s, t, home) {
 }
 function pomarLojaHTML() {
   const d = derrubarDe();
-  let html = dominioPomarHTML() + `<p class="hint">Plante frutíferas no gramado da roça ou do rancho (fora dos canteiros). Dá para ter até ${LIMITE_FRUTEIRA.arbusto} de cada arbusto e ${LIMITE_FRUTEIRA.arvore} de cada árvore (derrube uma seca para comprar outra). Cada uma dá ${colheitasDe(ENFEITE.pitangueira)} colheitas e depois seca. Seca, você escolhe: pôr a 🪧 placa de ajuda (todos os seus amigos são avisados e, quando um ajudar, ela volta a dar frutas) ou derrubar (arbusto com a 🪓 enxada de arrancar; árvore com a <img class="emo" alt="" src="${ferramentaIcon('motosserra')}"> motosserra). Ganhe as ferramentas completando todas as missões (dia: enxada, semana: motosserra), de presente de amigos ou compre aqui.</p>`;
+  let html = dominioPomarHTML() + `<p class="hint">Plante frutíferas no gramado da roça ou do rancho (fora dos canteiros). Dá para ter até ${LIMITE_FRUTEIRA.arbusto} de cada arbusto e ${LIMITE_FRUTEIRA.arvore} de cada árvore (derrube uma seca para comprar outra). Cada uma dá ${colheitasDe(ENFEITE.pitangueira)} colheitas e depois seca. Seca, você escolhe: pôr a 🪧 placa de ajuda (todos os seus amigos são avisados e, quando um ajudar, ela volta a dar frutas) ou derrubar (arbusto com a <img class="emo" alt="" src="${ferramentaIcon('enxada')}"> enxada de arrancar; árvore com a <img class="emo" alt="" src="${ferramentaIcon('motosserra')}"> motosserra). Ganhe as ferramentas completando todas as missões (dia: enxada, semana: motosserra), de presente de amigos ou compre aqui.</p>`;
   html += `<h3>Ferramentas de derrubar</h3>`;
   for (const [id, F] of Object.entries(FERR_DERRUBAR)) html += `<div class="row"><img alt="" src="${ferramentaIcon(id)}"><div><div class="name">${F.nome}</div><div class="meta">Tira um${F.para === 'arvore' ? 'a árvore' : ' arbusto'} seco · você tem <b>${d[id]}</b></div></div>
     <button class="btn" data-comprar-ferr="${id}" ${state.coins < F.custo ? 'disabled' : ''}>${moeda(F.custo)}</button></div>`;
@@ -8657,6 +8673,7 @@ function iconeTrevoItem(it) {
   return makeIcon('trevoitem:' + it.id, () => {
     if (tipo === 'musica') { ctx.fillStyle = '#2f8a2f'; ctx.font = '56px system-ui'; ctx.textAlign = 'center'; ctx.fillText({ 4: '🪕', 5: '🪗', 6: '🌙' }[id] || '🎵', 48, 70); return; }
     if (tipo === 'util' && id === 'motosserra') return drawMotosserra(52, 54, 0.95);
+    if (tipo === 'util' && id === 'enxada') return drawEnxada(38, 54, 0.9);
     if (tipo === 'util') { ctx.font = '54px system-ui'; ctx.textAlign = 'center'; ctx.fillText({ camarao: '🦐', artificial: '🎏', tarrafa: '🕸️', racao: '🌾', pontos: '🎣', enxada: '🪓', motosserra: '⛓️' }[id] || '🧺', 48, 70); return; }
     const av = Object.assign({}, avatarOk(state.avatar), tipo === 'chapeu' ? { chapeu: id } : { mao: id });
     drawAvatar(ctx, 48, 92, 1.2, av, 0, false, 1);
