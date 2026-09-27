@@ -911,6 +911,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 65, txt: 'Peixe novo ✨: quando pegar um peixe pela primeira vez, aparece o selo NOVO! e ele fica marcado no 📖 Livro de peixes. A dica da isca mostra com ✨ os que você ainda não pegou.' },
   { v: 63, txt: 'Agora são 5 missões diárias, com tipos novos: pescar, pegar peixe raro, cozinhar peixe, atender a vila, visitar roças e mais.' },
 ];
 const VERSAO_NUM = Number(document.querySelector('meta[name="rf-version"]')?.content) || 0;
@@ -5912,13 +5913,17 @@ function puxar() {
   if (pesca.fase === 'pronto' || pesca.fase === 'resultado') return lancar();
   if (pesca.fase === 'esperando') { pesca = { fase: 'resultado', t0: performance.now(), msg: 'Puxou cedo demais! O peixe fugiu.' }; sfx('error'); return renderPesca(); }
   if (pesca.fase === 'fisgou') {
-    const p = pesca.peixe;
+    const p = pesca.peixe, novo = !p.lixo && !(state.col[p.id] > 0);
     state.barn[p.id] = (state.barn[p.id] || 0) + 1;
+    if (novo) { state.peixesNovos = state.peixesNovos || []; if (!state.peixesNovos.includes(p.id)) state.peixesNovos.push(p.id); }
     if (!p.lixo) { collect(p.id, null); track('pescar'); if (['raro', 'épico', 'lendário'].includes(p.raro)) track('raro'); }
     addXP({ lixo: 0, comum: 2, incomum: 4, raro: 8, 'épico': 15, 'lendário': 40 }[p.raro], null);
     state.stats.peixes = (state.stats.peixes || 0) + (p.lixo ? 0 : 1);
-    pesca = { fase: 'resultado', t0: performance.now(), peixe: p, msg: p.lixo ? `Ih… veio uma ${p.nome.toLowerCase()}. 😅` : `Pegou um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''} ${p.nome}! (${p.raro})` };
-    sfx(p.lixo ? 'error' : ['raro', 'épico', 'lendário'].includes(p.raro) ? 'level' : 'collect');
+    const um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''}`;
+    pesca = { fase: 'resultado', t0: performance.now(), peixe: p, novo, msg: p.lixo ? `Ih… veio uma ${p.nome.toLowerCase()}. 😅`
+      : novo ? `✨ Peixe novo! Pegou ${um} ${p.nome} pela primeira vez (${p.raro}) — já está no 📖 Livro de peixes!` : `Pegou ${um} ${p.nome}! (${p.raro})` };
+    sfx(p.lixo ? 'error' : novo || ['raro', 'épico', 'lendário'].includes(p.raro) ? 'level' : 'collect');
+    if (novo) toast(`✨ Peixe novo no livro: ${p.nome}!`, 'good');
     done(); renderPesca();
   }
 }
@@ -5939,10 +5944,11 @@ function renderPesca() {
   const d = ISCA[sel], cb = $('#pescaComprar');
   cb.hidden = !!d.doCeleiro;
   if (!d.doCeleiro) { cb.textContent = `Comprar ${d.pacote} ${d.plural} · ${d.custo}`; cb.disabled = state.coins < d.custo; }
-  $('#pescaDica').textContent = `${d.emoji} ${d.nome}${d.doCeleiro ? ' (do celeiro)' : ''}: atrai ${PEIXES.filter(p => !p.lixo && p.iscas.includes(sel)).map(p => p.nivel <= state.level ? p.nome : '???').join(', ')}.`;
+  $('#pescaDica').textContent = `${d.emoji} ${d.nome}${d.doCeleiro ? ' (do celeiro)' : ''}: atrai ${PEIXES.filter(p => !p.lixo && p.iscas.includes(sel)).map(p => p.nivel > state.level ? '???' : p.nome + (state.col[p.id] ? '' : ' ✨')).join(', ')}.${PEIXES.some(p => !p.lixo && p.iscas.includes(sel) && p.nivel <= state.level && !state.col[p.id]) ? ' (✨ = nunca pegou)' : ''}`;
   $('#pescaLivro').hidden = !pescaLivro; $('#pescaCv').hidden = pescaLivro;
-  $('#pescaLivroBtn').textContent = pescaLivro ? '🎣 Voltar a pescar' : '📖 Livro de peixes';
-  if (pescaLivro) $('#pescaLivro').innerHTML = livroPeixes();
+  const nn = (state.peixesNovos || []).length;
+  $('#pescaLivroBtn').textContent = pescaLivro ? '🎣 Voltar a pescar' : `📖 Livro de peixes${nn ? ` · ✨ ${nn} novo${nn > 1 ? 's' : ''}` : ''}`;
+  if (pescaLivro) { $('#pescaLivro').innerHTML = livroPeixes(); if (nn) { state.peixesNovos = []; save(); } }
 }
 // Livro de peixes: o que já pegou (com figura), o que falta (sombra), raridade, quantos e do que precisa.
 let pescaLivro = false;
@@ -5950,8 +5956,8 @@ const peixeSombra = id => makeIcon('ps:' + id, () => { ctx.globalAlpha = 0.85; d
 function livroPeixes() {
   const lista = PEIXES.filter(p => !p.lixo), pegos = lista.filter(p => state.col[p.id]).length;
   return `<p class="hint" style="margin:0 0 8px">Você já pegou <b>${pegos} de ${lista.length}</b> peixes.</p><div class="livro">${lista.map(p => {
-    const n = state.col[p.id] || 0;
-    return `<div class="lvcard ${n ? '' : 'falta'}"><img alt="" src="${n ? productIcon(p.id) : peixeSombra(p.id)}">
+    const n = state.col[p.id] || 0, novo = (state.peixesNovos || []).includes(p.id);
+    return `<div class="lvcard ${n ? '' : 'falta'}">${novo ? '<span class="lvnovo">NOVO!</span>' : ''}<img alt="" src="${n ? productIcon(p.id) : peixeSombra(p.id)}">
       <b>${n ? esc(p.nome) : '???'}</b><span class="raro" style="color:${COR_RARO[p.raro]}">${p.raro}</span>
       <small>${n ? `Pegou ${n}× · vale ${p.preco}` : 'Ainda não pegou'}</small>
       <small class="req">Nível ${p.nivel}${p.nivel > state.level ? ' 🔒' : ''} · ${p.iscas.map(i => ISCA[i].emoji).join(' ')}</small></div>`;
@@ -6008,6 +6014,21 @@ function desenharPesca(t) {
     drawPeixe(g, x0 + w / 2, y0 + h * 0.42, 3.2 * esc * 0.8, p);
     g.textAlign = 'center'; g.font = `800 ${Math.round(15 * esc)}px system-ui, sans-serif`; g.fillStyle = '#2f2a1f'; g.fillText(p.nome, x0 + w / 2, y0 + h * 0.8);
     g.font = `800 ${Math.round(11 * esc)}px system-ui, sans-serif`; g.fillStyle = COR_RARO[p.raro]; g.fillText(`${p.raro.toUpperCase()} · vale ${p.preco}`, x0 + w / 2, y0 + h * 0.94);
+    if (pesca.novo) {
+      // selo dourado "NOVO!" pulsando no canto do cartão, com brilhinhos
+      const pul = 1 + Math.sin(t / 180) * 0.07, sx = x0 + w - 8, sy = y0 + 6;
+      g.save(); g.translate(sx, sy); g.rotate(0.22); g.scale(pul * k, pul * k);
+      g.fillStyle = '#e8a317'; g.strokeStyle = '#7a4a10'; g.lineWidth = 2.5;
+      g.beginPath(); g.roundRect(-34 * esc, -12 * esc, 68 * esc, 24 * esc, 12 * esc); g.fill(); g.stroke();
+      g.fillStyle = '#fffbe6'; g.font = `900 ${Math.round(13 * esc)}px system-ui, sans-serif`; g.textBaseline = 'middle'; g.fillText('NOVO!', 0, 1);
+      g.restore(); g.textBaseline = 'alphabetic';
+      g.fillStyle = '#f2c14e';
+      for (let i = 0; i < 5; i++) {
+        const a = t / 700 + i * 1.26, r = w * 0.36 + Math.sin(t / 260 + i) * 6;
+        const bx = x0 + w / 2 + Math.cos(a) * r, by = y0 + h * 0.42 + Math.sin(a) * r * 0.35, bs = (3 + Math.sin(t / 150 + i * 2) * 1.5) * esc;
+        g.beginPath(); g.moveTo(bx, by - bs * 2); g.lineTo(bx + bs * 0.6, by); g.lineTo(bx, by + bs * 2); g.lineTo(bx - bs * 0.6, by); g.closePath(); g.fill();
+      }
+    }
   }
   pescaRaf = requestAnimationFrame(desenharPesca);
 }
