@@ -948,8 +948,9 @@ const NOVIDADES = [
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
   { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
+  { v: 112, txt: 'Mudanças na caçada e nas pragas: a Caçada agora libera no nível 10. Pragas na plantação só aparecem no máximo uma vez a cada 12 horas, com você na roça: toca um alarme, a tela fica vermelha e você vê o bicho chegando. O cachorro de guarda corre atrás dele, e tem a nova 🪤 Armadilha de pragas (Loja › Itens), que pega um bicho por vez e depois recarrega.' },
   { v: 111, txt: 'Caçada ainda melhor 🎯: cada bicho novo vira uma 📷 foto no mural da sua casa (uma por bicho). Dá para ter uma 2ª arapuca e escolher a isca: milho, quirera (atrai bicho incomum) ou fruta do pomar (atrai os raros). Cada bicho tem seu domínio ★ com estrelas e trevos. E, de vez em quando, um rato ou javali entra na plantação: clique para espantar! Se ninguém espantar, ele come só um pouquinho de 1 ou 2 plantas. Com o cachorro da roça de guarda, isso quase não acontece.' },
-  { v: 110, txt: 'Chegou a CAÇADA 🎯 (a partir do nível 4)! Clique na trilha do mato na sua roça. Cace pragas com o estilingue e a espingarda (rato, pombo, pardal, lebre-europeia, javali, javaporco… e o lendário CHUPA-CABRA, que anda pela Serra Dourada e pela Chapada, mais à noite 👀). Arme a 🪤 arapuca com milho para pegar bichos do mato (preá, tatu, paca, mutum…): eles vão para o Livro da caçada e são soltos. Tem lugares para comprar, domínio de caçada, trevos, missões e conquistas.' },
+  { v: 110, txt: 'Chegou a CAÇADA 🎯 (a partir do nível 10)! Clique na trilha do mato na sua roça. Cace pragas com o estilingue e a espingarda (rato, pombo, pardal, lebre-europeia, javali, javaporco… e o lendário CHUPA-CABRA, que anda pela Serra Dourada e pela Chapada, mais à noite 👀). Arme a 🪤 arapuca com milho para pegar bichos do mato (preá, tatu, paca, mutum…): eles vão para o Livro da caçada e são soltos. Tem lugares para comprar, domínio de caçada, trevos, missões e conquistas.' },
   { v: 108, txt: 'A motosserra ganhou desenho de motosserra de verdade (antes aparecia um serrote).' },
   { v: 107, txt: 'Correio: agora dá para apagar cada carta (✕) ou todas de uma vez, e as cartas somem sozinhas depois de 7 dias. Na conversa com amigos tem o botão 🧹 Limpar.' },
   { v: 106, txt: 'Canteiros se mudam como o resto: segure o dedo (ou botão direito) em cima de um e escolha Mover. A placa de terras à venda agora fica no lugar dela, e também dá para mudar de lugar.' },
@@ -2409,6 +2410,7 @@ function drawDogSpot(slot, s, t, home) {
   const W = L.W, k = KENNEL_AT(), p = DOG_AT();
   const d = s.dogs && s.dogs[slot];
   if (!home && !dogAlive(d)) return;
+  if (home && slot === 'roca' && invasor && invasor.fase === 'cachorro') return; // saiu correndo atrás da praga
   if (dogAlive(d)) {
     if (hover && hover.kind === 'dog' && hover.slot === slot) {
       ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5;
@@ -3304,6 +3306,7 @@ function drawRoca(s, t, home) {
   drawCritters(t, tod);
   nightOverlay(tod);
   drawWeather(t);
+  if (home) drawAlertaInvasao(t);
   for (let i = 0; i < N; i++) {
     const k = plotBubble(s.plots[i], home);
     if (k) { const m = cellCenter(i); drawBubbleAt(m.x, m.y - W * 0.55, k, s.plots[i], t, i); }
@@ -4188,6 +4191,9 @@ function renderPane() {
       }
       if (upcoming.length > 2) html += `<p class="hint">Mais ${upcoming.length - 2} ${trees ? 'árvores' : 'plantações'} liberam nos próximos níveis, até o nível ${upcoming[upcoming.length - 1].nivel}.</p>`;
     } else if (shopSeg === 'adubo') {
+      html += `<div class="row ${state.armadilha ? 'sel' : state.level < ARMADILHA.nivel ? 'locked' : ''}"><div class="avatar" style="background:#5a646c;font-size:24px">🪤</div>
+        <div><div class="name">Armadilha de pragas</div><div class="meta">Fica perto da plantação e pega o rato ou javali que invadir (um por vez, e dá a recompensa). Depois recarrega em ${fmt(ARMADILHA.recarga / 1000)}.${state.armadilha ? ` ${armadilhaPronta() ? '<b>Carregada.</b>' : `Pronta em ${fmt((state.armadilha.pronta - Date.now()) / 1000)}.`}` : ''}</div></div>
+        ${state.armadilha ? '<button class="btn ghost" disabled>Sua</button>' : state.level < ARMADILHA.nivel ? `<button class="btn" disabled>Nível ${ARMADILHA.nivel}</button>` : `<button class="btn" data-comprar-armadilha="1" ${state.coins < ARMADILHA.custo ? 'disabled' : ''}>${moeda(ARMADILHA.custo)}</button>`}</div>`;
       html += `<div class="row ${state.tools.enxada ? 'sel' : ''}"><div class="avatar" style="background:#8a5a33">${TOOL_ICONS.hoe}</div>
         <div><div class="name">Rastelo</div><div class="meta">100 moedas · limpa a terra e arranca qualquer plantação ou árvore do canteiro</div></div>
         ${state.tools.enxada ? '<button class="btn ghost" disabled>Sua</button>' : `<button class="btn" data-buy-hoe ${state.coins < 100 ? 'disabled' : ''}>${moeda(100)}</button>`}</div>`;
@@ -4468,6 +4474,7 @@ $('#pane').addEventListener('click', e => {
   if (d.trevoTodos) { resgatarTodosPeixes(); return renderPane(); }
   if (d.trevoDominio) { resgatarDominio(); return renderPane(); }
   if (d.trevoPomar) { resgatarPomar(); return renderPane(); }
+  if (d.comprarArmadilha) { comprarArmadilha(); return renderPane(); }
   if (d.trevoBichos) { resgatarBichos(); return renderPane(); }
   if (d.trevoDomcaca) { resgatarDomCaca(); return renderPane(); }
   if (d.newsDel) { state.news = state.news.filter(n => String(n.at) !== d.newsDel); sfx('click'); save(); renderTabs(); return renderPane(); }
@@ -4692,7 +4699,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'caca' ? (state.level >= CACA_NIVEL ? '<b>🎯 Trilha da caçada</b><br>Clique para caçar pragas com o estilingue ou a espingarda, e armar a arapuca.' : `<b>🎯 Trilha da caçada</b><br>Libera no nível ${CACA_NIVEL}.`) : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'invasor' ? `<b>${invasor ? (invasor.tipo === 'javali' ? '🐗 Javali' : '🐀 Rato') : 'Praga'} na plantação!</b><br>Clique para espantar antes que ele coma.` : hover.kind === 'mural' ? `<b>📷 Mural da caçada</b><br>${hover.n} foto${hover.n === 1 ? '' : 's'} de bichos. ${isHome() ? 'Clique para abrir o Livro da caçada.' : ''}` : hover.kind === 'folhas' ? '<b>🍂 Monte de folhas</b><br>Clique e o avatar vai rastelar (+XP e umas moedinhas).' : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'caca' ? (state.level >= CACA_NIVEL ? '<b>🎯 Trilha da caçada</b><br>Clique para caçar pragas com o estilingue ou a espingarda, e armar a arapuca.' : `<b>🎯 Trilha da caçada</b><br>Libera no nível ${CACA_NIVEL}.`) : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'invasor' ? `<b>${invasor ? (invasor.tipo === 'javali' ? '🐗 Javali' : '🐀 Rato') : 'Praga'} na plantação!</b><br>Clique para espantar antes que ele coma.` : hover.kind === 'armadilha' ? `<b>🪤 Armadilha de pragas</b><br>${armadilhaPronta() ? 'Carregada: pega a próxima praga que invadir a plantação.' : `Recarregando: pronta em ${fmt((state.armadilha.pronta - Date.now()) / 1000)}.`}` : hover.kind === 'mural' ? `<b>📷 Mural da caçada</b><br>${hover.n} foto${hover.n === 1 ? '' : 's'} de bichos. ${isHome() ? 'Clique para abrir o Livro da caçada.' : ''}` : hover.kind === 'folhas' ? '<b>🍂 Monte de folhas</b><br>Clique e o avatar vai rastelar (+XP e umas moedinhas).' : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4771,7 +4778,7 @@ let holdTimer = null, holdFired = false;
 function objAt(x, y) {
   if (!isHome() || scene === 'casa') return null;
   // a área de clique cobre o desenho inteiro (largura para cada lado e altura, em casas da grade)
-  const CAIXA = { mata: [0.6, 0.8], placa: [0.5, 0.95], casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05], pesqueiro: [0.5, 0.3] };
+  const CAIXA = { armadilha: [0.25, 0.35], mata: [0.6, 0.8], placa: [0.5, 0.95], casa: [0.55, 1.0], celeiro: [0.62, 1.15], canil: [0.4, 0.65], arv1: [0.4, 1.05], arv2: [0.4, 1.05], pesqueiro: [0.5, 0.3] };
   let best = null, bd = Infinity;
   for (const o of objList(state, scene)) {
     if (o.key === 'placa' && !landSignText()) continue;
@@ -4866,6 +4873,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'lago') abrirPesca();
   else if (target.kind === 'folhas') rastelarFolhas(target.id);
   else if (target.kind === 'invasor') espantarInvasor();
+  else if (target.kind === 'armadilha') toast(armadilhaPronta() ? '🪤 Armadilha carregada: pega a próxima praga que invadir a plantação.' : `🪤 Armadilha recarregando: pronta em ${fmt((state.armadilha.pronta - Date.now()) / 1000)}.`);
   else if (target.kind === 'mural') { abrirCaca(); if (caca) { cacaLivro = true; renderCaca(); } }
   else if (target.kind === 'avatar' && target.quem === 'dono') { falar('avatar:dono', view.nome, sorteia(FALAS_DONO.concat(FALAS_AVATAR))); sfx('fala'); }
   else if (target.kind === 'avatar') { falar('avatar', meuApelido(), sorteia(FALAS_AVATAR)); sfx('fala'); }
@@ -7788,11 +7796,11 @@ const LUGARES = {
 // Posição padrão de cada coisa, em coordenadas da grade da cena.
 const POS_PADRAO = {
   // (as árvores de enfeite saíram: agora as árvores são as frutíferas do Pomar, compradas na Loja)
-  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], pesqueiro: [-1.05, 4.85], placa: [-0.1, 1.1], mata: [1.6, 6.9] },
+  roca: { casa: [1.25, -1.45], celeiro: [-0.95, 2.15], canil: [-1.65, 3.65], pesqueiro: [-1.05, 4.85], placa: [-0.1, 1.1], mata: [1.6, 6.9], armadilha: [3.3, -0.6] },
   animais: { canil: [-1.65, 3.65] },
 };
 const LAGO_POS = [3.55, -1.95];
-const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 }, placa: { nome: 'Placa de terras', r: 0.45 }, mata: { nome: 'Trilha da caçada', r: 1.0 } };
+const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 }, placa: { nome: 'Placa de terras', r: 0.45 }, mata: { nome: 'Trilha da caçada', r: 1.0 }, armadilha: { nome: 'Armadilha de pragas', r: 0.45 } };
 function posOf(s, sc, key) {
   const p = s.pos && s.pos[sc] && s.pos[sc][key];
   if (Array.isArray(p)) return p;
@@ -7801,7 +7809,7 @@ function posOf(s, sc, key) {
 }
 const objetosDe = (s, sc) => (s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && ENFEITE[o.id]);
 function objList(s, sc) {
-  const l = Object.keys(POS_PADRAO[sc]).map(key => { const [u, v] = posOf(s, sc, key); return { key, u, v, r: OBJ_INFO[key].r }; });
+  const l = Object.keys(POS_PADRAO[sc]).filter(key => key !== 'armadilha' || s.armadilha).map(key => { const [u, v] = posOf(s, sc, key); return { key, u, v, r: OBJ_INFO[key].r }; });
   objetosDe(s, sc).forEach((o, i) => l.push(ehCerca(o.id) ? { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: 0.3, obj: o, cerca: true, rot: o.rot ? 1 : 0 }
     : { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: ENFEITE[o.id].fruteira === 'arvore' ? 0.65 : 0.55, obj: o }));
   return l;
@@ -8004,6 +8012,11 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       hits.push({ kind: 'obj', key: o.key, nome: o.id ? ENFEITE[o.id].nome : OBJ_INFO[o.key].nome, x: q.x, y: q.y - W * 0.3, r: W * Math.max(0.35, o.r * 0.5) });
     }
     if (o.key === 'placa') { drawLandSign(q.x, q.y); continue; }
+    if (o.key === 'armadilha') {
+      drawArmadilha(q.x, q.y, W, !s.armadilha || Date.now() >= (s.armadilha.pronta || 0), t);
+      if (!moveMode && home) hits.push({ kind: 'armadilha', x: q.x, y: q.y - W * 0.12, r: W * 0.25 });
+      continue;
+    }
     if (o.key === 'mata') {
       drawMataCaca(q.x, q.y, W);
       if (!moveMode && home) {
@@ -8092,6 +8105,7 @@ function drawMoving(sc, t) {
   else if (k === 'pesqueiro') drawLake(q.x, q.y, W * 0.48, t);
   else if (k === 'placa') drawLandSign(q.x, q.y, true);
   else if (k === 'mata') drawMataCaca(q.x, q.y, W);
+  else if (k === 'armadilha') drawArmadilha(q.x, q.y, W, true, t);
   else drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro);
   ctx.globalAlpha = 1;
 }
@@ -8589,42 +8603,42 @@ function comprarFerramenta(id) {
 // recompensa (e carne, no caso do javali). Os bichos nativos só caem na arapuca: são registrados no
 // livro e soltos de volta no mato. O lendário é o Chupa-cabra: aparece na serra e na chapada, mais à noite.
 // ============================================================
-const CACA_NIVEL = 4, CACA_POR_VEZ = 3, CACA_MS = 2 * 3600e3, ARAPUCA_MS = 4 * 3600e3;
+const CACA_NIVEL = 10, CACA_POR_VEZ = 3, CACA_MS = 2 * 3600e3, ARAPUCA_MS = 4 * 3600e3;
 const LUGARES_CACA = [
-  { id: 'capoeira', nome: 'Capoeira do fundo',     emoji: '🌿', nivel: 4,  custo: 0,     sorte: 1,   chao: '#86c050', mato: '#3f8a2a', morro: '#9ccf6a' },
-  { id: 'mata',     nome: 'Mata ciliar',           emoji: '🌳', nivel: 8,  custo: 2500,  sorte: 1.3, chao: '#6fae44', mato: '#2f6f22', morro: '#7fb85a' },
-  { id: 'cerrado',  nome: 'Cerrado',               emoji: '🌾', nivel: 12, custo: 6000,  sorte: 1.6, chao: '#bdb466', mato: '#7a8a3a', morro: '#c9b877' },
-  { id: 'serra',    nome: 'Serra Dourada',         emoji: '⛰️', nivel: 18, custo: 12000, sorte: 2,   chao: '#c8a466', mato: '#6a7a3a', morro: '#b89a6a' },
-  { id: 'chapada',  nome: 'Chapada dos Veadeiros', emoji: '🏞️', nivel: 25, custo: 25000, sorte: 2.6, chao: '#a8a456', mato: '#4a6a2a', morro: '#9a8a6a' },
+  { id: 'capoeira', nome: 'Capoeira do fundo',     emoji: '🌿', nivel: 10, custo: 0,     sorte: 1,   chao: '#86c050', mato: '#3f8a2a', morro: '#9ccf6a' },
+  { id: 'mata',     nome: 'Mata ciliar',           emoji: '🌳', nivel: 12, custo: 2500,  sorte: 1.3, chao: '#6fae44', mato: '#2f6f22', morro: '#7fb85a' },
+  { id: 'cerrado',  nome: 'Cerrado',               emoji: '🌾', nivel: 15, custo: 6000,  sorte: 1.6, chao: '#bdb466', mato: '#7a8a3a', morro: '#c9b877' },
+  { id: 'serra',    nome: 'Serra Dourada',         emoji: '⛰️', nivel: 20, custo: 12000, sorte: 2,   chao: '#c8a466', mato: '#6a7a3a', morro: '#b89a6a' },
+  { id: 'chapada',  nome: 'Chapada dos Veadeiros', emoji: '🏞️', nivel: 28, custo: 25000, sorte: 2.6, chao: '#a8a456', mato: '#4a6a2a', morro: '#9a8a6a' },
 ];
 const LUGAR_CACA = Object.fromEntries(LUGARES_CACA.map(l => [l.id, l]));
 // lug = a partir de qual lugar aparece (0 = capoeira… 4 = chapada)
 const CACA_BICHOS = [
   // pragas: estilingue (pequenas) e espingarda (grandes)
-  { id: 'rato',       nome: 'Rato do paiol',   raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 4,  lug: 0, forma: 'rato',  cor: '#8a8078', tam: 0.7,  vel: 1.1, hp: 1, moedas: 15,  peso: 10 },
-  { id: 'pombo',      nome: 'Pombo',           raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 4,  lug: 0, forma: 'ave',   cor: '#9aa3ad', tam: 0.75, vel: 1.1, hp: 1, moedas: 12,  peso: 10, voa: true },
-  { id: 'pardal',     nome: 'Pardal',          raro: 'incomum',  praga: true, armas: ['estilingue'], nivel: 4,  lug: 0, forma: 'ave',   cor: '#a07a4a', tam: 0.6,  vel: 1.45, hp: 1, moedas: 22, peso: 5, voa: true },
-  { id: 'lebre',      nome: 'Lebre-europeia',  raro: 'incomum',  praga: true, armas: ['estilingue', 'espingarda'], nivel: 6, lug: 0, forma: 'lebre', cor: '#b08a5a', tam: 0.9, vel: 1.55, hp: 1, moedas: 40, peso: 6 },
+  { id: 'rato',       nome: 'Rato do paiol',   raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'rato',  cor: '#8a8078', tam: 0.7,  vel: 1.1, hp: 1, moedas: 15,  peso: 10 },
+  { id: 'pombo',      nome: 'Pombo',           raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9aa3ad', tam: 0.75, vel: 1.1, hp: 1, moedas: 12,  peso: 10, voa: true },
+  { id: 'pardal',     nome: 'Pardal',          raro: 'incomum',  praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#a07a4a', tam: 0.6,  vel: 1.45, hp: 1, moedas: 22, peso: 5, voa: true },
+  { id: 'lebre',      nome: 'Lebre-europeia',  raro: 'incomum',  praga: true, armas: ['estilingue', 'espingarda'], nivel: 10, lug: 0, forma: 'lebre', cor: '#b08a5a', tam: 0.9, vel: 1.55, hp: 1, moedas: 40, peso: 6 },
   { id: 'javali',     nome: 'Javali',          raro: 'raro',     praga: true, armas: ['espingarda'], nivel: 12, lug: 1, forma: 'porco', cor: '#5a4a3a', tam: 1.3,  vel: 1.0, hp: 2, moedas: 90,  carne: 2, peso: 7 },
   { id: 'javaporco',  nome: 'Javaporco',       raro: 'épico',    praga: true, armas: ['espingarda'], nivel: 15, lug: 2, forma: 'porco', cor: '#7a5a44', tam: 1.5,  vel: 1.15, hp: 3, moedas: 160, carne: 3, peso: 2.5, pintas: true },
   { id: 'chupacabra', nome: 'Chupa-cabra',     raro: 'lendário', praga: true, armas: ['espingarda'], nivel: 20, lug: 3, forma: 'chupa', cor: '#6a7a6a', tam: 1.25, vel: 1.75, hp: 4, moedas: 1000, peso: 0.6 },
   // nativos: só na arapuca, e voltam para o mato
-  { id: 'rolinha',    nome: 'Rolinha',         raro: 'comum',    armas: ['arapuca'], nivel: 6,  lug: 0, forma: 'ave',   cor: '#c89a7a', tam: 0.6,  moedas: 5,  peso: 10 },
-  { id: 'prea',       nome: 'Preá',            raro: 'comum',    armas: ['arapuca'], nivel: 6,  lug: 0, forma: 'rato',  cor: '#8a6a4a', tam: 0.7,  moedas: 5,  peso: 10, semRabo: true },
-  { id: 'codorna',    nome: 'Codorna',         raro: 'comum',    armas: ['arapuca'], nivel: 6,  lug: 0, forma: 'ave',   cor: '#9a7a52', tam: 0.65, moedas: 5,  peso: 8, gorda: true },
-  { id: 'inhambu',    nome: 'Inhambu',         raro: 'incomum',  armas: ['arapuca'], nivel: 8,  lug: 1, forma: 'ave',   cor: '#7a6a4a', tam: 0.75, moedas: 10, peso: 6, gorda: true },
-  { id: 'tatu',       nome: 'Tatu-galinha',    raro: 'incomum',  armas: ['arapuca'], nivel: 8,  lug: 1, forma: 'tatu',  cor: '#a09080', tam: 0.9,  moedas: 10, peso: 6 },
-  { id: 'cutia',      nome: 'Cutia',           raro: 'incomum',  armas: ['arapuca'], nivel: 10, lug: 1, forma: 'rato',  cor: '#c8843a', tam: 0.9,  moedas: 10, peso: 5, semRabo: true },
+  { id: 'rolinha',    nome: 'Rolinha',         raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#c89a7a', tam: 0.6,  moedas: 5,  peso: 10 },
+  { id: 'prea',       nome: 'Preá',            raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'rato',  cor: '#8a6a4a', tam: 0.7,  moedas: 5,  peso: 10, semRabo: true },
+  { id: 'codorna',    nome: 'Codorna',         raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9a7a52', tam: 0.65, moedas: 5,  peso: 8, gorda: true },
+  { id: 'inhambu',    nome: 'Inhambu',         raro: 'incomum',  armas: ['arapuca'], nivel: 10,  lug: 1, forma: 'ave',   cor: '#7a6a4a', tam: 0.75, moedas: 10, peso: 6, gorda: true },
+  { id: 'tatu',       nome: 'Tatu-galinha',    raro: 'incomum',  armas: ['arapuca'], nivel: 10,  lug: 1, forma: 'tatu',  cor: '#a09080', tam: 0.9,  moedas: 10, peso: 6 },
+  { id: 'cutia',      nome: 'Cutia',           raro: 'incomum',  armas: ['arapuca'], nivel: 12, lug: 1, forma: 'rato',  cor: '#c8843a', tam: 0.9,  moedas: 10, peso: 5, semRabo: true },
   { id: 'paca',       nome: 'Paca',            raro: 'raro',     armas: ['arapuca'], nivel: 12, lug: 2, forma: 'rato',  cor: '#7a5230', tam: 1,    moedas: 20, peso: 3, semRabo: true, pintas: true },
   { id: 'jacu',       nome: 'Jacu',            raro: 'raro',     armas: ['arapuca'], nivel: 14, lug: 2, forma: 'ave',   cor: '#2e2a2a', tam: 0.95, moedas: 20, peso: 3, papo: true },
   { id: 'mutum',      nome: 'Mutum',           raro: 'épico',    armas: ['arapuca'], nivel: 18, lug: 3, forma: 'ave',   cor: '#1e1e22', tam: 1.05, moedas: 40, peso: 1.2, crista: true },
 ];
 const CACA_BICHO = Object.fromEntries(CACA_BICHOS.map(b => [b.id, b]));
 const ARMAS_CACA = {
-  estilingue: { nome: 'Estilingue', nivel: 4,  custo: 0,    mun: 'pedra',    munNome: 'pedrinhas', pacote: 10, munCusto: 20 },
+  estilingue: { nome: 'Estilingue', nivel: 10, custo: 0,    mun: 'pedra',    munNome: 'pedrinhas', pacote: 10, munCusto: 20 },
   espingarda: { nome: 'Espingarda', nivel: 12, custo: 2500, mun: 'cartucho', munNome: 'cartuchos', pacote: 5,  munCusto: 120 },
 };
-const ARAPUCA = { nivel: 6, custo: 400, nivel2: 10, custo2: 1500 };
+const ARAPUCA = { nivel: 10, custo: 400, nivel2: 14, custo2: 1500 };
 // Iscas da arapuca: milho (do celeiro), quirera (compra) atrai mais bicho incomum, e fruta do pomar atrai os raros.
 const ISCAS_ARAPUCA = {
   milho:   { nome: 'Milho',   emoji: '🌽', vazia: 0.15, bonus: {} },
@@ -9136,57 +9150,147 @@ function drawMural(s, t, home) {
   hits.push({ kind: 'mural', n: fotos.length, x: m.x, y: m.y, r: W * 0.45 });
 }
 // ---------- Pragas que invadem a roça ----------
-// De vez em quando um rato (ou, a partir do nível 12, um javali) entra na plantação. Se ninguém espantar
-// em 90 segundos, ele come um pouco de 1 planta (o javali, de até 2) e vai embora: nunca estraga a roça toda.
-// Com o cachorro da roça acordado (com ração), é bem mais raro: quase sempre ele late e espanta antes.
+// No máximo uma vez a cada 12 horas, e só com você na roça (jogo aberto). Toca um alarme, a tela fica com um
+// alerta vermelho e o bicho (rato; javali a partir do nível 12) corre até um canteiro. Aí:
+//  · a armadilha (se tiver e estiver carregada) pega o bicho — e recarrega;
+//  · senão, o cachorro da roça acordado (com ração) corre e espanta, em 3 de cada 4 vezes;
+//  · senão, você tem 60 segundos para clicar e espantar; se não, ele come um pouco de 1 planta (o javali, até 2) e vai embora.
 let invasor = null;
-const INVASAO_MS = 90e3;
-function invasaoTick() {
-  if (!state || !isHome() || state.level < CACA_NIVEL) return;
+const INVASAO_ESPERA = 60e3, INVASAO_CADA = 12 * 3600e3, ARMADILHA = { nivel: CACA_NIVEL, custo: 1500, recarga: 16 * 3600e3 };
+const sessaoIni = Date.now();
+const armadilhaPronta = () => !!state.armadilha && Date.now() >= (state.armadilha.pronta || 0);
+function invasaoTick(forca) {
+  if (!state || !isHome() || state.level < CACA_NIVEL || invasor) return;
   const agora = Date.now();
-  if (invasor) { if (agora >= invasor.ate) invasorCome(); return; }
-  if (!state.invasaoProx) { state.invasaoProx = agora + (25 + Math.random() * 25) * 60e3; return; }
-  if (agora < state.invasaoProx) return;
-  state.invasaoProx = agora + (35 + Math.random() * 35) * 60e3;
+  if (!forca) {
+    if (scene !== 'roca' || document.hidden || !$('#pesca').hidden || !$('#caca').hidden || agora - sessaoIni < 60e3) return; // só com você olhando a roça
+    if (agora - (state.invasaoUlt || 0) < INVASAO_CADA) return;
+    if (Math.random() > 1 / 450) return; // passou das 12h: acontece num momento qualquer (≈ 15 min jogando, em média)
+  }
   const alvos = state.plots.map((p, i) => i).filter(i => { const p = state.plots[i]; return p.s === 'growing' && !p.podre && !p.poda; });
-  if (!alvos.length) return save();
-  const tipo = state.level >= 12 && Math.random() < 0.35 ? 'javali' : 'rato', nome = tipo === 'javali' ? 'um javali' : 'um rato';
+  if (!alvos.length) return;
+  state.invasaoUlt = agora; save();
+  const tipo = state.level >= 12 && Math.random() < 0.35 ? 'javali' : 'rato', i = alvos[Math.floor(Math.random() * alvos.length)];
+  const u = i % COLS + 0.5, v = Math.floor(i / COLS) + 0.5, lado = Math.random() < 0.5 ? 1 : -1;
   const d = state.dogs && state.dogs.roca;
-  if (d && dogAwake(d) && Math.random() < 0.75) { toast(`🐕 ${d.nome} latiu e espantou ${nome} que vinha para a plantação!`, 'good'); sfx('bark'); addNews(`🐕 ${d.nome} espantou ${nome} que ia comer a sua plantação.`); return save(); }
-  invasor = { tipo, i: alvos[Math.floor(Math.random() * alvos.length)], t0: agora, ate: agora + INVASAO_MS, dir: Math.random() < 0.5 ? 1 : -1 };
-  sfx(tipo === 'javali' ? 'bicho_porco' : 'prea');
-  toast(`${tipo === 'javali' ? '🐗 Um javali' : '🐀 Um rato'} entrou na plantação! Clique nele para espantar antes que coma.`, 'bad');
-  save();
+  invasor = { tipo, i, u, v, fase: 'chegando', t0: performance.now(), de: [u + 4 * lado, v + 3.5], dir: lado > 0 ? -1 : 1,
+    destino: armadilhaPronta() ? 'armadilha' : d && dogAwake(d) && Math.random() < 0.75 ? 'cachorro' : 'espera' };
+  sfx('alarme'); try { if (navigator.vibrate) navigator.vibrate([120, 80, 120]); } catch (e) { /* sem vibração */ }
+  toast(`⚠️ ${tipo === 'javali' ? '🐗 Um javali' : '🐀 Um rato'} está invadindo a plantação!`, 'bad');
 }
-function invasorCome() {
-  const v = invasor; invasor = null; if (!v) return;
-  const comidas = [v.i];
-  if (v.tipo === 'javali') { const viz = neighbors(v.i).filter(j => state.plots[j].s === 'growing' && !state.plots[j].podre); if (viz.length) comidas.push(viz[Math.floor(Math.random() * viz.length)]); }
-  for (const i of comidas) { const p = state.plots[i]; if (p.s === 'growing' && CROP[p.c]) p.dmg = Math.min(CROP[p.c].rend - 1, (p.dmg || 0) + (v.tipo === 'javali' ? 2 : 1)); }
-  const msg = `${v.tipo === 'javali' ? '🐗 O javali' : '🐀 O rato'} comeu um pouco de ${comidas.length} planta${comidas.length > 1 ? 's' : ''} e foi embora. (Com o cachorro de guarda, isso quase não acontece!)`;
-  toast(msg, 'bad'); addNews(msg); done();
+const nomePraga = v => v.tipo === 'javali' ? 'o javali' : 'o rato';
+// Passo da animação (chamado a cada quadro).
+function passoInvasao(t) {
+  const v = invasor; if (!v) return;
+  const dt = t - v.t0;
+  if (v.fase === 'chegando' && dt > 2200) {
+    v.t0 = t;
+    if (v.destino === 'armadilha') { v.fase = 'presa'; sfx('armadilha'); }
+    else if (v.destino === 'cachorro') { v.fase = 'cachorro'; sfx('bark'); const c = posOf(state, 'roca', 'canil'); v.cao = [c[0], c[1]]; }
+    else { v.fase = 'espera'; v.limite = Date.now() + INVASAO_ESPERA; }
+  } else if (v.fase === 'presa' && dt > 2600) {
+    state.armadilha.pronta = Date.now() + ARMADILHA.recarga;
+    const b = CACA_BICHO[v.tipo]; addCoins(b.moedas, null); if (b.carne) state.barn.carnejavali = (state.barn.carnejavali || 0) + b.carne;
+    const msg = `🪤 A armadilha pegou ${nomePraga(v)} na plantação! +${b.moedas} moedas${b.carne ? ` e ${b.carne} carnes de javali` : ''}. Ela recarrega em ${fmt(ARMADILHA.recarga / 1000)}.`;
+    toast(msg, 'good'); addNews(msg); invasor = null; done();
+  } else if (v.fase === 'cachorro' && dt > 1500 && !v.fugindo) { v.fugindo = t; sfx('bark'); }
+  else if (v.fase === 'cachorro' && v.fugindo && t - v.fugindo > 1800) {
+    const d = state.dogs.roca, msg = `🐕 ${d ? d.nome : 'Seu cachorro'} correu atrás ${v.tipo === 'javali' ? 'do javali' : 'do rato'} e espantou da plantação!`;
+    addXP(d ? DOG[d.raca].xpPega : 5, null); toast(msg, 'good'); addNews(msg); invasor = null; done();
+  } else if (v.fase === 'espera' && Date.now() >= v.limite) { v.fase = 'comendo'; v.t0 = t; sfx('bicho_porco'); }
+  else if (v.fase === 'comendo' && dt > 3200) {
+    const comidas = [v.i];
+    if (v.tipo === 'javali') { const viz = neighbors(v.i).filter(j => state.plots[j].s === 'growing' && !state.plots[j].podre); if (viz.length) comidas.push(viz[Math.floor(Math.random() * viz.length)]); }
+    for (const i of comidas) { const p = state.plots[i]; if (p.s === 'growing' && CROP[p.c]) p.dmg = Math.min(CROP[p.c].rend - 1, (p.dmg || 0) + (v.tipo === 'javali' ? 2 : 1)); }
+    const msg = `${v.tipo === 'javali' ? '🐗 O javali' : '🐀 O rato'} comeu um pouco de ${comidas.length} planta${comidas.length > 1 ? 's' : ''} e foi embora. Um cachorro de guarda ou a armadilha evitam isso!`;
+    toast(msg, 'bad'); addNews(msg); v.fase = 'fugindo'; v.t0 = t; done();
+  } else if (v.fase === 'fugindo' && dt > 1600) invasor = null;
 }
 function espantarInvasor() {
-  if (!invasor) return;
-  const m = cellCenter(invasor.i), pos = { x: m.x, y: m.y - L.W * 0.3 }, tipo = invasor.tipo; invasor = null;
-  addXP(tipo === 'javali' ? 6 : 3, pos); addCoins(tipo === 'javali' ? 12 : 5, pos); sfx('hoe'); popupAt(pos, 'Xô!', '#c8402f');
-  toast(`${tipo === 'javali' ? '🐗 Espantou o javali' : '🐀 Espantou o rato'}! A plantação está salva.`, 'good'); done();
+  const v = invasor; if (!v || v.fase !== 'espera') return;
+  const q = iso(v.u, v.v), pos = { x: q.x, y: q.y - L.W * 0.3 };
+  addXP(v.tipo === 'javali' ? 6 : 3, pos); addCoins(v.tipo === 'javali' ? 12 : 5, pos); sfx('hoe'); popupAt(pos, 'Xô!', '#c8402f');
+  toast(`${v.tipo === 'javali' ? '🐗 Espantou o javali' : '🐀 Espantou o rato'}! A plantação está salva.`, 'good');
+  v.fase = 'fugindo'; v.t0 = performance.now(); done();
 }
 function drawInvasor(t) {
-  if (!invasor) return;
-  const W = L.W, m = cellCenter(invasor.i), b = CACA_BICHO[invasor.tipo], pulo = Math.abs(Math.sin(t / 160)) * W * 0.03;
-  ctx.save(); if (invasor.dir < 0) { ctx.translate(m.x * 2, 0); ctx.scale(-1, 1); }
-  drawBicho(ctx, m.x, m.y + W * 0.05 - pulo, W / 100 * (invasor.tipo === 'javali' ? 0.95 : 1.4), b, t, true);
-  ctx.restore();
-  // contagem: o balão "!" fica mais vermelho perto de ele comer
-  const falta = Math.max(0, invasor.ate - Date.now()) / INVASAO_MS, by = m.y - W * 0.45 + Math.sin(t / 200) * 3, R = clamp(W * 0.12, 11, 18);
-  ctx.fillStyle = falta < 0.3 ? '#e0463a' : '#fff3c4'; ctx.strokeStyle = '#8f2a1e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(m.x, by, R, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = '#c8402f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(m.x, by, R + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * falta); ctx.stroke();
-  ctx.fillStyle = falta < 0.3 ? '#fff' : '#c8402f'; ctx.font = `900 ${Math.round(R * 1.3)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', m.x, by + 1); ctx.textBaseline = 'alphabetic';
-  if (hover && hover.kind === 'invasor') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(m.x, m.y + W * 0.05, W * 0.3, W * 0.1, 0, 0, 7); ctx.stroke(); }
-  hits.push({ kind: 'invasor', x: m.x, y: m.y - W * 0.12, r: Math.max(W * 0.34, 22) });
+  passoInvasao(t);
+  const v = invasor; if (!v) return;
+  const W = L.W, b = CACA_BICHO[v.tipo], esc = W / 100 * (v.tipo === 'javali' ? 0.95 : 1.4), dt = t - v.t0;
+  const lerp2 = (a, c, k) => [a[0] + (c[0] - a[0]) * k, a[1] + (c[1] - a[1]) * k];
+  let pos = [v.u, v.v], correndo = false, dir = v.dir, alfa = 1;
+  if (v.fase === 'chegando') { pos = lerp2(v.de, [v.u, v.v], Math.min(1, dt / 2200)); correndo = true; }
+  else if (v.fase === 'fugindo' || (v.fase === 'cachorro' && v.fugindo)) { const k = Math.min(1, (t - (v.fugindo || v.t0)) / 1600); pos = lerp2([v.u, v.v], [v.de[0], v.de[1] + 1], k); correndo = true; dir = -v.dir; alfa = 1 - Math.max(0, k - 0.7) / 0.3; }
+  const q = iso(pos[0], pos[1]), pulo = correndo ? Math.abs(Math.sin(t / 90)) * W * 0.03 : 0;
+  // comendo: a planta balança e voam pedacinhos de folha
+  if (v.fase === 'comendo') {
+    for (let k = 0; k < 6; k++) { const f = ((dt / 500) + k / 6) % 1; ctx.globalAlpha = 1 - f; ctx.fillStyle = k % 2 ? '#4fa83a' : '#8a6a3a'; ctx.beginPath(); ctx.ellipse(q.x + Math.cos(k * 1.9) * f * W * 0.3, q.y - W * 0.1 - f * W * 0.25, 3, 1.6, k, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+  ctx.save(); ctx.globalAlpha = alfa; if (dir < 0) { ctx.translate(q.x * 2, 0); ctx.scale(-1, 1); }
+  const mastiga = v.fase === 'comendo' ? Math.sin(t / 60) * W * 0.012 : 0;
+  drawBicho(ctx, q.x, q.y + W * 0.05 - pulo + mastiga, esc, b, t, correndo || v.fase === 'comendo');
+  ctx.restore(); ctx.globalAlpha = 1;
+  // armadilha: a gaiolinha cai em cima do bicho
+  if (v.fase === 'presa') {
+    const k = Math.min(1, dt / 250), gy = q.y - W * 0.6 * (1 - k), w = W * (v.tipo === 'javali' ? 0.42 : 0.3), h = w * 0.8;
+    ctx.strokeStyle = '#5a646c'; ctx.lineWidth = 2.2; ctx.fillStyle = 'rgba(90,100,108,.15)';
+    ctx.beginPath(); ctx.rect(q.x - w / 2, gy - h, w, h); ctx.fill(); ctx.stroke();
+    for (let x = 1; x < 6; x++) { ctx.beginPath(); ctx.moveTo(q.x - w / 2 + (w * x) / 6, gy - h); ctx.lineTo(q.x - w / 2 + (w * x) / 6, gy); ctx.stroke(); }
+    ctx.fillStyle = '#8a5a33'; ctx.fillRect(q.x - w / 2 - 2, gy - h - 4, w + 4, 5);
+    if (k >= 1) { ctx.font = `900 ${Math.round(W * 0.13)}px system-ui`; ctx.textAlign = 'center'; ctx.fillStyle = '#2f8a2f'; ctx.fillText('Pego! 🪤', q.x, gy - h - 10 - Math.min(10, (dt - 250) / 40)); }
+  }
+  // cachorro: sai da casinha correndo e vai atrás do bicho
+  if (v.fase === 'cachorro' && v.cao) {
+    const k = Math.min(1, dt / 1500), cp = v.fugindo ? lerp2([v.u - 0.3, v.v + 0.2], [v.de[0] - 0.4, v.de[1] + 1.2], Math.min(1, (t - v.fugindo) / 1700)) : lerp2(v.cao, [v.u - 0.3, v.v + 0.2], k);
+    const cq = iso(cp[0], cp[1]); const d = state.dogs.roca;
+    drawDog(cq.x, cq.y - Math.abs(Math.sin(t / 80)) * W * 0.03, W * 0.7, t, d ? d.raca : 'caramelo');
+    if (!v.fugindo || t - v.fugindo < 900) { ctx.font = `900 ${Math.round(W * 0.12)}px system-ui`; ctx.textAlign = 'center'; ctx.fillStyle = '#7a3a12'; ctx.fillText('Au! Au!', cq.x, cq.y - W * 0.55); }
+  }
+  // esperando você: balão "!" com a contagem dos 60 segundos
+  if (v.fase === 'espera') {
+    const falta = Math.max(0, v.limite - Date.now()) / INVASAO_ESPERA, by = q.y - W * 0.45 + Math.sin(t / 200) * 3, R = clamp(W * 0.12, 11, 18);
+    ctx.fillStyle = falta < 0.3 ? '#e0463a' : '#fff3c4'; ctx.strokeStyle = '#8f2a1e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q.x, by, R, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#c8402f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(q.x, by, R + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * falta); ctx.stroke();
+    ctx.fillStyle = falta < 0.3 ? '#fff' : '#c8402f'; ctx.font = `900 ${Math.round(R * 1.3)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', q.x, by + 1); ctx.textBaseline = 'alphabetic';
+    if (hover && hover.kind === 'invasor') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y + W * 0.05, W * 0.3, W * 0.1, 0, 0, 7); ctx.stroke(); }
+    hits.push({ kind: 'invasor', x: q.x, y: q.y - W * 0.12, r: Math.max(W * 0.34, 22) });
+  }
 }
-if (location.protocol === 'file:') window.__invadir = () => { state.invasaoProx = 1; invasaoTick(); return invasor; }; // só para testes
+// Alerta vermelho na tela inteira enquanto o bicho está na plantação (desenhado por cima de tudo).
+function drawAlertaInvasao(t) {
+  const v = invasor; if (!v || !['chegando', 'espera', 'comendo'].includes(v.fase)) return;
+  const pu = 0.5 + 0.5 * Math.sin(t / 180), cw = L.cw, ch = L.ch;
+  const g = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.35, cw / 2, ch / 2, Math.max(cw, ch) * 0.75);
+  g.addColorStop(0, 'rgba(220,30,20,0)'); g.addColorStop(1, `rgba(220,30,20,${0.25 + pu * 0.3})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
+  ctx.strokeStyle = `rgba(230,40,30,${0.5 + pu * 0.5})`; ctx.lineWidth = 8; ctx.strokeRect(4, 4, cw - 8, ch - 8);
+  const txt = v.fase === 'comendo' ? `${v.tipo === 'javali' ? '🐗 O javali' : '🐀 O rato'} está comendo a plantação!` : v.fase === 'espera' ? `⚠️ ${v.tipo === 'javali' ? 'JAVALI' : 'RATO'} NA PLANTAÇÃO! Toque nele para espantar` : `⚠️ ${v.tipo === 'javali' ? 'JAVALI' : 'RATO'} INVADINDO A ROÇA!`;
+  ctx.font = `900 ${Math.round(clamp(cw * 0.03, 15, 24))}px 'Baloo 2', system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(txt).width + 30, y = ch * (cw < 700 ? 0.3 : 0.26);
+  ctx.fillStyle = `rgba(200,30,20,${0.85 + pu * 0.15})`; ctx.beginPath(); ctx.roundRect(cw / 2 - w / 2, y - 20, w, 40, 12); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText(txt, cw / 2, y + 1); ctx.textBaseline = 'alphabetic';
+}
+// ---------- Armadilha de pragas: comprada na Loja › Itens. Fica na roça e pega um bicho por vez. ----------
+function comprarArmadilha() {
+  if (state.armadilha) return;
+  if (state.level < ARMADILHA.nivel) return toast(`A armadilha libera no nível ${ARMADILHA.nivel}.`);
+  if (state.coins < ARMADILHA.custo) return toast(`A armadilha custa ${ARMADILHA.custo.toLocaleString('pt-BR')} moedas.`, 'bad');
+  state.coins -= ARMADILHA.custo; state.armadilha = { pronta: 0 }; sfx('buy');
+  toast('🪤 Armadilha comprada! Ela fica perto da plantação e pega a próxima praga que aparecer (dá para mudar de lugar no Mover).', 'good'); done();
+}
+function drawArmadilha(x, y, W, pronta, t) {
+  const s = W / 100;
+  ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(x, y, 22 * s, 7 * s, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#8a5a33'; ctx.beginPath(); ctx.moveTo(x - 20 * s, y); ctx.lineTo(x + 20 * s, y); ctx.lineTo(x + 20 * s, y - 4 * s); ctx.lineTo(x - 20 * s, y - 4 * s); ctx.fill();
+  ctx.strokeStyle = '#5a646c'; ctx.lineWidth = 1.6 * s; ctx.fillStyle = 'rgba(90,100,108,.12)';
+  ctx.beginPath(); ctx.rect(x - 18 * s, y - 24 * s, 36 * s, 20 * s); ctx.fill(); ctx.stroke();
+  for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(x - 18 * s + k * 6 * s, y - 24 * s); ctx.lineTo(x - 18 * s + k * 6 * s, y - 4 * s); ctx.stroke(); }
+  // porta: aberta (pronta, com a iscazinha) ou fechada (recarregando)
+  if (pronta) { ctx.beginPath(); ctx.moveTo(x + 18 * s, y - 24 * s); ctx.lineTo(x + 30 * s, y - 32 * s); ctx.stroke(); ctx.fillStyle = '#f2c14e'; ctx.beginPath(); ctx.moveTo(x - 4 * s, y - 5 * s); ctx.lineTo(x + 4 * s, y - 5 * s); ctx.lineTo(x, y - 11 * s); ctx.fill(); }
+  else { ctx.fillStyle = 'rgba(40,40,40,.35)'; ctx.fillRect(x + 16 * s, y - 24 * s, 3 * s, 20 * s); }
+}
+if (location.protocol === 'file:') window.__invadir = () => { invasaoTick(true); return invasor; }; // só para testes
 
 // ============================================================
 // Trevos 🍀: a moeda verde. Não se compra: ganha resgatando peixes novos (no Livro de peixes),

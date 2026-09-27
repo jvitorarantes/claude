@@ -389,6 +389,9 @@
     weed: t => { noise(t, 0.2, 'bandpass', 400, 2200, 0.2, 1.5); blip(t + 0.17, 'sine', 400, 800, 0.06, 0.15); },
     fert: t => { noise(t, 0.3, 'bandpass', 800, 3000, 0.1); for (let k = 0; k < 6; k++) blip(t + 0.05 + k * 0.05, 'sine', 1500 + k * 250, 2200 + k * 250, 0.07, 0.07); },
     // caçada: tiro de espingarda (estouro grave) e o estalo do estilingue
+    // alerta de praga na plantação: sirene de dois tons
+    alarme: t => { for (let k = 0; k < 3; k++) { blip(t + k * 0.36, 'square', 880, 880, 0.16, 0.07); blip(t + k * 0.36 + 0.18, 'square', 660, 660, 0.16, 0.07); } },
+    armadilha: t => { blip(t, 'square', 300, 90, 0.12, 0.2); noise(t, 0.15, 'highpass', 3000, 1200, 0.2); },
     tiro: t => { noise(t, 0.4, 'lowpass', 3200, 180, 0.55); blip(t, 'sine', 140, 40, 0.3, 0.5); },
     estilingue: t => { blip(t, 'triangle', 280, 950, 0.09, 0.16); noise(t + 0.02, 0.07, 'highpass', 3000, 5200, 0.06); },
     uivo: t => voz(t, { f: [[0, 300], [0.4, 700], [1.2, 420]], dur: 1.3, vel: 0.22, filtro: 1200, q: 2, vib: 6, vibD: 25 }),
