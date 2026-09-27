@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="70">
-<script src="firebase-config.js?v=70"></script>
+<meta name="rf-version" content="71">
+<script src="firebase-config.js?v=71"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -409,6 +409,13 @@
   .iscabtn small { font-size: 11px; font-weight: 800; color: #2f2a1f; }
   .iscabtn[aria-pressed="true"] { border-color: #e0a800; background: #fff4c8; box-shadow: 0 0 0 2px #f2c14e; }
   .iscabtn:disabled { opacity: .45; cursor: default; }
+  .pontos { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px; scrollbar-width: thin; }
+  .pontobtn { flex: 0 0 auto; display: grid; justify-items: center; gap: 1px; padding: 5px 9px; border-radius: 12px; border: 2px solid var(--wood-3); background: var(--card); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; line-height: 1.2; }
+  .pontobtn b { font-size: 12.5px; white-space: nowrap; } .pontobtn small { font-size: 11px; font-weight: 800; color: #4f7a2a; white-space: nowrap; }
+  .pontobtn.descansa small { color: #9a6a2a; } .pontobtn.loja { border-style: dashed; } .pontobtn.loja small { color: #7a4a22; }
+  .pontobtn[aria-pressed="true"] { border-color: #e0a800; background: #fff4c8; box-shadow: 0 0 0 2px #f2c14e; }
+  .pontobtn:disabled { opacity: .5; cursor: default; }
+  .btn.tarrafa { line-height: 1.15; } .btn.tarrafa small { font-size: 11px; font-weight: 700; }
   .pescadica { margin: 0 14px; text-align: center; font-size: 12.5px; color: var(--muted); }
   .pescabar.iscas { padding-bottom: 4px; }
   .pescamsg { margin: 8px 14px 0; text-align: center; font-weight: 800; min-height: 1.4em; }
@@ -722,10 +729,11 @@
 <div class="modal" id="pesca" hidden role="dialog" aria-modal="true" aria-labelledby="pescaTitle">
   <div class="modal-card pescacard">
     <div class="modal-head"><h2 id="pescaTitle">Pescaria 🎣</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="pontos" id="pescaPontos" role="radiogroup" aria-label="Pontos de pesca"></div>
     <canvas class="pescacv" id="pescaCv" aria-label="Lago"></canvas>
     <div class="pescalivro" id="pescaLivro" hidden></div>
     <p class="pescamsg" id="pescaMsg" role="status"></p>
-    <div class="pescabar"><button class="btn gold" type="button" id="pescaBtn">Lançar a linha</button></div>
+    <div class="pescabar"><button class="btn gold" type="button" id="pescaBtn">Lançar a linha</button><button class="btn ghost tarrafa" type="button" id="pescaTarrafa">🕸️ Tarrafa</button></div>
     <div class="pescabar iscas"><span>Isca:</span><span class="iscasel" id="pescaIscas" role="radiogroup" aria-label="Isca"></span></div>
     <p class="pescadica" id="pescaDica"></p>
     <div class="pescabar"><button class="btn ghost" type="button" id="pescaComprar">Comprar</button><button class="btn" type="button" id="pescaLivroBtn">📖 Livro de peixes</button></div>
@@ -817,8 +825,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=70"></script>
-<script src="js/cloud.js?v=70"></script>
-<script src="js/game.js?v=70"></script>
+<script src="js/audio.js?v=71"></script>
+<script src="js/cloud.js?v=71"></script>
+<script src="js/game.js?v=71"></script>
 </body>
 </html>
