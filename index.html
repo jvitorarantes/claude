@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="106">
-<script src="firebase-config.js?v=106"></script>
+<meta name="rf-version" content="107">
+<script src="firebase-config.js?v=107"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -629,6 +629,11 @@
   @keyframes socorro{50%{box-shadow:0 0 0 4px rgba(255,120,70,.35)}}
   .hint.pedeajuda{background:#fff0e0;border:2px solid #e0772a;border-radius:10px;padding:8px 10px;color:#7a3a12;font-weight:700}
   #ctxMenu .meta{font-size:12px;color:#7a5a3a}
+  .newsbar{display:flex;justify-content:flex-end;margin:-2px 0 6px}
+  .news > div{position:relative;padding-right:30px}
+  .newsdel{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(122,74,34,.12);color:#7a4a22;font-weight:900;font-size:11px;cursor:pointer;line-height:22px;padding:0}
+  .newsdel:hover{background:#e0463a;color:#fff}
+  .chatlimpar{font-size:12px;padding:3px 10px;margin-right:6px}
 </style>
 </head>
 <body>
@@ -770,7 +775,7 @@
 
 <div class="modal" id="chat" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
   <div class="modal-card chatcard">
-    <div class="modal-head"><h2 id="chatTitle">Conversa</h2><span class="status" id="chatStatus"></span><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-head"><h2 id="chatTitle">Conversa</h2><span class="status" id="chatStatus"></span><button class="btn ghost chatlimpar" type="button" id="chatLimpar" title="Apagar esta conversa da sua caixa">🧹 Limpar</button><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <p class="chataviso" id="chatAviso" hidden>🔔 Quer saber quando chegar mensagem com o jogo fechado? Ligue em <b>⚙️ › Notificações</b> neste aparelho.</p>
     <div class="chatlista" id="chatLista" role="log" aria-live="polite"></div>
     <div class="chatrapidas" id="chatRapidas"></div>
@@ -884,8 +889,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=106"></script>
-<script src="js/cloud.js?v=106"></script>
-<script src="js/game.js?v=106"></script>
+<script src="js/audio.js?v=107"></script>
+<script src="js/cloud.js?v=107"></script>
+<script src="js/game.js?v=107"></script>
 </body>
 </html>

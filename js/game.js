@@ -363,7 +363,7 @@ function migrate(s) {
   s.dogs = {};
   for (const slot of ['roca', 'animais']) { const d = dogs[slot]; s.dogs[slot] = d && DOG[d.raca] ? d : null; }
   s.dogFood = Math.max(0, Number(s.dogFood) || 0);
-  s.news = Array.isArray(s.news) ? s.news.slice(0, 30) : [];
+  s.news = Array.isArray(s.news) ? s.news.filter(n => n && n.at > Date.now() - NEWS_DIAS * 86400e3).slice(0, 30) : [];
   s.newsSeen = Number(s.newsSeen) || 0;
   s.limits = s.limits && typeof s.limits === 'object' ? s.limits : {};
   if (s.barn && s.barn.trufa) { s.barn.bacon = (s.barn.bacon || 0) + s.barn.trufa; delete s.barn.trufa; } // a trufa virou bacon
@@ -947,6 +947,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
+  { v: 107, txt: 'Correio: agora dá para apagar cada carta (✕) ou todas de uma vez, e as cartas somem sozinhas depois de 7 dias. Na conversa com amigos tem o botão 🧹 Limpar.' },
   { v: 106, txt: 'Canteiros se mudam como o resto: segure o dedo (ou botão direito) em cima de um e escolha Mover. A placa de terras à venda agora fica no lugar dela, e também dá para mudar de lugar.' },
   { v: 105, txt: 'Pomar com limite: até 4 de cada arbusto e 3 de cada árvore (contando as do inventário). Derrubou uma seca? Libera para comprar outra.' },
   { v: 104, txt: 'Pomar ainda mais barato: enxada 50, motosserra 100 e frutíferas que rendem mais de 2,5× o preço. E chegou o 🌳 Domínio do pomar: colher frutas (e ajudar as dos amigos) sobe o nível, que dá mais frutas por colheita, mais colheitas antes de secar e trevos para resgatar.' },
@@ -991,9 +992,12 @@ function checarNovidades() {
   state.novVisto = ultima; save(); renderTabs();
   setTimeout(() => toast(`📬 Chegou ${novas.length > 1 ? `${novas.length} cartas novas` : 'uma carta nova'} no correio: novidades do jogo!`, 'good'), 2500);
 }
+// Cartas do correio ficam no máximo 7 dias (e as 30 mais novas); dá para apagar antes.
+const NEWS_DIAS = 7;
+function podarNews() { const lim = Date.now() - NEWS_DIAS * 86400e3; state.news = state.news.filter(n => n.at > lim).slice(0, 30); }
 function addNews(msg) {
   state.news.unshift({ at: Date.now(), msg });
-  state.news.length = Math.min(state.news.length, 30);
+  podarNews();
   renderTabs();
 }
 function tickLife() {
@@ -4338,11 +4342,13 @@ function renderPane() {
     html += `<p class="hint">Pragas comem parte da colheita enquanto ficam lá. Terra seca faz a planta crescer mais devagar. Nunca acontecem os dois juntos. Cada planta dá XP em até ${XP_CAP} colheitas por dia.</p>`;
   } else if (tab === 'correio') {
     // Caixa de correio: as novidades da sua roça (visitas, presentes, cachorro, animais…)
-    html += `<p class="hint">Tudo o que aconteceu na sua roça (visitas dos amigos, presentes, o que o cachorro fez, recados da vila) e as novidades do jogo 📰.</p>`;
+    podarNews();
+    html += `<p class="hint">Tudo o que aconteceu na sua roça (visitas dos amigos, presentes, o que o cachorro fez, recados da vila) e as novidades do jogo 📰. As cartas somem sozinhas depois de ${NEWS_DIAS} dias.</p>`;
     if (!state.news.length) html += `<div class="empty">A caixa de correio está vazia.</div>`;
     else {
-      html += `<div class="news">${state.news.slice(0, 30).map(n =>
-        `<div class="${n.at > state.newsSeen ? 'new' : ''}"><time>${quando(n.at)}</time>${esc(n.msg)}</div>`).join('')}</div>`;
+      html += `<div class="newsbar"><button class="btn ghost" type="button" data-news-limpar="1">🗑️ Apagar todas</button></div>`;
+      html += `<div class="news">${state.news.map(n =>
+        `<div class="${n.at > state.newsSeen ? 'new' : ''}"><button class="newsdel" type="button" data-news-del="${n.at}" aria-label="Apagar esta carta" title="Apagar">✕</button><time>${quando(n.at)}</time>${esc(n.msg)}</div>`).join('')}</div>`;
       if (state.news[0].at > state.newsSeen) { state.newsSeen = state.news[0].at; setTimeout(renderTabs, 0); save(); }
     }
   } else if (tab === 'amigos') {
@@ -4448,6 +4454,8 @@ $('#pane').addEventListener('click', e => {
   if (d.trevoTodos) { resgatarTodosPeixes(); return renderPane(); }
   if (d.trevoDominio) { resgatarDominio(); return renderPane(); }
   if (d.trevoPomar) { resgatarPomar(); return renderPane(); }
+  if (d.newsDel) { state.news = state.news.filter(n => String(n.at) !== d.newsDel); sfx('click'); save(); renderTabs(); return renderPane(); }
+  if (d.newsLimpar) return confirmTwice('news-limpar', 'Apagar todas as cartas do correio? Toque de novo para confirmar.', () => { state.news = []; sfx('water'); toast('Correio limpo! 📭', 'good'); save(); renderTabs(); renderPane(); });
   if (d.trevoComprar) return comprarTrevoItem(d.trevoComprar);
   if (d.abrirTrevos) { missSeg = 'trevos'; return openPanel('missoes'); }
   if (d.irLojaTrevo) return openPanel('loja', 'trevo');
@@ -5526,6 +5534,17 @@ function renderChatStatus() {
   const st = statusAmigo(chatCom); el.textContent = st.txt; el.className = 'status' + (st.on ? ' on' : '');
 }
 function fecharChat() { $('#chat').hidden = true; chatCom = null; }
+// Limpa a conversa só da sua caixa (o amigo continua com a cópia dele).
+function limparChat() {
+  if (!chatCom || !user) return;
+  const com = chatCom, conversa = chatMsgs.filter(m => (m.de === user.uid && m.para === com) || (m.de === com && m.para === user.uid));
+  if (!conversa.length) return toast('Não tem mensagens para limpar.');
+  confirmTwice('chat-limpar:' + com, 'Apagar esta conversa da sua caixa? (O amigo continua com a dele.) Toque de novo para confirmar.', async () => {
+    await Promise.all(conversa.map(m => Cloud.apagarMsg(user.uid, m.id).catch(e => console.warn('apagar msg:', e))));
+    toast('Conversa limpa! 🧹', 'good'); sfx('water');
+  });
+}
+$('#chatLimpar')?.addEventListener('click', limparChat);
 function renderChat() {
   const box = $('#chatLista'); if (!box || !chatCom) return;
   const conversa = chatMsgs.filter(m => (m.de === user.uid && m.para === chatCom) || (m.de === chatCom && m.para === user.uid));
