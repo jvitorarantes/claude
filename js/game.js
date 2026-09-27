@@ -917,6 +917,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 78, txt: 'Peixes de Goiás 🐟: chegaram 15 espécies novas, como cará, piau, mandi, curimbatá, cascudo, piranha, corvina, matrinxã, peixe-cachorra, aruanã, barbado, tambaqui, pirarara, jaú e piraíba. Alguns só aparecem nos rios grandes: veja no 📖 Livro de peixes onde cada um morde.' },
   { v: 77, txt: 'Mais pescaria: agora cada ponto de pesca dá 3 pescarias de vara antes de descansar (a tarrafa continua igual).' },
   { v: 75, txt: 'Domínio de pesca 🎖️: cada peixe pego dá pontos (os raros valem mais). A cada nível de domínio, a espera da vara e da tarrafa cai 5%, até 45% no nível 10. Os peixes que você já pegou contam!' },
   { v: 74, txt: 'Os pontos de pesca ganharam nomes de verdade: Córrego Cascavel (nível 5), Rio Meia Ponte (10), Ribeirão João Leite (15), Rio dos Bois (20), Rio Araguaia (25) e Rio Amazonas (30), cada um com seu cenário.' },
@@ -2522,7 +2523,7 @@ function drawBug(x, y, s, t, k) {
 // Produtos dos animais, centrados em (x, y); s ≈ 1/10 do tamanho.
 function drawProduct(id, x, y, s) {
   if (RECEITA[id]) return drawGood(id, x, y, s);
-  if (PEIXE[id]) return drawPeixe(ctx, x, y, s * 0.85, PEIXE[id]);
+  if (PEIXE[id]) return drawPeixe(ctx, x, y, s * 0.85 * cabePeixe(PEIXE[id]), PEIXE[id]);
   ctx.lineWidth = Math.max(1, 0.6 * s);
   if (id === 'ovo') {
     ctx.fillStyle = '#fff6df'; ctx.strokeStyle = '#cdb88c';
@@ -6002,7 +6003,26 @@ const PEIXES = [
   { id: 'pintado',  nome: 'Pintado',    preco: 220,  raro: 'raro',     peso: 6,   nivel: 9,  iscas: ['camarao'], cor: ['#c7c1b3', '#4a4a4a'], tam: 1.1, pintas: true },
   { id: 'dourado',  nome: 'Dourado',    preco: 400,  raro: 'épico',    peso: 3,   nivel: 12, iscas: ['camarao', 'artificial'], cor: ['#f2b705', '#d9822b'], tam: 1.1 },
   { id: 'pirarucu', nome: 'Pirarucu',   preco: 1000, raro: 'lendário', peso: 1,   nivel: 18, iscas: ['artificial'], cor: ['#6b5a4a', '#c8402f'], tam: 1.3 },
+  // Peixes de Goiás (bacias do Araguaia, Tocantins e Paranaíba). "pontos" = só morde nesses pontos de pesca.
+  { id: 'acara',    nome: 'Cará',        preco: 35,   raro: 'comum',    peso: 22,  nivel: 1,  iscas: ['minhoca'], cor: ['#b9a86a', '#7a6a3a'], tam: 0.7, alto: true, listras: true },
+  { id: 'piau',     nome: 'Piau',        preco: 45,   raro: 'comum',    peso: 20,  nivel: 2,  iscas: ['minhoca', 'milho'], cor: ['#c9c2a0', '#9a8a5a'], tam: 0.85, pintas: true },
+  { id: 'mandi',    nome: 'Mandi',       preco: 40,   raro: 'comum',    peso: 18,  nivel: 2,  iscas: ['minhoca'], cor: ['#d9c79a', '#a88a4a'], tam: 0.8, bigode: true },
+  { id: 'curimba',  nome: 'Curimbatá',   preco: 55,   raro: 'comum',    peso: 16,  nivel: 3,  iscas: ['milho'], cor: ['#b8bcc0', '#8a6a4a'], tam: 0.95 },
+  { id: 'cascudo',  nome: 'Cascudo',     preco: 80,   raro: 'incomum',  peso: 10,  nivel: 4,  iscas: ['minhoca', 'milho'], cor: ['#5a5040', '#3a3228'], tam: 0.85, armadura: true, pintas: true },
+  { id: 'piranha',  nome: 'Piranha',     preco: 85,   raro: 'incomum',  peso: 11,  nivel: 5,  iscas: ['minhoca', 'camarao'], cor: ['#9aa0a8', '#6a707a'], tam: 0.8, alto: true, dentes: true, barriga: '#e0503a' },
+  { id: 'corvina',  nome: 'Corvina',     preco: 110,  raro: 'incomum',  peso: 9,   nivel: 7,  iscas: ['camarao'], cor: ['#d9d9cf', '#a8a898'], tam: 1 },
+  { id: 'matrinxa', nome: 'Matrinxã',    preco: 120,  raro: 'incomum',  peso: 8,   nivel: 8,  iscas: ['milho'], cor: ['#c8ccd2', '#3a3a3a'], tam: 1, barriga: '#e8c070' },
+  { id: 'cachorra', nome: 'Peixe-cachorra', preco: 190, raro: 'raro',   peso: 6,   nivel: 10, iscas: ['camarao', 'artificial'], cor: ['#d0d4d8', '#e0a040'], tam: 1, longo: true, dentes: true, pontos: ['represa', 'rio', 'lagoa', 'araguaia', 'amazonas'] },
+  { id: 'aruana',   nome: 'Aruanã',      preco: 240,  raro: 'raro',     peso: 5,   nivel: 11, iscas: ['artificial'], cor: ['#c8c090', '#8a8a5a'], tam: 1.05, longo: true, pontos: ['araguaia', 'amazonas'] },
+  { id: 'barbado',  nome: 'Barbado',     preco: 260,  raro: 'raro',     peso: 5,   nivel: 13, iscas: ['camarao'], cor: ['#b0a898', '#7a7060'], tam: 1.05, bigode: true, pontos: ['rio', 'lagoa', 'araguaia', 'amazonas'] },
+  { id: 'tambaqui', nome: 'Tambaqui',    preco: 450,  raro: 'épico',    peso: 3,   nivel: 15, iscas: ['milho'], cor: ['#6a6a50', '#2a2a22'], tam: 1.15, alto: true, barriga: '#d8c060', pontos: ['araguaia', 'amazonas'] },
+  { id: 'pirarara', nome: 'Pirarara',    preco: 600,  raro: 'épico',    peso: 2,   nivel: 20, iscas: ['camarao'], cor: ['#4a4a44', '#e0502a'], tam: 1.2, bigode: true, barriga: '#e8d8a0', pontos: ['lagoa', 'araguaia', 'amazonas'] },
+  { id: 'jau',      nome: 'Jaú',         preco: 1200, raro: 'lendário', peso: 1,   nivel: 24, iscas: ['camarao', 'artificial'], cor: ['#7a6a4a', '#5a4a30'], tam: 1.3, bigode: true, pintas: true, pontos: ['lagoa', 'araguaia', 'amazonas'] },
+  { id: 'piraiba',  nome: 'Piraíba',     preco: 1500, raro: 'lendário', peso: 0.7, nivel: 28, iscas: ['artificial'], cor: ['#8a8e92', '#5a5e62'], tam: 1.4, bigode: true, pontos: ['araguaia', 'amazonas'] },
 ];
+// Peixe grande ou comprido encolhe um pouco para caber no ícone.
+const cabePeixe = p => Math.min(1, 0.95 / ((p.tam || 1) * (p.longo ? 1.3 : 1)));
+const peixeNoPonto = (p, ponto) => !p.pontos || p.pontos.includes(ponto);
 const PEIXE = Object.fromEntries(PEIXES.map(p => [p.id, p]));
 for (const p of PEIXES) PRODUCT[p.id] = { id: p.id, nome: p.nome, preco: p.preco, peixe: true };
 const COR_RARO = { lixo: '#8a8672', comum: '#6a8a4a', incomum: '#3f8ac8', raro: '#8a4fc8', 'épico': '#d9822b', 'lendário': '#c8402f' };
@@ -6029,11 +6049,16 @@ function drawPeixe(g, x, y, s, p) {
   } else if (p.id === 'lata') {
     g.fillStyle = '#9aa3aa'; g.fillRect(-4, -7, 8, 13); g.fillStyle = '#c8402f'; g.fillRect(-4, -3, 8, 5); g.fillStyle = '#6b7780'; g.fillRect(-4, -8, 8, 1.5);
   } else {
-    const k = p.tam || 1, a = p.alto ? 1.35 : 1;
+    const k = p.tam || 1, a = p.alto ? 1.35 : 1, L = p.longo ? 1.3 : 1;
+    if (p.longo) { g.scale(L, 1 / 1.12); }
     g.fillStyle = p.cor[1]; g.beginPath(); g.moveTo(-8 * k, 0); g.lineTo(-13 * k, -5 * k * a); g.lineTo(-13 * k, 5 * k * a); g.closePath(); g.fill(); // rabo
     g.beginPath(); g.moveTo(-2 * k, -4 * k * a); g.quadraticCurveTo(1 * k, -8 * k * a, 4 * k, -4 * k * a); g.fill(); // barbatana
     g.fillStyle = p.cor[0]; g.beginPath(); g.ellipse(0, 0, 10 * k, 4.6 * k * a, 0, 0, 7); g.fill();
+    if (p.barriga) { g.save(); g.beginPath(); g.ellipse(0, 0, 10 * k, 4.6 * k * a, 0, 0, 7); g.clip(); g.fillStyle = p.barriga; g.beginPath(); g.ellipse(1 * k, 3.6 * k * a, 9 * k, 2.6 * k * a, 0, 0, 7); g.fill(); g.restore(); }
     g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(1 * k, 1.8 * k * a, 7 * k, 1.8 * k * a, 0, 0, 7); g.fill();
+    if (p.armadura) { g.strokeStyle = 'rgba(20,16,10,.5)'; g.lineWidth = 0.6 * k; for (const lx of [-6, -3, 0, 3]) { g.beginPath(); g.arc(lx * k, 0, 4 * k, -1.1, 1.1); g.stroke(); } }
+    if (p.bigode) { g.strokeStyle = 'rgba(40,30,20,.85)'; g.lineWidth = 0.55 * k; for (const [dy, cx, cy] of [[-0.5, 13, -3], [0.8, 13.5, 4], [1.6, 11.5, 6.5]]) { g.beginPath(); g.moveTo(9.3 * k, dy * k); g.quadraticCurveTo(cx * k, cy * k, (cx - 1) * k, (cy + 2.5) * k); g.stroke(); } }
+    if (p.dentes) { g.fillStyle = '#fff'; for (const tx of [7.2, 8.2, 9.1]) { g.beginPath(); g.moveTo(tx * k, 1.2 * k); g.lineTo((tx + 0.4) * k, 2.4 * k); g.lineTo((tx + 0.8) * k, 1.2 * k); g.fill(); } g.strokeStyle = 'rgba(40,20,20,.6)'; g.lineWidth = 0.5 * k; g.beginPath(); g.moveTo(6.5 * k, 1.2 * k); g.lineTo(10 * k, 1 * k); g.stroke(); }
     if (p.listras) { g.fillStyle = 'rgba(40,60,20,.55)'; for (const lx of [-4, 0, 4]) g.fillRect(lx * k, -4 * k, 1.4 * k, 7 * k); }
     if (p.pintas) { g.fillStyle = 'rgba(30,30,30,.6)'; for (const [px, py] of [[-4, -1], [-1, -2], [2, -1], [-2, 1], [4, 0]]) { g.beginPath(); g.arc(px * k, py * k, 0.8 * k, 0, 7); g.fill(); } }
     g.fillStyle = '#fff'; g.beginPath(); g.arc(6 * k, -1.2 * k, 1.5 * k, 0, 7); g.fill();
@@ -6109,8 +6134,8 @@ function comprarPonto(id) {
     toast(`${d.emoji} ${d.nome} é seu! Peixe raro morde mais por lá.`, 'good'); done(); renderPesca();
   });
 }
-function sortearPeixe(isca, sorte = 1, semLixo = false) {
-  let ok = PEIXES.filter(p => p.nivel <= state.level && (!isca || p.iscas.includes(isca)) && !(semLixo && p.lixo));
+function sortearPeixe(isca, sorte = 1, semLixo = false, ponto = 'casa') {
+  let ok = PEIXES.filter(p => p.nivel <= state.level && (!isca || p.iscas.includes(isca)) && !(semLixo && p.lixo) && peixeNoPonto(p, ponto));
   if (!ok.length) ok = PEIXES.filter(p => p.id === 'lambari');
   const peso = p => p.lixo ? p.peso / sorte : ['raro', 'épico', 'lendário'].includes(p.raro) ? p.peso * sorte : p.raro === 'incomum' ? p.peso * Math.sqrt(sorte) : p.peso;
   const tot = ok.reduce((t, p) => t + peso(p), 0);
@@ -6139,7 +6164,7 @@ function jogarTarrafa() {
   if (!pesca || pesca.fase === 'esperando' || pesca.fase === 'fisgou' || pesca.fase === 'tarrafa') return;
   if (faltaTarrafa()) return toast(`A tarrafa está secando: dá para jogar de novo em ${fmt(faltaTarrafa() / 1000)}.`);
   const sorte = PONTO[pontoSel()].sorte;
-  const peixes = Array.from({ length: TARRAFA_N }, () => sortearPeixe(null, sorte, true));
+  const peixes = Array.from({ length: TARRAFA_N }, () => sortearPeixe(null, sorte, true, pontoSel()));
   state.tarrafaEm = Date.now() + esperaTarrafa(); save();
   if (pescaLivro) livroVisto(); pescaLivro = false;
   pesca = { fase: 'tarrafa', t0: performance.now(), peixes };
@@ -6228,7 +6253,7 @@ function renderPesca() {
   const d = ISCA[sel], cb = $('#pescaComprar');
   cb.hidden = !!d.doCeleiro;
   if (!d.doCeleiro) { setHtml(cb, `Comprar ${d.pacote} ${d.plural} · ${moeda(d.custo)}`); cb.disabled = state.coins < d.custo; }
-  $('#pescaDica').textContent = `${d.emoji} ${d.nome}${d.doCeleiro ? ' (do celeiro)' : ''}: atrai ${PEIXES.filter(p => !p.lixo && p.iscas.includes(sel)).map(p => p.nivel > state.level ? '???' : p.nome + (state.col[p.id] ? '' : ' ✨')).join(', ')}.${PEIXES.some(p => !p.lixo && p.iscas.includes(sel) && p.nivel <= state.level && !state.col[p.id]) ? ' (✨ = nunca pegou)' : ''}`;
+  $('#pescaDica').textContent = `${d.emoji} ${d.nome}${d.doCeleiro ? ' (do celeiro)' : ''}: atrai ${PEIXES.filter(p => !p.lixo && p.iscas.includes(sel) && peixeNoPonto(p, pt.id)).map(p => p.nivel > state.level ? '???' : p.nome + (state.col[p.id] ? '' : ' ✨')).join(', ')}.${PEIXES.some(p => !p.lixo && p.iscas.includes(sel) && peixeNoPonto(p, pt.id) && p.nivel <= state.level && !state.col[p.id]) ? ' (✨ = nunca pegou)' : ''}`;
   $('#pescaLivro').hidden = !pescaLivro; $('#pescaCv').hidden = pescaLivro;
   const nn = (state.peixesNovos || []).length;
   $('#pescaLivroBtn').textContent = pescaLivro ? '🎣 Voltar a pescar' : `📖 Livro de peixes${nn ? ` · ✨ ${nn} novo${nn > 1 ? 's' : ''}` : ''}`;
@@ -6236,7 +6261,7 @@ function renderPesca() {
 }
 // Livro de peixes: o que já pegou (com figura), o que falta (sombra), raridade, quantos e do que precisa.
 let pescaLivro = false;
-const peixeSombra = id => makeIcon('ps:' + id, () => { ctx.globalAlpha = 0.85; drawPeixe(ctx, 48, 48, 4.7, Object.assign({}, PEIXE[id], { cor: ['#5b6470', '#4a525c'], listras: false, pintas: false })); ctx.globalAlpha = 1; });
+const peixeSombra = id => makeIcon('ps:' + id, () => { ctx.globalAlpha = 0.85; drawPeixe(ctx, 48, 48, 4.7 * cabePeixe(PEIXE[id]), Object.assign({}, PEIXE[id], { cor: ['#5b6470', '#4a525c'], listras: false, pintas: false, barriga: false, armadura: false })); ctx.globalAlpha = 1; });
 function livroPeixes() {
   const lista = PEIXES.filter(p => !p.lixo), pegos = lista.filter(p => state.col[p.id]).length;
   return `<p class="hint" style="margin:0 0 8px">Você já pegou <b>${pegos} de ${lista.length}</b> peixes.</p><div class="livro">${lista.map(p => {
@@ -6244,7 +6269,7 @@ function livroPeixes() {
     return `<div class="lvcard ${n ? '' : 'falta'}">${novo ? '<span class="lvnovo">NOVO!</span>' : ''}<img alt="" src="${n ? productIcon(p.id) : peixeSombra(p.id)}">
       <b>${n ? esc(p.nome) : '???'}</b><span class="raro" style="color:${COR_RARO[p.raro]}">${p.raro}</span>
       <small>${n ? `Pegou ${n}× · vale ${p.preco}` : 'Ainda não pegou'}</small>
-      <small class="req">Nível ${p.nivel}${p.nivel > state.level ? ' 🔒' : ''} · ${p.iscas.map(i => ISCA[i].emoji).join(' ')}</small></div>`;
+      <small class="req">Nível ${p.nivel}${p.nivel > state.level ? ' 🔒' : ''} · ${p.iscas.map(i => ISCA[i].emoji).join(' ')}</small>${p.pontos ? `<small class="req">📍 ${p.pontos.map(id => PONTO[id].nome).slice(0, 2).join(', ')}${p.pontos.length > 2 ? '…' : ''}</small>` : ''}</div>`;
   }).join('')}</div>`;
 }
 function desenharPesca(t) {
@@ -6254,7 +6279,7 @@ function desenharPesca(t) {
   if (c.width !== Math.round(cw * dpr)) { c.width = Math.round(cw * dpr); c.height = Math.round(ch * dpr); }
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   // fases que mudam com o tempo
-  if (pesca.fase === 'esperando' && t >= pesca.mordida) { pesca = { fase: 'fisgou', t0: t, ponto: pesca.ponto, peixe: sortearPeixe(pesca.isca, PONTO[pesca.ponto || 'casa'].sorte) }; pesca.janela = { comum: 950, lixo: 1000, incomum: 850, raro: 720, 'épico': 620, 'lendário': 520 }[pesca.peixe.raro]; sfx('water'); renderPesca(); }
+  if (pesca.fase === 'esperando' && t >= pesca.mordida) { pesca = { fase: 'fisgou', t0: t, ponto: pesca.ponto, peixe: sortearPeixe(pesca.isca, PONTO[pesca.ponto || 'casa'].sorte, false, pesca.ponto || 'casa') }; pesca.janela = { comum: 950, lixo: 1000, incomum: 850, raro: 720, 'épico': 620, 'lendário': 520 }[pesca.peixe.raro]; sfx('water'); renderPesca(); }
   if (pesca.fase === 'fisgou' && t - pesca.t0 > pesca.janela) { pesca = { fase: 'resultado', t0: t, msg: 'Ah, escapou… tente de novo!' }; renderPesca(); }
   if (pesca.fase === 'tarrafa' && t - pesca.t0 > 2200) recolherTarrafa();
   if (!pescaRelogio || t - pescaRelogio > 1000) { pescaRelogio = t; renderPesca(); } // contagem regressiva dos pontos e da tarrafa
