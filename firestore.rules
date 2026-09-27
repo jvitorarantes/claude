@@ -32,6 +32,12 @@ service cloud.firestore {
         allow read, delete: if signedIn() && me() == uid;
       }
 
+      // Cópias de segurança da roça (uma por dia). Só o dono.
+      match /backups/{dia} {
+        allow read, delete: if signedIn() && me() == uid;
+        allow create, update: if signedIn() && me() == uid && request.resource.data.size() < 8;
+      }
+
       // Lista oficial de amigos: só o dono escreve (ao virar amigo ou ao Excluir).
       // O dono e o próprio amigo podem ler (para cada um confirmar que a amizade continua).
       match /amigos/{amigoUid} {
@@ -48,6 +54,20 @@ service cloud.firestore {
                               && request.resource.size() < 2000;
         allow read, delete: if signedIn() && (me() == uid || me() == fromUid);
       }
+    }
+
+    // Notificações: cada um guarda os próprios aparelhos (tokens), preferências e a agenda.
+    match /push/{uid} {
+      allow read, delete: if signedIn() && me() == uid;
+      allow create, update: if signedIn() && me() == uid && request.resource.data.size() < 12;
+    }
+    // Avisos para outra pessoa (visita, presente, pedido de amizade). Ninguém lê pelo jogo:
+    // o programinha de notificações entrega e apaga.
+    match /avisos/{id} {
+      allow create: if signedIn() && request.resource.data.de == me()
+                    && request.resource.data.para is string && request.resource.data.para != me()
+                    && request.resource.data.txt is string && request.resource.data.txt.size() < 200
+                    && request.resource.data.size() < 8;
     }
 
     // Códigos de amigo (6 letras) apontando para o jogador. Não podem ser trocados depois.

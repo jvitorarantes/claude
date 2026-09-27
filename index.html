@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="45">
-<script src="firebase-config.js?v=45"></script>
+<meta name="rf-version" content="46">
+<script src="firebase-config.js?v=46"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -695,6 +695,10 @@
       <div class="avcfg" id="avatarCfg"></div>
     </section>
     <section>
+      <h3>Notificações</h3>
+      <div id="pushCfg"></div>
+    </section>
+    <section>
       <h3>Música</h3>
       <div class="setrow"><label for="optMusic">Tocar música</label><input type="checkbox" class="switch" id="optMusic"></div>
       <div class="setrow"><label for="volMusic">Volume</label><input type="range" id="volMusic" min="0" max="100" step="5"><output id="volMusicOut" for="volMusic"></output></div>
@@ -715,6 +719,12 @@
       <p class="hint" style="margin:0;color:var(--muted);font-size:13px">Automático segue o relógio: de noite, a roça escurece. Na roça, as teclas 1 a 7 trocam de ferramenta.</p>
     </section>
     <section>
+      <h3>Cópias de segurança</h3>
+      <p class="hint" style="margin:0 0 6px;color:var(--muted);font-size:13px">Todo dia o jogo guarda uma cópia da sua roça na nuvem (as últimas 14). Se algo der errado, dá para voltar para uma delas.</p>
+      <div class="setrow"><span>Ver as cópias guardadas</span><button class="btn" type="button" id="verCopias">Ver cópias</button></div>
+      <div id="copiasLista"></div>
+    </section>
+    <section>
       <h3>Jogo</h3>
       <div class="setrow"><span id="verTxt">Versão</span><button class="btn" type="button" id="checkUpdate">Verificar atualizações</button></div>
       <p class="hint" id="updStatus" role="status" style="margin:0;color:var(--muted);font-size:13px"></p>
@@ -723,8 +733,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=45"></script>
-<script src="js/cloud.js?v=45"></script>
-<script src="js/game.js?v=45"></script>
+<script src="js/audio.js?v=46"></script>
+<script src="js/cloud.js?v=46"></script>
+<script src="js/game.js?v=46"></script>
 </body>
 </html>

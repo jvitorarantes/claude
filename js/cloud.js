@@ -48,6 +48,24 @@
     return d.exists ? d.data() : null;
   }
   const saveFarm = (uid, data) => farm(uid).set(data);
+  // Salva só se a nuvem ainda estiver na versão (rev) em que esta roça se baseou. Se outro aparelho
+  // (ou um save antigo) gravou no meio, NÃO grava por cima: devolve erro 'conflito'.
+  async function saveFarmSeguro(uid, data, baseRev) {
+    const ref = farm(uid);
+    return db.runTransaction(async tx => {
+      const d = await tx.get(ref), atual = d.exists ? (d.data().rev || 0) : 0;
+      if (atual !== baseRev) { const e = new Error('conflito'); e.code = 'conflito'; e.rev = atual; throw e; }
+      tx.set(ref, Object.assign({}, data, { rev: baseRev + 1 }));
+      return baseRev + 1;
+    });
+  }
+  // Cópias de segurança diárias: farms/{uid}/backups/{AAAA-MM-DD}.
+  const salvarBackup = (uid, dia, data) => farm(uid).collection('backups').doc(dia).set(data);
+  async function listarBackups(uid) {
+    const qs = await farm(uid).collection('backups').get();
+    return qs.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => (a.id < b.id ? 1 : -1));
+  }
+  const apagarBackup = (uid, dia) => farm(uid).collection('backups').doc(dia).delete();
   // Sessão: qual aparelho está jogando agora. Entrar num aparelho novo tira o anterior.
   const claimSession = (uid, session) => farm(uid).set({ session }, { merge: true });
   const watchFarm = (uid, cb) => farm(uid).onSnapshot(d => cb(d.exists ? d.data() : null), e => console.warn('roça:', e));
@@ -103,7 +121,25 @@
   // O "amigo" ainda tem o "dono" como amigo? (pode ler porque é sobre si mesmo)
   async function ehAmigoDe(dono, amigo) { return (await amigoRef(dono, amigo).get()).exists; }
 
+  // Notificações (Firebase Cloud Messaging). O aparelho guarda o "endereço" dele (token) em push/{uid},
+  // junto com a agenda do que vai ficar pronto. Um programinha no GitHub lê isso e manda os avisos.
+  let messagingOk = false;
+  async function ativarPush(uid, vapidKey, reg) {
+    if (!messagingOk) { await loadScript(SDK + 'firebase-messaging-compat.js'); messagingOk = true; }
+    const token = await firebase.messaging().getToken({ vapidKey, serviceWorkerRegistration: reg });
+    if (!token) throw new Error('sem token');
+    await db.collection('push').doc(uid).set({ tokens: firebase.firestore.FieldValue.arrayUnion(token) }, { merge: true });
+    return token;
+  }
+  async function desativarPush(uid, token) {
+    if (token) await db.collection('push').doc(uid).set({ tokens: firebase.firestore.FieldValue.arrayRemove(token) }, { merge: true });
+  }
+  const salvarPush = (uid, data) => db.collection('push').doc(uid).set(data, { merge: true });
+  // Aviso para outra pessoa (visita, presente, pedido de amizade). O programinha entrega e apaga.
+  const mandarAviso = data => db.collection('avisos').add(data);
+
   window.RFCloud = {
+    ativarPush, desativarPush, salvarPush, mandarAviso, saveFarmSeguro, salvarBackup, listarBackups, apagarBackup,
     available, init, signIn, signOut, loadFarm, saveFarm, claimSession, watchFarm, claimCode, findCode, normalizeCode,
     sendVisit, watchVisits, deleteVisit, sendRequest, deleteRequest, requestExists, watchRequests,
     addAmigo, removeAmigo, listAmigos, ehAmigoDe,

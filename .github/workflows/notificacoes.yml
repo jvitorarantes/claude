@@ -1,0 +1,28 @@
+name: Notificações da Roça Feliz
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # a cada 15 minutos (o GitHub pode atrasar um pouco)
+  workflow_dispatch: {}       # botão "Run workflow" para testar na hora
+
+concurrency:
+  group: notificacoes
+  cancel-in-progress: false
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: servidor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: node notificacoes.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SITE_URL: https://jvitorarantes.github.io/roca-feliz/

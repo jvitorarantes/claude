@@ -50,6 +50,9 @@ Sem o Firebase configurado, o jogo funciona do mesmo jeito, mas salva só no nav
 - **Mover no celular**: segure o dedo num item (ou use o botão Mover), arraste o item com o dedo até o lugar novo e toque em **Salvar aqui** (fica cinza se o lugar não serve). No computador, o item segue o mouse e um clique solta. Com qualquer ferramenta dá para arrastar a tela para os lados.
 - Os botões da tela se ajustam ao tamanho da janela para nunca ficarem um por cima do outro.
 - O jogo procura versão nova sozinho toda vez que é aberto e, se tiver, atualiza.
+- **Notificações** (⚙️ › Notificações): avisos com o jogo fechado — colheita pronta, plantas quase estragando, animais, fábrica, caminhão e amigos. Cada tipo liga e desliga. Precisa configurar uma vez: veja [`NOTIFICACOES.md`](NOTIFICACOES.md).
+- **Progresso protegido**: cada salvamento na nuvem tem um número de versão. Um aparelho só grava se a roça dele foi feita em cima da versão atual da nuvem; se não, carrega a da nuvem em vez de gravar por cima (e guarda a dele como cópia). Nunca grava uma roça de nível menor que o da nuvem, e se a nuvem não carregar ao entrar, não grava nada nela. Se um aparelho tiver uma roça de nível maior que a da nuvem, o jogo pergunta qual usar.
+- **Cópias de segurança** (⚙️ › Cópias de segurança): uma cópia por dia na nuvem (as últimas 14) e a última cópia deste aparelho, com botão de restaurar.
 - **Modo Mover** (botão à esquerda): clique na casa, no celeiro, na casinha do cachorro, numa árvore ou num enfeite e depois no lugar novo. Uma sombra verde mostra onde pode e vermelha onde não pode. Esc cancela.
 - **Celeiro na roça**: clicar nele abre o Celeiro.
 - **No celular, segurar o dedo** (no computador, **botão direito**) em cima de uma casa, árvore ou enfeite abre um menu com **Mover** e, nos enfeites, **Guardar no inventário**.

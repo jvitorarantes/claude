@@ -9,3 +9,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "625452180491",
   appId: "1:625452180491:web:b949a5491b77ee89f0930e"
 };
+
+// Chave pública das notificações (Firebase › Configurações do projeto › Cloud Messaging ›
+// Certificados push da Web › Par de chaves). Pode ficar pública. Vazia = notificações desligadas.
+window.FIREBASE_VAPID_KEY = "";

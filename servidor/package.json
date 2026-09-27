@@ -1,0 +1,8 @@
+{
+  "name": "roca-feliz-notificacoes",
+  "private": true,
+  "description": "Manda as notificações da Roça Feliz (roda no GitHub Actions a cada 15 minutos).",
+  "type": "commonjs",
+  "scripts": { "start": "node notificacoes.js" },
+  "dependencies": { "firebase-admin": "^12.7.0" }
+}

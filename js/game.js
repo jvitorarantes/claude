@@ -544,7 +544,7 @@ function gain(id, qty, pos) {
 }
 // state.changed marca a última mudança de verdade (não o último salvamento): é o que decide
 // se a roça deste aparelho é mais nova que a da nuvem.
-function done() { if (state) state.changed = Date.now(); save(); dirty = true; renderHUD(); renderPane(); renderSceneInfo(); }
+function done() { if (state) { state.changed = Date.now(); state.pendente = true; } save(); dirty = true; renderHUD(); renderPane(); renderSceneInfo(); }
 
 // ============================================================
 // Ações na sua roça
@@ -1154,6 +1154,7 @@ function sendVisit(v) {
   if (view.kind !== 'friend' || !user) return;
   Cloud.sendVisit(view.uid, Object.assign({ from: user.uid, fromName: user.name || 'Um amigo', at: Date.now() }, v))
     .catch(e => console.warn('visita não enviada:', e));
+  if (v.t !== 'gift') avisarAmigo(view.uid, 'visita', `${firstName(user.name) || 'Um amigo'} passou na sua roça!`);
 }
 function alreadyTook(obj, key) {
   return obj.stolen || state.log[key] || (user && Array.isArray(obj.th) && obj.th.includes(user.uid));
@@ -1270,31 +1271,63 @@ function applyVisits(list) {
 // ============================================================
 // Nuvem: login com Google, salvamento e amigos
 // ============================================================
+// Proteções contra perder progresso:
+//  - nuvemOk: só salva na nuvem depois de ter CARREGADO a roça da nuvem com sucesso neste aparelho;
+//  - rev: cada salvamento aumenta a versão; só grava se a nuvem ainda estiver na versão em que esta roça
+//    se baseou (senão outro aparelho gravou no meio, e este recarrega em vez de gravar por cima);
+//  - nivelNuvem: nunca grava uma roça com nível menor que o que já está na nuvem.
+let nuvemOk = false, nivelNuvem = 0, salvando = false;
 async function cloudSave() {
-  if (!user || kicked) return;
-  dirty = false; lastCloud = performance.now();
+  if (!user || kicked || !nuvemOk || salvando) return;
+  if (state.level < nivelNuvem) { console.warn('bloqueado: nível menor que o da nuvem'); return recarregarDaNuvem('A roça deste aparelho está atrás da nuvem. Carregando a versão salva…'); }
+  salvando = true; dirty = false; lastCloud = performance.now();
   syncStatus = 'Salvando…'; renderAccount();
   try {
     state.owner = user.uid;
+    const base = state.rev || 0;
     // friends e sent ficam fora do JSON para as regras do Firestore decidirem quem pode ver a roça.
-    await Cloud.saveFarm(user.uid, {
-      stateJson: JSON.stringify(state), name: user.name || '', photo: user.photo || '',
+    const rev = await Cloud.saveFarmSeguro(user.uid, {
+      stateJson: JSON.stringify(Object.assign({}, state, { rev: base + 1, pendente: false })), name: user.name || '', photo: user.photo || '',
       level: state.level, code: state.code || '', updatedAt: Date.now(),
       friends: state.friends.slice(), sent: Object.keys(state.sent), session: SESSION,
-    });
+    }, base);
+    state.rev = rev; state.pendente = false; nivelNuvem = Math.max(nivelNuvem, state.level); save();
     syncStatus = 'Salvo na nuvem';
+    sincronizarPush(); // agenda dos avisos (só grava se mudou)
   } catch (e) {
-    console.warn(e); dirty = true; syncStatus = 'Sem conexão';
-  }
+    console.warn(e);
+    if (e && e.code === 'conflito') { salvando = false; return recarregarDaNuvem('A roça foi salva em outro aparelho. Carregando a versão mais nova…'); }
+    dirty = true; syncStatus = 'Sem conexão';
+  } finally { salvando = false; }
   renderAccount();
+}
+// Guarda uma cópia da roça deste aparelho antes de trocar pela da nuvem (dá para restaurar nas Configurações).
+function guardarCopiaLocal(s, motivo) {
+  try { if (s && s.level) localStorage.setItem('roca-feliz-copia', JSON.stringify({ at: Date.now(), motivo, level: s.level, stateJson: JSON.stringify(s) })); } catch (e) { /* sem espaço */ }
+}
+async function recarregarDaNuvem(msg) {
+  if (!user) return;
+  nuvemOk = false; toast(msg);
+  try {
+    const remote = await Cloud.loadFarm(user.uid);
+    const rs = remote && remote.stateJson ? migrate(JSON.parse(remote.stateJson)) : null;
+    if (!rs) return;
+    guardarCopiaLocal(state, 'antes de recarregar da nuvem');
+    catchUp(rs, (Date.now() - (remote.updatedAt || Date.now())) / 1000);
+    rs.rev = remote.rev || 0; rs.pendente = false; rs.owner = user.uid;
+    state = rs; nivelNuvem = Math.max(nivelNuvem, rs.level || 0); nuvemOk = true; save();
+    view = { kind: 'home' }; $('#banner').hidden = true;
+    renderTools(); renderHUD(); renderAccount(); renderPane(); renderSceneInfo(); renderTabs();
+  } catch (e) { console.warn(e); setTimeout(() => recarregarDaNuvem(msg), 30000); }
 }
 
 // Outro aparelho entrou na mesma conta: este para, sem gravar por cima, e sai.
 function kick(sess) {
   if (kicked) return;
   kicked = `Você entrou no ${sess.device || 'outro aparelho'} e por isso saiu daqui. Para jogar neste aparelho, entre de novo: a roça continua de onde parou.`;
+  guardarCopiaLocal(state, 'saiu porque entrou em outro aparelho');
   try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* sem armazenamento */ }
-  state.changed = 0; staleLocal = true;
+  state.changed = 0; staleLocal = true; nuvemOk = false;
   Cloud.signOut().catch(() => {});
   showGate('login', kicked);
 }
@@ -1321,13 +1354,35 @@ async function onUser(u) {
     await new Promise(r => setTimeout(r, 1500));
     const remote = await Cloud.loadFarm(u.uid);
     const rs = remote && remote.stateJson ? migrate(JSON.parse(remote.stateJson)) : null;
+    const remoteRev = (remote && remote.rev) || 0;
     if (rs) {
-      // Este aparelho só ganha da nuvem se tiver mudanças que ainda não subiram.
-      const localIsNewer = !staleLocal && state.owner === u.uid && (state.changed || 0) > (remote.updatedAt || 0);
-      if (!localIsNewer) { catchUp(rs, (Date.now() - (remote.updatedAt || Date.now())) / 1000); state = rs; }
+      rs.rev = remoteRev; rs.pendente = false;
+      // Este aparelho só fica com a roça dele se ela foi feita EM CIMA da versão atual da nuvem
+      // (mesma rev) e tem mudanças que ainda não subiram. Horário não decide mais nada.
+      const localDescende = !staleLocal && state.owner === u.uid && (state.rev || 0) === remoteRev && state.pendente;
+      if (localDescende && state.level >= (rs.level || 0)) { /* fica com a daqui: é a nuvem + mudanças novas */ }
+      else if (state.owner === u.uid && state.level > (rs.level || 0) &&
+        confirm(`Este aparelho tem uma roça no nível ${state.level}, e a da nuvem está no nível ${rs.level}.\n\nOK = usar a deste aparelho (nível ${state.level})\nCancelar = usar a da nuvem (nível ${rs.level})`)) {
+        state.rev = remoteRev; state.pendente = true; // o jogador escolheu: sobe a daqui
+      } else {
+        if (state.owner === u.uid) guardarCopiaLocal(state, 'antes de carregar da nuvem');
+        catchUp(rs, (Date.now() - (remote.updatedAt || Date.now())) / 1000); state = rs;
+      }
+      nivelNuvem = state.pendente ? state.level : (rs.level || 0);
+      // cópia de segurança do dia na nuvem (antes de qualquer coisa gravar por cima)
+      try {
+        const dia = new Date().toISOString().slice(0, 10);
+        if (localStorage.getItem('rf-bkp-' + u.uid) !== dia) {
+          await Cloud.salvarBackup(u.uid, dia, { stateJson: remote.stateJson, level: rs.level || 0, rev: remoteRev, at: Date.now() });
+          localStorage.setItem('rf-bkp-' + u.uid, dia);
+          Cloud.listarBackups(u.uid).then(l => l.slice(14).forEach(b => Cloud.apagarBackup(u.uid, b.id).catch(() => {}))).catch(() => {});
+        }
+      } catch (e) { console.warn('cópia de segurança:', e); }
     } else if (state.owner && state.owner !== u.uid) {
       state = newState(); // a roça deste navegador é de outra conta
-    }
+      state.rev = remoteRev;
+    } else state.rev = remoteRev; // conta nova: primeira roça na nuvem
+    nuvemOk = true;
     staleLocal = false;
     state.owner = u.uid;
     if (!state.code) state.code = await Cloud.claimCode(u.uid);
@@ -1346,9 +1401,11 @@ async function onUser(u) {
     toast(`Olá, ${firstName(u.name)}! Bom te ver na roça.`, 'good');
   } catch (e) {
     console.warn(e);
-    cloudStatus = 'ready'; syncStatus = 'Sem conexão';
+    // Sem carregar a nuvem, NUNCA salva nela (senão a roça deste aparelho podia apagar a de lá).
+    nuvemOk = false; cloudStatus = 'ready'; syncStatus = 'Sem conexão';
     enterGame();
-    toast('Não consegui falar com a nuvem. Seguimos salvando neste aparelho.', 'bad');
+    toast('Não consegui falar com a nuvem. Vou tentar de novo sozinho; seu progresso da nuvem está seguro.', 'bad');
+    setTimeout(() => { if (user && user.uid === u.uid && !nuvemOk) onUser(u); }, 30000);
   }
   renderTools(); renderHUD(); renderAccount(); renderPane(); renderSceneInfo(); renderTabs();
 }
@@ -1437,6 +1494,7 @@ async function addFriend(code) {
     state.sent[uid] = { at: Date.now(), code };
     await cloudSave(); // libera a sua roça para essa pessoa espiar antes de aceitar
     await Cloud.sendRequest(uid, { from: user.uid, fromName: user.name || 'Alguém', fromPhoto: user.photo || '', at: Date.now() });
+    avisarAmigo(uid, 'pedido', `${firstName(user.name) || 'Alguém'} quer ser seu amigo na Roça Feliz!`);
     toast('Pedido enviado! A amizade começa quando a pessoa aceitar.', 'good');
     done();
   } catch (e) {
@@ -4252,7 +4310,7 @@ function saveSettings() {
 }
 const TRACK_INFO = ['Violão e flauta, bem tranquila', 'Valsa lenta de sanfona', 'Viola caipira no fim da tarde'];
 function renderSettings() {
-  renderAvatarCfg();
+  renderAvatarCfg(); renderPushCfg();
   $('#optMusic').checked = settings.music;
   $('#optSfx').checked = settings.sfx;
   $('#volMusic').value = Math.round(settings.musicVol * 100); $('#volMusicOut').textContent = $('#volMusic').value;
@@ -4263,6 +4321,124 @@ function renderSettings() {
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.tema === settings.tema)));
   document.querySelectorAll('#temaSeg button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tema === settings.tema)));
 }
+// ============================================================
+// Notificações no celular (com o jogo fechado)
+// ============================================================
+// O jogo monta uma agenda do que vai ficar pronto e guarda em push/{uid}. A cada 15 minutos um
+// programinha no GitHub (servidor/notificacoes.js) confere as agendas e manda os avisos.
+const PUSH_TIPOS = [
+  ['colheita', '🌽 Colheita pronta e plantas quase estragando'],
+  ['animais', '🐔 Produtos dos animais'],
+  ['fabrica', '🏭 Fábrica terminou'],
+  ['caminhao', '🚚 Pedidos novos no caminhão'],
+  ['amigos', '🎁 Amigos: visitas, presentes e pedidos'],
+];
+const VAPID = () => window.FIREBASE_VAPID_KEY || '';
+const pushOk = () => !!(VAPID() && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && /^https?:/.test(location.protocol));
+function pushCfg() { return state.push || (state.push = { on: false, prefs: Object.fromEntries(PUSH_TIPOS.map(([k]) => [k, true])) }); }
+function agendaPush() {
+  const agora = Date.now(), lista = [];
+  const add = (t, tipo, txt) => { if (t > agora + 60e3 && t < agora + 8 * DAY) lista.push({ t: Math.round(t), tipo, txt }); };
+  for (const p of state.plots) {
+    if (p.s !== 'growing' || p.poda || p.podre || !CROP[p.c]) continue;
+    const T = phaseTempo(p), crop = CROP[p.c];
+    if (p.g < T) add(agora + (T - p.g) / (p.dry ? 0.7 : 1) / acelera(state, crop.prod) * 1000, 'colheita', `${crop.nome} pronto para colher!`);
+    else add(agora + (PODRE_APOS - (p.pronto || 0) - 2 * HOUR) * 1000, 'colheita', `⚠️ ${crop.nome} vai estragar em 2 horas! Colha ou use uma poção.`);
+  }
+  for (const a of state.animals) {
+    const d = ANIMAL[a.k];
+    if (d && d.tipo === 'prod' && a.fed && !a.ready && PRODUCT[d.prod]) add(agora + (d.tempo - a.g) / acelera(state, d.prod) * 1000, 'animais', `${PRODUCT[d.prod].nome} pronto para recolher!`);
+  }
+  for (const x of (state.fab && state.fab.fila) || []) if (RECEITA[x.r]) add(x.fim, 'fabrica', `${RECEITA[x.r].nome} ficou pronto na fábrica!`);
+  add((blocoCaminhao() + 1) * CAMINHAO_BLOCO, 'caminhao', `Chegaram ${CAMINHAO_N} pedidos novos no caminhão!`);
+  // um aviso por tipo a cada 20 minutos no máximo
+  lista.sort((a, b) => a.t - b.t);
+  const ult = {}, out = [];
+  for (const x of lista) { if (ult[x.tipo] && x.t - ult[x.tipo] < 20 * 60e3) continue; ult[x.tipo] = x.t; out.push(x); }
+  return out.slice(0, 40);
+}
+let pushChave = '';
+function sincronizarPush(forcar) {
+  if (!user || !pushCfg().on || !Cloud.salvarPush) return;
+  const agenda = agendaPush(), prefs = pushCfg().prefs;
+  const chave = JSON.stringify([prefs, agenda.map(x => [Math.round(x.t / 300e3), x.tipo])]);
+  if (!forcar && chave === pushChave) return;
+  pushChave = chave;
+  Cloud.salvarPush(user.uid, { agenda, prefs, proximo: agenda.length ? agenda[0].t : 9e15, enviadoAte: Date.now(), nome: firstName(user.name) })
+    .catch(e => console.warn('notificações:', e));
+}
+async function ativarNotificacoes() {
+  const st = $('#pushStatus');
+  if (!user) return (st.textContent = 'Entre com a conta Google para receber avisos.');
+  if (!pushOk()) return (st.textContent = 'Este aparelho ou navegador não aceita notificações.');
+  st.textContent = 'Pedindo permissão…';
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { st.textContent = 'Sem permissão. Libere as notificações da Roça Feliz nas configurações do aparelho.'; return; }
+    const reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+    const token = await Cloud.ativarPush(user.uid, VAPID(), reg);
+    try { localStorage.setItem('rf-push-token', token); } catch (e) { /* tanto faz */ }
+    pushCfg().on = true; done(); sincronizarPush(true);
+    st.textContent = 'Pronto! Você vai receber avisos neste aparelho.';
+    toast('Notificações ligadas!', 'good');
+  } catch (e) { console.warn(e); st.textContent = 'Não deu para ligar agora. Tente de novo.'; }
+  renderPushCfg();
+}
+async function desligarNotificacoes() {
+  let token = null; try { token = localStorage.getItem('rf-push-token'); localStorage.removeItem('rf-push-token'); } catch (e) { /* tanto faz */ }
+  pushCfg().on = false; done();
+  if (user && Cloud.desativarPush) await Cloud.desativarPush(user.uid, token).catch(() => {});
+  renderPushCfg(); toast('Notificações desligadas neste aparelho.');
+}
+function renderPushCfg() {
+  const box = $('#pushCfg'); if (!box || !state) return;
+  const c = pushCfg(), neste = (() => { try { return !!localStorage.getItem('rf-push-token'); } catch (e) { return false; } })();
+  const ligado = c.on && neste && 'Notification' in window && Notification.permission === 'granted';
+  box.innerHTML = !VAPID() ? '<p class="hint" style="margin:0">As notificações ainda não foram configuradas no Firebase.</p>'
+    : `<div class="setrow"><span>${ligado ? '🔔 Avisos ligados neste aparelho' : '🔕 Avisos desligados neste aparelho'}</span>${ligado ? '<button class="btn ghost" type="button" data-push-off>Desligar</button>' : '<button class="btn gold" type="button" data-push-on>Ativar avisos</button>'}</div>
+    ${PUSH_TIPOS.map(([k, n]) => `<div class="setrow"><label for="push_${k}">${n}</label><input type="checkbox" class="switch" id="push_${k}" data-push-tipo="${k}" ${c.prefs[k] !== false ? 'checked' : ''}></div>`).join('')}
+    <p class="hint" id="pushStatus" role="status" style="margin:0;color:var(--muted);font-size:13px">Os avisos chegam mesmo com o jogo fechado (podem atrasar alguns minutos).</p>`;
+}
+// Aviso para um amigo (visita, presente, pedido). Visitas: no máximo um aviso a cada 30 min por amigo.
+const avisoFeito = {};
+function avisarAmigo(para, tipo, txt) {
+  if (!user || !Cloud.mandarAviso || !para) return;
+  const k = para + ':' + tipo;
+  if (tipo === 'visita' && avisoFeito[k] && Date.now() - avisoFeito[k] < 30 * 60e3) return;
+  avisoFeito[k] = Date.now();
+  Cloud.mandarAviso({ para, de: user.uid, tipo, txt, at: Date.now() }).catch(e => console.warn('aviso:', e));
+}
+
+// ---------- Cópias de segurança (Configurações) ----------
+let copias = null;
+async function verCopias() {
+  const box = $('#copiasLista'); if (!box) return;
+  box.innerHTML = '<p class="hint" style="margin:0">Procurando cópias…</p>';
+  const lista = [];
+  try { const c = JSON.parse(localStorage.getItem('roca-feliz-copia') || 'null'); if (c && c.stateJson) lista.push({ id: 'local', nome: `Neste aparelho (${new Date(c.at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })})`, level: c.level, stateJson: c.stateJson }); } catch (e) { /* sem cópia */ }
+  if (user && Cloud.listarBackups) {
+    try { for (const b of await Cloud.listarBackups(user.uid)) lista.push({ id: b.id, nome: `Nuvem, ${b.id.split('-').reverse().join('/')}`, level: b.level, stateJson: b.stateJson }); }
+    catch (e) { console.warn(e); }
+  }
+  copias = lista;
+  box.innerHTML = lista.length ? lista.map((c, k) => `<div class="setrow"><span>${esc(c.nome)} · <b>nível ${c.level}</b></span><button class="btn ghost" type="button" data-restaurar="${k}">Restaurar</button></div>`).join('')
+    : '<p class="hint" style="margin:0">Ainda não há cópias. A primeira é feita hoje, na próxima vez que você entrar.</p>';
+}
+async function restaurarCopia(k) {
+  const c = copias && copias[k]; if (!c) return;
+  if (!confirm(`Voltar a roça para esta cópia (nível ${c.level})? A roça de agora (nível ${state.level}) fica guardada como cópia deste aparelho.`)) return;
+  const s2 = migrate(JSON.parse(c.stateJson)); if (!s2) return toast('Essa cópia não abriu.', 'bad');
+  guardarCopiaLocal(state, 'antes de restaurar uma cópia');
+  let rev = state.rev || 0;
+  if (user) { try { const r = await Cloud.loadFarm(user.uid); rev = (r && r.rev) || 0; } catch (e) { return toast('Sem conexão com a nuvem agora. Tente de novo.', 'bad'); } }
+  s2.owner = user ? user.uid : s2.owner; s2.rev = rev; s2.friends = Array.from(new Set([...(s2.friends || []), ...state.friends]));
+  state = s2; nivelNuvem = state.level; nuvemOk = !!user;
+  done(); if (user) await cloudSave();
+  $('#settings').hidden = true;
+  view = { kind: 'home' }; renderTools(); renderHUD(); renderPane(); renderSceneInfo(); renderTabs();
+  toast(`Roça restaurada: nível ${state.level}!`, 'good');
+}
+
 // ---------- Atualizações ----------
 // Busca o index.html do site sem cache e compara a versão com a que está rodando.
 // Se tiver versão nova (ou não der para conferir), salva a roça, limpa os caches e recarrega.
@@ -4338,6 +4514,10 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gift').
 $('#settings').addEventListener('click', e => {
   if (e.target === $('#settings') || e.target.closest('[data-close]')) return closeSettings();
   if (avatarClick(e)) return;
+  if (e.target.closest('[data-push-on]')) return ativarNotificacoes();
+  if (e.target.closest('#verCopias')) return verCopias();
+  const rc = e.target.closest('[data-restaurar]'); if (rc) return restaurarCopia(Number(rc.dataset.restaurar));
+  if (e.target.closest('[data-push-off]')) return desligarNotificacoes();
   // Só os botões de dentro da janela (a página inteira também tem data-tema).
   const tr = e.target.closest('#tracks [data-track]');
   if (tr) { settings.track = Number(tr.dataset.track); settings.music = true; saveSettings(); renderSettings(); }
@@ -4345,6 +4525,10 @@ $('#settings').addEventListener('click', e => {
   if (tm) { settings.tema = tm.dataset.tema; saveSettings(); renderSettings(); }
 });
 $('#optMusic').addEventListener('change', e => { settings.music = e.target.checked; saveSettings(); });
+$('#settings').addEventListener('change', e => {
+  const t = e.target.closest('[data-push-tipo]'); if (!t) return;
+  pushCfg().prefs[t.dataset.pushTipo] = t.checked; done(); sincronizarPush(true);
+});
 $('#optSfx').addEventListener('change', e => { settings.sfx = e.target.checked; saveSettings(); });
 $('#volMusic').addEventListener('input', e => { settings.musicVol = e.target.value / 100; $('#volMusicOut').textContent = e.target.value; saveSettings(); });
 $('#volSfx').addEventListener('input', e => { settings.sfxVol = e.target.value / 100; $('#volSfxOut').textContent = e.target.value; saveSettings(); });
@@ -4549,6 +4733,7 @@ async function sendFriendGift(uid, escolha) {
   g.to.push(uid); renderPane();
   try {
     await Cloud.sendVisit(uid, { t: 'gift', gift: pick.id, from: user.uid, fromName: user.name || 'Um amigo', at: Date.now() });
+    avisarAmigo(uid, 'presente', `🎁 ${firstName(user.name) || 'Um amigo'} te mandou um presente!`);
     sfx('buy'); addXP(2, null); track('presentear');
     const f = friendInfo[uid];
     toast(`Presente enviado para ${firstName(f && f.name ? f.name : 'seu amigo')}: ${pick.nome}!`, 'good');

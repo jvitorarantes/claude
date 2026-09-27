@@ -31,3 +31,27 @@ self.addEventListener('fetch', e => {
     }
   })());
 });
+
+// Notificações: o programinha de avisos manda pelo Firebase Cloud Messaging e elas chegam aqui.
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { data: { body: e.data && e.data.text() } }; }
+  const n = Object.assign({}, d.notification || {}, d.data || {});
+  e.waitUntil((async () => {
+    // com o jogo aberto na tela, os avisos já aparecem dentro dele
+    const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (abertas.some(c => c.visibilityState === 'visible' && c.focused)) return;
+    await self.registration.showNotification(n.title || 'Roça Feliz', {
+      body: n.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
+      tag: n.tag || 'roca-feliz', renotify: true, data: { link: n.link || './' },
+    });
+  })());
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of abertas) if ('focus' in c) return c.focus();
+    return self.clients.openWindow((e.notification.data && e.notification.data.link) || './');
+  })());
+});
