@@ -921,6 +921,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
+  { v: 93, txt: 'O tema da casa agora vale também para a casinha do cachorro e para os abrigos dos bichos no rancho: tudo combinando!' },
   { v: 91, txt: 'Loja do Trevo 🍀 cheia de novidades: chapéu de cangaceiro, boina, panamá, gorro, sanfona, buquê, regador dourado, ipê-amarelo, fogueira de São João, balanço, carro de boi, as casas Lavanda, do Cerrado e Estrelada, a música Seresta ao Luar e itens úteis (iscas, ração especial, tarrafa e pontos de pesca prontos na hora).' },
   { v: 90, txt: 'Chegaram os Trevos 🍀, a moeda verde da roça! Ganhe resgatando cada peixe novo no 📖 Livro de peixes, os níveis do domínio de pesca e as conquistas (Missões › 🍀 Trevos). O que você já fez também vale: é só resgatar! Troque na Loja do Trevo por itens exclusivos: chapéus, lampião, músicas, enfeites e temas de casa.' },
   { v: 88, txt: 'Visual caprichado: abrigos, casinha do cachorro e enfeites com mais detalhes; animais maiores e mais fáceis de clicar; e a roça aparece mais perto na tela.' },
@@ -2290,10 +2291,12 @@ function drawDog(x, y, s, t, raca = 'caramelo', sleeping = false) {
   ctx.lineCap = 'butt';
 }
 // Casinha de cachorro, com a base centrada em (x, y).
-function drawKennel(x, y, s) {
-  // casinha em "2,5D": frente com empena, lateral mais escura, telhado vermelho com beiral, plaquinha e tigela
+function drawKennel(x, y, s, skin) {
+  // casinha em "2,5D": frente com empena, lateral mais escura, telhado com beiral, plaquinha e tigela.
+  // Com tema de casa, usa as cores do celeiro do tema.
   const fw = s * 0.5, fh = s * 0.3, rh = s * 0.22, dx = s * 0.26, dy = -s * 0.13, ov = s * 0.04;
-  const X0 = x - (fw + dx) / 2, Y = y - dy / 2, mad = '#b88350', tel = '#c8402f';
+  const tm = TEMA_CASA[skin] && skin !== 'classico' ? TEMA_CASA[skin] : null;
+  const X0 = x - (fw + dx) / 2, Y = y - dy / 2, mad = tm ? tm.celeiro : '#b88350', tel = tm ? tm.celTelhado : '#c8402f';
   ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.46, s * 0.1, 0, 0, 7); ctx.fill();
   forma([[X0 + fw, Y], [X0 + fw + dx, Y + dy], [X0 + fw + dx, Y + dy - fh], [X0 + fw, Y - fh]], tomCor(mad, -0.22));
   forma([[X0, Y], [X0 + fw, Y], [X0 + fw, Y - fh], [X0 + fw / 2, Y - fh - rh], [X0, Y - fh]], mad);
@@ -2332,7 +2335,7 @@ function drawKennelSpot(slot, s, home) {
   const d = s.dogs && s.dogs[slot];
   if (!home && !dogAlive(d)) return;
   const k = KENNEL_AT();
-  drawKennel(k.x, k.y, L.W * 0.85);
+  drawKennel(k.x, k.y, L.W * 0.85, s.skin);
 }
 function tipCanil(slot) {
   const c = S().dogs && S().dogs[slot]; if (!c) return null;
@@ -3249,8 +3252,15 @@ const SHED_LOOK = {
 };
 const sm0 = k => !!k.small;
 // Prédio com telhado de duas águas. A cumeeira corre no sentido u.
-function drawShed(id, u0, v0, lv, t) {
-  const k = SHED_LOOK[id], sm = k.small ? 0.78 : 1;
+// Abrigo com as cores do tema da casa (celeiro e telhado do tema), mantendo o formato de cada um.
+function lookDoAbrigo(id, skin) {
+  const k = SHED_LOOK[id], tm = TEMA_CASA[skin] && skin !== 'classico' ? TEMA_CASA[skin] : null;
+  if (!tm) return k;
+  return Object.assign({}, k, { wall: tm.celeiro, wallR: tomCor(tm.celeiro, -0.18), roof: k.aberto ? tm.celTelhado : tm.celTelhado, roofD: tomCor(tm.celTelhado, -0.28),
+    frisoCor: tm.friso, pedra: !!tm.pedra, tabuas: !!tm.tabuas });
+}
+function drawShed(id, u0, v0, lv, t, skin) {
+  const k = lookDoAbrigo(id, skin), sm = k.small ? 0.78 : 1;
   const a0 = u0 + SHED.u, b0 = v0 + SHED.v, a1 = a0 + SHED.w * sm, b1 = b0 + SHED.d * sm;
   const h0 = k.legs || 0, h = h0 + k.h * sm, rh = 0.42 * sm, vm = (b0 + b1) / 2, o = 0.1;
   const W = L.W;
@@ -3288,7 +3298,7 @@ function drawShed(id, u0, v0, lv, t) {
     // oitão (a ponta triangular do telhado)
     ctx.fillStyle = k.wallR; poly([P(a1, b0, h), P(a1, b1, h), P(a1, vm, h + rh)]); ctx.fill();
     // frisos claros nos cantos e janelinha com moldura na lateral (acabamento, sem pesar)
-    const friso = k.trim ? '#fff4e0' : 'rgba(255,248,230,.75)';
+    const friso = k.frisoCor || (k.trim ? '#fff4e0' : 'rgba(255,248,230,.75)');
     for (const [u, v] of [[a0, b1], [a1, b1], [a1, b0]]) line(P(u, v, h0), P(u, v, h), friso, Math.max(1.5, W * 0.022));
     line(P(a0, b1, h0), P(a1, b1, h0), 'rgba(0,0,0,.18)', Math.max(1, W * 0.012));
     if (!k.trim && !sm0(k)) {
@@ -3361,7 +3371,7 @@ function drawYard(b, s, t, home, dt, bubbles) {
   if (b.id === 'galinheiro') { ctx.fillStyle = 'rgba(200,160,70,.5)'; for (let j = 0; j < 14; j++) { const q = iso(y.u0 + 0.5 + (j * 0.37) % 3, y.v0 + 1.7 + (j * 0.61) % 1.8); ctx.fillRect(q.x, q.y, W * 0.08, 1.5); } }
   drawFenceRect(R[0], R[1], R[2], R[3], 'back');
   drawTrough(y, b.id);
-  const c = drawShed(b.id, y.u0, y.v0, lv, t);
+  const c = drawShed(b.id, y.u0, y.v0, lv, t, s.skin);
   const hov = hover && hover.kind === 'abrigo' && hover.id === b.id;
   if (hov) { ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)'; poly([iso(R[0], R[1]), iso(R[2], R[1]), iso(R[2], R[3]), iso(R[0], R[3])]); ctx.stroke(); }
   hits.push({ kind: 'abrigo', id: b.id, x: c.x, y: c.y, r: W * 0.55 });
@@ -7612,7 +7622,7 @@ function drawMoving(sc, t) {
   else if (k.startsWith('enf:')) { const o = objetosDe(s, sc)[Number(k.slice(4))]; if (o) drawEnfeite(o.id, q.x, q.y, W / 100, t); }
   else if (k === 'casa') drawHouse(q.x, q.y, W * 0.95, '#f1dcae', s.skin);
   else if (k === 'celeiro') drawBarn(q.x, q.y, W * 1.15, s.skin);
-  else if (k === 'canil') drawKennel(q.x, q.y, L.W * 0.85);
+  else if (k === 'canil') drawKennel(q.x, q.y, L.W * 0.85, s.skin);
   else if (k === 'pesqueiro') drawLake(q.x, q.y, W * 0.48, t);
   else drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro);
   ctx.globalAlpha = 1;
