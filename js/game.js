@@ -544,7 +544,7 @@ function gain(id, qty, pos) {
 }
 // state.changed marca a última mudança de verdade (não o último salvamento): é o que decide
 // se a roça deste aparelho é mais nova que a da nuvem.
-function done() { if (state) { state.changed = Date.now(); state.pendente = true; } save(); dirty = true; renderHUD(); renderPane(); renderSceneInfo(); }
+function done() { if (state) { state.changed = Date.now(); state.pendente = true; } save(); agendarSyncPush(); dirty = true; renderHUD(); renderPane(); renderSceneInfo(); }
 
 // ============================================================
 // Ações na sua roça
@@ -4379,16 +4379,21 @@ function agendaPush() {
   for (const x of lista) { if (ult[x.tipo] && x.t - ult[x.tipo] < 20 * 60e3) continue; ult[x.tipo] = x.t; out.push(x); }
   return out.slice(0, 40);
 }
-let pushChave = '';
+// A agenda sobe sozinha poucos segundos depois de cada ação (e na hora em que o app é fechado),
+// sem depender do salvamento da roça, que só acontece a cada 30 s.
+let pushChave = '', pushTimer = 0, pushInfo = null;
 function sincronizarPush(forcar) {
-  if (!user || !pushCfg().on || !Cloud.salvarPush) return;
+  clearTimeout(pushTimer);
+  if (!user || !state || !pushCfg().on || !Cloud.salvarPush) return;
   const agenda = agendaPush(), prefs = pushCfg().prefs;
-  const chave = JSON.stringify([prefs, agenda.map(x => [Math.round(x.t / 300e3), x.tipo])]);
+  const chave = JSON.stringify([prefs, agenda.map(x => [Math.round(x.t / 60e3), x.tipo])]);
   if (!forcar && chave === pushChave) return;
   pushChave = chave;
   Cloud.salvarPush(user.uid, { agenda, prefs, proximo: agenda.length ? agenda[0].t : 9e15, enviadoAte: Date.now(), nome: firstName(user.name) })
-    .catch(e => console.warn('notificações:', e));
+    .then(() => { pushInfo = { n: agenda.length, prox: agenda[0], at: Date.now() }; })
+    .catch(e => { console.warn('notificações:', e); pushChave = ''; pushErro = (e && (e.code || e.message)) || String(e); });
 }
+function agendarSyncPush() { if (state && state.push && state.push.on) { clearTimeout(pushTimer); pushTimer = setTimeout(sincronizarPush, 3000); } }
 async function ativarNotificacoes() {
   const st = $('#pushStatus');
   if (!user) return (st.textContent = 'Entre com a conta Google para receber avisos.');
@@ -4444,7 +4449,7 @@ function renderPushCfg() {
     : `<div class="setrow"><span>${ligado ? '🔔 Avisos ligados neste aparelho' : '🔕 Avisos desligados neste aparelho'}</span>${ligado ? '<button class="btn ghost" type="button" data-push-off>Desligar</button>' : '<button class="btn gold" type="button" data-push-on>Ativar avisos</button>'}</div>
     ${PUSH_TIPOS.map(([k, n]) => `<div class="setrow"><label for="push_${k}">${n}</label><input type="checkbox" class="switch" id="push_${k}" data-push-tipo="${k}" ${c.prefs[k] !== false ? 'checked' : ''}></div>`).join('')}
     <div class="setrow"><span>Testar</span><span class="stack" style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost" type="button" data-push-teste-aqui>Neste aparelho</button><button class="btn ghost" type="button" data-push-teste-servidor ${ligado ? '' : 'disabled'}>Pelo servidor</button></span></div>
-    <p class="hint" style="margin:0;color:var(--muted);font-size:12px">Permissão: ${'Notification' in window ? { granted: 'liberada', denied: 'bloqueada', default: 'ainda não pedida' }[Notification.permission] : 'sem suporte'} · aparelho registrado: ${neste ? 'sim' : 'não'} · conta: ${user ? 'conectada' : 'não'}${pushErro ? ` · último erro: ${esc(pushErro)}` : ''}</p>
+    <p class="hint" style="margin:0;color:var(--muted);font-size:12px">Permissão: ${'Notification' in window ? { granted: 'liberada', denied: 'bloqueada', default: 'ainda não pedida' }[Notification.permission] : 'sem suporte'} · aparelho registrado: ${neste ? 'sim' : 'não'} · conta: ${user ? 'conectada' : 'não'}${pushInfo ? ` · agenda enviada ${new Date(pushInfo.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}: ${pushInfo.n} aviso${pushInfo.n === 1 ? '' : 's'}${pushInfo.prox ? `, próximo às ${new Date(pushInfo.prox.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (${esc(pushInfo.prox.txt)})` : ''}` : ''}${pushErro ? ` · último erro: ${esc(pushErro)}` : ''}</p>
     <p class="hint" id="pushStatus" role="status" style="margin:0;color:var(--muted);font-size:13px">Os avisos chegam mesmo com o jogo fechado (podem atrasar alguns minutos).</p>`;
 }
 // Aviso para um amigo (visita, presente, pedido). Visitas: no máximo um aviso a cada 30 min por amigo.
@@ -6104,8 +6109,8 @@ function start(data) {
     });
   }
 }
-window.addEventListener('pagehide', () => { save(); if (user && dirty) cloudSave(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && state) { save(); if (user && dirty) cloudSave(); } });
+window.addEventListener('pagehide', () => { save(); sincronizarPush(); if (user && dirty) cloudSave(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && state) { save(); sincronizarPush(); if (user && dirty) cloudSave(); } });
 // Botão de salvar na hora
 async function saveNow() {
   if (!state || kicked) return;
