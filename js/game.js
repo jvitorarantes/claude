@@ -948,6 +948,7 @@ const NOVIDADES = [
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
   { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
+  { v: 111, txt: 'Caçada ainda melhor 🎯: cada bicho novo vira uma 📷 foto no mural da sua casa (uma por bicho). Dá para ter uma 2ª arapuca e escolher a isca: milho, quirera (atrai bicho incomum) ou fruta do pomar (atrai os raros). Cada bicho tem seu domínio ★ com estrelas e trevos. E, de vez em quando, um rato ou javali entra na plantação: clique para espantar! Se ninguém espantar, ele come só um pouquinho de 1 ou 2 plantas. Com o cachorro da roça de guarda, isso quase não acontece.' },
   { v: 110, txt: 'Chegou a CAÇADA 🎯 (a partir do nível 4)! Clique na trilha do mato na sua roça. Cace pragas com o estilingue e a espingarda (rato, pombo, pardal, lebre-europeia, javali, javaporco… e o lendário CHUPA-CABRA, que anda pela Serra Dourada e pela Chapada, mais à noite 👀). Arme a 🪤 arapuca com milho para pegar bichos do mato (preá, tatu, paca, mutum…): eles vão para o Livro da caçada e são soltos. Tem lugares para comprar, domínio de caçada, trevos, missões e conquistas.' },
   { v: 108, txt: 'A motosserra ganhou desenho de motosserra de verdade (antes aparecia um serrote).' },
   { v: 107, txt: 'Correio: agora dá para apagar cada carta (✕) ou todas de uma vez, e as cartas somem sozinhas depois de 7 dias. Na conversa com amigos tem o botão 🧹 Limpar.' },
@@ -3296,6 +3297,7 @@ function drawRoca(s, t, home) {
     }
   }
   if (home) drawFolhas(t);
+  if (home) drawInvasor(t);
   drawAvatares('roca', t);
   drawObjetos(s, 'roca', t, home, 'frente', d0);
   drawMoving('roca', t);
@@ -3659,6 +3661,7 @@ function drawRoom(s, t, home) {
   const kn = P(0, 3.6, 0.45); ctx.fillStyle = '#e8c35a'; ctx.beginPath(); ctx.arc(kn.x, kn.y, W * 0.025, 0, 7); ctx.fill();
   // decorações
   for (const id of DECOR_ORDER) { const m = emUso(s, id); if (m) DRAW_DECOR[id](t, m); }
+  drawMural(s, t, home);
   // bichos de companhia que moram dentro de casa
   const pets = s.animals.filter(a => ANIMAL[a.k].lugar === 'casa');
   const gato = pets.find(a => a.k === 'gato');
@@ -4689,7 +4692,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'caca' ? (state.level >= CACA_NIVEL ? '<b>🎯 Trilha da caçada</b><br>Clique para caçar pragas com o estilingue ou a espingarda, e armar a arapuca.' : `<b>🎯 Trilha da caçada</b><br>Libera no nível ${CACA_NIVEL}.`) : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'folhas' ? '<b>🍂 Monte de folhas</b><br>Clique e o avatar vai rastelar (+XP e umas moedinhas).' : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'caca' ? (state.level >= CACA_NIVEL ? '<b>🎯 Trilha da caçada</b><br>Clique para caçar pragas com o estilingue ou a espingarda, e armar a arapuca.' : `<b>🎯 Trilha da caçada</b><br>Libera no nível ${CACA_NIVEL}.`) : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'invasor' ? `<b>${invasor ? (invasor.tipo === 'javali' ? '🐗 Javali' : '🐀 Rato') : 'Praga'} na plantação!</b><br>Clique para espantar antes que ele coma.` : hover.kind === 'mural' ? `<b>📷 Mural da caçada</b><br>${hover.n} foto${hover.n === 1 ? '' : 's'} de bichos. ${isHome() ? 'Clique para abrir o Livro da caçada.' : ''}` : hover.kind === 'folhas' ? '<b>🍂 Monte de folhas</b><br>Clique e o avatar vai rastelar (+XP e umas moedinhas).' : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4862,6 +4865,8 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'bicho') actBicho(target.i);
   else if (target.kind === 'lago') abrirPesca();
   else if (target.kind === 'folhas') rastelarFolhas(target.id);
+  else if (target.kind === 'invasor') espantarInvasor();
+  else if (target.kind === 'mural') { abrirCaca(); if (caca) { cacaLivro = true; renderCaca(); } }
   else if (target.kind === 'avatar' && target.quem === 'dono') { falar('avatar:dono', view.nome, sorteia(FALAS_DONO.concat(FALAS_AVATAR))); sfx('fala'); }
   else if (target.kind === 'avatar') { falar('avatar', meuApelido(), sorteia(FALAS_AVATAR)); sfx('fala'); }
   else if (target.kind === 'enfeite') actEnfeite(target.id, target.key, target.sc);
@@ -8619,7 +8624,15 @@ const ARMAS_CACA = {
   estilingue: { nome: 'Estilingue', nivel: 4,  custo: 0,    mun: 'pedra',    munNome: 'pedrinhas', pacote: 10, munCusto: 20 },
   espingarda: { nome: 'Espingarda', nivel: 12, custo: 2500, mun: 'cartucho', munNome: 'cartuchos', pacote: 5,  munCusto: 120 },
 };
-const ARAPUCA = { nivel: 6, custo: 400 };
+const ARAPUCA = { nivel: 6, custo: 400, nivel2: 10, custo2: 1500 };
+// Iscas da arapuca: milho (do celeiro), quirera (compra) atrai mais bicho incomum, e fruta do pomar atrai os raros.
+const ISCAS_ARAPUCA = {
+  milho:   { nome: 'Milho',   emoji: '🌽', vazia: 0.15, bonus: {} },
+  quirera: { nome: 'Quirera', emoji: '🌾', vazia: 0.08, bonus: { incomum: 1.8, raro: 1.4 }, pacote: 5, custo: 60 },
+  fruta:   { nome: 'Fruta do pomar', emoji: '🍊', vazia: 0.05, bonus: { raro: 2.5, 'épico': 2.5, incomum: 1.2 } },
+};
+const frutaIsca = () => FRUTAS.map(f => f.id).filter(id => state.barn[id] > 0).sort((a, b) => state.barn[b] - state.barn[a])[0];
+const qtdIscaArap = id => id === 'milho' ? state.barn.milho || 0 : id === 'quirera' ? cacaDe().quirera || 0 : FRUTAS.reduce((t, f) => t + (state.barn[f.id] || 0), 0);
 PRODUCT.carnejavali = { id: 'carnejavali', nome: 'Carne de javali', preco: 60, caca: true };
 
 function cacaDe() {
@@ -8629,6 +8642,10 @@ function cacaDe() {
   c.prox = c.prox || {}; c.usos = c.usos || {}; c.col = c.col || {}; c.novos = c.novos || [];
   c.armas = c.armas || { estilingue: true }; c.mun = c.mun || {};
   if (!c.presente) { c.presente = 1; c.mun.pedra = (c.mun.pedra || 0) + 10; } // começa com 10 pedrinhas
+  if (c.temArapuca && !c.nArap) c.nArap = 1;
+  c.arms = Array.isArray(c.arms) ? c.arms : [c.arapuca || null, null]; delete c.arapuca; delete c.temArapuca;
+  c.nArap = c.nArap || 0;
+  if (!ISCAS_ARAPUCA[c.iscaArap]) c.iscaArap = 'milho';
   if (!LUGAR_CACA[c.lugar] || !temLugarCaca(c.lugar)) c.lugar = 'capoeira';
   if (!ARMAS_CACA[c.arma] || !c.armas[c.arma]) c.arma = 'estilingue';
   return c;
@@ -8647,10 +8664,20 @@ function dominioCaca() {
 const esperaCaca = () => Math.round(CACA_MS * (1 - dominioCaca().corte));
 const esperaArapuca = () => Math.round(ARAPUCA_MS * (1 - dominioCaca().corte));
 const cacaDomAResgatar = () => { const nv = dominioCaca().nv, t = trevosDe(), r = []; t.domCaca = t.domCaca || {}; for (let n = 2; n <= nv; n++) if (!t.domCaca[n]) r.push(n); return r; };
-const bichosAResgatar = () => { const t = trevosDe(); t.caca = t.caca || {}; return CACA_BICHOS.filter(b => cacaDe().col[b.id] && !t.caca[b.id]); };
+// Domínio de cada bicho ★: pegando mais do mesmo, ele ganha estrelas (até 4), aparece 15% mais por
+// estrela e cada estrela vale trevos (1, 2, 3 e 5), como os peixes.
+const estrelasBicho = b => { const n = cacaDe().col[b.id] || 0, m = MAESTRIA[b.raro] || MAESTRIA.comum; return m.filter(x => n >= x).length; };
+function trevosDoBicho(b) {
+  const t = trevosDe(); t.caca = t.caca || {}; t.cacaEst = t.cacaEst || {};
+  if (!cacaDe().col[b.id]) return 0;
+  let n = t.caca[b.id] ? 0 : (TREVO_PEIXE[b.raro] || 1);
+  for (let k = t.cacaEst[b.id] || 0; k < estrelasBicho(b); k++) n += TREVO_ESTRELA[k];
+  return n;
+}
+const bichosAResgatar = () => CACA_BICHOS.filter(b => trevosDoBicho(b) > 0);
 function resgatarBichos() {
   const l = bichosAResgatar(), t = trevosDe(); if (!l.length) return;
-  let n = 0; for (const b of l) { t.caca[b.id] = true; n += TREVO_PEIXE[b.raro] || 1; }
+  let n = 0; for (const b of l) { n += trevosDoBicho(b); t.caca[b.id] = true; t.cacaEst[b.id] = estrelasBicho(b); }
   ganharTrevos(n, `${l.length} bicho${l.length > 1 ? 's' : ''} do Livro da caçada.`);
 }
 function resgatarDomCaca() {
@@ -8664,11 +8691,13 @@ function dominioCacaHTML() {
     ${r.length ? `<button class="btn gold dresg" type="button" data-trevo-domcaca="1">Resgatar 🍀${r.reduce((t, n) => t + (TREVO_DOMINIO[n] || 0), 0)}</button>` : ''}
     <span class="dinfo">${d.corte ? `−${Math.round(d.corte * 100)}% de espera · mira +${Math.round((d.mira - 1) * 100)}% · ` : ''}mato ${fmt(esperaCaca() / 1000)} · arapuca ${fmt(esperaArapuca() / 1000)}${d.max ? ' · máximo!' : ` · ${d.fim - d.xp} pts p/ Nv ${d.nv + 1}`}</span>`;
 }
-function sortearBicho(arma, lugar) {
+function sortearBicho(arma, lugar, isca) {
   const li = LUGARES_CACA.findIndex(l => l.id === lugar), L0 = LUGAR_CACA[lugar], noite = timeOfDay() === 'noite';
   let ok = CACA_BICHOS.filter(b => b.armas.includes(arma) && b.nivel <= state.level && b.lug <= li);
   if (!ok.length) ok = [CACA_BICHO[arma === 'arapuca' ? 'rolinha' : arma === 'espingarda' ? 'lebre' : 'rato']];
-  const peso = b => b.peso * (['raro', 'épico', 'lendário'].includes(b.raro) ? L0.sorte : b.raro === 'incomum' ? Math.sqrt(L0.sorte) : 1) * (b.id === 'chupacabra' && noite ? 3 : 1);
+  const bonus = (isca && ISCAS_ARAPUCA[isca] && ISCAS_ARAPUCA[isca].bonus) || {};
+  const peso = b => b.peso * (['raro', 'épico', 'lendário'].includes(b.raro) ? L0.sorte : b.raro === 'incomum' ? Math.sqrt(L0.sorte) : 1) * (b.id === 'chupacabra' && noite ? 3 : 1)
+    * (1 + 0.15 * estrelasBicho(b)) * (bonus[b.raro] || 1);
   let r = Math.random() * ok.reduce((t, b) => t + peso(b), 0);
   for (const b of ok) { r -= peso(b); if (r <= 0) return b; }
   return ok[0];
@@ -8678,6 +8707,7 @@ function registrarBicho(b) {
   const c = cacaDe(), antes = dominioCaca().nv, novo = !c.col[b.id];
   c.col[b.id] = (c.col[b.id] || 0) + 1;
   if (novo && !c.novos.includes(b.id)) c.novos.push(b.id);
+  if (novo) setTimeout(() => toast(`📷 Foto nova de ${b.nome.toLowerCase()} no mural da sua casa!`, 'good'), 1600);
   addXP({ comum: 3, incomum: 6, raro: 12, 'épico': 20, 'lendário': 60 }[b.raro], null);
   state.stats.caca = (state.stats.caca || 0) + 1; track('cacar');
   const d = dominioCaca();
@@ -8709,26 +8739,37 @@ function comprarMunicao() {
   toast(`+${a.pacote} ${a.munNome}!`, 'good'); done(); renderCaca();
 }
 // ---------- Arapuca: arma com 1 milho de isca, volta depois de umas horas e vê o que caiu ----------
-function arapucaAcao() {
-  const c = cacaDe();
-  if (!c.arapuca && !c.temArapuca) {
-    if (state.level < ARAPUCA.nivel) return toast(`🪤 A arapuca libera no nível ${ARAPUCA.nivel}.`);
-    if (state.coins < ARAPUCA.custo) return toast(`A arapuca custa ${ARAPUCA.custo} moedas.`, 'bad');
-    return confirmTwice('arapuca', `Comprar a arapuca por ${ARAPUCA.custo} moedas? Toque de novo para confirmar.`, () => {
-      state.coins -= ARAPUCA.custo; c.temArapuca = true; sfx('buy'); toast('🪤 Arapuca comprada! Arme com 1 milho do celeiro e volte depois.', 'good'); done(); renderCaca();
-    });
+function comprarArapuca() {
+  const c = cacaDe(), segunda = c.nArap >= 1, nv = segunda ? ARAPUCA.nivel2 : ARAPUCA.nivel, custo = segunda ? ARAPUCA.custo2 : ARAPUCA.custo;
+  if (c.nArap >= 2) return;
+  if (state.level < nv) return toast(`🪤 A ${segunda ? 'segunda arapuca' : 'arapuca'} libera no nível ${nv}.`);
+  if (state.coins < custo) return toast(`A ${segunda ? 'segunda arapuca' : 'arapuca'} custa ${custo.toLocaleString('pt-BR')} moedas.`, 'bad');
+  confirmTwice('arapuca' + c.nArap, `Comprar ${segunda ? 'a segunda arapuca' : 'a arapuca'} por ${custo.toLocaleString('pt-BR')} moedas? Toque de novo para confirmar.`, () => {
+    state.coins -= custo; c.nArap++; sfx('buy'); toast(`🪤 ${segunda ? 'Segunda arapuca' : 'Arapuca'} comprada! Escolha a isca e arme.`, 'good'); done(); renderCaca();
+  });
+}
+function comprarQuirera() {
+  const q = ISCAS_ARAPUCA.quirera;
+  if (state.coins < q.custo) return toast(`${q.pacote} quireras custam ${q.custo} moedas.`, 'bad');
+  state.coins -= q.custo; cacaDe().quirera = (cacaDe().quirera || 0) + q.pacote; sfx('buy'); toast(`🌾 +${q.pacote} quireras para a arapuca!`, 'good'); done(); renderCaca();
+}
+function arapucaAcao(k) {
+  const c = cacaDe(), ar = c.arms[k];
+  if (!ar) {
+    const isca = c.iscaArap, d = ISCAS_ARAPUCA[isca];
+    if (qtdIscaArap(isca) <= 0) return toast(isca === 'milho' ? '🌽 Sem milho no celeiro! Plante e colha milho, ou escolha outra isca.' : isca === 'quirera' ? '🌾 Sem quirera: compre aqui embaixo.' : '🍊 Sem fruta no celeiro: colha do seu pomar.', 'bad');
+    if (isca === 'milho') { state.barn.milho--; if (!state.barn.milho) delete state.barn.milho; }
+    else if (isca === 'quirera') c.quirera--;
+    else { const f = frutaIsca(); state.barn[f]--; if (!state.barn[f]) delete state.barn[f]; }
+    c.arms[k] = { lugar: c.lugar, pronta: Date.now() + esperaArapuca(), isca }; sfx('hoe');
+    toast(`🪤 Arapuca armada em ${LUGAR_CACA[c.lugar].nome} com ${d.nome.toLowerCase()}! Volte em ${fmt(esperaArapuca() / 1000)}.`, 'good'); done(); return renderCaca();
   }
-  if (!c.arapuca) {
-    if (!(state.barn.milho > 0)) return toast('🌽 A arapuca precisa de 1 milho do celeiro de isca. Plante e colha milho!', 'bad');
-    state.barn.milho--; if (!state.barn.milho) delete state.barn.milho;
-    c.arapuca = { lugar: c.lugar, pronta: Date.now() + esperaArapuca() }; sfx('hoe');
-    toast(`🪤 Arapuca armada em ${LUGAR_CACA[c.lugar].nome}! Volte em ${fmt(esperaArapuca() / 1000)}.`, 'good'); done(); return renderCaca();
-  }
-  const falta = c.arapuca.pronta - Date.now();
+  const falta = ar.pronta - Date.now();
   if (falta > 0) return toast(`🪤 A arapuca ainda está armada: volte em ${fmt(falta / 1000)}.`);
-  const lugar = c.arapuca.lugar; c.arapuca = null;
-  if (Math.random() < 0.15) { caca = { fase: 'resultado', msg: '🪤 A arapuca desarmou e comeram o milho… nada desta vez. Arme de novo!' }; sfx('error'); done(); return renderCaca(); }
-  const b = sortearBicho('arapuca', lugar), novo = registrarBicho(b);
+  c.arms[k] = null;
+  const d = ISCAS_ARAPUCA[ar.isca] || ISCAS_ARAPUCA.milho;
+  if (Math.random() < d.vazia) { caca = { fase: 'resultado', msg: '🪤 A arapuca desarmou e comeram a isca… nada desta vez. Arme de novo!' }; sfx('error'); done(); return renderCaca(); }
+  const b = sortearBicho('arapuca', ar.lugar, ar.isca), novo = registrarBicho(b);
   addCoins(b.moedas, null);
   caca = { fase: 'resultado', bicho: b, solto: true, novo,
     msg: `🪤 Caiu ${um(b)} ${b.nome} na arapuca!${novo ? ' ✨ Novo no livro!' : ''} Anotou no livro e soltou de volta no mato 🌿 (+${b.moedas} moedas).` };
@@ -8826,12 +8867,18 @@ function renderCaca() {
   btn.textContent = caca.fase === 'procurando' ? 'Procurando… 👀' : caca.fase === 'mira' ? `🎯 Toque no bicho! (${munDe(caca.arma)} ${ARMAS_CACA[caca.arma].munNome})`
     : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : munDe(c.arma) <= 0 ? `Sem ${a.munNome}` : `${caca.fase === 'resultado' ? 'Caçar de novo' : 'Entrar no mato'} (${restamCaca(l.id)}/${CACA_POR_VEZ})`;
   btn.disabled = (livre && !!descansa) || caca.fase === 'mira' || caca.fase === 'procurando';
-  // arapuca
-  const ab = $('#cacaArapuca'), ar = c.arapuca, falta = ar ? ar.pronta - Date.now() : 0;
-  setHtml(ab, !c.temArapuca ? (state.level < ARAPUCA.nivel ? `🪤 Arapuca<br><small>🔒 Nv ${ARAPUCA.nivel}</small>` : `🪤 Arapuca<br><small>${moeda(ARAPUCA.custo)}</small>`)
-    : !ar ? `🪤 Armar arapuca<br><small>isca: 1 milho 🌽</small>` : falta > 0 ? `🪤 Arapuca armada<br><small>em ${fmt(falta / 1000)}</small>` : `🪤 Ver a arapuca!<br><small>caiu alguma coisa?</small>`);
-  ab.classList.toggle('gold', !!ar && falta <= 0); ab.classList.toggle('pulsa', !!ar && falta <= 0);
-  ab.disabled = !livre;
+  // arapucas (até 2) e a isca
+  const arBtn = k => {
+    const ar = c.arms[k], falta = ar ? ar.pronta - Date.now() : 0, pronta = ar && falta <= 0;
+    return `<button class="btn ${pronta ? 'gold pulsa' : 'ghost'} tarrafa" type="button" data-arap="${k}" ${livre ? '' : 'disabled'}>${!ar ? `🪤 Armar${c.nArap > 1 ? ` ${k + 1}` : ''}<br><small>${ISCAS_ARAPUCA[c.iscaArap].emoji} ${ISCAS_ARAPUCA[c.iscaArap].nome.toLowerCase()}</small>`
+      : pronta ? `🪤 Ver${c.nArap > 1 ? ` ${k + 1}` : ''}!<br><small>caiu alguma coisa?</small>` : `🪤 Armada${c.nArap > 1 ? ` ${k + 1}` : ''}<br><small>${ISCAS_ARAPUCA[ar.isca || 'milho'].emoji} em ${fmt(falta / 1000)}</small>`}</button>`;
+  };
+  const prox = c.nArap >= 2 ? '' : c.nArap === 0 ? `<button class="btn ghost tarrafa" type="button" data-arap="comprar">🪤 Arapuca<br><small>${state.level < ARAPUCA.nivel ? `🔒 Nv ${ARAPUCA.nivel}` : moeda(ARAPUCA.custo)}</small></button>`
+    : `<button class="btn ghost tarrafa" type="button" data-arap="comprar">+ 2ª arapuca<br><small>${state.level < ARAPUCA.nivel2 ? `🔒 Nv ${ARAPUCA.nivel2}` : moeda(ARAPUCA.custo2)}</small></button>`;
+  setHtml($('#cacaArapuca'), Array.from({ length: c.nArap }, (_, k) => arBtn(k)).join('') + prox);
+  const bi = $('#cacaIscas'); bi.closest('.pescabar').hidden = !c.nArap;
+  setHtml(bi, Object.entries(ISCAS_ARAPUCA).map(([id, d]) => `<button type="button" class="iscabtn" data-isca-arap="${id}" aria-pressed="${c.iscaArap === id}" title="${d.nome}">${d.emoji}<small>${qtdIscaArap(id)}</small></button>`).join('')
+    + (c.iscaArap === 'quirera' ? `<button type="button" class="btn ghost" data-comprar-quirera="1" style="font-size:12px;padding:4px 8px">+${ISCAS_ARAPUCA.quirera.pacote} · ${moeda(ISCAS_ARAPUCA.quirera.custo)}</button>` : ''));
   setHtml($('#cacaDominio'), dominioCacaHTML());
   setHtml($('#cacaLugares'), LUGARES_CACA.map(d => {
     const meu = temLugarCaca(d.id), trava = d.nivel > state.level, f = meu ? faltaLugarCaca(d.id) : 0;
@@ -8857,12 +8904,13 @@ function renderCaca() {
   if (cacaLivro) setHtml($('#cacaLivro'), livroCaca());
 }
 function livroCaca() {
-  const c = cacaDe(), pegos = CACA_BICHOS.filter(b => c.col[b.id]).length, pend = bichosAResgatar(), soma = pend.reduce((t, b) => t + (TREVO_PEIXE[b.raro] || 1), 0);
+  const c = cacaDe(), pegos = CACA_BICHOS.filter(b => c.col[b.id]).length, pend = bichosAResgatar(), soma = pend.reduce((t, b) => t + trevosDoBicho(b), 0);
   const card = b => { const n = c.col[b.id] || 0, novo = c.novos.includes(b.id);
     return `<div class="lvcard ${n ? '' : 'falta'}">${novo ? '<span class="lvnovo">NOVO!</span>' : ''}<img alt="" src="${n ? bichoIcon(b.id) : bichoSombra(b.id)}">
       <b>${n ? esc(b.nome) : '???'}</b><span class="raro" style="color:${COR_RARO[b.raro]}">${b.raro}</span>
-      <small>${n ? `${b.praga ? 'Pegou' : 'Registrou'} ${n}×` : b.nivel > state.level ? `Nível ${b.nivel}` : `${b.armas.map(x => x === 'arapuca' ? 'arapuca' : ARMAS_CACA[x].nome.toLowerCase()).join(' ou ')} · ${LUGARES_CACA[b.lug].nome}${b.lug < 4 ? ' ou além' : ''}`}</small></div>`; };
-  return `<p class="hint" style="margin:0 0 8px">Você já tem <b>${pegos} de ${CACA_BICHOS.length}</b> bichos no livro. Cada bicho novo vale trevos 🍀 (comum 1, incomum 2, raro 3, épico 5, lendário 10).</p>
+      ${n ? `<small class="lvest" title="Domínio deste bicho">${'★'.repeat(estrelasBicho(b))}${'☆'.repeat(4 - estrelasBicho(b))}${(MAESTRIA[b.raro] || MAESTRIA.comum)[estrelasBicho(b)] ? ` <span>${n}/${(MAESTRIA[b.raro] || MAESTRIA.comum)[estrelasBicho(b)]}</span>` : ' <span>máximo!</span>'}</small>` : ''}
+      <small>${n ? `📷 ${b.praga ? 'Pegou' : 'Registrou'} ${n}×` : b.nivel > state.level ? `Nível ${b.nivel}` : `${b.armas.map(x => x === 'arapuca' ? 'arapuca' : ARMAS_CACA[x].nome.toLowerCase()).join(' ou ')} · ${LUGARES_CACA[b.lug].nome}${b.lug < 4 ? ' ou além' : ''}`}</small></div>`; };
+  return `<p class="hint" style="margin:0 0 8px">Você já tem <b>${pegos} de ${CACA_BICHOS.length}</b> bichos no livro. Cada bicho novo vale trevos 🍀 (comum 1, incomum 2, raro 3, épico 5, lendário 10) e uma 📷 foto no mural da sua casa. E cada bicho tem o seu domínio ★: pegando mais do mesmo, ele ganha estrelas (até 4), aparece 15% mais e cada estrela vale trevos.</p>
     ${pend.length ? `<p style="margin:0 0 8px;text-align:center"><button class="btn gold" type="button" data-trevo-bichos="1">Resgatar tudo · 🍀 ${soma}</button></p>` : ''}
     <h3 style="margin:4px 0">🎯 Pragas (estilingue e espingarda)</h3><div class="livro">${CACA_BICHOS.filter(b => b.praga).map(card).join('')}</div>
     <h3 style="margin:10px 0 4px">🪤 Bichos do mato (arapuca, soltos depois)</h3><div class="livro">${CACA_BICHOS.filter(b => !b.praga).map(card).join('')}</div>`;
@@ -9008,7 +9056,9 @@ function desenharCaca(t) {
 $('#caca').addEventListener('click', e => {
   if (e.target === $('#caca') || e.target.closest('[data-close]')) return fecharCaca();
   if (e.target.closest('#cacaBtn')) return entrarNoMato();
-  if (e.target.closest('#cacaArapuca')) return arapucaAcao();
+  const apb = e.target.closest('[data-arap]'); if (apb) return apb.dataset.arap === 'comprar' ? comprarArapuca() : arapucaAcao(Number(apb.dataset.arap));
+  const ib = e.target.closest('[data-isca-arap]'); if (ib) { cacaDe().iscaArap = ib.dataset.iscaArap; save(); sfx('click'); return renderCaca(); }
+  if (e.target.closest('[data-comprar-quirera]')) return comprarQuirera();
   if (e.target.closest('#cacaComprar')) return comprarMunicao();
   if (e.target.closest('[data-trevo-bichos]')) { resgatarBichos(); return renderCaca(); }
   if (e.target.closest('[data-trevo-domcaca]')) { resgatarDomCaca(); return renderCaca(); }
@@ -9060,6 +9110,83 @@ function drawMataCaca(x, y, W) {
   ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 1.5 * s; ctx.beginPath(); ctx.roundRect(px - 16 * s, py - 44 * s, 32 * s, 18 * s, 3 * s); ctx.fill(); ctx.stroke();
   for (const [r, c] of [[7, '#c8402f'], [5, '#fff'], [3, '#c8402f']]) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(px, py - 35 * s, r * s, 0, 7); ctx.fill(); }
 }
+
+// ---------- Mural da caçada: uma foto de cada bicho, na parede da sala ----------
+const fotoImgs = {};
+function fotoImg(id) { const src = bichoIcon(id); if (!fotoImgs[src]) { const im = new Image(); im.src = src; fotoImgs[src] = im; } const im = fotoImgs[src]; return im.complete && im.naturalWidth ? im : null; }
+function drawMural(s, t, home) {
+  const col = (s.caca && s.caca.col) || {}, fotos = CACA_BICHOS.filter(b => col[b.id]);
+  if (!fotos.length) return;
+  const W = L.W;
+  // quadro de cortiça na parede da esquerda, em cima do sofá
+  quad(P(0, 0.92, 0.7), P(0, 3.28, 0.7), P(0, 3.28, 1.26), P(0, 0.92, 1.26), '#8a5a33', 'rgba(0,0,0,.35)', 1.5);
+  quad(P(0, 0.98, 0.74), P(0, 3.22, 0.74), P(0, 3.22, 1.22), P(0, 0.98, 1.22), '#d8a868');
+  fotos.forEach((b, k) => {
+    const c = P(0, 1.14 + (k % 8) * 0.28, k < 8 ? 1.1 : 0.86), w = W * 0.12, ang = ((k * 37) % 9 - 4) * 0.02;
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(ang);
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(-w / 2 + 1.5, -w / 2 + 1.5, w, w * 1.12);
+    ctx.fillStyle = '#fffdf6'; ctx.fillRect(-w / 2, -w / 2, w, w * 1.12);
+    ctx.fillStyle = '#cfe8b8'; ctx.fillRect(-w / 2 + w * 0.08, -w / 2 + w * 0.08, w * 0.84, w * 0.8);
+    const im = fotoImg(b.id); if (im) ctx.drawImage(im, -w / 2 + w * 0.08, -w / 2 + w * 0.08, w * 0.84, w * 0.8);
+    ctx.fillStyle = '#c8402f'; ctx.beginPath(); ctx.arc(0, -w / 2 + 1, Math.max(1.5, w * 0.06), 0, 7); ctx.fill(); // tachinha
+    ctx.restore();
+  });
+  const m = P(0, 2.1, 0.98);
+  if (hover && hover.kind === 'mural') { ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2; poly([P(0, 0.92, 0.7), P(0, 3.28, 0.7), P(0, 3.28, 1.26), P(0, 0.92, 1.26)]); ctx.stroke(); }
+  hits.push({ kind: 'mural', n: fotos.length, x: m.x, y: m.y, r: W * 0.45 });
+}
+// ---------- Pragas que invadem a roça ----------
+// De vez em quando um rato (ou, a partir do nível 12, um javali) entra na plantação. Se ninguém espantar
+// em 90 segundos, ele come um pouco de 1 planta (o javali, de até 2) e vai embora: nunca estraga a roça toda.
+// Com o cachorro da roça acordado (com ração), é bem mais raro: quase sempre ele late e espanta antes.
+let invasor = null;
+const INVASAO_MS = 90e3;
+function invasaoTick() {
+  if (!state || !isHome() || state.level < CACA_NIVEL) return;
+  const agora = Date.now();
+  if (invasor) { if (agora >= invasor.ate) invasorCome(); return; }
+  if (!state.invasaoProx) { state.invasaoProx = agora + (25 + Math.random() * 25) * 60e3; return; }
+  if (agora < state.invasaoProx) return;
+  state.invasaoProx = agora + (35 + Math.random() * 35) * 60e3;
+  const alvos = state.plots.map((p, i) => i).filter(i => { const p = state.plots[i]; return p.s === 'growing' && !p.podre && !p.poda; });
+  if (!alvos.length) return save();
+  const tipo = state.level >= 12 && Math.random() < 0.35 ? 'javali' : 'rato', nome = tipo === 'javali' ? 'um javali' : 'um rato';
+  const d = state.dogs && state.dogs.roca;
+  if (d && dogAwake(d) && Math.random() < 0.75) { toast(`🐕 ${d.nome} latiu e espantou ${nome} que vinha para a plantação!`, 'good'); sfx('bark'); addNews(`🐕 ${d.nome} espantou ${nome} que ia comer a sua plantação.`); return save(); }
+  invasor = { tipo, i: alvos[Math.floor(Math.random() * alvos.length)], t0: agora, ate: agora + INVASAO_MS, dir: Math.random() < 0.5 ? 1 : -1 };
+  sfx(tipo === 'javali' ? 'bicho_porco' : 'prea');
+  toast(`${tipo === 'javali' ? '🐗 Um javali' : '🐀 Um rato'} entrou na plantação! Clique nele para espantar antes que coma.`, 'bad');
+  save();
+}
+function invasorCome() {
+  const v = invasor; invasor = null; if (!v) return;
+  const comidas = [v.i];
+  if (v.tipo === 'javali') { const viz = neighbors(v.i).filter(j => state.plots[j].s === 'growing' && !state.plots[j].podre); if (viz.length) comidas.push(viz[Math.floor(Math.random() * viz.length)]); }
+  for (const i of comidas) { const p = state.plots[i]; if (p.s === 'growing' && CROP[p.c]) p.dmg = Math.min(CROP[p.c].rend - 1, (p.dmg || 0) + (v.tipo === 'javali' ? 2 : 1)); }
+  const msg = `${v.tipo === 'javali' ? '🐗 O javali' : '🐀 O rato'} comeu um pouco de ${comidas.length} planta${comidas.length > 1 ? 's' : ''} e foi embora. (Com o cachorro de guarda, isso quase não acontece!)`;
+  toast(msg, 'bad'); addNews(msg); done();
+}
+function espantarInvasor() {
+  if (!invasor) return;
+  const m = cellCenter(invasor.i), pos = { x: m.x, y: m.y - L.W * 0.3 }, tipo = invasor.tipo; invasor = null;
+  addXP(tipo === 'javali' ? 6 : 3, pos); addCoins(tipo === 'javali' ? 12 : 5, pos); sfx('hoe'); popupAt(pos, 'Xô!', '#c8402f');
+  toast(`${tipo === 'javali' ? '🐗 Espantou o javali' : '🐀 Espantou o rato'}! A plantação está salva.`, 'good'); done();
+}
+function drawInvasor(t) {
+  if (!invasor) return;
+  const W = L.W, m = cellCenter(invasor.i), b = CACA_BICHO[invasor.tipo], pulo = Math.abs(Math.sin(t / 160)) * W * 0.03;
+  ctx.save(); if (invasor.dir < 0) { ctx.translate(m.x * 2, 0); ctx.scale(-1, 1); }
+  drawBicho(ctx, m.x, m.y + W * 0.05 - pulo, W / 100 * (invasor.tipo === 'javali' ? 0.95 : 1.4), b, t, true);
+  ctx.restore();
+  // contagem: o balão "!" fica mais vermelho perto de ele comer
+  const falta = Math.max(0, invasor.ate - Date.now()) / INVASAO_MS, by = m.y - W * 0.45 + Math.sin(t / 200) * 3, R = clamp(W * 0.12, 11, 18);
+  ctx.fillStyle = falta < 0.3 ? '#e0463a' : '#fff3c4'; ctx.strokeStyle = '#8f2a1e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(m.x, by, R, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#c8402f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(m.x, by, R + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * falta); ctx.stroke();
+  ctx.fillStyle = falta < 0.3 ? '#fff' : '#c8402f'; ctx.font = `900 ${Math.round(R * 1.3)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', m.x, by + 1); ctx.textBaseline = 'alphabetic';
+  if (hover && hover.kind === 'invasor') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(m.x, m.y + W * 0.05, W * 0.3, W * 0.1, 0, 0, 7); ctx.stroke(); }
+  hits.push({ kind: 'invasor', x: m.x, y: m.y - W * 0.12, r: Math.max(W * 0.34, 22) });
+}
+if (location.protocol === 'file:') window.__invadir = () => { state.invasaoProx = 1; invasaoTick(); return invasor; }; // só para testes
 
 // ============================================================
 // Trevos 🍀: a moeda verde. Não se compra: ganha resgatando peixes novos (no Livro de peixes),
@@ -9233,7 +9360,7 @@ function trevosHTML() {
   if (state.level >= CACA_NIVEL) {
     const bb = bichosAResgatar(), dc = cacaDomAResgatar();
     if (bb.length) html += `<div class="row sel"><div class="avatar" style="background:#6b8a3a;font-size:24px">🎯</div><div><div class="name">Livro da caçada</div>
-      <div class="meta">${bb.map(b => esc(b.nome)).join(', ')}</div></div><button class="btn gold" data-trevo-bichos="1">Resgatar 🍀${bb.reduce((n, b) => n + (TREVO_PEIXE[b.raro] || 1), 0)}</button></div>`;
+      <div class="meta">${bb.map(b => `${esc(b.nome)}${estrelasBicho(b) ? ' ' + '★'.repeat(estrelasBicho(b)) : ''}`).join(', ')}</div></div><button class="btn gold" data-trevo-bichos="1">Resgatar 🍀${bb.reduce((n, b) => n + trevosDoBicho(b), 0)}</button></div>`;
     if (dc.length) html += `<div class="row sel"><div class="avatar" style="background:#e0a800;font-size:24px">🎖️</div><div><div class="name">Domínio de caçada</div>
       <div class="meta">Nível ${dc.length > 1 ? `${dc[0]} a ${dc[dc.length - 1]}` : dc[0]}</div></div><button class="btn gold" data-trevo-domcaca="1">Resgatar 🍀${dc.reduce((n, x) => n + (TREVO_DOMINIO[x] || 0), 0)}</button></div>`;
   }
@@ -9300,7 +9427,7 @@ function frame(now) {
   if (!isGated() && L.cw > 20) draw(now, dt);
   if (now - lastUI > 250) { updateTip(); lastUI = now; }
   if (now - lastInfo > 2000) {
-    tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao(); folhasTick();
+    tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao(); folhasTick(); invasaoTick();
     // a fábrica e o caminhão têm relógio: atualiza a janela (menos a banca, que tem formulário)
     if (!$('#panel').hidden && tab === 'fabrica' && fabSeg !== 'banca' && isHome()) { const y = $('#pane').scrollTop; renderPane(); $('#pane').scrollTop = y; } renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
   if (now - lastSave > 5000) { save(); lastSave = now; }
