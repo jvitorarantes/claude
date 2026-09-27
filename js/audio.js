@@ -221,6 +221,38 @@
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.start(t); o.stop(t + dur + 0.02);
   }
+  // Voz de bicho: oscilador com glissando, filtro e um tremido (vibrato) opcional.
+  function voz(t, { tipo = 'sawtooth', f = [[0, 400]], dur = 0.3, vel = 0.2, filtro = 1400, q = 1.5, vib = 0, vibD = 0, passa = 'bandpass' }) {
+    const o = ac.createOscillator(), b = ac.createBiquadFilter(), g = ac.createGain();
+    o.type = tipo; b.type = passa; b.frequency.value = filtro; b.Q.value = q;
+    o.frequency.setValueAtTime(f[0][1], t); for (const [dt, fr] of f.slice(1)) o.frequency.linearRampToValueAtTime(fr, t + dt);
+    if (vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = vib; lg.gain.value = vibD; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + dur + 0.05); }
+    o.connect(b); b.connect(g); g.connect(sfxBus);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel, t + Math.min(0.03, dur / 4)); g.gain.setValueAtTime(vel, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  const muu = (t, f0, dur) => voz(t, { f: [[0, f0], [dur * 0.3, f0 * 1.15], [dur, f0 * 0.85]], dur, vel: 0.35, filtro: 700, q: 1, passa: 'lowpass', vib: 5, vibD: 4 });
+  const mee = (t, f0) => voz(t, { f: [[0, f0], [0.5, f0 * 0.95]], dur: 0.55, vel: 0.22, filtro: 1400, q: 2, vib: 9, vibD: f0 * 0.09 });
+  const oinc = t => { for (const d of [0, 0.16]) { voz(t + d, { tipo: 'square', f: [[0, 260], [0.1, 180]], dur: 0.12, vel: 0.18, filtro: 700, q: 2 }); noise(t + d, 0.1, 'bandpass', 700, 500, 0.1, 3); } };
+  const cacarejo = t => { for (let k = 0; k < 3; k++) voz(t + k * 0.1, { tipo: 'square', f: [[0, 720], [0.06, 560]], dur: 0.07, vel: 0.1, filtro: 1500, q: 3 }); voz(t + 0.34, { tipo: 'square', f: [[0, 600], [0.25, 950]], dur: 0.3, vel: 0.12, filtro: 1700, q: 3 }); };
+  const relincho = (t, f0) => voz(t, { f: [[0, f0], [0.2, f0 * 1.3], [0.8, f0 * 0.55]], dur: 0.85, vel: 0.2, filtro: 1500, q: 2, vib: 13, vibD: f0 * 0.12 });
+  const BICHOS = {
+    galinha: cacarejo,
+    angola: t => { for (let k = 0; k < 3; k++) { voz(t + k * 0.24, { f: [[0, 1300], [0.08, 1000]], dur: 0.09, vel: 0.15, filtro: 1500, q: 4 }); voz(t + k * 0.24 + 0.1, { f: [[0, 1100], [0.1, 800]], dur: 0.11, vel: 0.15, filtro: 1300, q: 4 }); } },
+    pato: t => { for (const d of [0, 0.22]) voz(t + d, { f: [[0, 430], [0.16, 320]], dur: 0.18, vel: 0.25, filtro: 1100, q: 5 }); },
+    coelho: t => { blip(t, 'sine', 1800, 2400, 0.06, 0.08); blip(t + 0.1, 'sine', 1900, 2500, 0.06, 0.07); noise(t + 0.2, 0.12, 'highpass', 3000, 4000, 0.05); },
+    cabra: t => mee(t, 420), ovelha: t => mee(t, 330),
+    vaca: t => muu(t, 140, 1.0), bufala: t => muu(t, 115, 1.1), bezerro: t => muu(t, 230, 0.7),
+    porco: oinc, porca: oinc,
+    cavalo: t => relincho(t, 800), potro: t => relincho(t, 1000),
+    burro: t => { for (let k = 0; k < 2; k++) { voz(t + k * 0.55, { f: [[0, 750], [0.2, 700]], dur: 0.22, vel: 0.22, filtro: 1400, q: 1.5 }); voz(t + k * 0.55 + 0.25, { f: [[0, 260], [0.25, 230]], dur: 0.27, vel: 0.25, filtro: 800, q: 1.5 }); } },
+    abelha: t => voz(t, { f: [[0, 220], [0.8, 240]], dur: 0.85, vel: 0.12, filtro: 1600, q: 1, passa: 'lowpass', vib: 28, vibD: 25 }),
+    pavao: t => { for (const d of [0, 0.4]) voz(t + d, { f: [[0, 1100], [0.3, 1600]], dur: 0.32, vel: 0.15, filtro: 1800, q: 3 }); },
+    avestruz: t => { for (const d of [0, 0.35]) blip(t + d, 'sine', 95, 60, 0.3, 0.4); },
+    gato: t => voz(t, { tipo: 'triangle', f: [[0, 480], [0.18, 820], [0.5, 460]], dur: 0.55, vel: 0.2, filtro: 2000, q: 1.2 }),
+    tartaruga: t => blip(t, 'sine', 300, 260, 0.12, 0.1),
+    arara: t => { voz(t, { f: [[0, 1500], [0.22, 900]], dur: 0.25, vel: 0.18, filtro: 2000, q: 2 }); noise(t, 0.2, 'bandpass', 2500, 1500, 0.08, 2); },
+  };
   const SFX = {
     click: t => blip(t, 'sine', 880, 620, 0.05, 0.12),
     water: t => { noise(t, 0.5, 'bandpass', 900, 2600, 0.22, 1.2); for (let k = 0; k < 4; k++) blip(t + 0.08 + k * 0.09 + Math.random() * 0.04, 'sine', 1400 + Math.random() * 900, 700, 0.06, 0.05); },
@@ -306,8 +338,9 @@
       }
     },
     play(name) {
-      if (!ac || !unlocked || !cfg.sfx || !SFX[name]) return;
-      try { SFX[name](ac.currentTime + 0.01); } catch (e) { /* som é enfeite: nunca quebra o jogo */ }
+      const fn = SFX[name] || (name.startsWith('bicho_') && BICHOS[name.slice(6)]);
+      if (!ac || !unlocked || !cfg.sfx || !fn) return;
+      try { fn(ac.currentTime + 0.01); } catch (e) { /* som é enfeite: nunca quebra o jogo */ }
     },
   };
   window.RFAudio = RFAudio;

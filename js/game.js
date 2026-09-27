@@ -68,6 +68,7 @@ const PRODUCE = Object.fromEntries(CROPS.map(c => [c.prod, { id: c.prod, nome: c
 // Produtos dos animais de produção (o leitão da porca não vai para o celeiro: vira um porquinho).
 const PRODUCTS = [
   { id: 'ovo',         nome: 'Ovo',             preco: 60 },
+  { id: 'ovoangola',   nome: 'Ovo de angola',   preco: 75 },
   { id: 'ovopata',     nome: 'Ovo de pata',     preco: 90 },
   { id: 'pelo',        nome: 'Pelo de coelho',  preco: 120 },
   { id: 'leitecabra',  nome: 'Leite de cabra',  preco: 180 },
@@ -85,6 +86,7 @@ PRODUCT.leitao = { id: 'leitao', nome: 'Leitão', preco: 700 };
 // tipo 'pet': companhia, não come nem produz. lugar: 'casa' ou 'curral'.
 const ANIMALS = [
   { id: 'galinha',   tipo: 'prod', nome: 'Galinha',   f: 1, nivel: 2,  custo: 500,  racao: 20,  tempo: 4 * HOUR,  prod: 'ovo',         periodo: 30, xp: 2 },
+  { id: 'angola',    tipo: 'prod', nome: "Galinha-d'angola", f: 1, nivel: 3, custo: 700, racao: 25, tempo: 5 * HOUR, prod: 'ovoangola', periodo: 30, xp: 2 },
   { id: 'pato',      tipo: 'prod', nome: 'Pato',      f: 0, nivel: 4,  custo: 900,  racao: 30,  tempo: 6 * HOUR,  prod: 'ovopata',     periodo: 30, xp: 3 },
   { id: 'coelho',    tipo: 'prod', nome: 'Coelho',    f: 0, nivel: 5,  custo: 1200, racao: 40,  tempo: 8 * HOUR,  prod: 'pelo',        periodo: 30, xp: 3 },
   { id: 'cabra',     tipo: 'prod', nome: 'Cabra',     f: 1, nivel: 7,  custo: 2000, racao: 60,  tempo: 8 * HOUR,  prod: 'leitecabra',  periodo: 45, xp: 4 },
@@ -112,7 +114,7 @@ const inPen = a => ANIMAL[a.k].tipo !== 'pet' || ANIMAL[a.k].lugar === 'curral';
 // Abrigos do rancho: cada bicho mora no seu. Cada nível aumenta quantos cabem.
 // precos: construir (nível 1), depois aumentar para o nível 2 e o 3.
 const ABRIGOS = [
-  { id: 'galinheiro', nome: 'Galinheiro',   o: 'o', nivel: 1,  precos: [0, 1500, 4000],     bichos: ['galinha', 'pato'] },
+  { id: 'galinheiro', nome: 'Galinheiro',   o: 'o', nivel: 1,  precos: [0, 1500, 4000],     bichos: ['galinha', 'angola', 'pato'] },
   { id: 'coelheira',  nome: 'Coelheira',    o: 'a', nivel: 5,  precos: [2000, 3000, 6000],  bichos: ['coelho'] },
   { id: 'chiqueiro',  nome: 'Chiqueiro',    o: 'o', nivel: 3,  precos: [1500, 3000, 6000],  bichos: ['porco', 'porca'] },
   { id: 'apiario',    nome: 'Apiário',      o: 'o', nivel: 12, precos: [3000, 4500, 9000],  bichos: ['abelha'] },
@@ -712,9 +714,38 @@ function harvest(p, pos) {
 }
 
 
+// Clique num bicho: ele solta uma frase (balãozinho) e o seu barulho.
+const FALAS_BICHO = {
+  galinha: ['Có có có!', 'Botei um ovo! 🥚', 'Cadê o milho?', 'Achei uma minhoca!'],
+  angola: ['Tô fraco! Tô fraco!', 'Quem mexeu no meu ninho?', 'Tô de pintinha nova ✨', 'Que calor, sô!'],
+  pato: ['Quá quá!', 'Cadê a lagoa?', 'Hoje tem banho? 🦆', 'Quá! Quem chegou?'],
+  coelho: ['Cenoura, por favor! 🥕', 'Hop hop!', '*mexe o narizinho*', 'Orelhas em pé!'],
+  cabra: ['Méééé!', 'Posso comer seu chapéu?', 'Subi no telhado!', 'Mééé, que capim bom!'],
+  ovelha: ['Béééé!', 'Tá frio sem lã…', 'Contando carneirinhos 💤', 'Bééé, fofinha eu?'],
+  vaca: ['Muuuu!', 'Capim fresquinho 😋', 'Tô ruminando…', 'Leitinho saindo!'],
+  bufala: ['Muuuu!', 'Cadê a lama?', 'Forte que nem eu, só eu!'],
+  bezerro: ['Mé-uuu!', 'Cadê a mamãe?', 'Quero mamar!'],
+  porco: ['Oinc oinc!', 'Tem lama aí?', 'Sobrou lavagem?', 'Oinc! Tô com fome!'],
+  porca: ['Oinc oinc!', 'Cuidado com os leitõezinhos!', 'Tem lama aí?'],
+  cavalo: ['Iiirrí!', 'Bora dar uma volta?', 'Quero uma maçã! 🍎'],
+  potro: ['Iirrí!', 'Olha como eu corro!', 'Brincar! Brincar!'],
+  burro: ['Ió! Ió!', 'Teimoso eu? Nunca!', 'Ió… tô descansando.'],
+  abelha: ['Bzzzz!', 'Fazendo mel 🍯', 'Cuidado com o ferrão!', 'Bzz, cadê as flores?'],
+  pavao: ['Olha minha cauda! ✨', 'Sou o mais bonito da roça', 'Mi-áu! (não sou gato)'],
+  avestruz: ['Bum bum!', 'Quem viu meu ovo gigante?', 'Corro mais que o caminhão!'],
+  gato: ['Miau!', 'Ronronando… 😸', 'Cadê o peixe?', 'Miau, carinho!'],
+  tartaruga: ['Devagar se vai longe…', 'Oi… 🐢', 'Tô com pressa não.'],
+  arara: ['Currupaco!', 'Louro quer biscoito!', 'Roça Feliz! Roça Feliz!', 'Olá! Olá!'],
+};
+function falaBicho(a) {
+  const d = ANIMAL[a.k], lista = FALAS_BICHO[a.k] || ['…'];
+  falar('animal:' + a.id, a.nome || d.nome, lista[Math.floor(Math.random() * lista.length)]);
+  sfx('bicho_' + a.k);
+}
 function actAnimal(id) {
   const s = S(), a = s.animals.find(x => x.id === id);
   if (!a) return;
+  falaBicho(a);
   const d = ANIMAL[a.k], pos = animalPos(a.id);
   if (!isHome()) return awayAnimal(a, d, PRODUCT[d.prod], pos);
   if (d.tipo === 'pet') return petAnimal(a, pos);
@@ -1699,6 +1730,7 @@ function drawAnimalAt(a, m, base, t) {
   }
   drawAnimal(kind, p.x, p.y, sc, t, m.dir, m.moving);
   const h = ANIMAL_H[kind] * sc;
+  m.topo = { x: p.x, y: p.y - h - W * 0.05 };
   hits.push({ kind: 'animal', id: a.id, x: p.x, y: p.y - h * 0.5, r: Math.max(W * 0.22, h * 0.7) });
 }
 function animalBubble(a, home) {
@@ -3332,6 +3364,7 @@ let falas = [];
 function falar(alvo, nome, txt) { falas = falas.filter(f => f.alvo !== alvo); falas.push({ alvo, nome, txt, t0: performance.now() }); }
 function posFala(alvo) {
   if (alvo === 'avatar') { const w = avWalk[scene]; return w && w.tela; }
+  if (alvo.startsWith('animal:')) { const m = amb[alvo.slice(7)]; return m && m.topo; }
   if (alvo.startsWith('dog:')) return dogPos(alvo.slice(4));
   return null;
 }
