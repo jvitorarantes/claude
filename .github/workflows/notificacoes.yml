@@ -2,8 +2,8 @@ name: Notificações da Roça Feliz
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # a cada 15 minutos (o GitHub pode atrasar um pouco)
-  workflow_dispatch: {}       # botão "Run workflow" para testar na hora
+    - cron: '*/5 * * * *'    # reserva: o relógio do GitHub atrasa muito e às vezes pula horas
+  workflow_dispatch: {}       # disparo na hora: botão "Run workflow" e o cron-job.org (a cada 1 minuto, veja NOTIFICACOES.md)
 
 concurrency:
   group: notificacoes
@@ -21,7 +21,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install --no-audit --no-fund
+      # guarda o firebase-admin já instalado para as próximas vezes (roda bem mais rápido)
+      - uses: actions/cache@v4
+        with:
+          path: servidor/node_modules
+          key: node-${{ hashFiles('servidor/package.json') }}
+      - run: npm install --no-audit --no-fund --prefer-offline
       - run: node notificacoes.js
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
