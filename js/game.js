@@ -6172,7 +6172,7 @@ function renderPesca() {
   const pp = pontosDe();
   setHtml($('#pescaPontos'), PONTOS.map(d => {
     const meu = pp.meus.includes(d.id), trava = d.nivel > state.level, f = meu ? faltaPonto(d.id) : 0;
-    const st = meu ? (f ? `⏳ ${fmt(f / 1000)}` : 'Pronto!') : trava ? `🔒 Nv ${d.nivel}` : moeda(d.custo);
+    const st = meu ? (f ? `⏳ ${fmt(f / 1000)}` : 'Pronto!') : trava ? `🔒 Nv ${d.nivel} · ${moeda(d.custo)}` : moeda(d.custo);
     return `<button type="button" class="pontobtn ${meu ? '' : trava ? 'trava' : 'loja'} ${f ? 'descansa' : ''}" data-ponto="${d.id}" aria-pressed="${meu && d.id === pt.id}">
       <b>${d.emoji} ${d.nome}</b><small>${st}</small></button>`;
   }).join(''));
@@ -6190,7 +6190,7 @@ function renderPesca() {
   }).join(''));
   const d = ISCA[sel], cb = $('#pescaComprar');
   cb.hidden = !!d.doCeleiro;
-  if (!d.doCeleiro) { cb.textContent = `Comprar ${d.pacote} ${d.plural} · ${d.custo}`; cb.disabled = state.coins < d.custo; }
+  if (!d.doCeleiro) { setHtml(cb, `Comprar ${d.pacote} ${d.plural} · ${moeda(d.custo)}`); cb.disabled = state.coins < d.custo; }
   $('#pescaDica').textContent = `${d.emoji} ${d.nome}${d.doCeleiro ? ' (do celeiro)' : ''}: atrai ${PEIXES.filter(p => !p.lixo && p.iscas.includes(sel)).map(p => p.nivel > state.level ? '???' : p.nome + (state.col[p.id] ? '' : ' ✨')).join(', ')}.${PEIXES.some(p => !p.lixo && p.iscas.includes(sel) && p.nivel <= state.level && !state.col[p.id]) ? ' (✨ = nunca pegou)' : ''}`;
   $('#pescaLivro').hidden = !pescaLivro; $('#pescaCv').hidden = pescaLivro;
   const nn = (state.peixesNovos || []).length;

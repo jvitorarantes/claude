@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="72">
-<script src="firebase-config.js?v=72"></script>
+<meta name="rf-version" content="73">
+<script src="firebase-config.js?v=73"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -411,6 +411,7 @@
   .iscabtn[aria-pressed="true"] { border-color: #e0a800; background: #fff4c8; box-shadow: 0 0 0 2px #f2c14e; }
   .iscabtn:disabled { opacity: .45; cursor: default; }
   .pontos { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px; scrollbar-width: thin; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; cursor: grab; }
+  .pontobtn .coin { display: inline-block; width: 13px; height: 13px; vertical-align: -2px; margin-right: 3px; }
   .pontobtn.trava { opacity: .6; border-style: dashed; } .pontobtn.trava small { color: #7a6a52; }
   .pontobtn { flex: 0 0 auto; display: grid; justify-items: center; gap: 1px; padding: 5px 9px; border-radius: 12px; border: 2px solid var(--wood-3); background: var(--card); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; line-height: 1.2; }
   .pontobtn b { font-size: 12.5px; white-space: nowrap; } .pontobtn small { font-size: 11px; font-weight: 800; color: #4f7a2a; white-space: nowrap; }
@@ -827,8 +828,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=72"></script>
-<script src="js/cloud.js?v=72"></script>
-<script src="js/game.js?v=72"></script>
+<script src="js/audio.js?v=73"></script>
+<script src="js/cloud.js?v=73"></script>
+<script src="js/game.js?v=73"></script>
 </body>
 </html>
