@@ -917,6 +917,7 @@ const NOVIDADES = [
   { v: 61, txt: 'A partir de agora, toda novidade do jogo chega aqui no correio. Fique de olho! 📬' },
   { v: 63, txt: 'Pescaria nova: escolha a isca (🪱 minhoca, 🌽 milho do celeiro, 🦐 camarão no nível 6, 🎏 isca artificial no nível 12) — cada peixe só morde algumas. E abra o 📖 Livro de peixes para ver o que já pegou e o que falta!' },
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
+  { v: 70, txt: 'Clique na casinha do cachorro para trocar o nome dele. E o gato ganhou uma caminha na sala: clique nela para trocar o nome do bichano.' },
   { v: 69, txt: 'Venda animais direto no abrigo: clique na casa deles, e cada bicho da lista tem o botão Vender.' },
   { v: 69, txt: 'Itens novos para o avatar que liberam por nível: facão (5), foice (10), laço (15), viola (20) e machado (25). Escolha em ⚙️ › Seu avatar › Na mão.' },
   { v: 69, txt: 'Música nova: "Rock na Porteira", um rock rural com guitarra, bateria e viola. Troque em ⚙️ › Música.' },
@@ -1000,7 +1001,7 @@ function abrigoHTML() {
       : d.tipo === 'cria' ? (isAdult(a) ? 'adulto, pronto para vender' : `crescendo · falta ${fmt(d.tempo - a.g)}`) : 'companhia';
     const armed = buyPending && buyPending.i === 'venda' + a.id && performance.now() < buyPending.until;
     html += `<div class="row"><img alt="" src="${animalIcon(d.id)}"><div><div class="name">${esc(a.nome || d.nome)}</div><div class="meta">${d.nome} · ${st}</div></div>
-      <div class="stack"><button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${CUSTO_NOME_BICHO}</small></button>
+      <div class="stack"><button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${moeda(CUSTO_NOME_BICHO)}</small></button>
       <button class="btn ${armed ? 'danger' : isAdult(a) ? 'gold' : 'ghost'}" data-sell-animal="${a.id}" title="Vender">${armed ? 'Confirmar' : 'Vender ' + moeda(precoVenda(a))}</button></div></div>`;
   }
   html += `<h3>Comprar para ${b.o === 'a' ? 'a' : 'o'} ${b.nome.toLowerCase()}</h3>`;
@@ -2192,6 +2193,14 @@ function drawKennelSpot(slot, s, home) {
   const k = KENNEL_AT();
   drawKennel(k.x, k.y, L.W * 0.85);
 }
+function tipCanil(slot) {
+  const c = S().dogs && S().dogs[slot]; if (!c) return null;
+  return `<b>Casinha do ${esc(c.nome)}</b>${isHome() ? `<br>Clique para trocar o nome dele (${CUSTO_NOME_BICHO} moedas).` : ''}`;
+}
+function tipCaminha(id) {
+  const g = S().animals.find(x => x.id === id); if (!g) return null;
+  return `<b>Caminha do ${esc(g.nome || 'gato')}</b>${isHome() ? `<br>Clique para trocar o nome dele (${CUSTO_NOME_BICHO} moedas).` : ''}`;
+}
 function drawDogSpot(slot, s, t, home) {
   const W = L.W, k = KENNEL_AT(), p = DOG_AT();
   const d = s.dogs && s.dogs[slot];
@@ -2211,6 +2220,11 @@ function drawDogSpot(slot, s, t, home) {
     hits.push({ kind: 'dog', slot, x: m.x, y: m.y, r: Math.max(R * 1.8, 22) }); // o + também abre a loja de cães
   }
   hits.push({ kind: 'dog', slot, x: (k.x + p.x) / 2, y: p.y - W * 0.2, r: W * 0.4 });
+  // a casinha em si: clicar troca o nome do cachorro
+  if (dogAlive(d)) {
+    hits.push({ kind: 'canil', slot, x: k.x, y: k.y - W * 0.32, r: W * 0.3 });
+    if (hover && hover.kind === 'canil' && hover.slot === slot) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(k.x, k.y, W * 0.36, W * 0.13, 0, 0, 7); ctx.stroke(); }
+  }
 }
 function dogBubble(slot, s, t, home) {
   const d = s.dogs && s.dogs[slot];
@@ -3401,6 +3415,8 @@ function drawRoom(s, t, home) {
   for (const id of DECOR_ORDER) { const m = emUso(s, id); if (m) DRAW_DECOR[id](t, m); }
   // bichos de companhia que moram dentro de casa
   const pets = s.animals.filter(a => ANIMAL[a.k].lugar === 'casa');
+  const gato = pets.find(a => a.k === 'gato');
+  if (gato) drawCaminha(gato, t);
   updateWander(pets, Math.min(0.05, 1 / 60), ROOM_AREA);
   pets.map(a => ({ a, m: amb[a.id] })).sort((x, y) => (x.m.u + x.m.v) - (y.m.u + y.m.v)).forEach(({ a, m }) => drawAnimalAt(a, m, W / 100 * (a.k === 'arara' ? 1.35 : 2.1), t));
   for (const id of DECOR_ORDER) {
@@ -3409,6 +3425,24 @@ function drawRoom(s, t, home) {
   }
   const hv = hover && hover.kind === 'decor' && decorCenter(hover.id);
   if (hv) { ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(hv.x, hv.y, W * 0.42, 0, 7); ctx.stroke(); }
+}
+
+// Caminha do gato, no chão da sala. Clicar nela troca o nome dele.
+const CAMINHA_AT = [3.15, 4.45];
+function drawCaminha(a, t) {
+  const W = L.W, c = P(CAMINHA_AT[0], CAMINHA_AT[1]), rx = W * 0.34, ry = W * 0.17;
+  if (hover && hover.kind === 'caminha') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(c.x, c.y, rx * 1.15, ry * 1.2, 0, 0, 7); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(c.x, c.y + ry * 0.25, rx * 1.02, ry * 1.02, 0, 0, 7); ctx.fill();
+  // borda fofa (lateral e topo) e a almofada do meio
+  ctx.fillStyle = '#9c3a28'; ctx.beginPath(); ctx.ellipse(c.x, c.y, rx, ry, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#c9523a'; ctx.beginPath(); ctx.ellipse(c.x, c.y - ry * 0.35, rx, ry, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#f3dcae'; ctx.beginPath(); ctx.ellipse(c.x, c.y - ry * 0.3, rx * 0.72, ry * 0.62, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(120,70,30,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(c.x, c.y - ry * 0.3, rx * 0.5, ry * 0.4, 0, 0, 7); ctx.stroke();
+  // patinha bordada na borda da frente
+  const px = c.x, py = c.y + ry * 0.38, r = W * 0.018;
+  ctx.fillStyle = '#f3dcae'; ctx.beginPath(); ctx.arc(px, py, r * 1.3, 0, 7); ctx.fill();
+  for (const [dx, dy] of [[-1.5, -1.5], [0, -2.1], [1.5, -1.5]]) { ctx.beginPath(); ctx.arc(px + dx * r, py + dy * r, r * 0.6, 0, 7); ctx.fill(); }
+  hits.push({ kind: 'caminha', id: a.id, x: c.x, y: c.y - ry * 0.3, r: W * 0.32 });
 }
 
 // ---------- A ferramenta na mão ----------
@@ -3902,7 +3936,7 @@ function renderPane() {
       if (pets.length) {
         html += `<h3>Nomes dos seus bichos</h3>`;
         for (const a of pets) html += `<div class="row"><img alt="" src="${animalIcon(a.k)}"><div><div class="name">${esc(a.nome || ANIMAL[a.k].nome)}</div><div class="meta">${ANIMAL[a.k].nome}</div></div>
-          <button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${CUSTO_NOME_BICHO}</small></button></div>`;
+          <button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${moeda(CUSTO_NOME_BICHO)}</small></button></div>`;
       }
       const meus = state.animals.filter(a => ANIMAL[a.k].tipo === 'prod').sort((x, y) => lifeLeft(x) - lifeLeft(y));
       if (meus.length) {
@@ -3935,7 +3969,7 @@ function renderPane() {
         html += `<div class="row ${awake ? '' : 'sel'}"><img alt="" src="${dogIcon(d.raca)}">
           <div><div class="name">${esc(d.nome)} · ${slot === 'roca' ? 'roça' : 'rancho'}</div>
           <div class="meta">${awake ? `Acordado · ração por mais ${fmt((d.fedUntil - Date.now()) / 1000)}` : '<b>Dormindo de fome!</b> Não está vigiando.'}<br>${b.nome} · vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}</div></div>
-          <div class="stack">${awake ? '' : `<button class="btn" data-feed-dog="${slot}">Dar ração</button>`}<button class="btn ghost" data-renomear-dog="${slot}">Nome<br><small>${CUSTO_NOME_BICHO}</small></button></div></div>`;
+          <div class="stack">${awake ? '' : `<button class="btn" data-feed-dog="${slot}">Dar ração</button>`}<button class="btn ghost" data-renomear-dog="${slot}">Nome<br><small>${moeda(CUSTO_NOME_BICHO)}</small></button></div></div>`;
       }
       html += `<div class="row"><img alt="" src="${bowlIcon()}">
         <div><div class="name">Ração de cachorro</div><div class="meta">${DOG_FOOD.custo} moedas · dura ${DOG_FOOD.horas}h · você tem <b>${state.dogFood}</b></div></div>
@@ -4321,7 +4355,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>Clique para entrar.` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4477,6 +4511,8 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'animal') actAnimal(target.id);
   else if (target.kind === 'decor') actDecor(target.id);
   else if (target.kind === 'dog') actDog(target.slot);
+  else if (target.kind === 'canil') { if (isHome()) trocarNome({ dog: target.slot }); else { const c = S().dogs[target.slot]; if (c) toast(`Casinha do ${c.nome}.`); } }
+  else if (target.kind === 'caminha') { if (isHome()) trocarNome({ animal: target.id }); else { const g = S().animals.find(x => x.id === target.id); if (g) toast(`Caminha do ${g.nome || 'gato'}.`); } }
   else if (target.kind === 'abrigo') actAbrigo(target.id);
   else if (target.kind === 'land') openPanel('terreno');
   else if (target.kind === 'bicho') actBicho(target.i);
