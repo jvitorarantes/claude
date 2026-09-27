@@ -939,6 +939,7 @@ const NOVIDADES = [
   { v: 63, txt: 'Receitas com peixe na Fábrica: lambari frito, caldo de tilápia, moqueca de tucunaré, pintado assado, dourado na brasa e pirarucu de casaca.' },
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
+  { v: 100, txt: 'Montes de folhas 🍂: de vez em quando cai um monte de folhas no gramado (no outono, bem mais). Clique nele e o seu avatar vai lá rastelar: ganha XP e umas moedinhas!' },
   { v: 97, txt: 'Pomar 🌳: as árvores de enfeite saíram e chegaram as frutíferas! Compre na Loja › Pomar pitangueira, amoreira, maracujazeiro, jabuticabeira, mangueira, cajueiro e pequizeiro, e plante no gramado (agora dá para pôr enfeites e frutíferas no gramado dentro da cerca, fora da terra comprada). Elas dão frutas e secam depois de uns dias: arbusto seco sai com a 🪓 enxada de arrancar e árvore seca com a 🪚 motosserra, que você ganha completando missões, de amigos ou comprando.' },
   { v: 93, txt: 'O tema da casa agora vale também para a casinha do cachorro e para os abrigos dos bichos no rancho: tudo combinando!' },
   { v: 91, txt: 'Loja do Trevo 🍀 cheia de novidades: chapéu de cangaceiro, boina, panamá, gorro, sanfona, buquê, regador dourado, ipê-amarelo, fogueira de São João, balanço, carro de boi, as casas Lavanda, do Cerrado e Estrelada, a música Seresta ao Luar e itens úteis (iscas, ração especial, tarrafa e pontos de pesca prontos na hora).' },
@@ -3236,6 +3237,7 @@ function drawRoca(s, t, home) {
   if (home) drawLandSign();
   for (let sum = 0; sum <= COLS + ROWS - 2; sum++)
     for (let c = 0; c < COLS; c++) { const r = sum - c; if (r >= 0 && r < ROWS) drawPlot(r * COLS + c, s.plots[r * COLS + c], t, home); }
+  if (home) drawFolhas(t);
   drawAvatares('roca', t);
   drawObjetos(s, 'roca', t, home, 'frente');
   drawMoving('roca', t);
@@ -4612,7 +4614,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'folhas' ? '<b>🍂 Monte de folhas</b><br>Clique e o avatar vai rastelar (+XP e umas moedinhas).' : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -4774,6 +4776,7 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'land') openPanel('terreno');
   else if (target.kind === 'bicho') actBicho(target.i);
   else if (target.kind === 'lago') abrirPesca();
+  else if (target.kind === 'folhas') rastelarFolhas(target.id);
   else if (target.kind === 'avatar' && target.quem === 'dono') { falar('avatar:dono', view.nome, sorteia(FALAS_DONO.concat(FALAS_AVATAR))); sfx('fala'); }
   else if (target.kind === 'avatar') { falar('avatar', meuApelido(), sorteia(FALAS_AVATAR)); sfx('fala'); }
   else if (target.kind === 'enfeite') actEnfeite(target.id, target.key, target.sc);
@@ -5891,6 +5894,14 @@ function drawNaMao(g, tipo, t) {
     g.strokeStyle = '#e0b030'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(5, -2); g.lineTo(11, -7); g.stroke(); g.beginPath(); g.arc(0, -7, 3.5, Math.PI, 0); g.stroke();
     g.fillStyle = '#fff4c0'; g.fillRect(-3.5, -4.5, 2, 5);
     g.restore();
+  } else if (tipo === 'rastelo') {
+    // rastelo puxando as folhas: vai e vem
+    const o = Math.sin(t / 130) * 4;
+    g.strokeStyle = '#a4703f'; g.lineWidth = 2; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-3 + o * 0.3, 4); g.lineTo(9 + o, 40); g.stroke();
+    g.strokeStyle = '#5d6770'; g.lineWidth = 2; g.beginPath(); g.moveTo(3 + o, 40); g.lineTo(15 + o, 40); g.stroke();
+    g.lineWidth = 1.2; for (let k = 0; k < 5; k++) { g.beginPath(); g.moveTo(3.5 + o + k * 2.8, 40); g.lineTo(3 + o + k * 2.8, 43.5); g.stroke(); }
+    g.lineCap = 'butt';
   } else if (tipo === 'lampiao') {
     // lampião aceso pendurado na mão, com brilho que pulsa
     g.save(); g.translate(0, 18); g.rotate(Math.sin(t / 700) * 0.1);
@@ -6078,7 +6089,8 @@ function drawAvatarWalk(sc, t, quem = 'eu') {
     w = avWalk[chave] = { dono: view.kind + (view.id || view.uid || ''), fu: u, fv: v, tu: u, tv: v, t0: t, dur: 0, wait: 1500, dir: 1 };
   }
   let k = w.dur ? Math.min(1, (t - w.t0) / w.dur) : 1;
-  if (k >= 1 && t - w.t0 > w.dur + w.wait) {
+  if (quem === 'eu' && w.tarefa && k >= 1) return rastelando(w, sc, t);
+  if (k >= 1 && t - w.t0 > w.dur + w.wait && !w.tarefa) {
     w.fu = w.tu; w.fv = w.tv;
     w.tu = clamp(w.fu + (Math.random() - 0.5) * 4, a.u0, a.u1); w.tv = clamp(w.fv + (Math.random() - 0.5) * 4, a.v0, a.v1);
     const dist = Math.hypot(w.tu - w.fu, w.tv - w.fv), sx = (w.tu - w.fu) - (w.tv - w.fv);
@@ -6092,6 +6104,83 @@ function drawAvatarWalk(sc, t, quem = 'eu') {
   if (hover && hover.kind === 'avatar' && (hover.quem || 'eu') === quem) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.17, W * 0.06, 0, 0, 7); ctx.stroke(); }
   ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.13, W * 0.045, 0, 0, 7); ctx.fill();
   drawAvatar(ctx, q.x, q.y, esc, quem === 'dono' ? view.avatar : state.avatar, t, k < 1, w.dir);
+}
+// ---------- Montes de folhas: de vez em quando aparecem no gramado; o avatar vai lá e rastela ----------
+const FOLHAS_MAX = 3;
+const folhasIntervalo = () => (estacao().id === 'outono' ? 8 + Math.random() * 8 : 20 + Math.random() * 20) * 60e3; // no outono cai mais folha
+function folhasDe() { return state.folhas = Array.isArray(state.folhas) ? state.folhas : []; }
+function folhasTick() {
+  if (!state || kicked) return;
+  const l = folhasDe(), agora = Date.now();
+  if (!state.folhasProx) { state.folhasProx = agora + 3 * 60e3; return; }
+  let n = 0, mudou = false;
+  while (agora >= state.folhasProx && n++ < FOLHAS_MAX) { if (l.length < FOLHAS_MAX && novaFolha()) mudou = true; state.folhasProx += folhasIntervalo(); }
+  if (agora >= state.folhasProx) state.folhasProx = agora + folhasIntervalo();
+  if (mudou) save();
+}
+// Um lugar livre no gramado da roça, dentro da cerca (fora dos canteiros e sem encostar em nada).
+function novaFolha() {
+  let c0 = COLS, c1 = 0, r0 = ROWS, r1 = 0;
+  state.plots.forEach((p, i) => { if (p.s !== 'locked') { const c = i % COLS, r = Math.floor(i / COLS); c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1); } });
+  if (c1 <= c0) { c0 = 0; c1 = 3; r0 = 0; r1 = 3; }
+  for (let k = 0; k < 60; k++) {
+    const u = Math.round((c0 - 1.5 + Math.random() * (c1 - c0 + 3.5)) * 20) / 20, v = Math.round((r0 - 1.5 + Math.random() * (r1 - r0 + 3.5)) * 20) / 20;
+    if (u < 0.5 || v < 0.5 || u > COLS - 0.5 || v > ROWS - 0.5 || !validSpot('roca', u, v, null, 0.45)) continue; // só dentro da cerca
+    if (folhasDe().some(f => Math.hypot(f.u - u, f.v - v) < 1)) continue;
+    folhasDe().push({ id: Math.random().toString(36).slice(2, 8), u, v, at: Date.now() });
+    return true;
+  }
+  return false;
+}
+function drawFolhas(t) {
+  const W = L.W;
+  for (const f of folhasDe()) {
+    const q = iso(f.u, f.v), s = W / 100, bal = Math.sin(t / 900 + f.u) * 0.6;
+    if (hover && hover.kind === 'folhas' && hover.id === f.id) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.26, W * 0.09, 0, 0, 7); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(q.x, q.y, 20 * s, 6 * s, 0, 0, 7); ctx.fill();
+    const cores = ['#d9822b', '#c8402f', '#e8b020', '#9a5a2a', '#e06a2a'];
+    ctx.fillStyle = '#a8602a'; ctx.beginPath(); ctx.ellipse(q.x, q.y - 4 * s, 18 * s, 8 * s, 0, Math.PI, 0); ctx.fill();
+    for (let k = 0; k < 16; k++) {
+      const a = k * 2.4, r = (k % 4) * 4 + 2, lx = q.x + Math.cos(a) * r * 1.3 * s, ly = q.y - 5 * s - Math.abs(Math.sin(a)) * (10 - r * 0.9) * s - (k > 12 ? 6 * s : 0);
+      ctx.fillStyle = cores[k % cores.length]; ctx.beginPath(); ctx.ellipse(lx, ly, 3.4 * s, 1.8 * s, a + bal * 0.2, 0, 7); ctx.fill();
+    }
+    if (!f.alvo) hits.push({ kind: 'folhas', id: f.id, x: q.x, y: q.y - 6 * s, r: Math.max(W * 0.28, 18) });
+  }
+}
+function rastelarFolhas(id) {
+  if (!isHome()) return;
+  const f = folhasDe().find(x => x.id === id); if (!f || f.alvo) return;
+  const w = avWalk['roca:eu'];
+  if (scene !== 'roca' || !w || w.dono !== 'home') return concluirFolhas(id);
+  if (w.tarefa) return toast('Calma: o avatar ainda está rastelando o outro monte!');
+  const t = performance.now(), k = w.dur ? Math.min(1, (t - w.t0) / w.dur) : 1;
+  w.fu = w.fu + (w.tu - w.fu) * k; w.fv = w.fv + (w.tv - w.fv) * k;
+  w.tu = f.u + 0.4; w.tv = f.v + 0.1;
+  const dist = Math.hypot(w.tu - w.fu, w.tv - w.fv), sx = (w.tu - w.fu) - (w.tv - w.fv);
+  w.dir = sx > 0 ? 1 : -1; w.t0 = t; w.dur = dist / 1.4 * 1000; w.tarefa = { id, ini: 0 };
+  f.alvo = true; sfx('click');
+}
+// Chegou no monte: fica rastelando um pouquinho, com folhas voando, e depois o monte some.
+function rastelando(w, sc, t) {
+  const tf = w.tarefa, f = folhasDe().find(x => x.id === tf.id);
+  if (!f) { w.tarefa = null; return; }
+  if (!tf.ini) { tf.ini = t; sfx('hoe'); }
+  const q = iso(w.tu, w.tv), W = L.W, esc = W / 95;
+  w.dir = -1; w.tela = { x: q.x, y: q.y - 70 * esc };
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.13, W * 0.045, 0, 0, 7); ctx.fill();
+  drawAvatar(ctx, q.x, q.y, esc, Object.assign({}, state.avatar, { mao: 'rastelo' }), t, false, -1);
+  const fq = iso(f.u, f.v), ke = (t - tf.ini) / 1600;
+  for (let k = 0; k < 5; k++) { const p = (ke * 2.5 + k / 5) % 1; ctx.globalAlpha = 1 - p; ctx.fillStyle = ['#d9822b', '#c8402f', '#e8b020', '#e06a2a', '#9a5a2a'][k]; ctx.beginPath(); ctx.ellipse(fq.x + (k - 2) * 6 * esc + p * 10 * esc, fq.y - 8 * esc - p * 22 * esc, 3 * esc, 1.6 * esc, p * 6, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  if (ke >= 1) { concluirFolhas(tf.id); w.tarefa = null; w.fu = w.tu; w.fv = w.tv; w.t0 = t; w.dur = 0; w.wait = 1200; }
+}
+function concluirFolhas(id) {
+  const l = folhasDe(), i = l.findIndex(x => x.id === id); if (i < 0) return;
+  const f = l[i]; l.splice(i, 1);
+  const q = iso(f.u, f.v), pos = scene === 'roca' ? { x: q.x, y: q.y - L.W * 0.2 } : null, moedas = 5 + Math.floor(Math.random() * 8);
+  addCoins(moedas, pos); addXP(3, pos); sfx('collect');
+  state.stats.folhas = (state.stats.folhas || 0) + 1;
+  done();
 }
 // Na roça dos outros, o dono também passeia (desenha antes o que está mais ao fundo).
 function drawAvatares(sc, t) {
@@ -8355,7 +8444,7 @@ function frame(now) {
   if (!isGated() && L.cw > 20) draw(now, dt);
   if (now - lastUI > 250) { updateTip(); lastUI = now; }
   if (now - lastInfo > 2000) {
-    tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao();
+    tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao(); folhasTick();
     // a fábrica e o caminhão têm relógio: atualiza a janela (menos a banca, que tem formulário)
     if (!$('#panel').hidden && tab === 'fabrica' && fabSeg !== 'banca' && isHome()) { const y = $('#pane').scrollTop; renderPane(); $('#pane').scrollTop = y; } renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
   if (now - lastSave > 5000) { save(); lastSave = now; }
