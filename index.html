@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="120">
-<script src="firebase-config.js?v=120"></script>
+<meta name="rf-version" content="121">
+<script src="firebase-config.js?v=121"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -114,9 +114,9 @@
   .trevohud { margin-left: 8px; border: 0; background: rgba(47,138,47,.35); color: #d8ffc0; font: inherit; font-size: 14px; font-weight: 800; border-radius: 10px; padding: 0 7px; cursor: pointer; }
   .coins { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; color: #ffe08a; line-height: 1.1; }
   .coin {
-    width: 18px; height: 18px; border-radius: 50%; flex: none;
+    display: inline-block; width: 18px; height: 18px; border-radius: 50%; flex: none;
     background: radial-gradient(circle at 35% 35%, #fff2a8, var(--gold) 55%, #c98c00);
-    box-shadow: inset 0 0 0 2px #b77f00;
+    box-shadow: inset 0 0 0 2px #b77f00; vertical-align: -4px; margin-right: 3px;
   }
   .topright { top: 12px; right: 10px; display: flex; align-items: center; gap: 8px; }
   .sceneinfo {
@@ -913,8 +913,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=120"></script>
-<script src="js/cloud.js?v=120"></script>
-<script src="js/game.js?v=120"></script>
+<script src="js/audio.js?v=121"></script>
+<script src="js/cloud.js?v=121"></script>
+<script src="js/game.js?v=121"></script>
 </body>
 </html>

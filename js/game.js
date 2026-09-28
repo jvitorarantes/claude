@@ -46,6 +46,7 @@ const CROP_LIST = [
   ['cafe',     'Café',           26, 1800, 2880, 24 * HOUR,     30, 16, 'moita',    '#c0302a', null, 'pequeno'],
   ['conde',    'Fruta-do-conde', 29, 2400, 3840, 32 * HOUR,     38, 6,  'pendente', '#8fbf6a', null, 'redondo'],
   ['maracuja', 'Maracujá',       30, 2500, 4000, 36 * HOUR,     40, 10, 'pendente', '#f2d03a', null, 'redondo'],
+  ['cacau',    'Cacau',          32, 3200, 5120, 48 * HOUR,     44, 8,  'pendente', '#d4791e', '#7a4a2a', 'redondo'],
 ];
 // (as árvores frutíferas saíram daqui: agora são frutíferas do Pomar, plantadas no gramado, fora dos canteiros)
 const CROPS = [
@@ -237,9 +238,9 @@ const DECOR_SPOT = {
 
 // Fertilizantes: cada um corta uma parte do tempo total da planta. Dá para usar quantos quiser.
 const FERTS = [
-  { id: 'basico',  nome: 'Fertilizante básico',  curto: 'Básico',  corta: 0.1,  custo: 50,   nivel: 1,  cor: '#c98a4b' },
-  { id: 'rapido',  nome: 'Fertilizante rápido',  curto: 'Rápido',  corta: 0.25, custo: 200,  nivel: 5,  cor: '#4a8fd0' },
-  { id: 'premium', nome: 'Fertilizante premium', curto: 'Premium', corta: 0.5,  custo: 1000, nivel: 10, cor: '#e0a020' },
+  { id: 'basico',  nome: 'Fertilizante básico',  curto: 'Básico',  corta: 0.25, custo: 20,  nivel: 1,  cor: '#c98a4b' },
+  { id: 'rapido',  nome: 'Fertilizante rápido',  curto: 'Rápido',  corta: 0.5,  custo: 90,  nivel: 5,  cor: '#4a8fd0' },
+  { id: 'premium', nome: 'Fertilizante premium', curto: 'Premium', corta: 0.75, custo: 350, nivel: 10, cor: '#e0a020' },
 ];
 const FERT = Object.fromEntries(FERTS.map(f => [f.id, f]));
 
@@ -948,6 +949,7 @@ const NOVIDADES = [
   { v: 118, txt: 'Caçada mais fácil de acertar 🎯: os pássaros (pombo e pardal) voam mais devagar e balançam menos no ar, e a pedrinha do estilingue chega mais rápido — menos "chute" e mais precisão.' },
   { v: 119, txt: 'Aviso quando o ponto de pesca descansar 🎣: o pesqueiro brilha na sua roça assim que ele voltar a pescar, e chegou o aviso 🎣 Ponto de pesca descansado nas notificações do celular (⚙️ › Notificações).' },
   { v: 120, txt: 'Dá para pegar frutas do pomar dos amigos e da vila 🍇: quando estiver visitando, toque numa frutífera pronta para pegar uma fruta (até 3 por dia em cada roça, cuidado com o cachorro!).' },
+  { v: 121, txt: 'Fertilizantes mais fortes e mais baratos 🌱: básico corta 25%, rápido 50% e premium 75% do tempo da planta (antes era 10/25/50%), e ficaram bem mais baratos — agora compensa usar até nas plantas simples. E chegou o CACAU 🍫 (nível 32, 48h), a plantação mais demorada da Roça Feliz.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2502,7 +2504,7 @@ function ball(x, y, r, col) {
 // Brotinhos: cada planta cresce do seu jeito (capim, trevinho, folha larga, roseta, rama…).
 const BROTO = { feijao: 'trevo', soja: 'trevo', amendoim: 'amendoim', arroz: 'capim', trigo: 'capim', milho: 'milho', cana: 'cana', cenoura: 'plumosa',
   cebola: 'tubo', mandioca: 'palmada', batata: 'batata', tomate: 'tomate', alface: 'roseta', couve: 'couve', abobora: 'larga', melancia: 'larga', pepino: 'larga', maxixe: 'larga',
-  pimentao: 'arbusto', abacaxi: 'espada', mamao: 'mamao', limao: 'arvorezinha', cafe: 'cafe', conde: 'arvorezinha', maracuja: 'trepadeira', algodao: 'algodao' };
+  pimentao: 'arbusto', abacaxi: 'espada', mamao: 'mamao', limao: 'arvorezinha', cafe: 'cafe', conde: 'arvorezinha', maracuja: 'trepadeira', algodao: 'algodao', cacau: 'arvorezinha' };
 function drawBroto(x, y, s, crop, stage, sway) {
   const g = stage === 2 ? 1 : 0.6, tipo = BROTO[crop.id] || 'arbusto', lw = w => { ctx.lineWidth = w * s; ctx.lineCap = 'round'; };
   const haste = (h, cor = '#3a8a2c', w = 1.3) => { ctx.strokeStyle = cor; lw(w); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + sway * 6 * s, y - h * s); ctx.stroke(); return { x: x + sway * 6 * s, y: y - h * s }; };
@@ -4385,12 +4387,12 @@ function renderPane() {
     html += `<h3>Celeiro</h3>`;
     if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha na roça e recolha ovos, leite, lã e trufas dos animais.</div>`;
     else {
-      html += `<div class="total"><span>Total: ${total} moedas</span><button class="btn gold" data-sellall>Vender tudo</button></div>`;
+      html += `<div class="total"><span>Total: ${moeda(total)}</span><button class="btn gold" data-sellall>Vender tudo</button></div>`;
       for (const it of items) {
         const q = state.barn[it.id], key = 'sell:' + it.id, sel = q > 1 ? qtdSel[key] = clamp(qtdSel[key] || 1, 1, q) : 1;
         html += `<div class="row"><img alt="" src="${itemIcon(it.id)}">
-          <div><div class="name">${it.nome} × ${q}</div><div class="meta">${it.preco} moedas cada · ${q * it.preco} no total${it.id === 'milho' ? '<br>também serve de comida para os animais' : ''}</div></div>
-          <div class="stack">${q > 1 ? qtdStep(key, q) : ''}<button class="btn" data-sell="${it.id}" data-qtd="${sel}">Vender ${sel} · ${sel * it.preco}</button>${q > 1 ? `<button class="btn ghost" data-sellall-of="${it.id}">Todos</button>` : ''}</div></div>`;
+          <div><div class="name">${it.nome} × ${q}</div><div class="meta">${moeda(it.preco)} cada · ${moeda(q * it.preco)} no total${it.id === 'milho' ? '<br>também serve de comida para os animais' : ''}</div></div>
+          <div class="stack">${q > 1 ? qtdStep(key, q) : ''}<button class="btn" data-sell="${it.id}" data-qtd="${sel}">Vender ${sel} · ${moeda(sel * it.preco)}</button>${q > 1 ? `<button class="btn ghost" data-sellall-of="${it.id}">Todos</button>` : ''}</div></div>`;
       }
     }
   } else if (tab === 'terreno') {
