@@ -20,22 +20,27 @@ const Cloud = window.RFCloud || { available: false };
 const MIN = 60;
 const CROP_LIST = [
   // id, nome, nível, semente, venda, tempo, XP, unidades, tipo, cores
-  ['nabo',     'Nabo',           1,  10,   16,   2 * MIN,       2,  4,  'raiz',     '#f5eef7', '#a45bbb'],
+  ['feijao',   'Feijão',         1,  10,   16,   2 * MIN,       2,  4,  'pendente', '#c9a86a', null, 'longo'],
+  ['arroz',    'Arroz',          1,  15,   25,   3 * MIN,       2,  5,  'grao',     '#efdc9a'],
   ['cenoura',  'Cenoura',        1,  20,   32,   5 * MIN,       3,  4,  'raiz',     '#f08a24', '#e0761a'],
   ['trigo',    'Trigo',          2,  30,   48,   10 * MIN,      4,  6,  'grao',     '#e8c35a'],
   ['mandioca', 'Mandioca',       2,  150,  260,  8 * HOUR,      14, 6,  'raiz',     '#c9a06a', '#8a5a33'], // demorada: planta antes de dormir
   ['milho',    'Milho',          3,  50,   80,   20 * MIN,      5,  5,  'alto',     '#f7d046'],
   ['batata',   'Batata',         4,  80,   128,  30 * MIN,      6,  8,  'raiz',     '#c9a06a', '#a47a48'],
   ['tomate',   'Tomate',         5,  120,  192,  HOUR,          8,  8,  'moita',    '#e53b2f'],
+  ['couve',    'Couve',          5,  100,  160,  45 * MIN,      7,  6,  'folha',    '#4f8a3f'],
   ['alface',   'Alface',         6,  150,  240,  1.5 * HOUR,    9,  6,  'folha',    '#8fd05a'],
+  ['amendoim', 'Amendoim',       7,  180,  290,  2 * HOUR,      10, 8,  'raiz',     '#d9b27a', '#b8905a'],
   ['cebola',   'Cebola',         8,  200,  320,  2.5 * HOUR,    11, 8,  'raiz',     '#b8617e', '#e6c07a'],
   ['abobora',  'Abóbora',        9,  250,  400,  4 * HOUR,      12, 4,  'chao',     '#f28c1b', '#c9650a'],
+  ['cana',     'Cana-de-açúcar', 11, 350,  560,  5 * HOUR,      14, 6,  'cana',     '#8a5a7a'],
   ['melancia', 'Melancia',       12, 400,  640,  6 * HOUR,      15, 4,  'chao',     '#4d9a3e', '#2a5e27'],
   ['pepino',   'Pepino',         13, 450,  720,  5 * HOUR,      15, 8,  'pendente', '#4f8f3a', null, 'longo'],
   ['pimentao', 'Pimentão',       14, 500,  800,  7 * HOUR,      16, 8,  'pendente', '#d8342a'],
   ['abacaxi',  'Abacaxi',        16, 700,  1120, 10 * HOUR,     20, 4,  'abacaxi',  '#e0a83a'],
   ['mamao',    'Mamão',          17, 800,  1280, 12 * HOUR,     20, 4,  'pendente', '#f39a3a'],
-  ['pera',     'Pera',           20, 1100, 1760, 16 * HOUR,     25, 8,  'pendente', '#c9d45a'],
+  ['soja',     'Soja',           20, 1100, 1760, 16 * HOUR,     25, 8,  'pendente', '#a8984a'],
+  ['algodao',  'Algodão',        21, 1200, 1920, 18 * HOUR,     26, 10, 'moita',    '#ffffff'],
   ['limao',    'Limão',          23, 1400, 2240, 20 * HOUR,     27, 16, 'moita',    '#9ccf3a'],
   ['cafe',     'Café',           26, 1800, 2880, 24 * HOUR,     30, 16, 'moita',    '#c0302a', null, 'pequeno'],
   ['conde',    'Fruta-do-conde', 29, 2400, 3840, 32 * HOUR,     38, 6,  'pendente', '#8fbf6a', null, 'redondo'],
@@ -81,6 +86,7 @@ const PRODUCT = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
 // Frutas do pomar (vêm das frutíferas plantadas no gramado)
 const FRUTAS = [
   { id: 'pitanga',    nome: 'Pitanga',    preco: 25, cor: '#e0402a' },
+  { id: 'framboesa',  nome: 'Framboesa',  preco: 30, cor: '#d8284a' },
   { id: 'amora',      nome: 'Amora',      preco: 30, cor: '#5a1f4a' },
   { id: 'maracuja',   nome: 'Maracujá',   preco: 45, cor: '#e8c030' },
   { id: 'jabuticaba', nome: 'Jabuticaba', preco: 35, cor: '#2a1a2a' },
@@ -280,7 +286,7 @@ const EXPANSOES = [
   { nivel: 40, preco: 250000, total: 80 },
   { nivel: 50, preco: 500000, total: 100 },
 ];
-const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganhar XP infinito com o nabo)
+const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganhar XP infinito com o feijão)
 const newId = () => Math.random().toString(36).slice(2, 10);
 
 function emptyPlot(s = 'locked') { return { s, c: null, g: 0, dry: false, w: 0, b: 0, dmg: 0, id: null, th: [], fert: false, h: 0, adult: false, poda: false }; }
@@ -308,7 +314,7 @@ function newState() {
   START_LOTS.forEach(i => plots[i].s = 'plowed');
   return {
     v: 3, coins: 2000, xp: 0, level: 1, plots, barn: {}, owned: START_LOTS.length, exp: 0, novVisto, boasVindas: true,
-    tool: 'hand', seed: 'nabo', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
+    tool: 'hand', seed: 'feijao', t: Date.now(), nb: {}, tools: { enxada: false }, xpDay: { d: 0, c: {} },
     animals: [], decor: {}, abrigos: { galinheiro: 1 }, racaoEsp: 0,
     enfeites: { cerca: 40 }, cercaDada: 1, objetos: { roca: [], animais: [] }, pos: {}, invNovos: 0, skins: {}, skin: null,
     missions: null, gift: { i: 0, ciclo: 0, last: -1 }, owe: {}, col: {}, stamps: {}, temas: { classico: true }, tema: 'classico', helpDay: -1,
@@ -322,6 +328,11 @@ function newState() {
 // Aceita saves antigos (v1, grade 6×4) e dados vindos da nuvem.
 function migrate(s) {
   if (!s || typeof s !== 'object') return null;
+  if (!s.plantasBR) {
+    // as plantações ficaram mais brasileiras: o nabo virou feijão e a pera virou soja
+    try { s = JSON.parse(JSON.stringify(s).replace(/"nabo"/g, '"feijao"').replace(/"pera"/g, '"soja"')); } catch (e) { /* segue como está */ }
+    s.plantasBR = 1;
+  }
   if (s.v === 1 || s.v === 2) {
     // A economia mudou inteira: a roça recomeça, mas amigos, código e avisos ficam.
     const keep = { friends: s.friends, sent: s.sent, code: s.code, owner: s.owner, news: s.news, newsSeen: s.newsSeen };
@@ -398,7 +409,7 @@ function migrate(s) {
     if (p.s === 'growing' && !p.id) p.id = newId();
   }
   s.owned = s.plots.filter(p => p.s !== 'locked').length;
-  if (!CROP[s.seed]) s.seed = 'nabo';
+  if (!CROP[s.seed]) s.seed = 'feijao';
   if (!s.tool || s.tool === 'weed') s.tool = 'hand';
   // frutíferas ganham um id (para os amigos ajudarem) e passam a viver por colheitas
   for (const sc of ['roca', 'animais']) for (const o of (s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : [])) if (o && ENFEITE[o.id] && ENFEITE[o.id].fruteira) { if (!o.fid) o.fid = newId(); if (typeof o.colhidas !== 'number') o.colhidas = 0; }
@@ -518,7 +529,7 @@ function stageOf(p) {
   return k >= 1 ? 4 : k < 0.12 ? 0 : k < 0.4 ? 1 : k < 0.7 ? 2 : 3;
 }
 const ripe = p => p.s === 'growing' && !p.poda && !p.podre && p.g >= phaseTempo(p);
-// Cada colheita rende um número sorteado numa faixa em volta da média (nabo: 3 a 5).
+// Cada colheita rende um número sorteado numa faixa em volta da média (feijão: 3 a 5).
 const yieldRange = c => { const k = daEstacao(c.id) ? 1 + ESTACAO_BONUS : 1; return [Math.max(1, Math.round(c.rend * 0.75 * k)), Math.max(1, Math.round(c.rend * 1.25 * k))]; };
 const OURO_CHANCE = 0.03, OURO_VEZES = 5; // colheita dourada: rara, rende 5 vezes mais
 const expectedYield = p => Math.max(1, Math.round(CROP[p.c].rend - p.dmg));
@@ -948,6 +959,7 @@ const NOVIDADES = [
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
   { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
+  { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
   { v: 112, txt: 'Mudanças na caçada e nas pragas: a Caçada agora libera no nível 10. Pragas na plantação só aparecem no máximo uma vez a cada 12 horas, com você na roça: toca um alarme, a tela fica vermelha e você vê o bicho chegando. O cachorro de guarda corre atrás dele, e tem a nova 🪤 Armadilha de pragas (Loja › Itens), que pega um bicho por vez e depois recarrega.' },
@@ -2494,6 +2506,113 @@ function ball(x, y, r, col) {
 }
 
 // Planta com a base em (x, y); s = escala.
+// Brotinhos: cada planta cresce do seu jeito (capim, trevinho, folha larga, roseta, rama…).
+const BROTO = { feijao: 'trevo', soja: 'trevo', amendoim: 'amendoim', arroz: 'capim', trigo: 'capim', milho: 'milho', cana: 'cana', cenoura: 'plumosa',
+  cebola: 'tubo', mandioca: 'palmada', batata: 'batata', tomate: 'tomate', alface: 'roseta', couve: 'couve', abobora: 'larga', melancia: 'larga', pepino: 'larga',
+  pimentao: 'arbusto', abacaxi: 'espada', mamao: 'mamao', limao: 'arvorezinha', cafe: 'cafe', conde: 'arvorezinha', maracuja: 'trepadeira', algodao: 'algodao',
+  morangueiro: 'morango', videira: 'trepadeira', macieira: 'arvorezinha', laranjeira: 'arvorezinha', bananeira: 'bananeira', coqueiro: 'coqueiro', mangueira: 'arvorezinha', goiabeira: 'arvorezinha' };
+function drawBroto(x, y, s, crop, stage, sway) {
+  const g = stage === 2 ? 1 : 0.6, tipo = BROTO[crop.id] || 'arbusto', lw = w => { ctx.lineWidth = w * s; ctx.lineCap = 'round'; };
+  const haste = (h, cor = '#3a8a2c', w = 1.3) => { ctx.strokeStyle = cor; lw(w); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + sway * 6 * s, y - h * s); ctx.stroke(); return { x: x + sway * 6 * s, y: y - h * s }; };
+  const bolinha = (cx, cy, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx, cy, r * s, 0, 7); ctx.fill(); };
+  switch (tipo) {
+    case 'capim': case 'milho': case 'cana': { // folhas finas e compridas saindo do chão
+      const n = stage === 2 ? 5 : 3, larg = tipo === 'milho' ? 2.8 : tipo === 'cana' ? 2 : 1.3, alt = (crop.id === 'arroz' ? 15 : 18) * g;
+      for (let k = 0; k < n; k++) { const a = (k - (n - 1) / 2) * (tipo === 'milho' ? 0.5 : 0.28) + sway; leaf(x, y, alt * s * (1 - Math.abs(a) * 0.3), larg * s, a, k % 2 ? '#6cc24a' : (crop.id === 'arroz' ? '#7cc84a' : '#4fa83a')); }
+      if (tipo === 'cana') { ctx.fillStyle = '#9a6a8a'; ctx.fillRect(x - 1.2 * s, y - 3 * s, 2.4 * s, 3 * s); }
+      break;
+    }
+    case 'trevo': case 'amendoim': { // hastezinha com folhas de três (feijão/soja) ou pares de folhinhas ovais (amendoim)
+      const topo = haste(9 * g + 2);
+      const tri = (cx, cy, r, c) => { for (const a of [-0.9, 0, 0.9]) { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(cx + Math.sin(a) * r * 1.1, cy - Math.cos(a) * r * 1.1, r * 0.75, r, a, 0, 7); ctx.fill(); } };
+      const cor = crop.id === 'soja' ? '#7ab84a' : '#4fa83a';
+      if (tipo === 'trevo') { tri(topo.x, topo.y, 2.6 * s * (0.8 + g * 0.3), cor); if (stage === 2) { tri(x - 5 * s, y - 6 * s, 2.2 * s, '#6cc24a'); tri(x + 5 * s, y - 5 * s, 2.2 * s, '#6cc24a'); } }
+      else for (const [dx, dy] of stage === 2 ? [[-3, -4], [3, -4], [-3, -9], [3, -9], [0, -12]] : [[-2.5, -5], [2.5, -5]]) { ctx.fillStyle = '#5aa83a'; ctx.beginPath(); ctx.ellipse(x + dx * s, y + dy * s, 2 * s, 1.3 * s, dx * 0.2, 0, 7); ctx.fill(); }
+      break;
+    }
+    case 'plumosa': { // cenoura: folhagem fininha e rendada
+      ctx.strokeStyle = '#4fa83a'; lw(0.8);
+      for (const a of stage === 2 ? [-0.6, -0.3, 0, 0.3, 0.6] : [-0.3, 0.3]) {
+        const tx = x + Math.sin(a + sway) * 14 * g * s, ty = y - Math.cos(a) * 14 * g * s;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke();
+        for (let k = 1; k <= 3; k++) { const px = x + (tx - x) * k / 4, py = y + (ty - y) * k / 4; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - 2.5 * s, py - 2 * s); ctx.moveTo(px, py); ctx.lineTo(px + 2.5 * s, py - 2 * s); ctx.stroke(); }
+      }
+      break;
+    }
+    case 'tubo': { // cebola: canudinhos em pé
+      ctx.strokeStyle = '#5aa83a'; lw(1.8);
+      for (const a of stage === 2 ? [-0.25, 0, 0.22] : [-0.1, 0.12]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(a + sway * 0.5) * 16 * g * s, y - Math.cos(a) * 16 * g * s); ctx.stroke(); }
+      break;
+    }
+    case 'palmada': { // mandioca: talos avermelhados com folha em forma de mão
+      const topo = haste(12 * g + 2, '#b0503a', 1.4);
+      const mao = (cx, cy, r) => { for (const a of [-1.1, -0.55, 0, 0.55, 1.1]) leaf(cx, cy, r, r * 0.22, a + sway, '#3f8a2c'); };
+      mao(topo.x, topo.y, 9 * g * s); if (stage === 2) mao(x - 4 * s, y - 6 * s, 6 * s);
+      break;
+    }
+    case 'roseta': case 'couve': { // alface/couve: rosetinha de folhas redondas
+      const cor = tipo === 'couve' ? '#4f8a4a' : '#9ad85a', cor2 = tipo === 'couve' ? '#6a9a6a' : '#b8e87a', n = stage === 2 ? 6 : 4;
+      for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2; ctx.fillStyle = k % 2 ? cor : cor2; ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 3.5 * g * s, y - 3 * s + Math.sin(a) * 1.8 * g * s, 4.2 * g * s, 3 * g * s, a, 0, 7); ctx.fill(); }
+      if (tipo === 'couve') { ctx.strokeStyle = 'rgba(230,240,230,.7)'; lw(0.6); ctx.beginPath(); ctx.moveTo(x, y - 3 * s); ctx.lineTo(x + 3 * g * s, y - 5 * s); ctx.stroke(); }
+      break;
+    }
+    case 'larga': { // abóbora/melancia/pepino: folhas largas e rentes ao chão, com gavinha
+      const cor = crop.id === 'melancia' ? '#3f8a2f' : '#5aa83a';
+      for (const [dx, a] of stage === 2 ? [[-6, -1.2], [6, 1.2], [0, 0]] : [[-3, -0.9], [3, 0.9]]) { ctx.save(); ctx.translate(x + dx * s, y); ctx.scale(1, 0.7); leaf(0, 0, 10 * g * s, 6 * g * s, a + sway, cor); ctx.restore(); }
+      if (stage === 2) { ctx.strokeStyle = '#6cc24a'; lw(0.7); ctx.beginPath(); ctx.arc(x + 9 * s, y - 4 * s, 2 * s, 0, 5); ctx.stroke(); }
+      break;
+    }
+    case 'espada': { // abacaxi: folhas duras em ponta
+      ctx.fillStyle = '#4f8a3a';
+      for (const a of stage === 2 ? [-1, -0.5, 0, 0.5, 1] : [-0.5, 0, 0.5]) { ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(-1.2 * s, 0); ctx.lineTo(0, -13 * g * s); ctx.lineTo(1.2 * s, 0); ctx.fill(); ctx.restore(); }
+      break;
+    }
+    case 'tomate': case 'arbusto': case 'algodao': case 'cafe': case 'morango': case 'batata': {
+      // hastezinha com folhas: tomate recortadas e acinzentadas; café brilhantes e escuras em pares;
+      // algodão largas com lóbulos; morango de três com borda serrilhada; batata e pimentão, lisinhas
+      const cor = { tomate: '#5a9a4a', cafe: '#2f7a2a', algodao: '#5aa83a', morango: '#3f9a3a', batata: '#4f9a3a' }[tipo] || '#4fa83a';
+      const topo = haste(tipo === 'morango' ? 4 : 11 * g + 2, tipo === 'cafe' ? '#6b4a2a' : '#3a8a2c');
+      const pares = stage === 2 ? [0.4, 0.7, 1] : [0.8];
+      for (const k of pares) {
+        const px = x + (topo.x - x) * k, py = y + (topo.y - y) * k, tam = (tipo === 'algodao' ? 7 : tipo === 'cafe' ? 6.5 : 5.5) * s * (0.7 + g * 0.3);
+        for (const lado of [-1, 1]) {
+          if (tipo === 'algodao') { for (const a of [-0.5, 0, 0.5]) leaf(px, py, tam, tam * 0.4, lado * (1 + a * 0.6) + sway, cor); }
+          else if (tipo === 'tomate') { leaf(px, py, tam, tam * 0.35, lado * 1.1 + sway, cor); leaf(px + lado * tam * 0.5, py - tam * 0.3, tam * 0.5, tam * 0.2, lado * 0.6 + sway, cor); }
+          else leaf(px, py, tam, tam * (tipo === 'cafe' ? 0.45 : 0.4), lado * 1.05 + sway, cor);
+        }
+      }
+      if (tipo === 'cafe') bolinha(topo.x, topo.y, 1.2, '#3f8a2c');
+      break;
+    }
+    case 'mamao': { // mamoeiro: um caule só e folhonas recortadas lá em cima
+      const topo = haste(14 * g + 2, '#8a9a5a', 2);
+      for (const a of stage === 2 ? [-1.2, -0.4, 0.4, 1.2] : [-0.7, 0.7]) for (const b of [-0.3, 0, 0.3]) leaf(topo.x, topo.y, 7 * g * s, 1.6 * s, a + b + sway, '#4fa83a');
+      break;
+    }
+    case 'trepadeira': { // maracujá/uva: raminha com gavinhas enrolando num tutor
+      ctx.strokeStyle = '#8a5a33'; lw(1); ctx.beginPath(); ctx.moveTo(x + 3 * s, y); ctx.lineTo(x + 3 * s, y - 18 * g * s); ctx.stroke();
+      const topo = haste(15 * g, '#4f8a2a', 1);
+      for (const k of stage === 2 ? [0.4, 0.7, 1] : [0.8]) leaf(x + (topo.x - x) * k, y + (topo.y - y) * k, 6 * s, 3.4 * s, (k * 7 % 2 ? 1 : -1) + sway, '#5aa83a');
+      ctx.strokeStyle = '#7ab84a'; lw(0.6); ctx.beginPath(); ctx.arc(topo.x + 2 * s, topo.y, 1.6 * s, 0, 5); ctx.stroke();
+      break;
+    }
+    case 'bananeira': { // folhonas compridas que saem de um pseudocaule
+      const topo = haste(8 * g + 2, '#8aae5a', 2.6);
+      for (const a of stage === 2 ? [-1, -0.2, 0.7] : [-0.5, 0.5]) leaf(topo.x, topo.y, 14 * g * s, 4 * g * s, a + sway, '#6cc24a');
+      break;
+    }
+    case 'coqueiro': { // palmas arqueadas
+      ctx.fillStyle = '#9a7a4a'; ctx.beginPath(); ctx.ellipse(x, y - 2 * s, 3 * s, 2.4 * s, 0, 0, 7); ctx.fill();
+      for (const a of stage === 2 ? [-1.1, -0.4, 0.3, 1] : [-0.6, 0.5]) leaf(x, y - 3 * s, 15 * g * s, 2.2 * s, a + sway, '#4f9a3a');
+      break;
+    }
+    default: { // arvorezinha: muda com caule fino e folhinhas alternadas
+      const topo = haste(12 * g + 3, '#6b4a2a', 1.2);
+      for (const k of stage === 2 ? [0.35, 0.6, 0.85, 1] : [0.7, 1]) leaf(x + (topo.x - x) * k, y + (topo.y - y) * k, 5.5 * s, 2.4 * s, (k * 10 % 2 < 1 ? -1 : 1) + sway, crop.id === 'laranjeira' || crop.id === 'limao' ? '#3f8a2c' : '#5aa83a');
+    }
+  }
+  ctx.lineCap = 'butt';
+}
 function drawPlant(x, y, s, crop, stage, t, withered) {
   const sway = Math.sin(t / 700 + x * 0.05) * 0.08;
   const G = '#4fa83a', GD = '#3a8a2c', GL = '#6cc24a';
@@ -2513,11 +2632,8 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
     ctx.strokeStyle = GD; ctx.lineWidth = 1.2 * s; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(x, y - 2 * s); ctx.lineTo(x, y - 5 * s * k); ctx.stroke(); ctx.lineCap = 'butt';
     leaf(x, y - 4.6 * s * k, 4.2 * s, 1.9 * s, -0.9 + sway, GL); leaf(x, y - 4.6 * s * k, 4.2 * s, 1.9 * s, 0.9 + sway, GL);
-  } else if (stage === 1) {
-    ctx.strokeStyle = GD; ctx.lineWidth = 1.4 * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 5 * s); ctx.stroke();
-    leaf(x, y - 4 * s, 8 * s, 3 * s, -0.8 + sway, GL); leaf(x, y - 4 * s, 8 * s, 3 * s, 0.8 + sway, GL);
-  } else if (stage === 2) {
-    for (const a of [-1.0, -0.35, 0.35, 1.0]) leaf(x, y, 14 * s, 4 * s, a + sway, G);
+  } else if (stage === 1 || stage === 2) {
+    drawBroto(x, y, s, crop, stage, sway);
   } else {
     const ripeNow = stage === 4;
     switch (crop.tipo) {
@@ -2616,6 +2732,18 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
             ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(fx - 1 * s, fy + 2 * s, 0.8 * s, 2 * s, 0.1, 0, 7); ctx.fill();
             ctx.fillStyle = '#3f7a2a'; ctx.beginPath(); ctx.ellipse(fx, fy - 1 * s, 2.4 * s, 1.4 * s, 0, 0, 7); ctx.fill();
           }
+        }
+        break;
+      }
+      case 'cana': {
+        // touceira de cana: colmos em gomos (verde-arroxeados) e folhas compridas lá em cima
+        const h = (ripeNow ? 42 : 32) * s;
+        for (const [dx, a] of [[-4, -0.08], [0, 0.02], [4, 0.1]]) {
+          const tx = x + dx * s + Math.sin(a) * h + sway * 14 * s, ty = y - h;
+          ctx.strokeStyle = ripeNow ? crop.cor : '#7aa84a'; ctx.lineWidth = 2.6 * s; ctx.beginPath(); ctx.moveTo(x + dx * s, y); ctx.lineTo(tx, ty); ctx.stroke();
+          ctx.strokeStyle = 'rgba(40,30,20,.45)'; ctx.lineWidth = 1 * s;
+          for (let k = 1; k < 6; k++) { const q = { x: x + dx * s + (tx - x - dx * s) * k / 6, y: y + (ty - y) * k / 6 }; ctx.beginPath(); ctx.moveTo(q.x - 1.4 * s, q.y); ctx.lineTo(q.x + 1.4 * s, q.y); ctx.stroke(); }
+          for (const la of [-1.3, -0.6, 0.6, 1.3]) leaf(tx, ty + 2 * s, 14 * s, 1.8 * s, la + sway, la > 0 ? GL : G);
         }
         break;
       }
@@ -5251,11 +5379,11 @@ const thisWeek = () => weekOf(localDay());
 const ESTACOES = [
   { id: 'primavera', nome: 'Primavera', icone: '🌸', plantas: ['alface', 'cenoura', 'morangueiro', 'tomate', 'cebola'],
     grama: ['#86c450', '#9ad35e'], morro: '#6fae43', folha: '#4f9a34', flores: 9, borboletas: 10, flor: true },
-  { id: 'verao', nome: 'Verão', icone: '☀️', plantas: ['melancia', 'milho', 'abacaxi', 'maracuja', 'pepino'],
+  { id: 'verao', nome: 'Verão', icone: '☀️', plantas: ['melancia', 'milho', 'abacaxi', 'maracuja', 'pepino', 'cana'],
     grama: ['#94c24a', '#a8cf55'], morro: '#79a83f', folha: '#4a8f2a', flores: 2, borboletas: 5 },
-  { id: 'outono', nome: 'Outono', icone: '🍂', plantas: ['abobora', 'batata', 'macieira', 'videira', 'pera'],
+  { id: 'outono', nome: 'Outono', icone: '🍂', plantas: ['abobora', 'batata', 'macieira', 'videira', 'soja', 'amendoim'],
     grama: ['#a7b64c', '#b9c05a'], morro: '#8f9c3e', folha: '#d9822b', flores: 0, folhas: true, pelada: true, borboletas: 2 },
-  { id: 'inverno', nome: 'Inverno', icone: '❄️', plantas: ['nabo', 'trigo', 'laranjeira', 'limao', 'cafe'],
+  { id: 'inverno', nome: 'Inverno', icone: '❄️', plantas: ['feijao', 'trigo', 'laranjeira', 'limao', 'cafe', 'couve'],
     grama: ['#e3ecf1', '#f3f7fa'], morro: '#d2dfe7', folha: '#2f6e3a', flores: 0, neve: true, pelada: true, borboletas: 0 },
 ];
 const ESTACAO_BONUS = 0.3; // plantas da estação rendem 30% a mais
@@ -5659,7 +5787,7 @@ for (const id of ['#pescaCv', '#pescaBtn']) {
   $(id).addEventListener('contextmenu', e => e.preventDefault());
 }
 if (location.protocol === 'file:') window.__pesca = () => pesca; // só para testes locais
-if (location.protocol === 'file:') window.__rf = { iso: (u, v) => iso(u, v), st: () => state, mov: () => moving, bicho: id => bichoIcon(id) }; // só para testes locais
+if (location.protocol === 'file:') window.__rf = { iso: (u, v) => iso(u, v), st: () => state, mov: () => moving, bicho: id => bichoIcon(id), planta: (id, st) => makeIcon('pt:' + id + st, () => drawPlant(48, 80, 2.6, CROP[id], st, 0, false)), enf: id => enfeiteIcon(id) }; // só para testes locais
 $('#chatForm').addEventListener('submit', e => { e.preventDefault(); enviarChat($('#chatTxt').value); });
 $('#chat').addEventListener('click', e => {
   if (e.target === $('#chat') || e.target.closest('[data-close]')) return fecharChat();
@@ -7451,6 +7579,9 @@ const RECEITAS = [
   { id: 'queijo',   nome: 'Queijo',              nivel: 10, in: { leite: 2 },                           tempo: HOUR,     forma: 'queijo',   cor: '#f7d046' },
   { id: 'sucouva',  nome: 'Suco de uva',         nivel: 15, in: { uva: 4 },                             tempo: 30 * MIN, forma: 'garrafa',  cor: '#6b3a8a' },
   { id: 'sucolar',  nome: 'Suco de laranja',     nivel: 19, in: { laranja: 4 },                         tempo: 30 * MIN, forma: 'garrafa',  cor: '#f28c1b' },
+  { id: 'arrozfeijao', nome: 'Arroz com feijão', nivel: 2,  in: { arroz: 3, feijao: 3 },                tempo: 20 * MIN, forma: 'prato',    cor: '#e8d8a8' },
+  { id: 'pacoca',   nome: 'Paçoca',              nivel: 7,  in: { amendoim: 4 },                        tempo: 40 * MIN, forma: 'manteiga', cor: '#d9b27a' },
+  { id: 'rapadura', nome: 'Rapadura',            nivel: 11, in: { cana: 4 },                            tempo: HOUR,     forma: 'manteiga', cor: '#a0602a' },
   // pratos com peixe (os peixes vêm da pescaria)
   { id: 'peixefrito',  nome: 'Lambari frito',       nivel: 3,  in: { lambari: 3, farofa: 1 },            tempo: 20 * MIN, forma: 'prato',  cor: '#d9a441', peixe: 'lambari' },
   { id: 'caldo',       nome: 'Caldo de tilápia',    nivel: 4,  in: { tilapia: 2, mandioca: 2 },          tempo: 40 * MIN, forma: 'panela', cor: '#e8c65a' },
@@ -7794,7 +7925,8 @@ const ENFEITES = [
   { id: 'peixedourado', nome: 'Estátua do Peixe Dourado', especial: true, trevo: true, conforto: 3 },
   // Pomar: frutíferas. Dão frutas de tempos em tempos e secam depois da última colheita.
   // Seca: um amigo ajuda (volta a dar frutas) ou sai com enxada (arbusto) / motosserra (árvore).
-  { id: 'pitangueira',   nome: 'Pitangueira',    fruteira: 'arbusto', fruta: 'pitanga',    nivel: 3,  custo: 80,   tempo: 6 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#4f9a2f' },
+  { id: 'framboeseira',  nome: 'Framboeseira',   fruteira: 'arbusto', fruta: 'framboesa',  nivel: 3,  custo: 90,   tempo: 6 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#5a9a3a' },
+  { id: 'pitangueira',   nome: 'Pitangueira',    fruteira: 'arvore',  fruta: 'pitanga',    nivel: 4,  custo: 80,   tempo: 6 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#4f9a2f' },
   { id: 'amoreira',      nome: 'Amoreira',       fruteira: 'arbusto', fruta: 'amora',      nivel: 5,  custo: 130,  tempo: 7 * 3600,  rende: 4, colheitas: 3, conforto: 1, copa: '#3f8a2a' },
   { id: 'maracujazeiro', nome: 'Maracujazeiro',  fruteira: 'arbusto', fruta: 'maracuja',   nivel: 8,  custo: 150,  tempo: 8 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#5aa03a' },
   { id: 'jabuticabeira', nome: 'Jabuticabeira',  fruteira: 'arvore',  fruta: 'jabuticaba', nivel: 7,  custo: 230,  tempo: 10 * 3600, rende: 6, colheitas: 3, conforto: 2, copa: '#3f7a2a' },
@@ -8591,35 +8723,93 @@ function drawFruta(id, x, y, s) {
   else if (id === 'caju') { ctx.fillStyle = '#e8502a'; ctx.beginPath(); ctx.ellipse(x, y + 1 * s, 4.5 * s, 5.5 * s, 0, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#8a6a3a'; ctx.beginPath(); ctx.ellipse(x, y + 7.5 * s, 2.2 * s, 1.8 * s, 0, 0, 7); ctx.fill(); }
   else if (id === 'maracuja') bola(0, 1, 5.5, f.cor);
   else if (id === 'pequi') bola(0, 1, 5.5, f.cor);
+  else if (id === 'framboesa' || id === 'amora') {
+    // frutinha feita de bolinhas (drupas): framboesa redondinha e vermelha; amora comprida e roxa-escura
+    const pts = id === 'amora' ? [[0, -4], [-1.4, -2], [1.4, -2], [0, 0], [-1.4, 2], [1.4, 2], [0, 4]] : [[0, -2.6], [-2, -1], [2, -1], [0, 0.4], [-2, 1.8], [2, 1.8], [0, 3]];
+    for (const [dx, dy] of pts) bola(dx, dy + 1, 1.7, f.cor);
+  } else if (id === 'pitanga') {
+    bola(0, 1, 4.6, f.cor); ctx.strokeStyle = 'rgba(120,20,10,.45)'; ctx.lineWidth = 0.6 * s;
+    for (const a of [-0.9, -0.3, 0.3, 0.9]) { ctx.beginPath(); ctx.ellipse(x + a * 3 * s, y + 1 * s, 1.2 * s, 4.2 * s, 0, 0, 7); ctx.stroke(); }
+  }
   else for (const [dx, dy] of [[-2.5, 2], [2.5, 2], [0, -1.5]]) bola(dx, dy, id === 'jabuticaba' ? 2.8 : 2.5, f.cor);
   ctx.fillStyle = '#4f9a2f'; ctx.beginPath(); ctx.ellipse(x + 2 * s, y - 5 * s, 2.6 * s, 1.2 * s, -0.5, 0, 7); ctx.fill();
 }
 // A frutífera no chão: arbusto redondinho ou árvore com tronco. Pronta = cheia de frutas; seca = galhos pelados.
 function drawFruteira(o, x, y, s, t, home) {
   const e = ENFEITE[o.id], st = o.t0 ? estadoFruteira(o) : { pronto: true, morta: false }, f = FRUTA[e.fruta], arv = e.fruteira === 'arvore';
+  const seca = st.morta, pronto = st.pronto && !seca, sway = Math.sin(t / 900 + x * 0.03) * 0.6 * s;
+  const bola = (cx, cy, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + cx * s, y + cy * s, r * s, 0, 7); ctx.fill(); };
+  const tronco = (pts, w, c) => { ctx.strokeStyle = c; ctx.lineWidth = w * s; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); pts.forEach(([px, py], k) => k ? ctx.lineTo(x + px * s, y + py * s) : ctx.moveTo(x + px * s, y + py * s)); ctx.stroke(); ctx.lineCap = 'butt'; };
+  const fruta = (cx, cy, k = 0.5) => drawFruta(e.fruta, x + cx * s, y + cy * s, s * k);
+  const cinza = '#9a8a5a', galho = seca ? '#7a6a5a' : '#6b4a2a';
   ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(x, y, (arv ? 30 : 22) * s, (arv ? 9 : 7) * s, 0, 0, 7); ctx.fill();
-  const seca = st.morta, copa = seca ? '#9a8a5a' : e.copa;
-  if (arv) {
-    ctx.fillStyle = seca ? '#7a6a5a' : '#6b4a2a';
-    ctx.beginPath(); ctx.moveTo(x - 4 * s, y); ctx.lineTo(x - 2.5 * s, y - 34 * s); ctx.lineTo(x + 2.5 * s, y - 34 * s); ctx.lineTo(x + 4 * s, y); ctx.fill();
-    ctx.strokeStyle = seca ? '#7a6a5a' : '#6b4a2a'; ctx.lineWidth = 2.4 * s; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(x, y - 26 * s); ctx.lineTo(x - 13 * s, y - 40 * s); ctx.moveTo(x, y - 28 * s); ctx.lineTo(x + 14 * s, y - 42 * s); ctx.moveTo(x, y - 33 * s); ctx.lineTo(x + 2 * s, y - 50 * s); ctx.stroke(); ctx.lineCap = 'butt';
-    if (!seca) {
-      for (const [dx, dy, r] of [[-14, -44, 13], [14, -46, 14], [0, -54, 15], [-5, -40, 11], [7, -40, 11]]) { ctx.fillStyle = copa; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, 7); ctx.fill(); }
-      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.arc(x - 6 * s, y - 56 * s, 7 * s, 0, 7); ctx.fill();
-      if (o.id === 'jabuticabeira' && st.pronto) for (let k = 0; k < 10; k++) { ctx.fillStyle = f.cor; ctx.beginPath(); ctx.arc(x + ((k * 7) % 10 - 5) * 0.6 * s, y - (6 + k * 2.6) * s, 1.8 * s, 0, 7); ctx.fill(); } // nasce no tronco!
-    } else for (const [dx, dy] of [[-16, -44], [16, -46], [3, -54]]) { ctx.strokeStyle = '#7a6a5a'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.moveTo(x + dx * 0.7 * s, y + dy * 0.9 * s); ctx.lineTo(x + dx * s, y + dy * s - 5 * s); ctx.stroke(); }
-  } else {
-    ctx.fillStyle = seca ? '#8a7a4a' : tomCor(copa, -0.15);
-    for (const [dx, dy, r] of [[-11, -10, 10], [10, -11, 10], [0, -17, 12], [-4, -8, 9], [5, -8, 9]]) { ctx.fillStyle = seca ? '#9a8a5a' : copa; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, 7); ctx.fill(); }
-    if (o.id === 'maracujazeiro' && !seca) { ctx.fillStyle = '#f4f1ea'; for (const [dx, dy] of [[-8, -20], [9, -16]]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 2.2 * s, 0, 7); ctx.fill(); ctx.fillStyle = '#7a4aa0'; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 0.9 * s, 0, 7); ctx.fill(); ctx.fillStyle = '#f4f1ea'; } }
-    if (seca) { ctx.strokeStyle = '#6b5a3a'; ctx.lineWidth = 1 * s; for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(x + (k * 5 - 10) * s, y - 3 * s); ctx.lineTo(x + (k * 6 - 12) * s, y - 20 * s); ctx.stroke(); } }
+  switch (o.id) {
+    case 'framboeseira': { // hastes compridas e arqueadas, folhinhas serrilhadas, framboesas nas pontas
+      const hastes = [[-16, -22], [-8, -30], [2, -33], [11, -28], [17, -20]];
+      for (const [hx, hy] of hastes) {
+        ctx.strokeStyle = seca ? '#8a7a5a' : '#8a4a3a'; ctx.lineWidth = 1.6 * s; ctx.beginPath(); ctx.moveTo(x, y - 1 * s); ctx.quadraticCurveTo(x + hx * 0.3 * s, y + (hy - 6) * s, x + hx * s + sway, y + hy * 0.6 * s); ctx.stroke();
+        if (!seca) for (const k of [0.45, 0.75]) { const lx = x + hx * k * s + sway * k, ly = y + hy * (k < 0.6 ? 0.85 : 0.75) * s; leaf(lx, ly, 7 * s, 3 * s, hx > 0 ? 0.9 : -0.9, k < 0.6 ? '#4f8a33' : '#6aa844'); }
+        if (pronto) fruta(hx + sway / s, hy * 0.6 + 2, 0.45);
+      }
+      break;
+    }
+    case 'amoreira': { // arbusto mais alto e irregular, verde-escuro, cachinhos de amora
+      for (const [cx, cy, r, c] of [[-11, -12, 9, '#2f6a22'], [10, -14, 10, '#2f6a22'], [-2, -24, 11, '#3a7a2a'], [-12, -24, 7, '#3a7a2a'], [11, -27, 7, '#44882f'], [0, -33, 7, '#4f9434']]) bola(cx + sway / s * (cy < -20 ? 1 : 0.4), cy, r, seca ? cinza : c);
+      if (seca) tronco([[0, 0], [-3, -18], [-9, -26]], 1.6, galho);
+      if (pronto) for (const [cx, cy] of [[-10, -12], [8, -16], [-2, -26], [11, -26], [-12, -22], [2, -9]]) fruta(cx, cy, 0.42);
+      break;
+    }
+    case 'maracujazeiro': { // espaldeira de madeira com a rama subindo, flores e maracujás pendurados
+      tronco([[-18, 0], [-18, -30]], 2.4, '#8a5a33'); tronco([[18, 0], [18, -30]], 2.4, '#8a5a33');
+      ctx.strokeStyle = '#8a8a8a'; ctx.lineWidth = 0.8 * s; for (const h of [-29, -18]) { ctx.beginPath(); ctx.moveTo(x - 18 * s, y + h * s); ctx.lineTo(x + 18 * s, y + h * s); ctx.stroke(); }
+      tronco([[0, 0], [-3, -12], [0, -20], [-8, -26], [-17, -29]], 1.4, seca ? '#8a7a5a' : '#4f7a2a');
+      tronco([[0, -20], [9, -25], [17, -29]], 1.4, seca ? '#8a7a5a' : '#4f7a2a');
+      if (!seca) {
+        for (const [lx, ly, a] of [[-14, -30, -0.4], [-6, -28, 0.3], [5, -27, -0.3], [13, -31, 0.4], [-2, -16, -1], [3, -10, 1], [-11, -19, 0.2], [11, -19, -0.2]]) leaf(x + lx * s, y + ly * s, 7 * s, 3.4 * s, a, '#4f9a3a');
+        for (const [fx, fy] of [[-10, -31], [8, -32]]) { bola(fx, fy, 2.4, '#f4f1ea'); bola(fx, fy, 1.1, '#7a4aa0'); }
+        if (pronto) for (const fx of [-12, 1, 12]) { tronco([[fx, -28], [fx, -23]], 0.6, '#4f7a2a'); fruta(fx, -19, 0.5); }
+      }
+      break;
+    }
+    case 'pitangueira': { // arvorezinha de copa cheia de folhinhas miúdas, pitangas vermelhas
+      tronco([[0, 0], [-1, -18]], 4, galho); tronco([[-1, -14], [-9, -22]], 2, galho); tronco([[-1, -16], [8, -24]], 2, galho);
+      if (!seca) for (let k = 0; k < 16; k++) { const a = k * 2.4, r = 5 + (k % 4) * 3.4; bola(Math.cos(a) * r * 1.3 + sway / s, -30 + Math.sin(a) * r * 0.8, 5.2, ['#2f6a22', '#3a7a2a', '#44882f', '#4f9434'][k % 4]); }
+      if (pronto) for (const [cx, cy] of [[-12, -28], [-4, -36], [7, -34], [13, -26], [0, -24], [-8, -20]]) fruta(cx, cy, 0.42);
+      break;
+    }
+    case 'jabuticabeira': { // vários tronquinhos lisos saindo do chão; a fruta nasce no tronco!
+      for (const [bx, tx] of [[-5, -12], [0, 0], [5, 12]]) tronco([[bx, 0], [tx * 0.6, -26], [tx, -36]], 3.2, seca ? '#8a7a6a' : '#9a7a5a');
+      if (!seca) for (const [cx, cy, r] of [[-14, -42, 12], [14, -44, 13], [0, -52, 14], [-5, -40, 10], [7, -40, 10]]) bola(cx + sway / s, cy, r, '#3f7a2a');
+      if (pronto) for (let k = 0; k < 14; k++) { const tr = [-1, 0, 1][k % 3]; bola(tr * 4 + tr * (k / 14) * 6 + (k % 2 ? 1.6 : -1.6), -4 - k * 1.9, 1.9, f.cor); }
+      break;
+    }
+    case 'mangueira': { // tronco grosso e uma copa enorme, bem fechada
+      tronco([[0, 0], [0, -24]], 7, galho); tronco([[0, -20], [-10, -30]], 3, galho); tronco([[0, -22], [11, -32]], 3, galho);
+      if (!seca) { ctx.fillStyle = '#245a1a'; ctx.beginPath(); ctx.ellipse(x + sway, y - 42 * s, 30 * s, 20 * s, 0, 0, 7); ctx.fill(); bola(-12, -48, 13, '#2f6a22'); bola(10, -50, 14, '#2f6a22'); bola(0, -56, 12, '#3a7a2a'); }
+      if (pronto) for (const [cx, cy] of [[-18, -32], [-6, -30], [8, -31], [19, -35], [0, -40]]) { tronco([[cx, cy - 5], [cx, cy - 1]], 0.6, '#3f5a2a'); fruta(cx, cy + 3, 0.55); }
+      break;
+    }
+    case 'cajueiro': { // tronco torto e baixo, copa larga e esparramada
+      tronco([[0, 0], [4, -10], [-2, -18], [3, -24]], 5, galho); tronco([[-2, -18], [-18, -26]], 2.6, galho); tronco([[3, -22], [20, -28]], 2.6, galho);
+      if (!seca) for (const [cx, cy, r] of [[-22, -30, 9], [-10, -34, 11], [4, -36, 12], [18, -33, 10], [26, -29, 7], [-26, -26, 6]]) bola(cx + sway / s, cy, r, cx % 2 ? '#3f7a2a' : '#4f8a2f');
+      if (pronto) for (const [cx, cy] of [[-18, -24], [-5, -26], [10, -27], [22, -24]]) fruta(cx, cy + 2, 0.55);
+      break;
+    }
+    case 'pequizeiro': { // árvore do cerrado: tronco retorcido e casca grossa, copa em tufos
+      tronco([[0, 0], [-4, -10], [2, -20], [-2, -28]], 5.5, seca ? '#7a6a5a' : '#5a4230');
+      tronco([[2, -20], [16, -30], [22, -40]], 2.6, seca ? '#7a6a5a' : '#5a4230'); tronco([[-2, -26], [-16, -36]], 2.6, seca ? '#7a6a5a' : '#5a4230');
+      ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 0.8 * s; for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(x + (-3 + k) * s, y - k * 5 * s); ctx.lineTo(x + (-1 + k) * s, y - (k * 5 + 3) * s); ctx.stroke(); }
+      if (!seca) for (const [cx, cy, r] of [[-18, -40, 9], [-6, -36, 7], [4, -44, 10], [20, -44, 9], [12, -34, 6]]) bola(cx + sway / s, cy, r, '#5a8a3a');
+      if (pronto) for (const [cx, cy] of [[-16, -32], [2, -36], [18, -36]]) fruta(cx, cy + 2, 0.5);
+      break;
+    }
+    default: {
+      bola(0, -12, 12, seca ? cinza : e.copa || '#4f9a2f');
+      if (pronto) fruta(0, -12, 0.5);
+    }
   }
-  // frutas quando está pronta
-  if (st.pronto && !(arv && o.id === 'jabuticabeira')) {
-    const pos = arv ? [[-15, -44], [-6, -52], [8, -50], [16, -42], [2, -42], [-10, -38]] : [[-10, -12], [9, -13], [0, -20], [-3, -9], [6, -8]];
-    for (const [dx, dy] of pos) { ctx.fillStyle = f.cor; ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, (arv ? 3 : 2.4) * s, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.arc(x + (dx - 0.8) * s, y + (dy - 0.8) * s, 0.8 * s, 0, 7); ctx.fill(); }
-  }
+  if (seca && arv && o.id !== 'jabuticabeira') for (const [dx, dy] of [[-16, -44], [16, -46], [3, -54]]) { ctx.strokeStyle = '#7a6a5a'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.moveTo(x + dx * 0.7 * s, y + dy * 0.8 * s); ctx.lineTo(x + dx * s, y + dy * s - 5 * s); ctx.stroke(); }
+  if (seca && !arv && o.id === 'framboeseira') { /* as hastes já ficam secas */ }
   // placa de ajuda fincada do lado
   if (seca && o.placa) {
     const px = x + (arv ? 22 : 18) * s, py = y + 2 * s;
