@@ -1056,6 +1056,7 @@ const NOVIDADES = [
   { v: 160, txt: 'Os blocos de água ganharam bordas arredondadas: as pontas que ficam pra fora do laguinho agora são curvas, em vez de quadradinhas.' },
   { v: 161, txt: 'Celeste, a sucuri, ficou bem mais fofa: cabeça grande e redonda, olhões brilhantes, bochecha rosada, sorrisinho e uma linguinha que aparece de vez em quando.' },
   { v: 162, txt: 'Corrigido: dava pra notar a divisão entre blocos de água encostados (uma friestinha de grama e o brilho repetido em cada um). Agora ficam bem juntinhos, sem gap, com um brilho só pro laguinho inteiro.' },
+  { v: 163, txt: 'Celeste, a sucuri, ganhou um corpo de verdade: uma fita só afunilando da cabeça até a cauda, sem as bolinhas, em tom azul-esverdeado de bicho d\'água.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -8927,17 +8928,37 @@ function drawSucuri(s, t, home) {
   const q = iso(u, v);
   ctx.save(); ctx.translate(q.x, q.y);
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(W * 0.05, W * 0.11, W * 0.55, W * 0.14, 0, 0, 7); ctx.fill();
-  const seg = 8, comp = W * 1.05, hx = comp / 2 + W * 0.06; // hx: centro da cabeça
-  for (let i = seg - 1; i >= 0; i--) {
-    const a = i / (seg - 1), sx = (a - 0.5) * comp, sy = Math.sin(a * 5 + t / 260) * W * 0.1, r = W * (0.105 - a * 0.02);
-    ctx.fillStyle = i % 2 === 0 ? '#4fae42' : '#6bc957';
-    ctx.beginPath(); ctx.ellipse(sx, sy, r * 1.65, r * 1.05, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#eef7d8'; ctx.beginPath(); ctx.ellipse(sx, sy + r * 0.55, r * 1.1, r * 0.4, 0, 0, 7); ctx.fill(); // barriguinha clarinha
-    if (i % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(sx - r * 0.3, sy - r * 0.35, r * 0.4, r * 0.25, 0, 0, 7); ctx.fill(); }
-  }
+  const comp = W * 1.05, hx = comp / 2 + W * 0.06; // hx: centro da cabeça
+  // corpo inteiro numa peça só (uma fita afunilando da cabeça até a ponta da cauda), sem bolinhas
+  const N = 22, espinha = [];
+  for (let i = 0; i <= N; i++) { const a = i / N, sx = (a - 0.5) * comp, sy = Math.sin(a * 5 + t / 260) * W * 0.1; espinha.push({ x: sx, y: sy, a }); }
+  const larguraEm = a => W * (0.045 + a * 0.08);
+  const fitaLados = largFn => {
+    const esq = [], dir = [];
+    for (let i = 0; i < espinha.length; i++) {
+      const p = espinha[i], prev = espinha[Math.max(0, i - 1)], next = espinha[Math.min(espinha.length - 1, i + 1)];
+      const dx = next.x - prev.x, dy = next.y - prev.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, w = largFn(p.a);
+      esq.push({ x: p.x + nx * w, y: p.y + ny * w }); dir.push({ x: p.x - nx * w, y: p.y - ny * w });
+    }
+    return { esq, dir };
+  };
+  const fitaPath = (esq, dir) => {
+    ctx.beginPath(); ctx.moveTo(esq[0].x, esq[0].y);
+    for (const pt of esq.slice(1)) ctx.lineTo(pt.x, pt.y);
+    for (let i = dir.length - 1; i >= 0; i--) ctx.lineTo(dir[i].x, dir[i].y);
+    ctx.closePath();
+  };
+  const { esq, dir } = fitaLados(larguraEm);
+  fitaPath(esq, dir);
+  const grad = ctx.createLinearGradient(espinha[0].x, 0, espinha[N].x, 0);
+  grad.addColorStop(0, '#1c7078'); grad.addColorStop(1, '#2fa39a');
+  ctx.fillStyle = grad; ctx.fill();
+  // barriguinha clara, uma faixa só ao longo do corpo (não uma por segmento)
+  const { esq: esq2, dir: dir2 } = fitaLados(a => larguraEm(a) * 0.4);
+  fitaPath(esq2, dir2); ctx.fillStyle = '#dff2ea'; ctx.fill();
   // cabecinha grande e redonda, bem fofa
-  ctx.fillStyle = '#4fae42'; ctx.beginPath(); ctx.ellipse(hx, 0, W * 0.155, W * 0.125, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#eef7d8'; ctx.beginPath(); ctx.ellipse(hx + W * 0.02, W * 0.05, W * 0.1, W * 0.05, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#1c7078'; ctx.beginPath(); ctx.ellipse(hx, 0, W * 0.155, W * 0.125, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#dff2ea'; ctx.beginPath(); ctx.ellipse(hx + W * 0.02, W * 0.05, W * 0.1, W * 0.05, 0, 0, 7); ctx.fill();
   // bochechas rosadas
   ctx.fillStyle = 'rgba(255,140,160,.45)';
   ctx.beginPath(); ctx.ellipse(hx - W * 0.03, W * 0.045, W * 0.028, W * 0.02, 0, 0, 7); ctx.fill();
