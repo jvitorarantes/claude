@@ -982,6 +982,7 @@ const NOVIDADES = [
   { v: 136, txt: 'O avisinho de peixe 🐟 no pesqueiro agora também aparece quando a tarrafa está pronta, não só a vara.' },
   { v: 137, txt: 'A entrada do mato agora também ganha um avisinho 🐾, parecido com o da pescaria: aparece sempre que tem caçada disponível em algum dos seus lugares.' },
   { v: 138, txt: 'Corrigido: no celular, um objeto movido bem pra longe (como a casa) podia ficar cortado na borda da tela, mesmo aparecendo certinho no computador. Agora o enquadramento sempre encolhe a roça o quanto for preciso pra tudo caber.' },
+  { v: 139, txt: 'Corrigido: a correção anterior não estava encolhendo o bastante quando um objeto ficava bem longe da grade (o cálculo travava num zoom mínimo que ainda cortava). Agora encolhe de verdade até tudo caber, com casa movida pra direita, pro celular em pé ou não.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2029,19 +2030,23 @@ function layout(sc) {
     // (um pouco mais perto que antes: a roça aparece maior e é mais fácil de tocar)
     const antes = Math.max(full, Math.min(rw * 1.8 / span, ah * 0.86 / (span / 4 + 0.9), rw / 5, ah / 3.6));
     L.W = antes * 1.15;
-    // da casinha do cachorro (à esquerda) até o fim dos canteiros (ou de um objeto movido pra longe)
-    // tem que caber na largura, sem ir para trás dos botões; nunca fica menor do que era antes.
-    // (antes isso só rodava no computador: no celular um objeto movido bem pra direita, como a casa, podia ficar cortado)
-    {
-      const esqU = Math.min((c0 - r1) / 2, ...objs.map(o => (o.u - o.v) / 2)) - 0.6, dirU = (c1 - r0) / 2 + 0.4;
-      L.W = Math.max(antes, Math.min(L.W, rw / (dirU - esqU)));
-    }
+    // esqU/dirU: extremos de verdade da cena em iso-x. c1/r1 acima já vêm limitados à grade
+    // (Math.min(COLS/ROWS, …)), então um objeto movido bem além dela (como a casa) precisa entrar
+    // aqui pelo valor real dele, senão nem o zoom nem a centralização percebem que ele ficou pra fora.
+    const esqU = Math.min((c0 - r1) / 2, ...objs.map(o => (o.u - o.v) / 2)) - 0.6;
+    const dirU = Math.max((c1 - r0) / 2, ...objs.map(o => (o.u - o.v) / 2)) + 0.4;
+    // da casinha do cachorro (à esquerda) até o fim dos canteiros (ou do objeto mais distante) tem
+    // que caber na largura, sem ir para trás dos botões. Só encolhe (nunca aumenta o zoom); o piso de
+    // 20px é só pra não desaparecer se alguém arrastar um objeto pra um lugar bem absurdo.
+    // (antes isso só rodava no computador, e o piso era "antes": no celular, e sempre que o objeto ficava
+    // bem longe da grade, esse piso impedia de encolher o quanto precisava e cortava a tela)
+    L.W = Math.min(L.W, Math.max(20, rw / (dirU - esqU)));
     const cc = (c0 + c1) / 2, rc = (r0 + r1) / 2;
-    L.ox = cx - (cc - rc) * L.W / 2;
+    L.ox = cx - (esqU + dirU) * L.W / 2;
     L.oy = Math.min(I.t + ah * 0.6 - (cc + rc) * L.W / 4, I.t + ah - (c1 + r1) * L.W / 4 - 0.25 * L.W);
     // Se sobrar espaço à direita, empurra a roça para a casinha do cachorro caber na tela.
     const esq = Math.min(...objs.map(o => (o.u - o.v) / 2)) - 0.45; // o que fica mais à esquerda (casinha, celeiro…)
-    const falta = (cw < 700 ? 6 : I.l) - esq * L.W - L.ox, sobra = I.l + aw - (L.ox + (c1 - r0) * L.W / 2);
+    const falta = (cw < 700 ? 6 : I.l) - esq * L.W - L.ox, sobra = I.l + aw - (L.ox + (dirU - 0.4) * L.W);
     if (falta > 0 && (sobra > 0 || cw < 700)) L.ox += cw < 700 ? falta : Math.min(falta, sobra);
   } else if (sc === 'animais') {
     // O rancho inteiro cabe na tela; no celular fica maior e dá para arrastar.
