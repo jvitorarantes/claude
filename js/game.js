@@ -1058,6 +1058,7 @@ const NOVIDADES = [
   { v: 162, txt: 'Corrigido: dava pra notar a divisão entre blocos de água encostados (uma friestinha de grama e o brilho repetido em cada um). Agora ficam bem juntinhos, sem gap, com um brilho só pro laguinho inteiro.' },
   { v: 163, txt: 'Celeste, a sucuri, ganhou um corpo de verdade: uma fita só afunilando da cabeça até a cauda, sem as bolinhas, em tom azul-esverdeado de bicho d\'água.' },
   { v: 164, txt: 'Bloco de água mais barato: agora custa 30 moedas, o mesmo preço da cerca mais em conta.' },
+  { v: 165, txt: 'Tirada a Celeste. Os peixinhos do laguinho ficaram maiores e agora nadam de bloco em bloco por todo o laguinho, em vez de pular parados num cantinho só.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3514,7 +3515,7 @@ function drawRoca(s, t, home) {
   if (home) drawInvasor(t);
   drawAvatares('roca', t);
   drawObjetos(s, 'roca', t, home, 'frente', d0);
-  drawSucuri(s, t, home);
+  drawPeixesRoca(s, t);
   drawMoving('roca', t);
   drawCritters(t, tod);
   nightOverlay(tod);
@@ -5032,7 +5033,7 @@ function tipDecor(id) {
 let lastTip = '';
 function updateTip() {
   const show = hover && $('#ctxMenu').hidden && (pointer.inside && !pointer.touch || performance.now() < pointer.tipUntil);
-  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'caca' ? (state.level >= CACA_NIVEL ? '<b>🎯 Trilha da caçada</b><br>Clique para caçar pragas com o estilingue ou a espingarda, e armar a arapuca.' : `<b>🎯 Trilha da caçada</b><br>Libera no nível ${CACA_NIVEL}.`) : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'invasor' ? `<b>${invasor ? (invasor.tipo === 'javali' ? '🐗 Javali' : '🐀 Rato') : 'Praga'} na plantação!</b><br>Clique para espantar antes que ele coma.` : hover.kind === 'armadilha' ? `<b>🪤 Armadilha de pragas</b><br>${armadilhaPronta() ? 'Carregada: pega a próxima praga que invadir a plantação.' : `Recarregando: pronta em ${fmt((state.armadilha.pronta - Date.now()) / 1000)}.`}` : hover.kind === 'sucuri' ? '<b>🐍 Celeste</b><br>A sucuri que mora no laguinho. Anda por perto, entra na água pra pescar, sai e come o peixe.' : hover.kind === 'mural' ? `<b>📷 Mural da caçada</b><br>${hover.n} foto${hover.n === 1 ? '' : 's'} de bichos. ${isHome() ? 'Clique para abrir o Livro da caçada.' : ''}` : hover.kind === 'folhas' ? '<b>🍂 Monte de folhas</b><br>Clique e o avatar vai rastelar (+XP e umas moedinhas).' : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
+  const html = !show ? null : hover.kind === 'plot' ? tipPlot(hover.i) : hover.kind === 'animal' ? tipAnimal(hover.id) : hover.kind === 'dog' ? tipDog(hover.slot) : hover.kind === 'canil' ? tipCanil(hover.slot) : hover.kind === 'caminha' ? tipCaminha(hover.id) : hover.kind === 'abrigo' ? tipAbrigo(hover.id) : hover.kind === 'land' ? tipLand() : hover.kind === 'caca' ? (state.level >= CACA_NIVEL ? '<b>🎯 Trilha da caçada</b><br>Clique para caçar pragas com o estilingue ou a espingarda, e armar a arapuca.' : `<b>🎯 Trilha da caçada</b><br>Libera no nível ${CACA_NIVEL}.`) : hover.kind === 'bicho' ? tipBicho(hover.i) : hover.kind === 'avatar' ? (hover.quem === 'dono' ? `<b>${esc(view.nome)}</b><br>${view.avatar && view.avatar.sexo === 'f' ? 'Dona' : 'Dono'} de ${esc(view.fazenda || 'Roça Feliz')}. Clique para dar um oi.` : `<b>${esc(meuApelido())}</b>${meuApelido() === 'Você' ? '' : ' (você)'}<br>Clique para dar um oi.`) : hover.kind === 'invasor' ? `<b>${invasor ? (invasor.tipo === 'javali' ? '🐗 Javali' : '🐀 Rato') : 'Praga'} na plantação!</b><br>Clique para espantar antes que ele coma.` : hover.kind === 'armadilha' ? `<b>🪤 Armadilha de pragas</b><br>${armadilhaPronta() ? 'Carregada: pega a próxima praga que invadir a plantação.' : `Recarregando: pronta em ${fmt((state.armadilha.pronta - Date.now()) / 1000)}.`}` : hover.kind === 'mural' ? `<b>📷 Mural da caçada</b><br>${hover.n} foto${hover.n === 1 ? '' : 's'} de bichos. ${isHome() ? 'Clique para abrir o Livro da caçada.' : ''}` : hover.kind === 'folhas' ? '<b>🍂 Monte de folhas</b><br>Clique e o avatar vai rastelar (+XP e umas moedinhas).' : hover.kind === 'lago' ? `<b>🎣 Lago</b><br>Clique para pescar (🪱 ${iscasDe().minhoca || 0} minhocas).` : hover.kind === 'enfeite' ? tipEnfeite(hover.id, hover.key, hover.sc) : hover.kind === 'obj' ? null : hover.kind === 'celeiro' ? `<b>${isHome() ? 'Seu celeiro' : 'Celeiro de ' + esc(view.nome)}</b>${isHome() ? '<br>Clique para ver o que está guardado.' : ''}` : hover.kind === 'casa' ? `<b>${isHome() ? 'Sua casa' : 'Casa de ' + esc(view.nome)}</b><br>${isHome() ? 'Clique para entrar ou trocar o tema.' : 'Clique para entrar.'}` : tipDecor(hover.id);
   if (!html) { tip.hidden = true; lastTip = ''; return; }
   if (html !== lastTip) { tip.innerHTML = html; lastTip = html; }
   tip.hidden = false;
@@ -5207,7 +5208,6 @@ cv.addEventListener('click', e => {
   else if (target.kind === 'folhas') rastelarFolhas(target.id);
   else if (target.kind === 'invasor') espantarInvasor();
   else if (target.kind === 'armadilha') toast(armadilhaPronta() ? '🪤 Armadilha carregada: pega a próxima praga que invadir a plantação.' : `🪤 Armadilha recarregando: pronta em ${fmt((state.armadilha.pronta - Date.now()) / 1000)}.`);
-  else if (target.kind === 'sucuri') toast(`🐍 Celeste, a sucuri do laguinho! ${{ andando: 'Está rondando por aqui.', entrando: 'Entrando na água…', pescando: 'Caçando um peixinho!', saindo: 'Saiu da água com o peixe.', comendo: 'Comendo o peixe que pescou.' }[sucuri ? sucuri.fase : 'andando']}`);
   else if (target.kind === 'mural') { abrirCaca(); if (caca) { cacaLivro = true; renderCaca(); } }
   else if (target.kind === 'avatar' && target.quem === 'dono') { falar('avatar:dono', view.nome, sorteia(FALAS_DONO.concat(FALAS_AVATAR))); sfx('fala'); }
   else if (target.kind === 'avatar') { falar('avatar', meuApelido(), sorteia(FALAS_AVATAR)); sfx('fala'); }
@@ -8847,144 +8847,47 @@ function drawAgua(s, sc, o, t) {
   }
   const m = { x: (p1.x + p3.x) / 2, y: (p1.y + p3.y) / 2 };
   const conectado = viz(1, 0) || viz(-1, 0) || viz(0, 1) || viz(0, -1);
-  // O brilho é só um por laguinho (não um por bloco), senão dá pra perceber onde cada bloco termina.
+  const grupo = conectado ? aguaGrupo(objs, o) : [o];
+  const ancora = grupo.every(x => x.u > o.u || (x.u === o.u && x.v >= o.v));
+  // O brilho e os peixes são só um por laguinho (não um por bloco), senão dá pra perceber a divisão.
   if (!conectado) { ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(m.x - L.W * 0.08, m.y - L.W * 0.06, L.W * 0.14, L.W * 0.06, 0, 0, 7); ctx.fill(); }
-  else {
-    const grupo = aguaGrupo(objs, o);
-    if (grupo.every(x => x.u > o.u || (x.u === o.u && x.v >= o.v))) {
-      const gu = grupo.reduce((a, x) => a + x.u, 0) / grupo.length, gv = grupo.reduce((a, x) => a + x.v, 0) / grupo.length;
-      const gc = iso(gu, gv), k = Math.sqrt(grupo.length);
-      ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.ellipse(gc.x - L.W * 0.1 * k, gc.y - L.W * 0.08 * k, L.W * 0.16 * k, L.W * 0.07 * k, 0, 0, 7); ctx.fill();
-    }
+  else if (ancora) {
+    const gu = grupo.reduce((a, x) => a + x.u, 0) / grupo.length, gv = grupo.reduce((a, x) => a + x.v, 0) / grupo.length;
+    const gc = iso(gu, gv), k = Math.sqrt(grupo.length);
+    ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.ellipse(gc.x - L.W * 0.1 * k, gc.y - L.W * 0.08 * k, L.W * 0.16 * k, L.W * 0.07 * k, 0, 0, 7); ctx.fill();
   }
-  if (conectado) drawPeixinhoLagoa(m.x, m.y, L.W, t, Math.round(o.u * 1300 + o.v * 700));
 }
-function drawPeixinhoLagoa(x, y, W, t, seed) {
-  const T = 2600, ph = (t + seed) % T;
-  if (ph > 480) return;
-  const p = ph / 480, arc = Math.sin(p * Math.PI);
-  if (p < 0.1 || p > 0.9) { ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.ellipse(x, y, W * 0.1, W * 0.04, 0, 0, 7); ctx.stroke(); }
-  ctx.save(); ctx.translate(x + (p - 0.5) * W * 0.35, y - arc * W * 0.42); ctx.rotate(-0.5 + arc * 0.5);
-  drawPeixe(ctx, 0, 0, W / 230, PEIXE.lambari);
-  ctx.restore();
+// Peixe de célula em célula do laguinho, num horário determinístico (sem guardar estado): a cada
+// "perna" (PEIXE_LAGOA_LEG ms) troca de bloco de destino, escolhido por uma pseudo-aleatoriedade com seed.
+const PEIXE_LAGOA_LEG = 3200;
+function peixeLagoaAlvo(grupo, seed, leg) {
+  const x = Math.sin(seed * 12.9898 + leg * 78.233) * 43758.5453;
+  return grupo[Math.floor((x - Math.floor(x)) * grupo.length) % grupo.length];
 }
-// ---------- Celeste, a sucuri: mora perto do laguinho (2+ blocos de água juntos), anda, entra, pesca, sai e come ----------
-// Grupos de blocos de água que se tocam (só os com 2 ou mais viram "laguinho" de verdade).
-function laguinhos(s) {
-  const objs = objetosDe(s, 'roca').filter(o => ehAgua(o.id)), vistos = new Set(), grupos = [];
+function drawPeixesLagoa(grupo, t, W) {
+  const n = Math.min(3, Math.max(1, Math.round(grupo.length / 2)));
+  for (let i = 0; i < n; i++) {
+    const seed = i * 991 + Math.round(grupo[0].u * 131 + grupo[0].v * 257);
+    const total = t + i * 1300, leg = Math.floor(total / PEIXE_LAGOA_LEG), frac = (total % PEIXE_LAGOA_LEG) / PEIXE_LAGOA_LEG;
+    const de = peixeLagoaAlvo(grupo, seed, leg), pra = peixeLagoaAlvo(grupo, seed, leg + 1);
+    const u = de.u + (pra.u - de.u) * frac, v = de.v + (pra.v - de.v) * frac;
+    const q = iso(u, v), qDe = iso(de.u, de.v), qPra = iso(pra.u, pra.v);
+    const ang = Math.atan2(qPra.y - qDe.y, qPra.x - qDe.x);
+    ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(ang); ctx.globalAlpha = 0.92;
+    drawPeixe(ctx, 0, 0, W / 130, PEIXE.lambari);
+    ctx.globalAlpha = 1; ctx.restore();
+  }
+}
+// Desenha os peixinhos de todos os laguinhos da cena, por cima de tudo (senão um bloco de água
+// desenhado depois do peixe, na mesma volta do loop, cobria ele).
+function drawPeixesRoca(s, t) {
+  const objs = objetosDe(s, 'roca').filter(x => ehAgua(x.id)), vistos = new Set();
   for (const o of objs) {
-    const k0 = o.u + ',' + o.v; if (vistos.has(k0)) continue;
-    const grupo = [], fila = [o];
-    while (fila.length) {
-      const c = fila.pop(), kk = c.u + ',' + c.v; if (vistos.has(kk)) continue; vistos.add(kk); grupo.push(c);
-      for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const viz = objs.find(x => Math.abs(x.u - (c.u + du)) < 0.1 && Math.abs(x.v - (c.v + dv)) < 0.1);
-        if (viz) fila.push(viz);
-      }
-    }
-    if (grupo.length >= 2) grupos.push(grupo);
+    const k = o.u + ',' + o.v; if (vistos.has(k)) continue;
+    const grupo = aguaGrupo(objs, o);
+    for (const x of grupo) vistos.add(x.u + ',' + x.v);
+    drawPeixesLagoa(grupo, t, L.W);
   }
-  return grupos;
-}
-let sucuri = null; // { fase, t0, scRef, u, v, cx, cv, alvo, legFrom, legAlvo, legT0 }
-// Onde ela está, dado quanto tempo já passou (em segundos) na fase atual. "andando" troca de destino
-// a cada perna de caminhada (SUCURI_LEG segundos), pra parecer que ela realmente passeia por ali.
-const SUCURI_LEG = 9;
-function sucuriPos(sc, cx, cv, age) {
-  if (sc.fase === 'andando') {
-    if (sc.legT0 === undefined || age - sc.legT0 > SUCURI_LEG) {
-      sc.legFrom = sc.legAlvo || [sc.u, sc.v];
-      const a = Math.random() * Math.PI * 2, d = 1.2 + Math.random() * 1.2;
-      sc.legAlvo = [cx + Math.cos(a) * d, cv + Math.sin(a) * d];
-      sc.legT0 = age;
-    }
-    const lp = Math.min(1, (age - sc.legT0) / SUCURI_LEG);
-    return [sc.legFrom[0] + (sc.legAlvo[0] - sc.legFrom[0]) * lp, sc.legFrom[1] + (sc.legAlvo[1] - sc.legFrom[1]) * lp];
-  }
-  const p = Math.min(1, age / SUCURI_DUR[sc.fase]);
-  if (sc.fase === 'entrando') return [sc.u + (cx - sc.u) * p, sc.v + (cv - sc.v) * p];
-  if (sc.fase === 'pescando') return [cx, cv];
-  if (sc.fase === 'saindo') {
-    if (!sc.alvo) { const a = Math.random() * Math.PI * 2; sc.alvo = [cx + Math.cos(a) * 1.6, cv + Math.sin(a) * 1.2]; }
-    return [cx + (sc.alvo[0] - cx) * p, cv + (sc.alvo[1] - cv) * p];
-  }
-  return [sc.u, sc.v]; // comendo: parada
-}
-const SUCURI_DUR = { andando: 75, entrando: 7, pescando: 10, saindo: 7, comendo: 14 };
-const SUCURI_PROX = { andando: 'entrando', entrando: 'pescando', pescando: 'saindo', saindo: 'comendo', comendo: 'andando' };
-function drawSucuri(s, t, home) {
-  const grupos = laguinhos(s);
-  if (!grupos.length) { if (sucuri && sucuri.scRef === s) sucuri = null; return; }
-  const g = grupos[0], cx = g.reduce((a, o) => a + o.u, 0) / g.length, cv = g.reduce((a, o) => a + o.v, 0) / g.length;
-  if (!sucuri || sucuri.scRef !== s) {
-    const a0 = Math.random() * Math.PI * 2;
-    sucuri = { fase: 'andando', t0: t, scRef: s, u: cx + Math.cos(a0) * 1.8, v: cv + Math.sin(a0) * 1.3, alvo: null };
-  }
-  if ((t - sucuri.t0) / 1000 > SUCURI_DUR[sucuri.fase]) {
-    if (sucuri.fase === 'andando' || sucuri.fase === 'saindo') { const [pu, pv] = sucuriPos(sucuri, cx, cv, SUCURI_DUR[sucuri.fase]); sucuri.u = pu; sucuri.v = pv; }
-    sucuri.fase = SUCURI_PROX[sucuri.fase]; sucuri.t0 = t; sucuri.alvo = null; sucuri.legT0 = undefined;
-  }
-  const age = (t - sucuri.t0) / 1000, W = L.W, p = Math.min(1, age / SUCURI_DUR[sucuri.fase]);
-  const [u, v] = sucuriPos(sucuri, cx, cv, age);
-  const q = iso(u, v);
-  ctx.save(); ctx.translate(q.x, q.y);
-  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(W * 0.05, W * 0.11, W * 0.55, W * 0.14, 0, 0, 7); ctx.fill();
-  const comp = W * 1.05, hx = comp / 2 + W * 0.06; // hx: centro da cabeça
-  // corpo inteiro numa peça só (uma fita afunilando da cabeça até a ponta da cauda), sem bolinhas
-  const N = 22, espinha = [];
-  for (let i = 0; i <= N; i++) { const a = i / N, sx = (a - 0.5) * comp, sy = Math.sin(a * 5 + t / 260) * W * 0.1; espinha.push({ x: sx, y: sy, a }); }
-  const larguraEm = a => W * (0.045 + a * 0.08);
-  const fitaLados = largFn => {
-    const esq = [], dir = [];
-    for (let i = 0; i < espinha.length; i++) {
-      const p = espinha[i], prev = espinha[Math.max(0, i - 1)], next = espinha[Math.min(espinha.length - 1, i + 1)];
-      const dx = next.x - prev.x, dy = next.y - prev.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, w = largFn(p.a);
-      esq.push({ x: p.x + nx * w, y: p.y + ny * w }); dir.push({ x: p.x - nx * w, y: p.y - ny * w });
-    }
-    return { esq, dir };
-  };
-  const fitaPath = (esq, dir) => {
-    ctx.beginPath(); ctx.moveTo(esq[0].x, esq[0].y);
-    for (const pt of esq.slice(1)) ctx.lineTo(pt.x, pt.y);
-    for (let i = dir.length - 1; i >= 0; i--) ctx.lineTo(dir[i].x, dir[i].y);
-    ctx.closePath();
-  };
-  const { esq, dir } = fitaLados(larguraEm);
-  fitaPath(esq, dir);
-  const grad = ctx.createLinearGradient(espinha[0].x, 0, espinha[N].x, 0);
-  grad.addColorStop(0, '#1c7078'); grad.addColorStop(1, '#2fa39a');
-  ctx.fillStyle = grad; ctx.fill();
-  // barriguinha clara, uma faixa só ao longo do corpo (não uma por segmento)
-  const { esq: esq2, dir: dir2 } = fitaLados(a => larguraEm(a) * 0.4);
-  fitaPath(esq2, dir2); ctx.fillStyle = '#dff2ea'; ctx.fill();
-  // cabecinha grande e redonda, bem fofa
-  ctx.fillStyle = '#1c7078'; ctx.beginPath(); ctx.ellipse(hx, 0, W * 0.155, W * 0.125, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#dff2ea'; ctx.beginPath(); ctx.ellipse(hx + W * 0.02, W * 0.05, W * 0.1, W * 0.05, 0, 0, 7); ctx.fill();
-  // bochechas rosadas
-  ctx.fillStyle = 'rgba(255,140,160,.45)';
-  ctx.beginPath(); ctx.ellipse(hx - W * 0.03, W * 0.045, W * 0.028, W * 0.02, 0, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(hx + W * 0.1, W * 0.035, W * 0.026, W * 0.018, 0, 0, 7); ctx.fill();
-  // olhões bem grandes e fofos, com brilho
-  for (const ex of [hx - W * 0.015, hx + W * 0.075]) {
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex, -W * 0.05, W * 0.042, W * 0.05, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(ex + W * 0.008, -W * 0.045, W * 0.026, 0, 7); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex - W * 0.002, -W * 0.06, W * 0.011, 0, 7); ctx.fill();
-  }
-  // sorrisinho
-  ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = W * 0.012; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(hx + W * 0.02, W * 0.09); ctx.quadraticCurveTo(hx + W * 0.09, W * 0.115, hx + W * 0.14, W * 0.06); ctx.stroke();
-  // linguinha, de vez em quando
-  if ((sucuri.fase === 'andando' || sucuri.fase === 'pescando') && Math.sin(t / 420) > 0.7) {
-    ctx.strokeStyle = '#e0506a'; ctx.lineWidth = W * 0.012;
-    ctx.beginPath(); ctx.moveTo(hx + W * 0.15, W * 0.02); ctx.lineTo(hx + W * 0.21, W * 0.005); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(hx + W * 0.21, W * 0.005); ctx.lineTo(hx + W * 0.24, -W * 0.01); ctx.moveTo(hx + W * 0.21, W * 0.005); ctx.lineTo(hx + W * 0.24, W * 0.02); ctx.stroke();
-  }
-  if (sucuri.fase === 'saindo' || sucuri.fase === 'comendo') {
-    const escala = sucuri.fase === 'comendo' ? Math.max(0, 1 - p) : 1;
-    if (escala > 0) { ctx.save(); ctx.translate(hx + W * 0.2, W * 0.04); ctx.scale(escala, escala); drawPeixe(ctx, 0, 0, W / 260, PEIXE.lambari); ctx.restore(); }
-  }
-  ctx.restore();
-  if (home && !moveMode) hits.push({ kind: 'sucuri', x: q.x, y: q.y - W * 0.1, r: W * 0.5 });
 }
 // Desenho dos enfeites, com a base em (x, y). s = escala (1 = casa de 100px).
 function drawEnfeite(id, x, y, s, t) {
