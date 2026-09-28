@@ -948,6 +948,7 @@ const NOVIDADES = [
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
   { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
+  { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
   { v: 112, txt: 'Mudanças na caçada e nas pragas: a Caçada agora libera no nível 10. Pragas na plantação só aparecem no máximo uma vez a cada 12 horas, com você na roça: toca um alarme, a tela fica vermelha e você vê o bicho chegando. O cachorro de guarda corre atrás dele, e tem a nova 🪤 Armadilha de pragas (Loja › Itens), que pega um bicho por vez e depois recarrega.' },
   { v: 111, txt: 'Caçada ainda melhor 🎯: cada bicho novo vira uma 📷 foto no mural da sua casa (uma por bicho). Dá para ter uma 2ª arapuca e escolher a isca: milho, quirera (atrai bicho incomum) ou fruta do pomar (atrai os raros). Cada bicho tem seu domínio ★ com estrelas e trevos. E, de vez em quando, um rato ou javali entra na plantação: clique para espantar! Se ninguém espantar, ele come só um pouquinho de 1 ou 2 plantas. Com o cachorro da roça de guarda, isso quase não acontece.' },
@@ -2460,7 +2461,13 @@ function fenceRun(a, b, steps, skipFirst, tm) {
     if (tm.bambu) for (const h of [0.07, 0.14]) { ctx.fillStyle = 'rgba(60,80,20,.5)'; ctx.fillRect(p.x - W * 0.025, p.y - W * h, W * 0.05, 1.5); }
     if (tm.rosas) { ctx.fillStyle = '#3f8a2a'; ctx.beginPath(); ctx.arc(p.x, p.y - W * 0.03, W * 0.05, 0, 7); ctx.fill(); ctx.fillStyle = '#e53b2f'; ctx.beginPath(); ctx.arc(p.x + W * 0.02, p.y - W * 0.06, W * 0.022, 0, 7); ctx.fill(); }
   };
-  for (const h of [0.08, 0.16]) line({ x: a.x, y: a.y - W * h }, { x: b.x, y: b.y - W * h }, tm.trilho, W * 0.03);
+  if (tm.arame) {
+    for (const h of [0.06, 0.12, 0.18]) {
+      line({ x: a.x, y: a.y - W * h }, { x: b.x, y: b.y - W * h }, tm.trilho, Math.max(1, W * 0.008));
+      ctx.strokeStyle = tm.trilho; ctx.lineWidth = 1;
+      for (let k = 1; k < steps * 4; k++) { const q = lerp(a, b, k / (steps * 4)); ctx.beginPath(); ctx.moveTo(q.x - 2, q.y - W * h - 2); ctx.lineTo(q.x + 2, q.y - W * h + 2); ctx.moveTo(q.x + 2, q.y - W * h - 2); ctx.lineTo(q.x - 2, q.y - W * h + 2); ctx.stroke(); }
+    }
+  } else for (const h of [0.08, 0.16]) line({ x: a.x, y: a.y - W * h }, { x: b.x, y: b.y - W * h }, tm.trilho, W * 0.03);
   for (let k = skipFirst ? 1 : 0; k <= steps; k++) post(lerp(a, b, k / steps));
 }
 function drawFenceRect(u0, v0, u1, v1, side) {
@@ -4284,9 +4291,14 @@ function renderPane() {
     } else if (shopSeg === 'enfeites') {
       html += `<p class="hint">Enfeites vão para o Inventário. De lá você escolhe onde pôr, na roça ou no rancho, fora dos canteiros e cercados. Cada um dá conforto (+XP).</p>`;
       {
-        const tem = state.enfeites.cerca || 0, postos = objetosDe(state, 'roca').filter(o => o.id === 'cerca').length, e = ENFEITE.cerca;
-        html += `<h3>Cercas</h3><div class="row wide"><img alt="" src="${enfeiteIcon('cerca')}"><div><div class="name">Cerca</div><div class="meta">Pedaço de cerca para a roça, no estilo do tema (Loja › Temas). Ponha quantos quiser seguidos, girando para fechar os cantos.${tem ? ` · no inventário: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
-          <div class="actions">${tem ? `<button class="btn gold" data-enfeite-usar="cerca">📦 Usar · tem ${tem}</button>` : ''}<button class="btn ${tem ? 'ghost' : ''}" data-enfeite-comprar="cerca" data-mais="1" ${state.coins < e.custo ? 'disabled' : ''}>${tem ? '+ ' : ''}1 · ${moeda(e.custo)}</button><button class="btn ${tem ? 'ghost' : ''}" data-enfeite-comprar="cerca" data-qtd="10" data-mais="1" ${state.coins < e.custo * 10 ? 'disabled' : ''}>${tem ? '+ ' : ''}10 · ${moeda(e.custo * 10)}</button></div></div><h3>Enfeites</h3>`;
+        html += `<h3>Cercas e porteiras</h3><p class="hint" style="margin:0 0 6px">Cada pedaço tem uma casa de comprimento: ponha vários seguidos e gire (⟳) para fechar os cantos. A porteira ocupa um pedaço da cerca. Só enfeitam (não dão XP).</p>`;
+        for (const e of ENFEITES.filter(x => x.cerca)) {
+          const tem = state.enfeites[e.id] || 0, postos = objetosDe(state, 'roca').filter(o => o.id === e.id).length, locked = e.nivel > state.level;
+          const btn = (q, mais) => `<button class="btn ${mais ? 'ghost' : ''}" data-enfeite-comprar="${e.id}" data-mais="1"${q > 1 ? ` data-qtd="${q}"` : ''} ${state.coins < e.custo * q ? 'disabled' : ''}>${mais ? '+ ' : ''}${q > 1 ? q + ' · ' : ''}${moeda(e.custo * q)}</button>`;
+          html += `<div class="row wide ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div><div class="meta">${e.desc}${tem ? ` · no inventário: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
+            <div class="actions">${tem ? `<button class="btn gold" data-enfeite-usar="${e.id}">📦 Usar · tem ${tem}</button>` : ''}${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : btn(1, tem) + (e.porteira ? '' : btn(10, tem))}</div></div>`;
+        }
+        html += `<h3>Enfeites</h3>`;
       }
       for (const e of ENFEITES.filter(x => !x.especial && !x.fruteira && !x.cerca)) {
         const tem = state.enfeites[e.id] || 0, postos = ['roca', 'animais'].reduce((t, sc) => t + objetosDe(state, sc).filter(o => o.id === e.id).length, 0);
@@ -4490,7 +4502,7 @@ $('#pane').addEventListener('click', e => {
   if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar, Number(d.qtd) || 1);
   if (d.invPor) return invPor(d.invPor, d.sc);
   if (d.venderDec) return venderDecoracao(d.venderDec);
-  if (d.invGuardarCercas) { const sc = d.invGuardarCercas, l = objetosDe(state, sc), n = l.filter(o => ehCerca(o.id)).length; state.objetos[sc] = l.filter(o => !ehCerca(o.id)); state.enfeites.cerca = (state.enfeites.cerca || 0) + n; toast(`${n} pedaços de cerca guardados no inventário.`); return done(); }
+  if (d.invGuardarCercas) { const [sc, id] = d.invGuardarCercas.split(':'), l = objetosDe(state, sc), n = l.filter(o => o.id === id).length; state.objetos[sc] = l.filter(o => o.id !== id); state.enfeites[id] = (state.enfeites[id] || 0) + n; toast(`${n}× ${ENFEITE[id].nome.toLowerCase()} guardado${n > 1 ? 's' : ''} no inventário.`); return done(); }
   if (d.invGuardar) { const [sc, i] = d.invGuardar.split(':'); return invGuardar(sc, Number(i)); }
   if (d.pocao) {
     const n = Number(d.pocao) || 1;
@@ -7764,7 +7776,17 @@ const ENFEITES = [
   { id: 'fonte',      nome: 'Fonte',                  nivel: 10, custo: 3000, conforto: 2 },
   { id: 'moinho',     nome: 'Cata-vento',             nivel: 14, custo: 5000, conforto: 3 },
   // Cerca: um pedaço de uma casa de comprimento, no estilo do tema da roça. Só enfeita (não dá XP).
-  { id: 'cerca',      nome: 'Cerca',                  nivel: 1,  custo: 40,   conforto: 0, cerca: true },
+  { id: 'cerca',      nome: 'Cerca da roça',          nivel: 1,  custo: 40,   conforto: 0, cerca: true, desc: 'No estilo do tema da roça (Loja › Temas).' },
+  { id: 'cerca_arame',  nome: 'Cerca de arame farpado', nivel: 2,  custo: 30,  conforto: 0, cerca: true, estilo: { poste: '#8a6a44', topo: '#a4825a', trilho: '#6a6a6a', arame: true }, desc: 'Moirão de madeira e três fios de arame.' },
+  { id: 'cerca_branca', nome: 'Cerca branca',          nivel: 3,  custo: 60,  conforto: 0, cerca: true, estilo: { trilho: '#f4f1ea', poste: '#dcd6ca', topo: '#ffffff' }, desc: 'Branquinha, de casa de fazenda.' },
+  { id: 'cerca_bambu',  nome: 'Cerca de bambu',        nivel: 5,  custo: 70,  conforto: 0, cerca: true, estilo: { trilho: '#c9b35a', poste: '#8fae3e', topo: '#b5cf5a', bambu: true }, desc: 'Varas de bambu amarradas.' },
+  { id: 'cerca_azul',   nome: 'Cerca azul',            nivel: 6,  custo: 60,  conforto: 0, cerca: true, estilo: { trilho: '#6b8fb5', poste: '#4f7299', topo: '#8fb0d1' }, desc: 'Pintada de azul-céu.' },
+  { id: 'cerca_rosas',  nome: 'Cerca com roseiras',    nivel: 8,  custo: 90,  conforto: 0, cerca: true, estilo: { trilho: '#f4f1ea', poste: '#dcd6ca', topo: '#ffffff', rosas: true }, desc: 'Cerca branca com roseira em cada moirão.' },
+  { id: 'cerca_pedra',  nome: 'Muro de pedra',         nivel: 10, custo: 110, conforto: 0, cerca: true, estilo: { trilho: '#a8a294', poste: '#8f897b', topo: '#c7c1b3', pedra: true }, desc: 'Muro baixo de pedra, bem de sítio.' },
+  // porteiras: ocupam um pedaço de cerca (encaixam e giram igual)
+  { id: 'porteira',        nome: 'Porteira de madeira', nivel: 1,  custo: 150, conforto: 0, cerca: true, porteira: 'madeira', desc: 'Porteira de tábua com a travessa em diagonal.' },
+  { id: 'porteira_branca', nome: 'Porteira branca',     nivel: 5,  custo: 250, conforto: 0, cerca: true, porteira: 'branca', desc: 'Pintada de branco, com duas travessas em X.' },
+  { id: 'porteira_ferro',  nome: 'Portão de ferro',     nivel: 12, custo: 500, conforto: 0, cerca: true, porteira: 'ferro', desc: 'Grades de ferro com o arco em cima.' },
   { id: 'bandeira',   nome: 'Bandeira dos Pioneiros', especial: true, conforto: 2 },
   { id: 'bolo',       nome: 'Bolo de boas-vindas',    especial: true, conforto: 2 },
   { id: 'carroca',    nome: 'Carroça de feno do Seu Zé',    especial: true, vila: true, conforto: 3 },
@@ -7851,8 +7873,35 @@ function validCerca(u, v, rot, ignora) {
   return objList(state, 'roca').every(o => o.key === ignora || (o.cerca ? !(o.u === u && o.v === v && o.rot === rot)
     : [0.15, 0.5, 0.85].every(k => Math.hypot(a[0] + (b[0] - a[0]) * k - o.u, a[1] + (b[1] - a[1]) * k - o.v) >= o.r * 0.7)));
 }
-function drawCercaSeg(u, v, rot, s) { const [a, b] = pontasCerca(u, v, rot); fenceRun(iso(...a), iso(...b), 2, false, temaDe(s)); }
+const estiloCerca = (id, s) => (ENFEITE[id] && ENFEITE[id].estilo) || temaDe(s);
+function drawCercaSeg(u, v, rot, s, id = 'cerca') {
+  const [a, b] = pontasCerca(u, v, rot), e = ENFEITE[id];
+  if (e && e.porteira) return drawPorteira(iso(...a), iso(...b), e.porteira, L.W);
+  fenceRun(iso(...a), iso(...b), 2, false, estiloCerca(id, s));
+}
+// Porteira entre dois moirões mais grossos: tábuas com travessa (madeira/branca) ou grade com arco (ferro).
+function drawPorteira(a, b, tipo, W) {
+  const h = W * 0.22, cor = { madeira: '#a4703f', branca: '#f4f1ea', ferro: '#3f454b' }[tipo], esc = { madeira: '#6b4220', branca: '#b8b0a0', ferro: '#23272b' }[tipo];
+  const at = (k, y) => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k - y });
+  if (tipo === 'ferro') {
+    for (let k = 1; k < 10; k++) line(at(k / 10, 0), at(k / 10, h * (0.85 + Math.sin(k / 10 * Math.PI) * 0.35)), cor, W * 0.014);
+    ctx.strokeStyle = cor; ctx.lineWidth = W * 0.02; ctx.beginPath(); for (let k = 0; k <= 20; k++) { const p = at(k / 20, h * (0.85 + Math.sin(k / 20 * Math.PI) * 0.35)); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke();
+    line(at(0.08, h * 0.35), at(0.92, h * 0.35), cor, W * 0.018);
+    ctx.fillStyle = '#e0b040'; for (const k of [0.3, 0.5, 0.7]) { const p = at(k, h * (0.85 + Math.sin(k * Math.PI) * 0.35) + W * 0.02); ctx.beginPath(); ctx.arc(p.x, p.y, W * 0.012, 0, 7); ctx.fill(); }
+  } else {
+    for (const y of [0.15, 0.5, 0.85]) line(at(0.06, h * y), at(0.94, h * y), cor, W * 0.034);
+    line(at(0.08, h * 0.12), at(0.92, h * 0.88), cor, W * 0.03);
+    if (tipo === 'branca') line(at(0.08, h * 0.88), at(0.92, h * 0.12), cor, W * 0.03);
+    ctx.strokeStyle = esc; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(at(0.06, h * 0.5).x, at(0.06, h * 0.5).y); ctx.lineTo(at(0.94, h * 0.5).x, at(0.94, h * 0.5).y); ctx.stroke();
+  }
+  // moirões grossos nas duas pontas, com tampinha
+  for (const p of [a, b]) {
+    ctx.fillStyle = tipo === 'ferro' ? '#8f897b' : esc; ctx.fillRect(p.x - W * 0.035, p.y - h * 1.35, W * 0.07, h * 1.35);
+    ctx.fillStyle = tipo === 'ferro' ? '#c7c1b3' : cor; ctx.fillRect(p.x - W * 0.045, p.y - h * 1.35 - W * 0.02, W * 0.09, W * 0.03);
+  }
+}
 // O que está sendo movido é uma cerca? (devolve o objeto guardado, se for um já colocado)
+const movCercaId = () => moving && (moving.novo || (moving.key && moving.key.startsWith('enf:') && (objetosDe(state, scene)[Number(moving.key.slice(4))] || {}).id)) || 'cerca';
 const movCerca = () => moving && (moving.novo ? ehCerca(moving.novo) : moving.key && moving.key.startsWith('enf:') && ehCerca((objetosDe(state, scene)[Number(moving.key.slice(4))] || {}).id));
 // Um canteiro só vai para um pedaço de terra livre (sem canteiro, enfeite ou folhas em cima).
 const celulaMov = () => { const c = Math.floor(moving.u), r = Math.floor(moving.v); return c >= 0 && r >= 0 && c < COLS && r < ROWS ? r * COLS + c : -1; };
@@ -7939,15 +7988,16 @@ function salvarMove() {
   }
   if (cerca && moving.novo) {
     // cerca: põe um pedaço e já vem o próximo, seguindo na mesma direção
-    if (!(state.enfeites.cerca > 0)) { moving = null; return; }
-    (state.objetos.roca = objetosDe(state, 'roca')).push({ id: 'cerca', u, v, rot: moving.rot || 0 });
-    state.enfeites.cerca--; sfx('buy'); done();
-    if (state.enfeites.cerca > 0) {
+    const id = moving.novo, nome = ENFEITE[id].nome;
+    if (!(state.enfeites[id] > 0)) { moving = null; return; }
+    (state.objetos.roca = objetosDe(state, 'roca')).push({ id, u, v, rot: moving.rot || 0 });
+    state.enfeites[id]--; sfx('buy'); done();
+    if (state.enfeites[id] > 0) {
       const r = moving.rot || 0; moving.u = r ? u : u + 1; moving.v = r ? v + 1 : v;
-      renderMoveBar(); return toast(`Cerca colocada! Sobram ${state.enfeites.cerca}.`, 'good');
+      renderMoveBar(); return toast(`${nome} colocada! Sobram ${state.enfeites[id]}.`, 'good');
     }
     moving = null; moveMode = false; renderMoveBtn(); renderTools();
-    return toast('Cerca colocada! Acabaram os pedaços de cerca (compre mais na Loja › Enfeites).', 'good');
+    return toast(`${nome} colocada! Acabou (compre mais na Loja › Enfeites).`, 'good');
   }
   if (moving.novo) {
     if (!(state.enfeites[moving.novo] > 0)) { moving = null; return; }
@@ -8001,7 +8051,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
     if (o.key === 'placa' && !(home && landSignText())) continue; // só aparece na sua roça, com terra para comprar
     const q = iso(o.u, o.v);
     if (o.cerca) {
-      drawCercaSeg(o.u, o.v, o.rot, s);
+      drawCercaSeg(o.u, o.v, o.rot, s, o.id);
       if (moveMode && home) {
         ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(q.x, q.y - W * 0.12, W * 0.035, 0, 7); ctx.fill();
         hits.push({ kind: 'obj', key: o.key, nome: 'Cerca', x: q.x, y: q.y - W * 0.12, r: W * 0.16 });
@@ -8085,7 +8135,7 @@ function drawMoving(sc, t) {
   if (movCerca()) {
     const ok = movOk(), [a, b] = pontasCerca(moving.u, moving.v, moving.rot || 0), qa = iso(...a), qb = iso(...b);
     line(qa, qb, ok ? 'rgba(80,200,80,.55)' : 'rgba(220,60,50,.55)', L.W * 0.12);
-    ctx.globalAlpha = 0.8; drawCercaSeg(moving.u, moving.v, moving.rot || 0, state); ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.8; drawCercaSeg(moving.u, moving.v, moving.rot || 0, state, movCercaId()); ctx.globalAlpha = 1;
     return;
   }
   const W = L.W, u = moving.u, v = moving.v, q = iso(u, v);
@@ -8156,7 +8206,7 @@ function comprarEnfeite(id, qtd = 1) {
   if (state.coins < e.custo * qtd) return toast(`${qtd > 1 ? qtd + ' × ' : ''}${e.nome} custa ${(e.custo * qtd).toLocaleString('pt-BR')} moedas.`, 'bad');
   state.coins -= e.custo * qtd; state.enfeites[id] = (state.enfeites[id] || 0) + qtd; state.invNovos = (state.invNovos || 0) + 1;
   sfx('buy'); if (!e.cerca) addXP(3, null);
-  toast(e.cerca ? `${qtd} pedaço${qtd > 1 ? 's' : ''} de cerca comprado${qtd > 1 ? 's' : ''}! Está no Inventário (Pôr na roça).` : `${e.nome} comprado! Está no Inventário.`, 'good');
+  toast(e.cerca ? `${qtd > 1 ? qtd + '× ' : ''}${e.nome} no Inventário! Toque em "📦 Usar" para pôr na roça.` : `${e.nome} comprado! Está no Inventário.`, 'good');
   renderTabs(); done();
 }
 function actEnfeite(id, key, sc) {
@@ -8180,8 +8230,10 @@ function inventarioHTML() {
     const l = objetosDe(state, sc);
     if (!l.length) continue;
     html += `<h3>${sc === 'roca' ? 'Na roça' : 'No rancho'}</h3>`;
-    const cercas = l.filter(o => ehCerca(o.id)).length;
-    if (cercas) html += `<div class="row"><img alt="" src="${enfeiteIcon('cerca')}"><div><div class="name">Cerca × ${cercas}</div><div class="meta">Para mudar uma de lugar ou girar, use o botão Mover</div></div><button class="btn ghost" data-inv-guardar-cercas="${sc}">Guardar todas</button></div>`;
+    for (const ce of ENFEITES.filter(x => x.cerca)) {
+      const n = l.filter(o => o.id === ce.id).length;
+      if (n) html += `<div class="row"><img alt="" src="${enfeiteIcon(ce.id)}"><div><div class="name">${ce.nome} × ${n}</div><div class="meta">Para mudar de lugar ou girar, use o botão Mover</div></div><button class="btn ghost" data-inv-guardar-cercas="${sc}:${ce.id}">Guardar ${n > 1 ? 'todas' : ''}</button></div>`;
+    }
     l.forEach((o, i) => {
       const e = ENFEITE[o.id];
       if (e.cerca) return;
@@ -8207,6 +8259,14 @@ function invGuardar(sc, i) {
 // Desenho dos enfeites, com a base em (x, y). s = escala (1 = casa de 100px).
 function drawEnfeite(id, x, y, s, t) {
   if (ENFEITE[id] && ENFEITE[id].fruteira) return drawFruteira({ id }, x, y, s, t, false);
+  if (ENFEITE[id] && ENFEITE[id].cerca && id !== 'cerca') {
+    // ícone: um pedaço de frente, no estilo do item
+    const W0 = L.W; L.W = 230 * s / 1.6;
+    ctx.fillStyle = '#9ccf6a'; ctx.beginPath(); ctx.ellipse(x, y - 4 * s, 30 * s, 7 * s, 0, 0, 7); ctx.fill();
+    const a = { x: x - 26 * s, y: y - 2 * s }, b = { x: x + 26 * s, y: y - 8 * s };
+    if (ENFEITE[id].porteira) drawPorteira(a, b, ENFEITE[id].porteira, L.W); else fenceRun(a, b, 2, false, ENFEITE[id].estilo);
+    L.W = W0; return;
+  }
   ctx.lineWidth = Math.max(1, 1.2 * s); ctx.strokeStyle = 'rgba(60,30,10,.5)';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, 26 * s, 8 * s, 0, 0, 7); ctx.fill();
   if (id === 'trofeuchupa') {
@@ -8381,7 +8441,7 @@ function drawEnfeite(id, x, y, s, t) {
     ctx.fillStyle = '#ffb300'; ctx.beginPath(); ctx.ellipse(x, y - 54 * s + Math.sin(t / 120) * 0.5 * s, 2 * s, 3.5 * s, 0, 0, 7); ctx.fill();
   }
 }
-const enfeiteIcon = id => makeIcon('enf:' + id, () => drawEnfeite(id, 48, 88, ENFEITE[id] && ENFEITE[id].fruteira === 'arvore' ? 1.1 : { bandeira: 1.15, espantalho: 1.3, moinho: 1.3, ipe: 1.2, fogueira: 1.5, balanco: 1.4, arcoflores: 1.4, peixedourado: 1.5, carrodeboi: 1.4 }[id] || 1.6, 0));
+const enfeiteIcon = id => makeIcon('enf3:' + id, () => drawEnfeite(id, 48, 88, ENFEITE[id] && ENFEITE[id].fruteira === 'arvore' ? 1.1 : { bandeira: 1.15, espantalho: 1.3, moinho: 1.3, ipe: 1.2, fogueira: 1.5, balanco: 1.4, arcoflores: 1.4, peixedourado: 1.5, carrodeboi: 1.4 }[id] || 1.6, 0));
 
 // ============================================================
 // Pomar: frutíferas (arbustos e árvores) plantadas no gramado. Dão frutas de tempos em tempos
