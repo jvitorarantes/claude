@@ -983,6 +983,7 @@ const NOVIDADES = [
   { v: 137, txt: 'A entrada do mato agora também ganha um avisinho 🐾, parecido com o da pescaria: aparece sempre que tem caçada disponível em algum dos seus lugares.' },
   { v: 138, txt: 'Corrigido: no celular, um objeto movido bem pra longe (como a casa) podia ficar cortado na borda da tela, mesmo aparecendo certinho no computador. Agora o enquadramento sempre encolhe a roça o quanto for preciso pra tudo caber.' },
   { v: 139, txt: 'Corrigido: a correção anterior não estava encolhendo o bastante quando um objeto ficava bem longe da grade (o cálculo travava num zoom mínimo que ainda cortava). Agora encolhe de verdade até tudo caber, com casa movida pra direita, pro celular em pé ou não.' },
+  { v: 140, txt: 'O selo do botão Negócios agora também avisa quando dá pra fazer algo na fábrica (espaço livre numa máquina + ingrediente na mão), não só quando algo já terminou de produzir ou tem pedido do caminhão pra entregar.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4195,7 +4196,7 @@ function renderTabs() {
   if (state) {
     setBadge(document.querySelector('.tab[data-tab="celeiro"]'), avisoItens('celeiro') ? Object.values(state.barn).reduce((t, q) => t + (q > 0 ? q : 0), 0) : 0, 'itens no celeiro');
     setBadge(document.querySelector('.tab[data-tab="inventario"]'), avisoItens('inventario') ? state.invNovos || 0 : 0, 'coisas novas no inventário');
-    setBadge(document.querySelector('.tab[data-tab="fabrica"]'), prontosFab() + entregaveis(), 'coisas prontas na fábrica ou pedidos para entregar');
+    setBadge(document.querySelector('.tab[data-tab="fabrica"]'), prontosFab() + entregaveis(), 'coisas prontas, disponíveis pra fazer na fábrica, ou pedidos para entregar');
   }
   const mb = document.querySelector('.tab[data-tab="missoes"]'), mn = missoesProntas();
   setBadge(mb, mn, 'prêmios');
@@ -7651,7 +7652,10 @@ function fabricar(id) {
   done();
 }
 const prontosFabDe = mid => filaDe(mid).fila.filter(x => x.fim <= Date.now()).length;
-const prontosFab = () => (state && state.fab && state.fab.maquinas ? MAQUINAS.reduce((t, M) => t + prontosFabDe(M.id), 0) : 0);
+// Máquina com espaço livre e ingrediente pra pelo menos uma receita: dá pra fazer algo ali agora.
+const podeFabricarAlgo = mid => MAQUINA[mid].receitas.some(rid => RECEITA[rid].nivel <= state.level && temIngredientes(RECEITA[rid]));
+const slotsLivresFab = mid => Math.max(0, slotsMax(mid) - filaDe(mid).fila.length);
+const prontosFab = () => state ? MAQUINAS.reduce((t, M) => t + prontosFabDe(M.id) + (slotsLivresFab(M.id) > 0 && podeFabricarAlgo(M.id) ? 1 : 0), 0) : 0;
 function recolherFab(mid) {
   const m = filaDe(mid), agora = Date.now(), prontos = m.fila.filter(x => x.fim <= agora);
   if (!prontos.length) return;
