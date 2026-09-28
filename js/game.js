@@ -968,6 +968,7 @@ const NOVIDADES = [
   { v: 121, txt: 'Fertilizantes mais fortes e mais baratos 🌱: básico corta 25%, rápido 50% e premium 75% do tempo da planta (antes era 10/25/50%), e ficaram bem mais baratos — agora compensa usar até nas plantas simples. E chegou o CACAU 🍫 (nível 32, 48h), a plantação mais demorada da Roça Feliz.' },
   { v: 122, txt: 'O limite de pegar coisas visitando ficou mais simples: agora é 4 itens da plantação e do pomar juntos (antes eram 3 + 3 separados) e 3 dos animais, por amigo por dia.' },
   { v: 123, txt: 'Fábrica remodelada 🏭: agora são 5 máquinas (Moinho & Padaria, Cozinha do Rio, Conservas, Laticínios e Suqueira), cada uma com seus próprios espaços de produção! O primeiro libera sozinho no nível certo, os outros você compra com moedas. Quem já tinha nível suficiente ganhou os espaços de graça.' },
+  { v: 124, txt: 'Roça mais leve pra bateria 🔋: o jogo desenha a tela a 30 quadros por segundo (de sobra pra uma roça) e para de desenhar quando a tela está bloqueada ou em outra aba. E chegou o botão "Jogar sem internet" na entrada: sem sinal, dá pra jogar na hora salvando só neste aparelho, e quando o sinal voltar é só entrar com o Google (aqui ou em ⚙️) que a roça sobe pra nuvem sozinha. Também chegou um toquinho de viola 🎻 quando chega novidade de um amigo.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1493,6 +1494,7 @@ function applyVisits(list) {
       if (o && ENFEITE[o.id] && ENFEITE[o.id].fruteira) note(`pegou 1 ${FRUTA[ENFEITE[o.id].fruta].nome} do seu pomar`, true);
     }
   }
+  if (Object.keys(msgs).length) sfx('aviso'); // toquinho de viola: chegou novidade de um amigo
   for (const [who, list2] of Object.entries(msgs)) {
     // Junta repetições: "pegou 1 Milho" duas vezes vira "pegou 2 Milho".
     const count = {};
@@ -1581,6 +1583,8 @@ async function onUser(u) {
     cloudStatus = 'out'; syncStatus = '';
     if (view.kind === 'friend') goHome();
     renderAccount(); renderPane(); renderTabs();
+    // Sem sinal e sem login: não trava esperando o Google, deixa jogar offline de uma vez.
+    if (!kicked && 'onLine' in navigator && !navigator.onLine) { enterGame(); return; }
     showGate('login', kicked || undefined);
     return;
   }
@@ -1659,6 +1663,7 @@ function showGate(mode, msg) {
   drawGateArt();
   $('#gateLogin').hidden = mode !== 'login';
   $('#gateRetry').hidden = mode !== 'error';
+  $('#gateOffline').hidden = mode !== 'login' && mode !== 'error';
   const st = $('#gateStatus');
   st.className = 'gate-status' + (mode === 'error' ? ' bad' : '');
   st.textContent = msg || { loading: 'Abrindo a porteira…', entering: 'Carregando sua roça…', waiting: 'Esperando o Google…' }[mode] || '';
@@ -1678,6 +1683,8 @@ function notify(msg, kind) {
 }
 $('#gateLogin').addEventListener('click', () => login());
 $('#gateRetry').addEventListener('click', () => location.reload());
+// Joga só neste aparelho por enquanto; quando fizer login (aqui ou em ⚙️ › Conta), a roça sobe pra nuvem sozinha.
+$('#gateOffline').addEventListener('click', () => { cloudStatus = 'out'; enterGame(); renderAccount(); toast('Jogando sem internet: a roça fica salva neste aparelho. Entre com o Google quando quiser salvar na nuvem.'); });
 
 // Ilustração da tela de entrada, feita com os mesmos desenhos do jogo.
 let gateArtDone = false;
@@ -9852,16 +9859,21 @@ function presentePioneiro() {
 // ============================================================
 // Laço principal
 // ============================================================
-let last = performance.now(), lastSave = 0, lastUI = 0, lastInfo = 0, lastSentCheck = 0;
+// 30 fps bastam pra um jogo de fazenda (nada precisa de 60+) e o canvas é a maior parte do
+// gasto de bateria; enquanto a tela está oculta (celular bloqueado, outra aba) não desenha nada.
+const DRAW_MS = 1000 / 30;
+let last = performance.now(), lastSave = 0, lastUI = 0, lastInfo = 0, lastSentCheck = 0, lastDraw = 0;
 function frame(now) {
   const dt = Math.min(1, (now - last) / 1000); last = now;
-  tick(dt);
-  if (!isGated() && L.cw > 20) draw(now, dt);
-  if (now - lastUI > 250) { updateTip(); lastUI = now; }
-  if (now - lastInfo > 2000) {
-    tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao(); folhasTick(); invasaoTick();
-    // a fábrica e o caminhão têm relógio: atualiza a janela (menos a banca, que tem formulário)
-    if (!$('#panel').hidden && tab === 'fabrica' && fabSeg !== 'banca' && isHome()) { const y = $('#pane').scrollTop; renderPane(); $('#pane').scrollTop = y; } renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
+  if (!document.hidden) {
+    tick(dt);
+    if (!isGated() && L.cw > 20 && now - lastDraw >= DRAW_MS) { draw(now, dt); lastDraw = now; }
+    if (now - lastUI > 250) { updateTip(); lastUI = now; }
+    if (now - lastInfo > 2000) {
+      tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao(); folhasTick(); invasaoTick();
+      // a fábrica e o caminhão têm relógio: atualiza a janela (menos a banca, que tem formulário)
+      if (!$('#panel').hidden && tab === 'fabrica' && fabSeg !== 'banca' && isHome()) { const y = $('#pane').scrollTop; renderPane(); $('#pane').scrollTop = y; } renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
+  }
   if (now - lastSave > 5000) { save(); lastSave = now; }
   if (user && dirty && now - lastCloud > CLOUD_MS) cloudSave(); // salva na nuvem no máximo a cada 30 segundos (poupa o limite grátis do Firebase)
   if (user && now - lastSentCheck > 60000) { lastSentCheck = now; checkSent(); }
@@ -9884,13 +9896,21 @@ function start(data) {
     showGate('loading');
     Cloud.init(onUser).catch(e => {
       console.warn(e); cloudStatus = 'off';
+      if ('onLine' in navigator && !navigator.onLine) { enterGame(); renderAccount(); return; }
       showGate('error', 'Não consegui abrir o login do Google. Confira a internet e tente de novo.');
       renderAccount();
     });
   }
 }
 window.addEventListener('pagehide', () => { save(); sincronizarPush(); if (user && dirty) cloudSave(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && state) { save(); sincronizarPush(); if (user && dirty) cloudSave(); } });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (state) { save(); sincronizarPush(); if (user && dirty) cloudSave(); } return; }
+  // voltou (tela desbloqueada, aba em foco de novo): avança de uma vez o tempo que passou
+  // parado, já que o laço principal não desenha nem conta o crescimento com a tela oculta.
+  if (state && state.t) { const sec = (Date.now() - state.t) / 1000; if (sec > 2) catchUp(state, sec); }
+  last = performance.now(); // evita um "pulo" grande de dt no próximo quadro
+  if (state) { renderPane(); renderTabs(); renderSceneInfo(); }
+});
 // Botão de salvar na hora
 async function saveNow() {
   if (!state || kicked) return;

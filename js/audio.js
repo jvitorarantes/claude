@@ -398,6 +398,8 @@
     coin: t => { blip(t, 'square', 988, 988, 0.07, 0.06); blip(t + 0.07, 'square', 1319, 1319, 0.18, 0.06); },
     buy: t => { blip(t, 'sine', 180, 90, 0.15, 0.3); SFX.coin(t + 0.05); },
     level: t => { [60, 64, 67, 72, 76].forEach((m, k) => pluck(sfxBus, t + k * 0.09, m + 12, 0.4, 0.16, 4500)); },
+    // Toquinho de viola: um dedilhado curtinho pra avisar que chegou novidade de um amigo.
+    aviso: t => { [67, 71, 74].forEach((m, k) => pluck(sfxBus, t + k * 0.045, m, 0.3, 0.14, 3800)); },
     feed: t => { for (let k = 0; k < 3; k++) noise(t + k * 0.07, 0.07, 'bandpass', 3000, 1800, 0.12, 2); },
     collect: t => { pluck(sfxBus, t, 79, 0.3, 0.16, 4000); pluck(sfxBus, t + 0.08, 84, 0.4, 0.16, 4000); },
     error: t => { blip(t, 'square', 220, 200, 0.09, 0.05); blip(t + 0.11, 'square', 185, 165, 0.12, 0.05); },
