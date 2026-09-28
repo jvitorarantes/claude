@@ -969,6 +969,7 @@ const NOVIDADES = [
   { v: 122, txt: 'O limite de pegar coisas visitando ficou mais simples: agora é 4 itens da plantação e do pomar juntos (antes eram 3 + 3 separados) e 3 dos animais, por amigo por dia.' },
   { v: 123, txt: 'Fábrica remodelada 🏭: agora são 5 máquinas (Moinho & Padaria, Cozinha do Rio, Conservas, Laticínios e Suqueira), cada uma com seus próprios espaços de produção! O primeiro libera sozinho no nível certo, os outros você compra com moedas. Quem já tinha nível suficiente ganhou os espaços de graça.' },
   { v: 124, txt: 'Roça mais leve pra bateria 🔋: o jogo desenha a tela a 30 quadros por segundo (de sobra pra uma roça) e para de desenhar quando a tela está bloqueada ou em outra aba. E chegou o botão "Jogar sem internet" na entrada: sem sinal, dá pra jogar na hora salvando só neste aparelho, e quando o sinal voltar é só entrar com o Google (aqui ou em ⚙️) que a roça sobe pra nuvem sozinha. Também chegou um toquinho de viola 🎻 quando chega novidade de um amigo.' },
+  { v: 125, txt: 'Mais lugares na banca 🏪: além dos 6 de sempre, mais 4 liberam por nível (8, 12, 18 e 25) — e cada amigo de verdade que você tem adianta a liberação em 1 nível, até 5 níveis de desconto!' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -7609,11 +7610,16 @@ function recolherFab(mid) {
 }
 
 // ---------- Banca: coloque coisas à venda para os amigos ----------
-const BANCA_MAX = 6;
+// 6 lugares sempre livres; mais 4 liberam por nível, e cada amigo de verdade adianta 1 nível (até 5).
+const BANCA_BASE = 6, BANCA_EXTRA = [8, 12, 18, 25], BANCA_TOPO = BANCA_BASE + BANCA_EXTRA.length, BANCA_DESC_MAX = 5;
+const bancaDesconto = () => Math.min(BANCA_DESC_MAX, (state.friends || []).length);
+const bancaNivelVaga = i => Math.max(1, BANCA_EXTRA[i] - bancaDesconto());
+const bancaMax = () => BANCA_BASE + BANCA_EXTRA.filter((_, i) => state.level >= bancaNivelVaga(i)).length;
 const valorDe = id => (item(id) || {}).preco || 0;
 function bancaAdd(id, qtd, preco) {
   state.banca = state.banca || [];
-  if (state.banca.length >= BANCA_MAX) return toast(`A banca tem ${BANCA_MAX} lugares.`);
+  const lim = bancaMax();
+  if (state.banca.length >= lim) return toast(`A banca tem ${lim} lugares.`);
   qtd = clamp(Math.floor(qtd) || 1, 1, 10);
   if ((state.barn[id] || 0) < qtd) return toast('Você não tem tudo isso no celeiro.', 'bad');
   const [min, max] = faixaPreco(id, qtd);
@@ -7631,7 +7637,8 @@ const bm = { item: null, qtd: 1, preco: 0 };
 function abrirBancaModal() {
   const tenho = Object.keys(state.barn).filter(id => state.barn[id] > 0 && item(id));
   if (!tenho.length) return toast('O celeiro está vazio. Colha ou fabrique algo para vender.');
-  if ((state.banca || []).length >= BANCA_MAX) return toast(`A banca tem ${BANCA_MAX} lugares.`);
+  const max = bancaMax();
+  if ((state.banca || []).length >= max) return toast(`A banca tem ${max} lugares.`);
   if (!tenho.includes(bm.item)) bm.item = tenho[0];
   escolherBancaItem(bm.item);
   $('#bancaModal').hidden = false;
@@ -7790,9 +7797,10 @@ function fabricaHTML() {
       }
     }
   } else if (fabSeg === 'banca') {
-    const banca = state.banca || [];
-    html += `<p class="hint">Coloque coisas do celeiro à venda. Os amigos compram quando visitam a sua roça, e os vizinhos da vila passam de vez em quando (se o preço for justo). O dinheiro chega sozinho.</p>`;
-    html += `<div class="banca">${Array.from({ length: BANCA_MAX }, (_, k) => {
+    const banca = state.banca || [], max = bancaMax(), desc = bancaDesconto();
+    html += `<p class="hint">Coloque coisas do celeiro à venda. Os amigos compram quando visitam a sua roça, e os vizinhos da vila passam de vez em quando (se o preço for justo). O dinheiro chega sozinho.${max < BANCA_TOPO ? ` Cada amigo de verdade adianta 1 nível pra liberar mais lugares (até ${BANCA_DESC_MAX})${desc ? ` — você já tem ${desc}` : ''}.` : ''}</p>`;
+    html += `<div class="banca">${Array.from({ length: Math.min(BANCA_TOPO, max + 1) }, (_, k) => {
+      if (k >= max) return `<button type="button" class="bslot vazio trancado" disabled>🔒<br>nível ${bancaNivelVaga(k - BANCA_BASE)}</button>`;
       const s = banca[k];
       if (!s) return '<button type="button" class="bslot vazio" data-banca-novo>+<br>lugar livre</button>';
       const armed = bancaRemArmed === s.id;
@@ -7800,7 +7808,7 @@ function fabricaHTML() {
         <button class="btn ${armed ? 'danger' : 'ghost'} tiny" data-banca-rem="${s.id}">${armed ? 'Confirmar' : 'Tirar'}</button></div>`;
     }).join('')}</div>`;
     if (!Object.keys(state.barn).some(id => state.barn[id] > 0 && item(id))) html += `<div class="empty">O celeiro está vazio. Colha ou fabrique algo para vender.</div>`;
-    else if (banca.length < BANCA_MAX) html += `<p class="hint">Clique num lugar livre para escolher o que vender.</p>`;
+    else if (banca.length < max) html += `<p class="hint">Clique num lugar livre para escolher o que vender.</p>`;
   } else {
     const t = state.truck, falta = (t.b + 1) * CAMINHAO_BLOCO - Date.now();
     html += `<p class="hint">O caminhão leva pedidos da cidade e paga bem mais que o celeiro. Pedidos novos em <b>${fmt(falta / 1000)}</b>.</p>`;

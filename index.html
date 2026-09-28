@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="124">
-<script src="firebase-config.js?v=124"></script>
+<meta name="rf-version" content="125">
+<script src="firebase-config.js?v=125"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -218,6 +218,8 @@
   .bslot .coin { width: 13px; height: 13px; margin-right: 3px; }
   .bslot.vazio { color: var(--muted); place-items: center; min-height: 110px; border-style: dashed; }
   .bslot.vendido { opacity: .5; }
+  .bslot.trancado { font-weight: 700; font-size: 12px; cursor: not-allowed; }
+  .bslot.trancado:hover { border-color: var(--panel-2); background: var(--card); color: var(--muted); }
   .btn.tiny { padding: 2px 8px; font-size: 12px; }
   .bform { display: grid; gap: 6px; }
   .bform label { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; font-weight: 700; }
@@ -914,8 +916,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=124"></script>
-<script src="js/cloud.js?v=124"></script>
-<script src="js/game.js?v=124"></script>
+<script src="js/audio.js?v=125"></script>
+<script src="js/cloud.js?v=125"></script>
+<script src="js/game.js?v=125"></script>
 </body>
 </html>
