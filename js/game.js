@@ -980,6 +980,7 @@ const NOVIDADES = [
   { v: 134, txt: 'Corrigido: a tarrafa tinha parado de funcionar pra quem já jogava antes da última atualização. Agora seca certinho, separada em cada pesqueiro.' },
   { v: 135, txt: 'Corrigido: o avisinho de peixe 🐟 em cima do pesqueiro só aparecia quando o ponto tinha acabado de descansar. Agora aparece sempre que der pra pescar de vara ali, mesmo que você ainda não tenha usado nenhuma pescaria.' },
   { v: 136, txt: 'O avisinho de peixe 🐟 no pesqueiro agora também aparece quando a tarrafa está pronta, não só a vara.' },
+  { v: 137, txt: 'A entrada do mato agora também ganha um avisinho 🐾, parecido com o da pescaria: aparece sempre que tem caçada disponível em algum dos seus lugares.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3198,6 +3199,13 @@ function drawBubbleAt(x, y, kind, obj, t, seed) {
     ctx.beginPath(); ctx.moveTo(x + 5 * s, y); ctx.lineTo(x + 8.5 * s, y - 3.2 * s); ctx.lineTo(x + 8.5 * s, y + 3.2 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 4.2 * s, y - 0.8 * s, 1 * s, 0, 7); ctx.fill();
     ctx.fillStyle = '#123'; ctx.beginPath(); ctx.arc(x - 4 * s, y - 0.8 * s, 0.5 * s, 0, 7); ctx.fill();
+  } else if (kind === 'caca') {
+    // Lugar de caçada com bicho disponível: uma pegadinha.
+    ctx.fillStyle = '#7a5a33';
+    ctx.beginPath(); ctx.ellipse(x, y + 2.4 * s, 4.4 * s, 5.6 * s, 0, 0, 7); ctx.fill();
+    for (const [dx, dy, r] of [[-3.6, -4.2, 1.7], [-1.3, -5.6, 1.9], [1.3, -5.6, 1.9], [3.6, -4.2, 1.7]]) {
+      ctx.beginPath(); ctx.ellipse(x + dx * s, y + dy * s, r * s, r * 1.15 * s, 0, 0, 7); ctx.fill();
+    }
   } else if (kind === 'poda') {
     // tesoura de poda
     ctx.strokeStyle = '#6b7780'; ctx.lineWidth = 1.8 * s; ctx.lineCap = 'round';
@@ -8251,6 +8259,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
     }
     if (o.key === 'mata') {
       drawMataCaca(q.x, q.y, W);
+      if (home && cacaPronta()) drawBubbleAt(q.x, q.y - W * 0.75, 'caca', null, t, 99);
       if (!moveMode && home) {
         if (hover && hover.kind === 'caca') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.62, W * 0.2, 0, 0, 7); ctx.stroke(); }
         hits.push({ kind: 'caca', x: q.x, y: q.y - W * 0.3, r: W * 0.5 });
@@ -9056,6 +9065,8 @@ const temLugarCaca = id => { const l = LUGAR_CACA[id]; return !!l && (l.custo ==
 const faltaLugarCaca = id => Math.max(0, (cacaDe().prox[id] || 0) - Date.now());
 const restamCaca = id => faltaLugarCaca(id) ? 0 : Math.max(0, CACA_POR_VEZ - (cacaDe().usos[id] || 0));
 const munDe = arma => cacaDe().mun[ARMAS_CACA[arma].mun] || 0;
+// Algum lugar seu tem caçada disponível agora (descansado ou nunca usado): mostra um brilho na entrada do mato.
+const cacaPronta = () => state && LUGARES_CACA.some(l => temLugarCaca(l.id) && !faltaLugarCaca(l.id) && restamCaca(l.id) > 0);
 // Domínio de caçada: pontos por bicho (mais para os raros); cada nível corta 5% da espera e aumenta a mira.
 const dominioCacaXP = () => CACA_BICHOS.reduce((t, b) => t + (cacaDe().col[b.id] || 0) * DOMINIO_PTS[b.raro], 0);
 function dominioCaca() {
