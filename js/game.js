@@ -945,6 +945,7 @@ const NOVIDADES = [
   { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
   { v: 116, txt: 'Chegou o MAXIXE 🥒 (nível 8): a rama se espalha no chão e dá maxixes verdinhos cheios de espinhos moles.' },
   { v: 117, txt: 'A Horta saiu da roça 🌳: morangueiro, videira, macieira, laranjeira, bananeira, coqueiro e goiabeira não ocupam mais canteiro! Agora são frutíferas do Pomar (Loja › Pomar): plante no gramado, dão morango, uva, maçã, laranja, banana, coco e goiaba de tempos em tempos e secam depois de umas colheitas, igualzinho às outras frutíferas. Quem já tinha uma plantada ganhou de volta no Inventário.' },
+  { v: 118, txt: 'Caçada mais fácil de acertar 🎯: os pássaros (pombo e pardal) voam mais devagar e balançam menos no ar, e a pedrinha do estilingue chega mais rápido — menos "chute" e mais precisão.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1187,9 +1188,9 @@ function usarDecor(id) {
   done();
 }
 
-function sell(id, all) {
+function sell(id, qtd) {
   const it = item(id), q = state.barn[id] || 0; if (!q || !it) return;
-  const n = all ? q : 1;
+  const n = qtd === true ? q : clamp(Math.round(qtd) || 1, 1, q);
   state.barn[id] = q - n; if (!state.barn[id]) delete state.barn[id];
   state.coins += n * it.preco; state.stats.vendido += n * it.preco; track('vender', n * it.preco);
   sfx('coin');
@@ -4379,10 +4380,10 @@ function renderPane() {
     else {
       html += `<div class="total"><span>Total: ${total} moedas</span><button class="btn gold" data-sellall>Vender tudo</button></div>`;
       for (const it of items) {
-        const q = state.barn[it.id];
+        const q = state.barn[it.id], key = 'sell:' + it.id, sel = q > 1 ? qtdSel[key] = clamp(qtdSel[key] || 1, 1, q) : 1;
         html += `<div class="row"><img alt="" src="${itemIcon(it.id)}">
           <div><div class="name">${it.nome} × ${q}</div><div class="meta">${it.preco} moedas cada · ${q * it.preco} no total${it.id === 'milho' ? '<br>também serve de comida para os animais' : ''}</div></div>
-          <div class="stack"><button class="btn" data-sell="${it.id}">Vender 1</button><button class="btn ghost" data-sellall-of="${it.id}">Todos</button></div></div>`;
+          <div class="stack">${q > 1 ? qtdStep(key, q) : ''}<button class="btn" data-sell="${it.id}" data-qtd="${sel}">Vender ${sel} · ${sel * it.preco}</button>${q > 1 ? `<button class="btn ghost" data-sellall-of="${it.id}">Todos</button>` : ''}</div></div>`;
       }
     }
   } else if (tab === 'terreno') {
@@ -4536,9 +4537,15 @@ $('#pane').addEventListener('click', e => {
   if (d.enfeiteUsar || (d.enfeiteComprar && !d.mais && state.enfeites[d.enfeiteComprar] > 0)) { const id = d.enfeiteUsar || d.enfeiteComprar; toast(`📦 Usando ${ENFEITE[id].nome.toLowerCase()} do inventário (você tem ${state.enfeites[id]}).`); return invPor(id, ehCerca(id) || scene !== 'animais' ? 'roca' : 'animais'); }
   if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar, Number(d.qtd) || 1);
   if (d.invPor) return invPor(d.invPor, d.sc);
-  if (d.venderDec) return venderDecoracao(d.venderDec);
-  if (d.invGuardarCercas) { const [sc, id] = d.invGuardarCercas.split(':'), l = objetosDe(state, sc), n = l.filter(o => o.id === id).length; state.objetos[sc] = l.filter(o => o.id !== id); state.enfeites[id] = (state.enfeites[id] || 0) + n; toast(`${n}× ${ENFEITE[id].nome.toLowerCase()} guardado${n > 1 ? 's' : ''} no inventário.`); return done(); }
+  if (d.venderDec) return venderDecoracao(d.venderDec, Number(d.qtd) || 1);
+  if (d.invGuardarCercas) {
+    const [sc, id] = d.invGuardarCercas.split(':'), l = objetosDe(state, sc), all = l.filter(o => o.id === id);
+    const n = clamp(Math.round(Number(d.qtd)) || all.length, 1, all.length), retirar = new Set(all.slice(0, n));
+    state.objetos[sc] = l.filter(o => !retirar.has(o)); state.enfeites[id] = (state.enfeites[id] || 0) + n;
+    toast(`${n}× ${ENFEITE[id].nome.toLowerCase()} guardado${n > 1 ? 's' : ''} no inventário.`); return done();
+  }
   if (d.invGuardar) { const [sc, i] = d.invGuardar.split(':'); return invGuardar(sc, Number(i)); }
+  if (d.qtdd || d.qtdi) { const k = d.qtdd || d.qtdi, max = Number(d.qtdMax) || 1; qtdSel[k] = clamp((qtdSel[k] || 1) + (d.qtdi ? 1 : -1), 1, max); return renderPane(); }
   if (d.pocao) {
     const n = Number(d.pocao) || 1;
     if (state.coins < POCAO.custo * n) return toast(`Faltam moedas: ${n} ${n > 1 ? 'poções custam' : 'poção custa'} ${POCAO.custo * n}.`, 'bad');
@@ -4568,7 +4575,7 @@ $('#pane').addEventListener('click', e => {
   else if (d.buyDecor) buyDecor(d.buyDecor);
   else if (d.usarDecor) usarDecor(d.usarDecor);
   else if ('seeHouse' in d) { if (!isHome()) goHome(); setScene('casa'); closePanel(); }
-  else if (d.sell) sell(d.sell, false);
+  else if (d.sell) sell(d.sell, Number(d.qtd) || 1);
   else if (d.sellallOf) sell(d.sellallOf, true);
   else if ('sellall' in d) sellAll();
   else if ('seeLand' in d) { if (!isHome()) goHome(); setScene('roca'); closePanel(); toast('Clique num + encostado na sua terra para colocar um canteiro.'); }
@@ -8205,12 +8212,24 @@ function drawMoving(sc, t) {
   else drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro);
   ctx.globalAlpha = 1;
 }
+// Seletor de quantidade (− n +) para vender ou guardar mais de um de uma vez. Só de tela, não salva.
+const qtdSel = {};
+function qtdStep(key, max) {
+  const n = clamp(Math.round(qtdSel[key]) || max, 1, max);
+  qtdSel[key] = n;
+  return `<div class="stepper"><button type="button" class="btn ghost" data-qtdd="${key}" data-qtd-max="${max}" ${n <= 1 ? 'disabled' : ''} aria-label="Menos">−</button><b>${n}</b><button type="button" class="btn ghost" data-qtdi="${key}" data-qtd-max="${max}" ${n >= max ? 'disabled' : ''} aria-label="Mais">+</button></div>`;
+}
 // Vender decoração: metade do que custou, com um clique a mais para confirmar. Itens de evento não se vendem.
 let vendaArmed = null;
-const venderBtn = (key, preco) => vendaArmed === key
-  ? `<button class="btn danger" data-vender-dec="${key}">Confirmar</button>`
-  : `<button class="btn ghost" data-vender-dec="${key}">Vender ${moeda(preco)}</button>`;
-function venderDecoracao(key) {
+const venderBtn = (key, preco, max = 1) => {
+  const qk = 'v:' + key, n = max > 1 ? clamp(qtdSel[qk] || 1, 1, max) : 1;
+  qtdSel[qk] = n;
+  const total = preco * n;
+  return (max > 1 ? qtdStep(qk, max) : '') + (vendaArmed === key
+    ? `<button class="btn danger" data-vender-dec="${key}" data-qtd="${n}">Confirmar ${moeda(total)}</button>`
+    : `<button class="btn ghost" data-vender-dec="${key}" data-qtd="${n}">Vender ${moeda(total)}</button>`);
+};
+function venderDecoracao(key, qtd = 1) {
   if (vendaArmed !== key) {
     vendaArmed = key; renderPane();
     setTimeout(() => { if (vendaArmed === key) { vendaArmed = null; renderPane(); } }, 4000);
@@ -8218,11 +8237,12 @@ function venderDecoracao(key) {
   }
   vendaArmed = null;
   const [tipo, id] = key.split(':');
-  let nome, preco;
+  let nome, preco, n = 1;
   if (tipo === 'enf') {
     const e = ENFEITE[id];
     if (!e || e.especial || !(state.enfeites[id] > 0)) return;
-    state.enfeites[id]--; nome = e.nome; preco = Math.floor(e.custo / 2);
+    n = clamp(Math.round(qtd) || 1, 1, state.enfeites[id]);
+    state.enfeites[id] -= n; nome = e.nome; preco = Math.floor(e.custo / 2) * n;
   } else {
     const d = MODELO[id];
     if (!d || !state.decorTem[id]) return;
@@ -8230,7 +8250,7 @@ function venderDecoracao(key) {
     nome = d.nome; preco = Math.floor(d.custo / 2);
   }
   state.coins += preco; sfx('coin');
-  toast(`Vendeu ${nome.toLowerCase()} por ${preco.toLocaleString('pt-BR')} moedas.`, 'good');
+  toast(`Vendeu ${n > 1 ? `${n}× ` : ''}${nome.toLowerCase()} por ${preco.toLocaleString('pt-BR')} moedas.`, 'good');
   done();
 }
 // Na Loja: se já tem o item no inventário, o botão principal usa o do inventário (e um botãozinho compra mais).
@@ -8268,7 +8288,7 @@ function inventarioHTML() {
   for (const e of guardados) {
     html += `<div class="row wide ${e.especial ? 'sel' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome} × ${state.enfeites[e.id]}${e.especial ? ` <span class="tag">${e.vila ? '🏡 vila' : '⭐ pioneiros'}</span>` : ''}</div><div class="meta">${e.cerca ? 'Um pedaço de cerca para a roça. Depois de pôr um, já vem o próximo (dá para girar).' : `+${e.conforto}% de XP quando está na roça ou no rancho`}${e.especial ? `<br>${origemEnfeite(e, state)}` : ''}</div></div>
       <div class="actions"><button class="btn gold" data-inv-por="${e.id}" data-sc="roca">Pôr na roça</button>${e.cerca ? '' : `<button class="btn gold" data-inv-por="${e.id}" data-sc="animais">Pôr no rancho</button>`}
-      ${e.especial ? '' : venderBtn('enf:' + e.id, Math.floor(e.custo / 2))}</div></div>`;
+      ${e.especial ? '' : venderBtn('enf:' + e.id, Math.floor(e.custo / 2), state.enfeites[e.id])}</div></div>`;
   }
   for (const sc of ['roca', 'animais']) {
     const l = objetosDe(state, sc);
@@ -8276,7 +8296,11 @@ function inventarioHTML() {
     html += `<h3>${sc === 'roca' ? 'Na roça' : 'No rancho'}</h3>`;
     for (const ce of ENFEITES.filter(x => x.cerca)) {
       const n = l.filter(o => o.id === ce.id).length;
-      if (n) html += `<div class="row"><img alt="" src="${enfeiteIcon(ce.id)}"><div><div class="name">${ce.nome} × ${n}</div><div class="meta">Para mudar de lugar ou girar, use o botão Mover</div></div><button class="btn ghost" data-inv-guardar-cercas="${sc}:${ce.id}">Guardar ${n > 1 ? 'todas' : ''}</button></div>`;
+      if (n) {
+        const key = 'gc:' + sc + ':' + ce.id, stepper = n > 1 ? qtdStep(key, n) : '', sel = qtdSel[key] || 1;
+        html += `<div class="row"><img alt="" src="${enfeiteIcon(ce.id)}"><div><div class="name">${ce.nome} × ${n}</div><div class="meta">Para mudar de lugar ou girar, use o botão Mover</div></div>
+          <div class="stack">${stepper}<button class="btn ghost" data-inv-guardar-cercas="${sc}:${ce.id}" data-qtd="${sel}">Guardar${n > 1 ? ` ${sel}` : ''}</button></div></div>`;
+      }
     }
     l.forEach((o, i) => {
       const e = ENFEITE[o.id];
@@ -8837,8 +8861,8 @@ const LUGAR_CACA = Object.fromEntries(LUGARES_CACA.map(l => [l.id, l]));
 const CACA_BICHOS = [
   // pragas: estilingue (pequenas) e espingarda (grandes)
   { id: 'rato',       nome: 'Rato do paiol',   raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'rato',  cor: '#8a8078', tam: 0.7,  vel: 1.1, hp: 1, moedas: 15,  peso: 10 },
-  { id: 'pombo',      nome: 'Pombo',           raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9aa3ad', tam: 0.75, vel: 1.1, hp: 1, moedas: 12,  peso: 10, voa: true },
-  { id: 'pardal',     nome: 'Pardal',          raro: 'incomum',  praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#a07a4a', tam: 0.6,  vel: 1.45, hp: 1, moedas: 22, peso: 5, voa: true },
+  { id: 'pombo',      nome: 'Pombo',           raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9aa3ad', tam: 0.75, vel: 0.9, hp: 1, moedas: 12,  peso: 10, voa: true },
+  { id: 'pardal',     nome: 'Pardal',          raro: 'incomum',  praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#a07a4a', tam: 0.6,  vel: 1.1, hp: 1, moedas: 22, peso: 5, voa: true },
   { id: 'lebre',      nome: 'Lebre-europeia',  raro: 'incomum',  praga: true, armas: ['estilingue', 'espingarda'], nivel: 10, lug: 0, forma: 'lebre', cor: '#b08a5a', tam: 0.9, vel: 1.55, hp: 1, moedas: 40, peso: 6 },
   { id: 'javali',     nome: 'Javali',          raro: 'raro',     praga: true, armas: ['espingarda'], nivel: 12, lug: 1, forma: 'porco', cor: '#5a4a3a', tam: 1.3,  vel: 1.0, hp: 2, moedas: 90,  carne: 2, peso: 7 },
   { id: 'javaporco',  nome: 'Javaporco',       raro: 'épico',    praga: true, armas: ['espingarda'], nivel: 15, lug: 2, forma: 'porco', cor: '#7a5a44', tam: 1.5,  vel: 1.15, hp: 3, moedas: 160, carne: 3, peso: 2.5, pintas: true },
@@ -9058,7 +9082,7 @@ function moverBicho(t, cw, ch) {
   }
 }
 const MOITAS = [0.16, 0.42, 0.68, 0.9];
-const posBicho = (a, t) => ({ x: a.x, y: a.y + (caca.bicho.voa ? Math.sin(t / 180) * 8 : 0) });
+const posBicho = (a, t) => ({ x: a.x, y: a.y + (caca.bicho.voa ? Math.sin(t / 260) * 4 : 0) });
 function atirar(x, y) {
   if (!caca || caca.fase !== 'mira') return;
   const c = cacaDe(), a = ARMAS_CACA[caca.arma];
@@ -9068,12 +9092,13 @@ function atirar(x, y) {
   if (caca.arma === 'espingarda') { sfx('tiro'); caca.tiro = { x, y, t }; return acertou(x, y, t); }
   // estilingue: a pedrinha voa até o ponto tocado; vale onde o bicho estiver quando ela chegar
   sfx('estilingue');
-  caca.pedra = { x0: cw / 2, y0: ch - 18, x, y, t0: t, dur: 240 };
+  caca.pedra = { x0: cw / 2, y0: ch - 18, x, y, t0: t, dur: 150 };
   renderCaca();
 }
 function acertou(x, y, t) {
   const a = caca.a, b = caca.bicho, p = posBicho(a, t), cv = $('#cacaCv'), escala = cv.clientWidth / 420;
-  const raio = 24 * b.tam * escala * dominioCaca().mira * (caca.arma === 'espingarda' ? 1.15 : 1);
+  // bicho voador tem uma mira um pouco mais generosa (é pequeno e rápido, senão fica quase impossível de acertar)
+  const raio = 24 * Math.max(b.tam, b.voa ? 0.85 : b.tam) * escala * dominioCaca().mira * (caca.arma === 'espingarda' ? 1.15 : 1);
   if (a.esconde > t || Math.hypot(x - p.x, y - (p.y - 10 * b.tam * escala)) > raio) { caca.fala = { txt: 'Errou!', cor: '#e0503a', t, x, y }; sfx('error'); return renderCaca(); }
   a.hp--; a.flash = t + 250;
   if (a.hp <= 0) return pegouBicho();

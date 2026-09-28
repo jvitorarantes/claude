@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="117">
-<script src="firebase-config.js?v=117"></script>
+<meta name="rf-version" content="118">
+<script src="firebase-config.js?v=118"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -351,6 +351,9 @@
   .btn:disabled, .btn.gold:disabled, .btn.danger:disabled { background: #b7b39c; color: #fff; box-shadow: 0 3px 0 #8f8a73; border: 0; cursor: not-allowed; }
   .penactions .btn.ghost { color: #fff; }
   .stack { display: grid; gap: 4px; }
+  .stepper { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .stepper button { width: 28px; height: 28px; padding: 0; font-size: 16px; line-height: 1; }
+  .stepper b { min-width: 1.4em; text-align: center; font-variant-numeric: tabular-nums; }
   .total { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 800; }
   .kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-variant-numeric: tabular-nums; }
   .kv span:nth-child(odd) { color: var(--muted); }
@@ -910,8 +913,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=117"></script>
-<script src="js/cloud.js?v=117"></script>
-<script src="js/game.js?v=117"></script>
+<script src="js/audio.js?v=118"></script>
+<script src="js/cloud.js?v=118"></script>
+<script src="js/game.js?v=118"></script>
 </body>
 </html>
