@@ -7065,7 +7065,14 @@ let pontosArrastou = false;
   el.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') { ini = { x: e.clientX, s: el.scrollLeft }; pontosArrastou = false; } });
   window.addEventListener('pointermove', e => { if (!ini) return; const dx = e.clientX - ini.x; if (Math.abs(dx) > 5) pontosArrastou = true; el.scrollLeft = ini.s - dx; });
   window.addEventListener('pointerup', () => { if (ini) { ini = null; setTimeout(() => { pontosArrastou = false; }, 0); } });
-  el.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { el.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+  // Só "rouba" a rolagem do mouse pros pontos quando ainda dá pra andar pro lado; nas pontas,
+  // deixa a rolagem passar pra tela (senão ela ficava travada quando o rato para em cima da fileira).
+  el.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    const podeEsquerda = el.scrollLeft > 0, podeDireita = el.scrollLeft < el.scrollWidth - el.clientWidth - 1;
+    if ((e.deltaY < 0 && !podeEsquerda) || (e.deltaY > 0 && !podeDireita)) return;
+    el.scrollLeft += e.deltaY; e.preventDefault();
+  }, { passive: false });
 })();
 // Só troca o HTML se mudou (assim o relógio atualiza sem "comer" o toque no botão).
 const setHtml = (el, html) => { if (el && el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
