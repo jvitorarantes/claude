@@ -972,6 +972,7 @@ const NOVIDADES = [
   { v: 125, txt: 'Mais lugares na banca 🏪: além dos 6 de sempre, mais 4 liberam por nível (8, 12, 18 e 25) — e cada amigo de verdade que você tem adianta a liberação em 1 nível, até 5 níveis de desconto!' },
   { v: 126, txt: 'Aviso da pesca mais visível 🐟: quando um ponto de pesca descansar, agora aparece um balãozinho com um peixe em cima do pesqueiro, bem mais fácil de notar.' },
   { v: 128, txt: 'Corrigido: girar o celular (retrato ↔ paisagem) no meio do jogo às vezes deixava a tela desalinhada. Agora reajusta sozinho sempre que a orientação ou o tamanho da tela muda.' },
+  { v: 129, txt: 'Sua lista de amigos agora vem ordenada por nível (quem pede ajuda no pomar continua aparecendo primeiro).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4500,7 +4501,8 @@ function renderPane() {
       if (state.friends.length) html += `<p class="hint">Mande um presente por dia para até ${PRESENTE_MAX} amigos (hoje: ${giftsToday().to.length} de ${PRESENTE_MAX}). Não custa nada!</p>`;
       if (!state.friends.length) html += `<div class="empty">Mande seu código para um amigo e peça o dele. A amizade começa quando um aceitar o pedido do outro.</div>`;
       if (amigosPedindo().length) html += `<p class="hint pedeajuda">🆘 ${amigosPedindo().length === 1 ? 'Um amigo precisa' : `${amigosPedindo().length} amigos precisam`} de ajuda no pomar! Visite e toque na frutífera com a placa (🤝). Ajudar frutífera não conta no limite do dia.</p>`;
-      for (const uid of [...state.friends].sort((a, b) => (pedeAjuda(b) ? 1 : 0) - (pedeAjuda(a) ? 1 : 0))) {
+      const nivelDe = uid => { const f = friendInfo[uid]; return f && typeof f === 'object' && !f.erro ? f.level || 0 : 0; };
+      for (const uid of [...state.friends].sort((a, b) => (pedeAjuda(b) ? 1 : 0) - (pedeAjuda(a) ? 1 : 0) || nivelDe(b) - nivelDe(a))) {
         fetchFriendInfo(uid);
         const f = friendInfo[uid];
         const here = view.kind === 'friend' && view.uid === uid;
