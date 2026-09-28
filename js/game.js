@@ -31,6 +31,7 @@ const CROP_LIST = [
   ['couve',    'Couve',          5,  100,  160,  45 * MIN,      7,  6,  'folha',    '#4f8a3f'],
   ['alface',   'Alface',         6,  150,  240,  1.5 * HOUR,    9,  6,  'folha',    '#8fd05a'],
   ['amendoim', 'Amendoim',       7,  180,  290,  2 * HOUR,      10, 8,  'raiz',     '#d9b27a', '#b8905a'],
+  ['maxixe',   'Maxixe',         8,  220,  350,  2 * HOUR,      11, 8,  'chao',     '#8fbf4a', '#d8ecb8'],
   ['cebola',   'Cebola',         8,  200,  320,  2.5 * HOUR,    11, 8,  'raiz',     '#b8617e', '#e6c07a'],
   ['abobora',  'Abóbora',        9,  250,  400,  4 * HOUR,      12, 4,  'chao',     '#f28c1b', '#c9650a'],
   ['cana',     'Cana-de-açúcar', 11, 350,  560,  5 * HOUR,      14, 6,  'cana',     '#8a5a7a'],
@@ -959,6 +960,7 @@ const NOVIDADES = [
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
   { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
+  { v: 116, txt: 'Chegou o MAXIXE 🥒 (nível 8): a rama se espalha no chão e dá maxixes verdinhos cheios de espinhos moles.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2508,7 +2510,7 @@ function ball(x, y, r, col) {
 // Planta com a base em (x, y); s = escala.
 // Brotinhos: cada planta cresce do seu jeito (capim, trevinho, folha larga, roseta, rama…).
 const BROTO = { feijao: 'trevo', soja: 'trevo', amendoim: 'amendoim', arroz: 'capim', trigo: 'capim', milho: 'milho', cana: 'cana', cenoura: 'plumosa',
-  cebola: 'tubo', mandioca: 'palmada', batata: 'batata', tomate: 'tomate', alface: 'roseta', couve: 'couve', abobora: 'larga', melancia: 'larga', pepino: 'larga',
+  cebola: 'tubo', mandioca: 'palmada', batata: 'batata', tomate: 'tomate', alface: 'roseta', couve: 'couve', abobora: 'larga', melancia: 'larga', pepino: 'larga', maxixe: 'larga',
   pimentao: 'arbusto', abacaxi: 'espada', mamao: 'mamao', limao: 'arvorezinha', cafe: 'cafe', conde: 'arvorezinha', maracuja: 'trepadeira', algodao: 'algodao',
   morangueiro: 'morango', videira: 'trepadeira', macieira: 'arvorezinha', laranjeira: 'arvorezinha', bananeira: 'bananeira', coqueiro: 'coqueiro', mangueira: 'arvorezinha', goiabeira: 'arvorezinha' };
 function drawBroto(x, y, s, crop, stage, sway) {
@@ -2730,6 +2732,7 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
             const fx = x + dx * s, fy = cy + r * 0.55;
             ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(fx, fy + 4 * s, rx * s, (ripeNow ? ry : ry * 0.66) * s, 0.1, 0, 7); ctx.fill();
             ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(fx - 1 * s, fy + 2 * s, 0.8 * s, 2 * s, 0.1, 0, 7); ctx.fill();
+            if (crop.id === 'maxixe') { ctx.strokeStyle = '#d8ecb8'; ctx.lineWidth = 0.7 * s; for (let k = 0; k < 8; k++) { const a = k * 0.8, ex = fx + Math.cos(a) * rx * s, ey = fy + 4 * s + Math.sin(a) * (ripeNow ? ry : ry * 0.66) * s; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex + Math.cos(a) * 1.4 * s, ey + Math.sin(a) * 1.4 * s); ctx.stroke(); } }
             ctx.fillStyle = '#3f7a2a'; ctx.beginPath(); ctx.ellipse(fx, fy - 1 * s, 2.4 * s, 1.4 * s, 0, 0, 7); ctx.fill();
           }
         }
@@ -2752,7 +2755,16 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
           ctx.save(); ctx.translate(x + dx * s, y + dy * s); ctx.scale(1, 0.55);
           leaf(0, 0, 13 * s, 6 * s, a, a === 0 ? GL : G); ctx.restore();
         }
-        if (ripeNow) {
+        if (crop.id === 'maxixe') {
+          // maxixes pequenos, ovais, cheios de espinhos moles, espalhados na rama
+          for (const [dx, dy, a] of [[-8, -2, 0.4], [6, -4, -0.3], [0, 2, 0.1]]) {
+            const fx = x + dx * s, fy = y + dy * s - 3 * s, rx = (ripeNow ? 3.4 : 2.4) * s, ry = (ripeNow ? 4.8 : 3.4) * s;
+            ctx.fillStyle = ripeNow ? crop.cor : '#a8cf6a'; ctx.beginPath(); ctx.ellipse(fx, fy, rx, ry, a, 0, 7); ctx.fill();
+            ctx.strokeStyle = crop.cor2; ctx.lineWidth = 0.8 * s;
+            for (let k = 0; k < 10; k++) { const b = k * 0.63, ex = fx + Math.cos(b) * rx * 0.9, ey = fy + Math.sin(b) * ry * 0.9; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex + Math.cos(b) * 1.6 * s, ey + Math.sin(b) * 1.6 * s); ctx.stroke(); }
+            ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(fx - rx * 0.35, fy - ry * 0.3, rx * 0.25, ry * 0.3, a, 0, 7); ctx.fill();
+          }
+        } else if (ripeNow) {
           const rx = 11 * s, ry = 8 * s, fy = y - 5 * s;
           ctx.fillStyle = crop.cor; ctx.beginPath(); ctx.ellipse(x, fy, rx, ry, 0, 0, 7); ctx.fill();
           ctx.strokeStyle = crop.cor2; ctx.lineWidth = (crop.id === 'melancia' ? 2 : 1.2) * s;
@@ -5379,7 +5391,7 @@ const thisWeek = () => weekOf(localDay());
 const ESTACOES = [
   { id: 'primavera', nome: 'Primavera', icone: '🌸', plantas: ['alface', 'cenoura', 'morangueiro', 'tomate', 'cebola'],
     grama: ['#86c450', '#9ad35e'], morro: '#6fae43', folha: '#4f9a34', flores: 9, borboletas: 10, flor: true },
-  { id: 'verao', nome: 'Verão', icone: '☀️', plantas: ['melancia', 'milho', 'abacaxi', 'maracuja', 'pepino', 'cana'],
+  { id: 'verao', nome: 'Verão', icone: '☀️', plantas: ['melancia', 'milho', 'abacaxi', 'maracuja', 'pepino', 'cana', 'maxixe'],
     grama: ['#94c24a', '#a8cf55'], morro: '#79a83f', folha: '#4a8f2a', flores: 2, borboletas: 5 },
   { id: 'outono', nome: 'Outono', icone: '🍂', plantas: ['abobora', 'batata', 'macieira', 'videira', 'soja', 'amendoim'],
     grama: ['#a7b64c', '#b9c05a'], morro: '#8f9c3e', folha: '#d9822b', flores: 0, folhas: true, pelada: true, borboletas: 2 },
