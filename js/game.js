@@ -1057,6 +1057,7 @@ const NOVIDADES = [
   { v: 161, txt: 'Celeste, a sucuri, ficou bem mais fofa: cabeça grande e redonda, olhões brilhantes, bochecha rosada, sorrisinho e uma linguinha que aparece de vez em quando.' },
   { v: 162, txt: 'Corrigido: dava pra notar a divisão entre blocos de água encostados (uma friestinha de grama e o brilho repetido em cada um). Agora ficam bem juntinhos, sem gap, com um brilho só pro laguinho inteiro.' },
   { v: 163, txt: 'Celeste, a sucuri, ganhou um corpo de verdade: uma fita só afunilando da cabeça até a cauda, sem as bolinhas, em tom azul-esverdeado de bicho d\'água.' },
+  { v: 164, txt: 'Bloco de água mais barato: agora custa 30 moedas, o mesmo preço da cerca mais em conta.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -8195,7 +8196,7 @@ const ENFEITES = [
   { id: 'poco',       nome: 'Poço',                   nivel: 6,  custo: 1500, conforto: 2 },
   { id: 'fonte',      nome: 'Fonte',                  nivel: 10, custo: 3000, conforto: 2 },
   { id: 'moinho',     nome: 'Cata-vento',             nivel: 14, custo: 5000, conforto: 3 },
-  { id: 'agua',       nome: 'Bloco de água',          nivel: 4,  custo: 700,  conforto: 1, agua: true, desc: 'Do tamanho de uma plantação. Encoste um no outro para virar um laguinho, com peixinhos pulando.' },
+  { id: 'agua',       nome: 'Bloco de água',          nivel: 4,  custo: 30,   conforto: 1, agua: true, desc: 'Do tamanho de uma plantação. Encoste um no outro para virar um laguinho, com peixinhos pulando.' },
   // Cerca: um pedaço de uma casa de comprimento, no estilo do tema da roça. Só enfeita (não dá XP).
   { id: 'cerca',      nome: 'Cerca da roça',          nivel: 1,  custo: 40,   conforto: 0, cerca: true, desc: 'No estilo do tema da roça (Loja › Temas).' },
   { id: 'cerca_arame',  nome: 'Cerca de arame farpado', nivel: 2,  custo: 30,  conforto: 0, cerca: true, estilo: { poste: '#8a6a44', topo: '#a4825a', trilho: '#6a6a6a', arame: true }, desc: 'Moirão de madeira e três fios de arame.' },
