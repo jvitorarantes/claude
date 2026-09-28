@@ -1052,6 +1052,7 @@ const NOVIDADES = [
   { v: 156, txt: 'As casinhas dos animais não ficam mais presas na grade do rancho: entre no Modo Mover e arraste cada abrigo para onde quiser (sem encostar em outro).' },
   { v: 157, txt: 'Chegou o Bloco de água na Loja › Enfeites: do tamanho de uma plantação, encaixa um do lado do outro e vira um laguinho, com peixinho pulando quando tem pelo menos dois juntos.' },
   { v: 158, txt: 'Se você tiver um laguinho (2+ blocos de água juntos), chegou Celeste, a sucuri: ela anda por perto, entra na água pra pescar, sai com o peixe e come. Clique nela para ver o que está fazendo.' },
+  { v: 159, txt: 'Celeste, a sucuri do laguinho, agora leva seu tempo: passeia bem mais antes de entrar na água de novo, pesca com calma e demora pra comer. Menos corrida, mais charme.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -8825,8 +8826,31 @@ function laguinhos(s) {
   }
   return grupos;
 }
-let sucuri = null; // { fase, t0, scRef, u, v, cx, cv, alvo }
-const SUCURI_DUR = { andando: 5, entrando: 2.2, pescando: 1.6, saindo: 2.2, comendo: 2.4 };
+let sucuri = null; // { fase, t0, scRef, u, v, cx, cv, alvo, legFrom, legAlvo, legT0 }
+// Onde ela está, dado quanto tempo já passou (em segundos) na fase atual. "andando" troca de destino
+// a cada perna de caminhada (SUCURI_LEG segundos), pra parecer que ela realmente passeia por ali.
+const SUCURI_LEG = 9;
+function sucuriPos(sc, cx, cv, age) {
+  if (sc.fase === 'andando') {
+    if (sc.legT0 === undefined || age - sc.legT0 > SUCURI_LEG) {
+      sc.legFrom = sc.legAlvo || [sc.u, sc.v];
+      const a = Math.random() * Math.PI * 2, d = 1.2 + Math.random() * 1.2;
+      sc.legAlvo = [cx + Math.cos(a) * d, cv + Math.sin(a) * d];
+      sc.legT0 = age;
+    }
+    const lp = Math.min(1, (age - sc.legT0) / SUCURI_LEG);
+    return [sc.legFrom[0] + (sc.legAlvo[0] - sc.legFrom[0]) * lp, sc.legFrom[1] + (sc.legAlvo[1] - sc.legFrom[1]) * lp];
+  }
+  const p = Math.min(1, age / SUCURI_DUR[sc.fase]);
+  if (sc.fase === 'entrando') return [sc.u + (cx - sc.u) * p, sc.v + (cv - sc.v) * p];
+  if (sc.fase === 'pescando') return [cx, cv];
+  if (sc.fase === 'saindo') {
+    if (!sc.alvo) { const a = Math.random() * Math.PI * 2; sc.alvo = [cx + Math.cos(a) * 1.6, cv + Math.sin(a) * 1.2]; }
+    return [cx + (sc.alvo[0] - cx) * p, cv + (sc.alvo[1] - cv) * p];
+  }
+  return [sc.u, sc.v]; // comendo: parada
+}
+const SUCURI_DUR = { andando: 75, entrando: 7, pescando: 10, saindo: 7, comendo: 14 };
 const SUCURI_PROX = { andando: 'entrando', entrando: 'pescando', pescando: 'saindo', saindo: 'comendo', comendo: 'andando' };
 function drawSucuri(s, t, home) {
   const grupos = laguinhos(s);
@@ -8836,23 +8860,12 @@ function drawSucuri(s, t, home) {
     const a0 = Math.random() * Math.PI * 2;
     sucuri = { fase: 'andando', t0: t, scRef: s, u: cx + Math.cos(a0) * 1.8, v: cv + Math.sin(a0) * 1.3, alvo: null };
   }
-  const age = (t - sucuri.t0) / 1000, dur = SUCURI_DUR[sucuri.fase];
-  if (age > dur) {
-    if (sucuri.fase === 'andando') sucuri.u = sucuri.alvo ? sucuri.alvo[0] : sucuri.u, sucuri.v = sucuri.alvo ? sucuri.alvo[1] : sucuri.v;
-    if (sucuri.fase === 'saindo') sucuri.u = sucuri.alvo ? sucuri.alvo[0] : sucuri.u, sucuri.v = sucuri.alvo ? sucuri.alvo[1] : sucuri.v;
-    sucuri.fase = SUCURI_PROX[sucuri.fase]; sucuri.t0 = t; sucuri.alvo = null;
+  if ((t - sucuri.t0) / 1000 > SUCURI_DUR[sucuri.fase]) {
+    if (sucuri.fase === 'andando' || sucuri.fase === 'saindo') { const [pu, pv] = sucuriPos(sucuri, cx, cv, SUCURI_DUR[sucuri.fase]); sucuri.u = pu; sucuri.v = pv; }
+    sucuri.fase = SUCURI_PROX[sucuri.fase]; sucuri.t0 = t; sucuri.alvo = null; sucuri.legT0 = undefined;
   }
-  const p = Math.min(1, age / dur), W = L.W;
-  let u = sucuri.u, v = sucuri.v, comFixe = null;
-  if (sucuri.fase === 'andando') {
-    if (!sucuri.alvo) { const a = Math.random() * Math.PI * 2, d = 1.4 + Math.random() * 0.8; sucuri.alvo = [cx + Math.cos(a) * d, cv + Math.sin(a) * d]; }
-    u = sucuri.u + (sucuri.alvo[0] - sucuri.u) * p; v = sucuri.v + (sucuri.alvo[1] - sucuri.v) * p;
-  } else if (sucuri.fase === 'entrando') { u = sucuri.u + (cx - sucuri.u) * p; v = sucuri.v + (cv - sucuri.v) * p; }
-  else if (sucuri.fase === 'pescando') { u = cx; v = cv; }
-  else if (sucuri.fase === 'saindo') {
-    if (!sucuri.alvo) { const a = Math.random() * Math.PI * 2; sucuri.alvo = [cx + Math.cos(a) * 1.6, cv + Math.sin(a) * 1.2]; }
-    u = cx + (sucuri.alvo[0] - cx) * p; v = cv + (sucuri.alvo[1] - cv) * p;
-  } else { u = sucuri.u; v = sucuri.v; }
+  const age = (t - sucuri.t0) / 1000, W = L.W, p = Math.min(1, age / SUCURI_DUR[sucuri.fase]);
+  const [u, v] = sucuriPos(sucuri, cx, cv, age);
   const q = iso(u, v);
   ctx.save(); ctx.translate(q.x, q.y);
   const seg = 8, comp = W * 1.05;
