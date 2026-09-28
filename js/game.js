@@ -592,6 +592,25 @@ function popupAt(pos, text, color, delay = 0) {
   if (!pos) return;
   popups.push({ x: pos.x, y: pos.y - L.W * 0.2, text, color, t0: performance.now() + delay });
 }
+function lvlUpFX() {
+  const lvlEl = $('#lvl'), ring = lvlEl && lvlEl.closest('.avatar-ring');
+  if (!ring) return;
+  lvlEl.classList.remove('lvlup'); void lvlEl.offsetWidth; lvlEl.classList.add('lvlup');
+  ring.classList.remove('lvlup'); void ring.offsetWidth; ring.classList.add('lvlup');
+  setTimeout(() => { lvlEl.classList.remove('lvlup'); ring.classList.remove('lvlup'); }, 850);
+  const bits = ['✨', '⭐', '🎉', '💛', '🌟'];
+  for (let i = 0; i < 9; i++) {
+    const s = document.createElement('span');
+    s.className = 'lvlconfetti'; s.textContent = bits[i % bits.length];
+    const ang = (i / 9) * Math.PI * 2 + Math.random() * 0.4;
+    const dist = 36 + Math.random() * 26;
+    s.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+    s.style.setProperty('--dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
+    s.style.setProperty('--rot', (Math.random() * 360 - 180).toFixed(0) + 'deg');
+    ring.appendChild(s);
+    setTimeout(() => s.remove(), 950);
+  }
+}
 function addXP(n, pos) {
   n = Math.max(n, Math.round(n * (1 + comfort(state) / 100)));
   state.xp += n;
@@ -599,6 +618,7 @@ function addXP(n, pos) {
   while (state.xp >= need(state.level)) {
     state.xp -= need(state.level); state.level++;
     sfx('level');
+    lvlUpFX();
     const bonus = state.level * 50; state.coins += bonus;
     const novas = [...CROPS, ...ANIMALS, ...DECOR].filter(c => c.nivel === state.level).map(c => c.nome);
     for (const M of MAQUINAS) if (M.slots[0].nivel === state.level) novas.push(`${M.nome} (fábrica)`);
@@ -997,6 +1017,7 @@ const NOVIDADES = [
   { v: 151, txt: 'Trocado o selo do Chupa-cabra: estava parecendo um demônio, agora é um alien 👽.' },
   { v: 152, txt: 'O selo de Alienígena 👽 virou opção separada, e o Chupa-cabra agora é um morcego 🦇. Chegaram 3 molduras grátis pra foto (Campo, Céu e Pôr do sol) além da dourada de pioneiro. E corrigido: quem já era pioneiro de antes agora recebe a moldura dourada.' },
   { v: 153, txt: 'Chegaram 5 molduras novas pra foto, liberando por nível: Flor (nível 5), Girassol (nível 10), Lavanda (nível 15), Borboleta (nível 22) e Arco-íris (nível 30).' },
+  { v: 154, txt: 'Molduras da foto redesenhadas: em vez de um anel liso, agora têm galhos, pétalas e nuvens invadindo a foto de um jeito mais criativo. E chegou uma animaçãozinha (com confete!) toda vez que você sobe de nível.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },

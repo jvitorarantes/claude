@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="153">
-<script src="firebase-config.js?v=153"></script>
+<meta name="rf-version" content="154">
+<script src="firebase-config.js?v=154"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -103,6 +103,12 @@
     display: grid; place-items: center; background: #ffd54a; color: #5a3a0c; font-weight: 800; font-size: 15px;
     border: 2px solid #a87400; box-shadow: 0 2px 0 rgba(0,0,0,.25); font-variant-numeric: tabular-nums;
   }
+  @keyframes lvlPulse { 0% { transform: scale(1); } 35% { transform: scale(1.45); box-shadow: 0 0 0 9px rgba(255,213,74,.55), 0 2px 0 rgba(0,0,0,.25); } 100% { transform: scale(1); box-shadow: 0 2px 0 rgba(0,0,0,.25); } }
+  .lvl.lvlup { animation: lvlPulse .8s ease; }
+  @keyframes ringGlow { 0% { box-shadow: 0 0 0 0 rgba(255,213,74,0); } 30% { box-shadow: 0 0 0 10px rgba(255,213,74,.45); } 100% { box-shadow: 0 0 0 0 rgba(255,213,74,0); } }
+  .avatar-ring.lvlup .face { animation: ringGlow .8s ease; }
+  @keyframes lvlConfetti { 0% { transform: translate(-50%, -50%) translate(0, 0) scale(1) rotate(0deg); opacity: 1; } 100% { transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(.3) rotate(var(--rot)); opacity: 0; } }
+  .lvlconfetti { position: absolute; left: 50%; top: 50%; font-size: 16px; pointer-events: none; z-index: 5; animation: lvlConfetti .9s ease-out forwards; }
   .pinfo { display: grid; gap: 2px; min-width: 0; }
   .pname { font-weight: 800; font-size: 15px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .xpbar { position: relative; height: 14px; width: 150px; max-width: 40vw; border-radius: 8px; background: rgba(0,0,0,.35); overflow: hidden; border: 1px solid rgba(255,255,255,.3); }
@@ -334,22 +340,80 @@
   .row > img, .row .avatar { width: 48px; height: 48px; }
   .row .avatar svg { width: 30px; height: 30px; }
   .row .avatar { border-radius: 12px; object-fit: cover; display: grid; place-items: center; color: #fff; font: 400 24px Chewy, cursive; }
-  .avatar.moldura-pioneiro, .acct img.moldura-pioneiro, .avatar-ring.moldura-pioneiro .face, .moldurabtn.moldura-pioneiro .molduraprev { box-shadow: 0 0 0 2px #fff3c4, 0 0 0 4px #e0a800; }
-  .avatar.moldura-campo, .acct img.moldura-campo, .avatar-ring.moldura-campo .face, .moldurabtn.moldura-campo .molduraprev { box-shadow: 0 0 0 2px #eaffda, 0 0 0 4px #2f8a2f; }
-  .avatar.moldura-ceu, .acct img.moldura-ceu, .avatar-ring.moldura-ceu .face, .moldurabtn.moldura-ceu .molduraprev { box-shadow: 0 0 0 2px #d8f3ff, 0 0 0 4px #1f7ab8; }
-  .avatar.moldura-sol, .acct img.moldura-sol, .avatar-ring.moldura-sol .face, .moldurabtn.moldura-sol .molduraprev { box-shadow: 0 0 0 2px #ffe0c0, 0 0 0 4px #c8622a; }
-  .avatar.moldura-flor, .acct img.moldura-flor, .avatar-ring.moldura-flor .face, .moldurabtn.moldura-flor .molduraprev { box-shadow: 0 0 0 2px #fff0f5, 0 0 0 4px #ff6fa5, 0 0 0 6px #7a1f4a; }
-  .avatar.moldura-girassol, .acct img.moldura-girassol, .avatar-ring.moldura-girassol .face, .moldurabtn.moldura-girassol .molduraprev { box-shadow: 0 0 0 2px #fff6c2, 0 0 0 4px #ffb800, 0 0 0 6px #6b4a17; }
-  .avatar.moldura-lavanda, .acct img.moldura-lavanda, .avatar-ring.moldura-lavanda .face, .moldurabtn.moldura-lavanda .molduraprev { box-shadow: 0 0 0 2px #f0e6ff, 0 0 0 4px #9b6fd9, 0 0 0 6px #4a2f7a; }
-  .avatar.moldura-borboleta, .acct img.moldura-borboleta, .avatar-ring.moldura-borboleta .face, .moldurabtn.moldura-borboleta .molduraprev { box-shadow: 0 0 0 2px #ffe9b0, 0 0 0 4px #ff7a3c, 0 0 0 6px #1f3a8a; }
-  .avatar.moldura-arcoiris, .acct img.moldura-arcoiris, .avatar-ring.moldura-arcoiris .face, .moldurabtn.moldura-arcoiris .molduraprev { box-shadow: 0 0 0 2px #ff5c5c, 0 0 0 4px #ffb84d, 0 0 0 6px #fff066, 0 0 0 8px #6fd96f, 0 0 0 10px #5c9dff; }
+  /* Molduras: nos avatares que são <img> (amigos, conta) fica um anel simples. No seu (HUD/Config), que são <div>, dá pra ter galhos/pétalas invadindo a foto de verdade, via ::after. */
+  .avatar.moldura-pioneiro, .acct img.moldura-pioneiro { box-shadow: 0 0 0 2px #fff3c4, 0 0 0 4px #e0a800; }
+  .avatar.moldura-campo, .acct img.moldura-campo { box-shadow: 0 0 0 2px #eaffda, 0 0 0 4px #2f8a2f; }
+  .avatar.moldura-ceu, .acct img.moldura-ceu { box-shadow: 0 0 0 2px #d8f3ff, 0 0 0 4px #1f7ab8; }
+  .avatar.moldura-sol, .acct img.moldura-sol { box-shadow: 0 0 0 2px #ffe0c0, 0 0 0 4px #c8622a; }
+  .avatar.moldura-flor, .acct img.moldura-flor { box-shadow: 0 0 0 2px #fff0f5, 0 0 0 4px #ff6fa5; }
+  .avatar.moldura-girassol, .acct img.moldura-girassol { box-shadow: 0 0 0 2px #fff6c2, 0 0 0 4px #ffb800; }
+  .avatar.moldura-lavanda, .acct img.moldura-lavanda { box-shadow: 0 0 0 2px #f0e6ff, 0 0 0 4px #9b6fd9; }
+  .avatar.moldura-borboleta, .acct img.moldura-borboleta { box-shadow: 0 0 0 2px #ffe9b0, 0 0 0 4px #ff7a3c; }
+  .avatar.moldura-arcoiris, .acct img.moldura-arcoiris { box-shadow: 0 0 0 2px #ff5c5c, 0 0 0 4px #5c9dff; }
+
+  .avatar-ring .face, .moldurabtn .molduraprev { position: relative; }
+  .avatar-ring .face::after, .moldurabtn .molduraprev::after { content: ''; position: absolute; inset: 0; pointer-events: none; }
+  .avatar-ring.moldura-pioneiro .face, .moldurabtn.moldura-pioneiro .molduraprev { box-shadow: inset 0 0 0 2px #fff3c4, inset 0 0 0 4px rgba(224,168,0,.6); }
+  .avatar-ring.moldura-pioneiro .face::after, .moldurabtn.moldura-pioneiro .molduraprev::after {
+    background: radial-gradient(ellipse 26% 40% at 10% 100%, #e0a800 0 60%, transparent 65%),
+      radial-gradient(ellipse 26% 40% at 90% 100%, #e0a800 0 60%, transparent 65%),
+      radial-gradient(circle at 50% 8%, #fff3c4 0 10%, transparent 12%);
+  }
+  .avatar-ring.moldura-campo .face, .moldurabtn.moldura-campo .molduraprev { box-shadow: inset 0 0 0 2px rgba(47,138,47,.55); }
+  .avatar-ring.moldura-campo .face::after, .moldurabtn.moldura-campo .molduraprev::after {
+    background: radial-gradient(ellipse 60% 40% at 8% 92%, #2f8a2f 0 55%, transparent 60%),
+      radial-gradient(ellipse 30% 22% at 28% 78%, #6fcf5c 0 60%, transparent 65%),
+      radial-gradient(ellipse 20% 16% at 45% 60%, #eaffda 0 55%, transparent 60%);
+  }
+  .avatar-ring.moldura-ceu .face, .moldurabtn.moldura-ceu .molduraprev { box-shadow: inset 0 0 0 2px rgba(31,122,184,.5); }
+  .avatar-ring.moldura-ceu .face::after, .moldurabtn.moldura-ceu .molduraprev::after {
+    background: radial-gradient(ellipse 55% 35% at 88% 10%, #ffffff 0 55%, transparent 60%),
+      radial-gradient(ellipse 35% 22% at 68% 22%, #d8f3ff 0 55%, transparent 60%),
+      radial-gradient(ellipse 22% 16% at 15% 12%, #ffffff 0 55%, transparent 60%);
+  }
+  .avatar-ring.moldura-sol .face, .moldurabtn.moldura-sol .molduraprev { box-shadow: inset 0 0 0 2px rgba(200,98,42,.55); }
+  .avatar-ring.moldura-sol .face::after, .moldurabtn.moldura-sol .molduraprev::after {
+    background: radial-gradient(ellipse 90% 55% at 50% 118%, #ff8a3c 0 40%, #ffd08a 55%, transparent 62%);
+  }
+  .avatar-ring.moldura-flor .face, .moldurabtn.moldura-flor .molduraprev { box-shadow: inset 0 0 0 2px rgba(122,31,74,.5); }
+  .avatar-ring.moldura-flor .face::after, .moldurabtn.moldura-flor .molduraprev::after {
+    background: radial-gradient(circle at 10% 88%, #ff6fa5 0 20%, transparent 22%),
+      radial-gradient(circle at 26% 96%, #ffb6cf 0 14%, transparent 16%),
+      radial-gradient(circle at 30% 74%, #ffe1ec 0 11%, transparent 13%),
+      radial-gradient(circle at 88% 14%, #ff6fa5 0 13%, transparent 15%);
+  }
+  .avatar-ring.moldura-girassol .face, .moldurabtn.moldura-girassol .molduraprev { box-shadow: inset 0 0 0 2px rgba(107,74,23,.5); }
+  .avatar-ring.moldura-girassol .face::after, .moldurabtn.moldura-girassol .molduraprev::after {
+    background: radial-gradient(circle at 50% 100%, #6b4a17 0 16%, transparent 18%),
+      radial-gradient(circle at 30% 92%, #ffb800 0 16%, transparent 18%),
+      radial-gradient(circle at 70% 92%, #ffb800 0 16%, transparent 18%),
+      radial-gradient(circle at 50% 84%, #fff6c2 0 10%, transparent 12%);
+  }
+  .avatar-ring.moldura-lavanda .face, .moldurabtn.moldura-lavanda .molduraprev { box-shadow: inset 0 0 0 2px rgba(74,47,122,.5); }
+  .avatar-ring.moldura-lavanda .face::after, .moldurabtn.moldura-lavanda .molduraprev::after {
+    background: radial-gradient(circle at 88% 15%, #9b6fd9 0 10%, transparent 12%),
+      radial-gradient(circle at 92% 32%, #9b6fd9 0 10%, transparent 12%),
+      radial-gradient(circle at 90% 50%, #9b6fd9 0 10%, transparent 12%),
+      radial-gradient(circle at 86% 68%, #9b6fd9 0 10%, transparent 12%),
+      radial-gradient(circle at 80% 84%, #4a2f7a 0 9%, transparent 11%);
+  }
+  .avatar-ring.moldura-borboleta .face, .moldurabtn.moldura-borboleta .molduraprev { box-shadow: inset 0 0 0 2px rgba(31,58,138,.5); }
+  .avatar-ring.moldura-borboleta .face::after, .moldurabtn.moldura-borboleta .molduraprev::after {
+    background: radial-gradient(ellipse 30% 45% at 6% 45%, #ff7a3c 0 55%, transparent 60%),
+      radial-gradient(ellipse 30% 45% at 94% 45%, #1f3a8a 0 55%, transparent 60%),
+      radial-gradient(circle at 50% 45%, #1f3a8a 0 6%, transparent 8%);
+  }
+  .avatar-ring.moldura-arcoiris .face, .moldurabtn.moldura-arcoiris .molduraprev { box-shadow: inset 0 0 0 2px rgba(0,0,0,.15); }
+  .avatar-ring.moldura-arcoiris .face::after, .moldurabtn.moldura-arcoiris .molduraprev::after {
+    background: radial-gradient(circle at 100% 100%, #ff5c5c 0 18%, #ffb84d 18% 30%, #fff066 30% 42%, #6fd96f 42% 54%, #5c9dff 54% 66%, transparent 66%);
+  }
   .fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px; }
   .fotobtn { display: grid; justify-items: center; gap: 3px; padding: 6px 4px; border-radius: 12px; border: 2px solid var(--wood-3); background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
   .fotobtn img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #fff; }
   .fotobtn small { font-size: 10.5px; font-weight: 700; text-align: center; }
   .fotobtn[aria-pressed="true"] { border-color: #e0a800; background: #fff4c8; box-shadow: 0 0 0 2px #f2c14e; }
   .fotobtn.trava { opacity: .7; border-style: dashed; cursor: default; }
-  .molduraprev { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(#fff6da, #e8d8b0); display: block; }
+  .molduraprev { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(#fff6da, #e8d8b0); display: block; overflow: hidden; }
   .row .name { font-weight: 800; overflow-wrap: anywhere; }
   .row .meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .btn {
@@ -947,8 +1011,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=153"></script>
-<script src="js/cloud.js?v=153"></script>
-<script src="js/game.js?v=153"></script>
+<script src="js/audio.js?v=154"></script>
+<script src="js/cloud.js?v=154"></script>
+<script src="js/game.js?v=154"></script>
 </body>
 </html>
