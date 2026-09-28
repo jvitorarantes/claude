@@ -1053,6 +1053,7 @@ const NOVIDADES = [
   { v: 157, txt: 'Chegou o Bloco de água na Loja › Enfeites: do tamanho de uma plantação, encaixa um do lado do outro e vira um laguinho, com peixinho pulando quando tem pelo menos dois juntos.' },
   { v: 158, txt: 'Se você tiver um laguinho (2+ blocos de água juntos), chegou Celeste, a sucuri: ela anda por perto, entra na água pra pescar, sai com o peixe e come. Clique nela para ver o que está fazendo.' },
   { v: 159, txt: 'Celeste, a sucuri do laguinho, agora leva seu tempo: passeia bem mais antes de entrar na água de novo, pesca com calma e demora pra comer. Menos corrida, mais charme.' },
+  { v: 160, txt: 'Os blocos de água ganharam bordas arredondadas: as pontas que ficam pra fora do laguinho agora são curvas, em vez de quadradinhas.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -8783,18 +8784,48 @@ function invGuardar(sc, i) {
   state.enfeites[o.id] = (state.enfeites[o.id] || 0) + 1;
   toast(`${ENFEITE[o.id].nome} guardado no inventário.`); done();
 }
+// Ponto na aresta from→to, a uma distância r de "from" (ou o próprio "from" se r for 0/falsy).
+function aguaApara(from, to, r) {
+  if (!r) return from;
+  const dx = to.x - from.x, dy = to.y - from.y, d = Math.hypot(dx, dy), rr = Math.min(r, d / 2);
+  return { x: from.x + dx / d * rr, y: from.y + dy / d * rr };
+}
 // Bloco de água: do tamanho de uma célula (igual um canteiro). Sem borda no lado que encosta em
-// outro bloco de água, pra virar um laguinho contínuo. Com peixinho pulando quando tem pelo menos 2 juntos.
+// outro bloco de água, pra virar um laguinho contínuo — e as pontas que ficam pra fora (sem vizinho
+// dos dois lados) saem arredondadas, pra não parecer um monte de quadradinhos colados.
+// Com peixinho pulando quando tem pelo menos 2 juntos.
 function drawAgua(s, sc, o, t) {
   const objs = objetosDe(s, sc).filter(x => ehAgua(x.id));
   const viz = (du, dv) => objs.some(x => Math.abs(x.u - (o.u + du)) < 0.1 && Math.abs(x.v - (o.v + dv)) < 0.1);
   const c = o.u - 0.5, r = o.v - 0.5;
   const [p1, p2, p3, p4] = diamond(c, r, 0.03);
-  quad(p1, p2, p3, p4, estacao().neve ? '#cfe6f5' : '#4f95d8');
-  if (!viz(0, -1)) line(p1, p2, 'rgba(255,255,255,.4)', 1.3);
-  if (!viz(1, 0)) line(p2, p3, 'rgba(255,255,255,.4)', 1.3);
-  if (!viz(0, 1)) line(p3, p4, 'rgba(255,255,255,.4)', 1.3);
-  if (!viz(-1, 0)) line(p4, p1, 'rgba(255,255,255,.4)', 1.3);
+  const cor = estacao().neve ? '#cfe6f5' : '#4f95d8', raio = L.W * 0.16;
+  // cada corte (round1..4) só arredonda se as DUAS arestas que se encontram ali não tiverem vizinho
+  const rd1 = (!viz(0, -1) && !viz(-1, 0)) ? raio : 0;
+  const rd2 = (!viz(0, -1) && !viz(1, 0)) ? raio : 0;
+  const rd3 = (!viz(1, 0) && !viz(0, 1)) ? raio : 0;
+  const rd4 = (!viz(0, 1) && !viz(-1, 0)) ? raio : 0;
+  const pts = [p1, p2, p3, p4], rds = [rd1, rd2, rd3, rd4];
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const prev = pts[(i + 3) % 4], cur = pts[i], next = pts[(i + 1) % 4], rr = rds[i];
+    const a = aguaApara(cur, prev, rr), b = aguaApara(cur, next, rr);
+    if (i === 0) ctx.moveTo(a.x, a.y); else ctx.lineTo(a.x, a.y);
+    if (rr) ctx.quadraticCurveTo(cur.x, cur.y, b.x, b.y); else ctx.lineTo(b.x, b.y);
+  }
+  ctx.closePath(); ctx.fillStyle = cor; ctx.fill();
+  // borda: só nas arestas sem vizinho, já aparadas nas pontas arredondadas
+  const bordaEdge = (exposto, a, ra, b, rb) => { if (exposto) line(aguaApara(a, b, ra), aguaApara(b, a, rb), 'rgba(255,255,255,.4)', 1.3); };
+  bordaEdge(!viz(0, -1), p1, rd1, p2, rd2);
+  bordaEdge(!viz(1, 0), p2, rd2, p3, rd3);
+  bordaEdge(!viz(0, 1), p3, rd3, p4, rd4);
+  bordaEdge(!viz(-1, 0), p4, rd4, p1, rd1);
+  ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.3;
+  for (const [cur, rr, prev, next] of [[p1, rd1, p4, p2], [p2, rd2, p1, p3], [p3, rd3, p2, p4], [p4, rd4, p3, p1]]) {
+    if (!rr) continue;
+    const a = aguaApara(cur, prev, rr), b = aguaApara(cur, next, rr);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(cur.x, cur.y, b.x, b.y); ctx.stroke();
+  }
   const m = { x: (p1.x + p3.x) / 2, y: (p1.y + p3.y) / 2 };
   ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(m.x - L.W * 0.08, m.y - L.W * 0.06, L.W * 0.14, L.W * 0.06, 0, 0, 7); ctx.fill();
   if (viz(1, 0) || viz(-1, 0) || viz(0, 1) || viz(0, -1)) drawPeixinhoLagoa(m.x, m.y, L.W, t, Math.round(o.u * 1300 + o.v * 700));
