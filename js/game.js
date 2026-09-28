@@ -47,25 +47,10 @@ const CROP_LIST = [
   ['conde',    'Fruta-do-conde', 29, 2400, 3840, 32 * HOUR,     38, 6,  'pendente', '#8fbf6a', null, 'redondo'],
   ['maracuja', 'Maracujá',       30, 2500, 4000, 36 * HOUR,     40, 10, 'pendente', '#f2d03a', null, 'redondo'],
 ];
-// Árvores: compra a muda uma vez, a primeira colheita demora mais e depois repete na metade do tempo.
-// Cada colheita vale 0,6 × a muda. Depois de 15 colheitas a árvore pede uma poda.
-const TREE_LIST = [
-  // id, nome, fruta, nome da fruta, nível, muda, 1ª colheita, próximas, XP, unidades, tipo, cores
-  ['morangueiro', 'Morangueiro', 'morango', 'Morango', 7,  180,  2 * HOUR,  HOUR,      10, 12, 'moita',     '#e0224a', null, 'pequeno'],
-  ['videira',     'Videira',     'uva',     'Uva',     15, 600,  8 * HOUR,  4 * HOUR,  18, 8,  'videira',   '#6b3a8a'],
-  ['macieira',    'Macieira',    'maca',    'Maçã',    18, 900,  12 * HOUR, 6 * HOUR,  22, 10, 'arvore',    '#d8342a'],
-  ['laranjeira',  'Laranjeira',  'laranja', 'Laranja', 19, 1000, 14 * HOUR, 7 * HOUR,  23, 10, 'arvore',    '#f28c1b'],
-  ['bananeira',   'Bananeira',   'banana',  'Banana',  22, 1300, 18 * HOUR, 9 * HOUR,  25, 12, 'bananeira', '#f2d03a'],
-  ['coqueiro',    'Coqueiro',    'coco',    'Coco',    24, 1500, 22 * HOUR, 11 * HOUR, 28, 6,  'palmeira',  '#7a5a3a'],
-  ['mangueira',   'Mangueira',   'manga',   'Manga',   27, 2000, 28 * HOUR, 14 * HOUR, 32, 8,  'arvore',    '#f2a03a', '#d8442a'],
-  ['goiabeira',   'Goiabeira',   'goiaba',  'Goiaba',  28, 2200, 30 * HOUR, 15 * HOUR, 35, 10, 'arvore',    '#c9d45a', '#e8788a'],
-];
-const TREE_HARVESTS = 15;
+// (as árvores frutíferas saíram daqui: agora são frutíferas do Pomar, plantadas no gramado, fora dos canteiros)
 const CROPS = [
   ...CROP_LIST.map(([id, nome, nivel, custo, venda, tempo, xp, rend, tipo, cor, cor2, forma]) =>
     ({ id, nome, nivel, custo, tempo, xp, rend, preco: Math.round(venda / rend), prod: id, prodNome: nome, tipo, cor, cor2: cor2 || cor, forma, pequeno: forma === 'pequeno' })),
-  ...TREE_LIST.map(([id, nome, prod, prodNome, nivel, custo, tempo, tempo2, xp, rend, tipo, cor, cor2, forma]) =>
-    ({ id, nome, nivel, custo, tempo, tempo2, xp, rend, preco: Math.round(custo * 0.6 / rend), prod, prodNome, tipo, cor, cor2: cor2 || cor, forma, pequeno: forma === 'pequeno', arvore: true, poda: Math.round(custo * 0.3) })),
 ];
 const CROP = Object.fromEntries(CROPS.map(c => [c.id, c]));
 // O que vai para o celeiro: a fruta/verdura de cada plantação.
@@ -89,11 +74,18 @@ const FRUTAS = [
   { id: 'pitanga',    nome: 'Pitanga',    preco: 25, cor: '#e0402a' },
   { id: 'framboesa',  nome: 'Framboesa',  preco: 30, cor: '#d8284a' },
   { id: 'amora',      nome: 'Amora',      preco: 30, cor: '#5a1f4a' },
+  { id: 'morango',    nome: 'Morango',    preco: 30, cor: '#e0224a' },
   { id: 'maracuja',   nome: 'Maracujá',   preco: 45, cor: '#e8c030' },
   { id: 'jabuticaba', nome: 'Jabuticaba', preco: 35, cor: '#2a1a2a' },
+  { id: 'uva',        nome: 'Uva',        preco: 50, cor: '#6b3a8a' },
   { id: 'manga',      nome: 'Manga',      preco: 60, cor: '#f2a030' },
   { id: 'caju',       nome: 'Caju',       preco: 55, cor: '#e8502a' },
+  { id: 'maca',       nome: 'Maçã',       preco: 65, cor: '#d8342a' },
+  { id: 'laranja',    nome: 'Laranja',    preco: 60, cor: '#f28c1b' },
   { id: 'pequi',      nome: 'Pequi',      preco: 90, cor: '#b8c040' },
+  { id: 'banana',     nome: 'Banana',     preco: 70, cor: '#f2d03a' },
+  { id: 'coco',       nome: 'Coco',       preco: 80, cor: '#7a5a3a' },
+  { id: 'goiaba',     nome: 'Goiaba',     preco: 75, cor: '#c9d45a' },
 ];
 const FRUTA = Object.fromEntries(FRUTAS.map(f => [f.id, f]));
 for (const f of FRUTAS) PRODUCT[f.id] = { id: f.id, nome: f.nome, preco: f.preco, fruta: true };
@@ -290,7 +282,7 @@ const EXPANSOES = [
 const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganhar XP infinito com o feijão)
 const newId = () => Math.random().toString(36).slice(2, 10);
 
-function emptyPlot(s = 'locked') { return { s, c: null, g: 0, dry: false, w: 0, b: 0, dmg: 0, id: null, th: [], fert: false, h: 0, adult: false, poda: false }; }
+function emptyPlot(s = 'locked') { return { s, c: null, g: 0, dry: false, w: 0, b: 0, dmg: 0, id: null, th: [], fert: false }; }
 function newAnimal(k) {
   const d = ANIMAL[k], a = { id: newId(), k, born: Date.now() };
   if (d.tipo === 'prod') Object.assign(a, { fed: true, g: 0, ready: false, n: 0 }); // a primeira refeição vem junto
@@ -400,10 +392,20 @@ function migrate(s) {
   s.tools = Object.assign({ enxada: false }, s.tools);
   s.xpDay = s.xpDay && s.xpDay.c ? s.xpDay : { d: 0, c: {} };
   s.exp = clamp(Number(s.exp) || 0, 0, EXPANSOES.length - 1);
+  if (!s.pomarMove) {
+    // as árvores frutíferas saíram da Horta (não ocupam mais canteiro) e viraram frutíferas do Pomar
+    const velhas = { morangueiro: 1, videira: 1, macieira: 1, laranjeira: 1, bananeira: 1, coqueiro: 1, mangueira: 1, goiabeira: 1 };
+    let n = 0;
+    for (const p of s.plots) if ((p.s === 'growing' || p.s === 'withered') && velhas[p.c]) { s.enfeites[p.c] = (s.enfeites[p.c] || 0) + 1; n++; }
+    if (n) {
+      s.invNovos = (s.invNovos || 0) + 1;
+      s.news = [{ at: Date.now(), msg: 'A Horta saiu: as árvores frutíferas não ocupam mais canteiro! Elas foram para o seu Inventário — plante no gramado da roça ou do rancho, junto com as outras frutíferas do Pomar.' }].concat(Array.isArray(s.news) ? s.news : []);
+    }
+    s.pomarMove = 1;
+  }
   for (const p of s.plots) {
     if (!Array.isArray(p.th)) p.th = [];
     if ((p.s === 'growing' || p.s === 'withered') && !CROP[p.c]) Object.assign(p, emptyPlot('plowed'));
-    p.h = p.h || 0; p.adult = !!p.adult; p.poda = !!p.poda;
     p.w = 0; // não tem mais mato
     if (p.b && p.dry) p.dry = false; // nunca os dois problemas juntos
     p.b = Math.min(1, p.b || 0);
@@ -420,14 +422,13 @@ function migrate(s) {
 }
 
 // O tempo passou enquanto a roça estava fechada.
-// Tempo da fase atual: árvore adulta usa o tempo das próximas colheitas.
-function phaseTempo(p) { const c = CROP[p.c]; return c.arvore && p.adult ? c.tempo2 : c.tempo; }
+function phaseTempo(p) { return CROP[p.c].tempo; }
 // Faz a planta crescer "sec" segundos. Terra seca cresce mais devagar; pragas
 // vão comendo parte da colheita (no máximo 35%), proporcional ao tempo da planta.
 // Planta pronta que fica mais de 24h sem colher apodrece. Volta com uma poção ou com a ajuda de amigos.
 const PODRE_APOS = 24 * HOUR, POCAO = { custo: 150 }, CURA_MAX = 3;
 function growPlot(p, sec, events, s = state) {
-  if (p.s !== 'growing' || p.poda) return;
+  if (p.s !== 'growing') return;
   const crop = CROP[p.c], T = phaseTempo(p);
   if (p.g >= T) {
     if (!p.podre) { p.pronto = (p.pronto || 0) + sec; if (p.pronto >= PODRE_APOS) p.podre = true; }
@@ -525,11 +526,10 @@ function fmt(sec) {
   return `${s}s`;
 }
 function stageOf(p) {
-  const T = phaseTempo(p), k = p.g / T;
-  if (CROP[p.c].arvore && p.adult) return !p.poda && k >= 1 ? 4 : 3; // árvore adulta: com ou sem fruta
+  const k = p.g / phaseTempo(p);
   return k >= 1 ? 4 : k < 0.12 ? 0 : k < 0.4 ? 1 : k < 0.7 ? 2 : 3;
 }
-const ripe = p => p.s === 'growing' && !p.poda && !p.podre && p.g >= phaseTempo(p);
+const ripe = p => p.s === 'growing' && !p.podre && p.g >= phaseTempo(p);
 // Cada colheita rende um número sorteado numa faixa em volta da média (feijão: 3 a 5).
 const yieldRange = c => { const k = daEstacao(c.id) ? 1 + ESTACAO_BONUS : 1; return [Math.max(1, Math.round(c.rend * 0.75 * k)), Math.max(1, Math.round(c.rend * 1.25 * k))]; };
 const OURO_CHANCE = 0.03, OURO_VEZES = 5; // colheita dourada: rara, rende 5 vezes mais
@@ -616,7 +616,6 @@ function actPlot(i) {
   if (p.s === 'growing' && p.w > 0 && has('weed')) { p.w--; sfx('weed'); addXP(2, pos); addCoins(1, pos); return done(); }
   if (p.s === 'growing' && p.dry && has('water')) { p.dry = false; sfx('water'); useFx('water', pos); track('regar'); addXP(1, pos); return done(); }
   if (ripe(p) && tool === 'hand') return harvest(p, pos);
-  if (p.s === 'growing' && p.poda && tool === 'hand') return prune(p, pos);
   if (p.s === 'withered' && has('hoe')) { Object.assign(p, emptyPlot('plowed')); sfx('hoe'); useFx('hoe', pos); addXP(1, pos); return done(); }
   if (p.s === 'growing' && tool === 'hoe') {
     // O rastelo (ferramenta 'hoe'; no save continua tools.enxada) arranca qualquer plantação. Pede um segundo clique.
@@ -629,7 +628,7 @@ function actPlot(i) {
   }
   if (p.s === 'plowed' && tool === 'seed') return plant(p, pos);
   // Terra vazia sem semente na mão: abre a Loja para escolher o que plantar (nada é plantado sozinho).
-  if (p.s === 'plowed' && tool === 'hand') { openPanel('loja', CROP[state.seed] && CROP[state.seed].arvore ? 'mudas' : 'sementes'); return toast('Escolha uma semente na Loja e clique na terra para plantar.'); }
+  if (p.s === 'plowed' && tool === 'hand') { openPanel('loja', 'sementes'); return toast('Escolha uma semente na Loja e clique na terra para plantar.'); }
   const hints = {
     hoe: 'O rastelo limpa plantas secas e arranca plantações.', water: 'Essa terra não precisa de água.',
     pest: 'Não há pragas aqui.', weed: 'Não há mato aqui.', seed: 'Só dá para plantar em terra arada.',
@@ -651,7 +650,7 @@ function usePotion(p, pos) {
 function plant(p, pos) {
   const crop = CROP[state.seed];
   if (crop.nivel > state.level) return toast(`${crop.nome} libera no nível ${crop.nivel}.`);
-  if (state.coins < crop.custo) return toast(`Faltam moedas para ${crop.arvore ? 'a muda de ' : ''}${crop.nome} (${crop.custo}).`, 'bad');
+  if (state.coins < crop.custo) return toast(`Faltam moedas para ${crop.nome} (${crop.custo}).`, 'bad');
   addCoins(-crop.custo, pos);
   Object.assign(p, emptyPlot('growing'), { c: crop.id, id: newId(), ouro: Math.random() < OURO_CHANCE });
   sfx('plant'); useFx('seed', pos); track('plantar');
@@ -665,22 +664,10 @@ function xpAllowed(id) {
   if (state.xpDay.d !== today) state.xpDay = { d: today, c: {} };
   return (state.xpDay.c[id] || 0) < XP_CAP;
 }
-function prune(p, pos) {
-  const crop = CROP[p.c];
-  if (state.coins < crop.poda) return toast(`A poda da ${crop.nome.toLowerCase()} custa ${crop.poda} moedas.`, 'bad');
-  addCoins(-crop.poda, pos);
-  Object.assign(p, { poda: false, h: 0, g: 0 });
-  sfx('hoe');
-  toast(`${crop.nome} podada! Mais ${TREE_HARVESTS} colheitas pela frente.`, 'good');
-  addXP(3, pos);
-  done();
-}
-
 function fertilize(p, pos) {
   const f = FERT[state.fertSel], have = state.fert[f.id] || 0;
   if (p.s !== 'growing') return toast('O adubo é para planta que está crescendo.');
   if (ripe(p)) return toast('Essa planta já está pronta para colher.');
-  if (p.poda) return toast('Essa árvore precisa de poda antes.');
   if (have <= 0) { openPanel('loja', 'adubo'); return toast(`Você não tem ${f.nome}. Compre na Loja.`); }
   const T = phaseTempo(p), corte = Math.min(T - p.g, T * f.corta);
   state.fert[f.id] = have - 1;
@@ -751,11 +738,7 @@ function harvest(p, pos) {
   }
   if (xpAllowed(crop.id)) { state.xpDay.c[crop.id] = (state.xpDay.c[crop.id] || 0) + 1; addXP(crop.xp, pos); }
   else if (state.xpDay.c[crop.id] === XP_CAP) { state.xpDay.c[crop.id]++; toast(`Hoje ${crop.nome.toLowerCase()} já deu todo o XP (${XP_CAP} colheitas). Ainda rende moedas; o XP volta amanhã.`); }
-  if (crop.arvore) {
-    // A árvore fica: volta a produzir. Depois de 15 colheitas, pede poda.
-    Object.assign(p, { g: 0, adult: true, h: p.h + 1, dmg: 0, w: 0, b: 0, dry: false, id: newId(), th: [], fert: false, ouro: Math.random() < OURO_CHANCE, pronto: 0, podre: false });
-    if (p.h >= TREE_HARVESTS) { p.poda = true; toast(`${crop.nome} deu ${TREE_HARVESTS} colheitas e precisa de poda (${crop.poda} moedas).`); }
-  } else Object.assign(p, { s: 'withered', g: 0, w: 0, b: 0, dry: false, th: [] });
+  Object.assign(p, { s: 'withered', g: 0, w: 0, b: 0, dry: false, th: [] });
   done();
 }
 
@@ -961,6 +944,7 @@ const NOVIDADES = [
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
   { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
   { v: 116, txt: 'Chegou o MAXIXE 🥒 (nível 8): a rama se espalha no chão e dá maxixes verdinhos cheios de espinhos moles.' },
+  { v: 117, txt: 'A Horta saiu da roça 🌳: morangueiro, videira, macieira, laranjeira, bananeira, coqueiro e goiabeira não ocupam mais canteiro! Agora são frutíferas do Pomar (Loja › Pomar): plante no gramado, dão morango, uva, maçã, laranja, banana, coco e goiaba de tempos em tempos e secam depois de umas colheitas, igualzinho às outras frutíferas. Quem já tinha uma plantada ganhou de volta no Inventário.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1228,7 +1212,7 @@ function genNeighbor() {
   const plots = Array.from({ length: N }, () => emptyPlot());
   const count = 12 + Math.floor(Math.random() * 16);
   for (const i of ORDER.slice(0, count)) {
-    const pool = CROPS.filter(c => !c.arvore && c.nivel <= Math.max(5, state.level + 3));
+    const pool = CROPS.filter(c => c.nivel <= Math.max(5, state.level + 3));
     const crop = pool[Math.floor(Math.random() * pool.length)];
     if (Math.random() < 0.12) { plots[i] = emptyPlot('plowed'); continue; }
     const mature = Math.random() < 0.5, bug = Math.random() < 0.08;
@@ -2511,8 +2495,7 @@ function ball(x, y, r, col) {
 // Brotinhos: cada planta cresce do seu jeito (capim, trevinho, folha larga, roseta, rama…).
 const BROTO = { feijao: 'trevo', soja: 'trevo', amendoim: 'amendoim', arroz: 'capim', trigo: 'capim', milho: 'milho', cana: 'cana', cenoura: 'plumosa',
   cebola: 'tubo', mandioca: 'palmada', batata: 'batata', tomate: 'tomate', alface: 'roseta', couve: 'couve', abobora: 'larga', melancia: 'larga', pepino: 'larga', maxixe: 'larga',
-  pimentao: 'arbusto', abacaxi: 'espada', mamao: 'mamao', limao: 'arvorezinha', cafe: 'cafe', conde: 'arvorezinha', maracuja: 'trepadeira', algodao: 'algodao',
-  morangueiro: 'morango', videira: 'trepadeira', macieira: 'arvorezinha', laranjeira: 'arvorezinha', bananeira: 'bananeira', coqueiro: 'coqueiro', mangueira: 'arvorezinha', goiabeira: 'arvorezinha' };
+  pimentao: 'arbusto', abacaxi: 'espada', mamao: 'mamao', limao: 'arvorezinha', cafe: 'cafe', conde: 'arvorezinha', maracuja: 'trepadeira', algodao: 'algodao' };
 function drawBroto(x, y, s, crop, stage, sway) {
   const g = stage === 2 ? 1 : 0.6, tipo = BROTO[crop.id] || 'arbusto', lw = w => { ctx.lineWidth = w * s; ctx.lineCap = 'round'; };
   const haste = (h, cor = '#3a8a2c', w = 1.3) => { ctx.strokeStyle = cor; lw(w); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + sway * 6 * s, y - h * s); ctx.stroke(); return { x: x + sway * 6 * s, y: y - h * s }; };
@@ -2780,77 +2763,6 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
   }
 }
 
-// Árvores frutíferas (uma por canteiro). stage: 0 muda, 1-2 crescendo, 3 adulta, 4 com frutas.
-function drawFruitTree(x, y, s, crop, stage, t) {
-  const sway = Math.sin(t / 900 + x * 0.03) * 0.04;
-  ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(x, y, 16 * s, 5 * s, 0, 0, 7); ctx.fill();
-  if (stage === 0) {
-    line({ x, y }, { x, y: y - 10 * s }, '#7a5a3a', 1.6 * s);
-    leaf(x, y - 9 * s, 8 * s, 3 * s, -0.8 + sway, '#6cc24a'); leaf(x, y - 9 * s, 8 * s, 3 * s, 0.8 + sway, '#4fa83a');
-    return;
-  }
-  const grow = stage === 1 ? 0.45 : stage === 2 ? 0.7 : 1, ripeNow = stage === 4;
-  const tipo = crop.tipo;
-  if (tipo === 'palmeira') {
-    const h = 44 * s * grow, top = { x: x + 5 * s * grow, y: y - h };
-    ctx.strokeStyle = '#9a7a52'; ctx.lineWidth = 4.5 * s * grow; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - 3 * s, y - h * 0.5, top.x, top.y); ctx.stroke();
-    ctx.strokeStyle = 'rgba(90,60,30,.35)'; ctx.lineWidth = 1;
-    for (let k = 1; k < 7; k++) { const q = y - h * k / 7; ctx.beginPath(); ctx.moveTo(x - 2.5 * s * grow + (top.x - x) * k / 7, q); ctx.lineTo(x + 2.5 * s * grow + (top.x - x) * k / 7, q); ctx.stroke(); }
-    for (const a of [-2.7, -2.1, -1.5, -0.9, -0.35, 0.3]) {
-      ctx.save(); ctx.translate(top.x, top.y); ctx.rotate(a + Math.PI / 2 + sway);
-      ctx.fillStyle = a < -1.2 ? '#4fa83a' : '#3a8a2c';
-      ctx.beginPath(); ctx.ellipse(0, -13 * s * grow, 3.2 * s * grow, 13 * s * grow, 0, 0, 7); ctx.fill();
-      ctx.restore();
-    }
-    if (ripeNow) { ctx.fillStyle = crop.cor; for (const [dx, dy] of [[-3, 3], [2, 4], [-0.5, 6]]) { ctx.beginPath(); ctx.arc(top.x + dx * s, top.y + dy * s, 2.8 * s, 0, 7); ctx.fill(); } }
-    ctx.lineCap = 'butt';
-    return;
-  }
-  if (tipo === 'bananeira') {
-    const h = 26 * s * grow;
-    ctx.fillStyle = '#7f9a4a'; ctx.fillRect(x - 3 * s * grow, y - h, 6 * s * grow, h);
-    for (const [a, len] of [[-1.3, 1], [-0.6, 1.1], [0.1, 1], [0.8, 1.1], [1.4, 0.9]]) {
-      ctx.save(); ctx.translate(x, y - h); ctx.rotate(a + sway);
-      ctx.fillStyle = a > 0 ? '#5cb04a' : '#4a9a3a';
-      ctx.beginPath(); ctx.ellipse(0, -11 * s * grow * len, 5.5 * s * grow, 12 * s * grow * len, 0, 0, 7); ctx.fill();
-      ctx.strokeStyle = 'rgba(30,80,20,.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -22 * s * grow * len); ctx.stroke();
-      ctx.restore();
-    }
-    if (ripeNow) {
-      ctx.strokeStyle = crop.cor; ctx.lineWidth = 2.6 * s; ctx.lineCap = 'round';
-      for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(x + 4 * s, y - h + 5 * s + k * 2.2 * s, 4 * s, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
-      ctx.lineCap = 'butt';
-    }
-    return;
-  }
-  if (tipo === 'videira') {
-    const h = 30 * s;
-    ctx.fillStyle = '#8a5a33';
-    ctx.fillRect(x - 13 * s, y - h, 2.4 * s, h); ctx.fillRect(x + 11 * s, y - h, 2.4 * s, h);
-    ctx.fillRect(x - 14 * s, y - h, 28 * s, 2.2 * s);
-    ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 1.6 * s;
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - 4 * s, y - h * 0.5, x, y - h * grow); ctx.stroke();
-    const n = Math.round(6 * grow);
-    for (let k = 0; k < n; k++) { const lx = x - 12 * s + k * 24 * s / Math.max(1, n - 1); leaf(lx, y - h + 2 * s, 7 * s, 3.5 * s, (k % 2 ? 0.6 : -0.6) + Math.PI + sway, k % 2 ? '#4fa83a' : '#3a8a2c'); }
-    if (ripeNow) for (const bx of [-7, 1, 8]) {
-      ctx.fillStyle = crop.cor;
-      for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, 2.2], [-1.6, 4.2], [1.6, 4.2], [0, 6.2]]) { ctx.beginPath(); ctx.arc(x + bx * s + dx * s * 0.9, y - h + 6 * s + dy * s, 1.7 * s, 0, 7); ctx.fill(); }
-    }
-    return;
-  }
-  // árvore frutífera comum (maçã, laranja, manga, goiaba)
-  const th = 18 * s * grow, R = 15 * s * grow;
-  ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - 2.5 * s * grow, y - th, 5 * s * grow, th);
-  const cx = x + sway * 20 * s, cy = y - th - R * 0.7;
-  ctx.fillStyle = '#3a8a2c'; ctx.beginPath(); ctx.arc(cx - R * 0.6, cy + R * 0.25, R * 0.75, 0, 7); ctx.arc(cx + R * 0.6, cy + R * 0.25, R * 0.75, 0, 7); ctx.fill();
-  ctx.fillStyle = '#4fa83a'; ctx.beginPath(); ctx.arc(cx, cy - R * 0.2, R, 0, 7); ctx.fill();
-  ctx.fillStyle = '#6cc24a'; ctx.beginPath(); ctx.arc(cx - R * 0.35, cy - R * 0.55, R * 0.4, 0, 7); ctx.fill();
-  if (ripeNow || stage === 3) {
-    const spots = [[-0.55, 0.1], [0.4, -0.35], [0.6, 0.35], [-0.2, -0.65], [0.05, 0.4], [-0.75, -0.3]];
-    spots.forEach(([dx, dy], k) => ball(cx + dx * R, cy + dy * R, (ripeNow ? 2.8 : 1.8) * s, ripeNow ? (k % 2 ? crop.cor2 : crop.cor) : '#9bc36a'));
-  }
-}
 
 function drawWeed(x, y, s) {
   ctx.strokeStyle = '#2d5e1a'; ctx.lineWidth = 1.4 * s; ctx.lineCap = 'round';
@@ -3330,15 +3242,6 @@ function drawPlot(i, p, t, home) {
     const crop = CROP[p.c];
     for (let k = 0; k < p.w; k++) { const [u, v] = WEED_SPOTS[k]; const q = iso(c + u, r + v); drawWeed(q.x, q.y, W / 100); }
     const st = p.s === 'growing' ? stageOf(p) : 4;
-    if (crop && crop.arvore && crop.tipo !== 'moita' && p.s === 'growing') {
-      const q = iso(c + 0.5, r + 0.58);
-      if (p.ouro && !p.podre) goldGlow(c, r, t, st);
-      drawFruitTree(q.x, q.y, W / 100 * 1.05, crop, p.podre ? 2 : st, t);
-      if (p.podre) drawRot(c, r, t);
-      if (p.ouro) goldSparkle(c, r, t, st);
-      for (let k = 0; k < p.b; k++) { const qb = iso(c + 0.3 + k * 0.15, r + 0.75); drawBug(qb.x, qb.y, W / 100, t, k + i); }
-      return;
-    }
     const big = crop && crop.tipo === 'chao' && st >= 3;
     const s = W / 100 * (big ? 1.25 : 0.72) * (st === 0 ? 1.2 : 1);
     if (p.ouro && p.s === 'growing') goldGlow(c, r, t, st);
@@ -3401,7 +3304,6 @@ function goldSparkle(c, r, t, st) {
 function plotBubble(p, home) {
   if (p.s === 'withered') return home ? 'hoe' : null;
   if (p.s !== 'growing') return null;
-  if (p.poda) return home ? 'poda' : null;
   if (p.podre) return 'podre';
   if (p.b) return 'pest';
   if (p.w) return 'weed';
@@ -3962,7 +3864,6 @@ function makeIcon(key, fn) {
 }
 const cropIcon = id => makeIcon('c:' + id, () => {
   const crop = CROP[id];
-  if (crop.arvore && crop.tipo !== 'moita') { drawFruitTree(48, 90, crop.tipo === 'palmeira' ? 1.35 : crop.tipo === 'arvore' ? 1.45 : 1.6, crop, 4, 0); return; }
   ctx.fillStyle = '#8b5a33'; ctx.beginPath(); ctx.ellipse(48, 76, 34, 13, 0, 0, 7); ctx.fill();
   ctx.fillStyle = 'rgba(60,34,14,.35)'; ctx.beginPath(); ctx.ellipse(48, 78, 26, 8, 0, 0, 7); ctx.fill();
   const sc = { chao: 2.3, alto: 1.6, grao: 2.2, abacaxi: 2.6, folha: 2.8 }[crop.tipo] || 2.4;
@@ -4315,29 +4216,23 @@ function renderPane() {
   else if (tab === 'missoes') html = missoesHTML();
   else if (tab === 'fabrica') html = fabricaHTML();
   else if (tab === 'loja') {
-    const segs = [['sementes', 'Sementes'], ['mudas', 'Horta'], ['pomar', 'Pomar'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['enfeites', 'Enfeites'], ['temas', 'Temas'], ['trevo', '🍀 Trevo']];
+    const segs = [['sementes', 'Sementes'], ['pomar', 'Pomar'], ['adubo', 'Itens'], ['animais', 'Animais'], ['abrigos', 'Abrigos'], ['caes', 'Cães'], ['decor', 'Casa'], ['enfeites', 'Enfeites'], ['temas', 'Temas'], ['trevo', '🍀 Trevo']];
     html += `<div class="seg small" role="tablist">${segs.map(([id, n]) => `<button type="button" role="tab" data-seg="${id}" aria-selected="${shopSeg === id}">${n}</button>`).join('')}</div>`;
-    if (shopSeg === 'sementes' || shopSeg === 'mudas') {
-      const trees = shopSeg === 'mudas';
-      html += trees
-        ? `<p class="hint">Árvores ocupam um canteiro e ficam lá: a primeira colheita demora mais, depois repete na metade do tempo. Depois de ${TREE_HARVESTS} colheitas pedem uma poda.</p>`
-        : `<p class="hint">Escolha uma semente e clique na terra arada para plantar. Cada semente vale para um canteiro e é cobrada no plantio.</p>`;
-      const list = CROPS.filter(c => !!c.arvore === trees);
-      const shown = list.filter(c => c.nivel <= state.level);
-      const upcoming = list.filter(c => c.nivel > state.level);
+    if (shopSeg === 'sementes') {
+      html += `<p class="hint">Escolha uma semente e clique na terra arada para plantar. Cada semente vale para um canteiro e é cobrada no plantio.</p>`;
+      const shown = CROPS.filter(c => c.nivel <= state.level);
+      const upcoming = CROPS.filter(c => c.nivel > state.level);
       for (const c of [...shown, ...upcoming.slice(0, 2)]) {
         const locked = c.nivel > state.level, sel = state.seed === c.id && state.tool === 'seed';
         const total = c.rend * c.preco;
-        const meta = trees
-          ? `Muda ${c.custo.toLocaleString('pt-BR')} · 1ª colheita em ${fmt(c.tempo)}, depois a cada ${fmt(c.tempo2)}<br>${faixa(c)} ${c.prodNome.toLowerCase()} × ${c.preco} (média ${total}) por colheita · ${c.xp} XP`
-          : `Semente ${c.custo.toLocaleString('pt-BR')} · ${fmt(c.tempo)}<br>rende ${faixa(c)} × ${c.preco} · lucro médio ${(total - c.custo).toLocaleString('pt-BR')} · ${c.xp} XP`;
+        const meta = `Semente ${c.custo.toLocaleString('pt-BR')} · ${fmt(c.tempo)}<br>rende ${faixa(c)} × ${c.preco} · lucro médio ${(total - c.custo).toLocaleString('pt-BR')} · ${c.xp} XP`;
         html += `<div class="row ${locked ? 'locked' : ''} ${sel ? 'sel' : ''}">
           <img alt="" src="${cropIcon(c.id)}">
           <div><div class="name">${c.nome}${daEstacao(c.id) ? ` <span class="tag">${estacao().icone} da estação +${Math.round(ESTACAO_BONUS * 100)}%</span>` : ''}</div><div class="meta">${meta}</div></div>
           ${locked ? `<button class="btn" disabled>Nível ${c.nivel}</button>` : `<button class="btn ${sel ? 'gold' : ''}" data-seed="${c.id}" aria-label="${sel ? 'Na mão' : `Escolher ${c.nome} por ${c.custo} moedas`}">${sel ? 'Na mão' : moeda(c.custo)}</button>`}
         </div>`;
       }
-      if (upcoming.length > 2) html += `<p class="hint">Mais ${upcoming.length - 2} ${trees ? 'árvores' : 'plantações'} liberam nos próximos níveis, até o nível ${upcoming[upcoming.length - 1].nivel}.</p>`;
+      if (upcoming.length > 2) html += `<p class="hint">Mais ${upcoming.length - 2} plantações liberam nos próximos níveis, até o nível ${upcoming[upcoming.length - 1].nivel}.</p>`;
     } else if (shopSeg === 'adubo') {
       html += `<div class="row ${state.armadilha ? 'sel' : state.level < ARMADILHA.nivel ? 'locked' : ''}"><div class="avatar" style="background:#5a646c;font-size:24px">🪤</div>
         <div><div class="name">Armadilha de pragas</div><div class="meta">Fica perto da plantação e pega o rato ou javali que invadir (um por vez, e dá a recompensa). Depois recarrega em ${fmt(ARMADILHA.recarga / 1000)}.${state.armadilha ? ` ${armadilhaPronta() ? '<b>Carregada.</b>' : `Pronta em ${fmt((state.armadilha.pronta - Date.now()) / 1000)}.`}` : ''}</div></div>
@@ -4778,16 +4673,14 @@ function tipPlot(i) {
   if (p.s === 'withered') return '<b>Planta seca</b><br>Use a Mão ou o rastelo para limpar.';
   const crop = CROP[p.c], st = stageOf(p), T = phaseTempo(p), k = Math.min(1, p.g / T);
   if (p.podre) return `<b>${crop.nome} podre</b><br>Ficou mais de 24h sem colher.<br>${home ? `Clique para usar uma poção (você tem ${state.pocao || 0}) ou peça ajuda a um amigo.` : 'Clique para salvar a planta do seu amigo!'}`;
-  if (p.poda) return `<b>${crop.nome}</b><br>Precisa de poda para voltar a produzir.<br>${home ? `Clique com a Mão para podar (${crop.poda} moedas).` : ''}`;
-  let h = `<b>${crop.nome}</b> · ${crop.arvore && p.adult ? (st === 4 ? 'Com frutas' : 'Dando frutas') : STAGE_NAMES[st]}`;
+  let h = `<b>${crop.nome}</b> · ${STAGE_NAMES[st]}`;
   if (st < 4 || k < 1) h += `<br>Fica pronto em ${fmt((T - p.g) / (p.dry ? 0.7 : 1) / acelera(S(), crop.prod))}`;
   else h += !home && (p.stolen || state.log[visitKey(p.id)]) ? '<br>Você já pegou daqui.' : `<br>Pronto para colher! Apodrece em ${fmt(Math.max(60, PODRE_APOS - (p.pronto || 0)))}`;
   h += `<div class="bar"><i style="width:${k * 100}%"></i></div>`;
   const probs = [];
   if (p.w) probs.push(`${p.w} mato`); if (p.b) probs.push(`${p.b} praga${p.b > 1 ? 's' : ''}`); if (p.dry) probs.push('terra seca');
   if (probs.length) h += `<div class="warn">${probs.join(' · ')}</div>`;
-  if (crop.arvore) h += `Colheita ${p.h + 1} de ${TREE_HARVESTS} até a poda`;
-  if (p.fert) h += `${crop.arvore ? ' · ' : ''}adubada`;
+  if (p.fert) h += 'adubada';
   if (home) {
     const [lo, hi] = yieldRange(crop), d = Math.round(p.dmg), a = Math.max(1, lo - d), z = Math.max(1, hi - d);
     h += `<br>Vai render ${a === z ? a : `${a} a ${z}`} ${crop.prodNome.toLowerCase()}${d ? ` (as pragas comeram ${d})` : ''}`;
@@ -5123,7 +5016,7 @@ function agendaPush() {
   const agora = Date.now(), lista = [];
   const add = (t, tipo, txt) => { if (t > agora + 60e3 && t < agora + 8 * DAY) lista.push({ t: Math.round(t), tipo, txt }); };
   for (const p of state.plots) {
-    if (p.s !== 'growing' || p.poda || p.podre || !CROP[p.c]) continue;
+    if (p.s !== 'growing' || p.podre || !CROP[p.c]) continue;
     const T = phaseTempo(p), crop = CROP[p.c];
     if (p.g < T) add(agora + (T - p.g) / (p.dry ? 0.7 : 1) / acelera(state, crop.prod) * 1000, 'colheita', `${crop.nome} pronto para colher!`);
     else add(agora + (PODRE_APOS - (p.pronto || 0) - 2 * HOUR) * 1000, 'colheita', `⚠️ ${crop.nome} vai estragar em 2 horas! Colha ou use uma poção.`);
@@ -7410,7 +7303,7 @@ function vilaDe(npc) {
 const receitaPossivel = r => Object.keys(r.in).every(id => !PEIXE[id] || (state.col && state.col[id] > 0));
 function itensDaVila() {
   const lista = [];
-  for (const c of CROPS) if (c.nivel <= state.level && !c.arvore) lista.push({ id: c.prod, min: 4, max: 12 });
+  for (const c of CROPS) if (c.nivel <= state.level) lista.push({ id: c.prod, min: 4, max: 12 });
   const temAnimal = new Set(state.animals.map(a => ANIMAL[a.k].prod).filter(Boolean));
   for (const p of PRODUCTS) if (temAnimal.has(p.id)) lista.push({ id: p.id, min: 2, max: 5 });
   for (const r of RECEITAS) if (r.nivel <= state.level && state.level >= r.nivel + 2 && receitaPossivel(r)) lista.push({ id: r.id, min: 1, max: 2 });
@@ -7940,11 +7833,18 @@ const ENFEITES = [
   { id: 'framboeseira',  nome: 'Framboeseira',   fruteira: 'arbusto', fruta: 'framboesa',  nivel: 3,  custo: 90,   tempo: 6 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#5a9a3a' },
   { id: 'pitangueira',   nome: 'Pitangueira',    fruteira: 'arvore',  fruta: 'pitanga',    nivel: 4,  custo: 80,   tempo: 6 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#4f9a2f' },
   { id: 'amoreira',      nome: 'Amoreira',       fruteira: 'arbusto', fruta: 'amora',      nivel: 5,  custo: 130,  tempo: 7 * 3600,  rende: 4, colheitas: 3, conforto: 1, copa: '#3f8a2a' },
+  { id: 'morangueiro',   nome: 'Morangueiro',    fruteira: 'arbusto', fruta: 'morango',    nivel: 7,  custo: 150,  tempo: 3 * 3600,  rende: 4, colheitas: 3, conforto: 1, copa: '#3f8a2a' },
   { id: 'maracujazeiro', nome: 'Maracujazeiro',  fruteira: 'arbusto', fruta: 'maracuja',   nivel: 8,  custo: 150,  tempo: 8 * 3600,  rende: 3, colheitas: 3, conforto: 1, copa: '#5aa03a' },
   { id: 'jabuticabeira', nome: 'Jabuticabeira',  fruteira: 'arvore',  fruta: 'jabuticaba', nivel: 7,  custo: 230,  tempo: 10 * 3600, rende: 6, colheitas: 3, conforto: 2, copa: '#3f7a2a' },
+  { id: 'videira',       nome: 'Videira',        fruteira: 'arbusto', fruta: 'uva',        nivel: 15, custo: 320,  tempo: 8 * 3600,  rende: 4, colheitas: 3, conforto: 1, copa: '#6b3a8a' },
   { id: 'mangueira',     nome: 'Mangueira',      fruteira: 'arvore',  fruta: 'manga',      nivel: 10, custo: 260,  tempo: 12 * 3600, rende: 4, colheitas: 3, conforto: 2, copa: '#2f6a22' },
   { id: 'cajueiro',      nome: 'Cajueiro',       fruteira: 'arvore',  fruta: 'caju',       nivel: 12, custo: 240,  tempo: 12 * 3600, rende: 4, colheitas: 3, conforto: 2, copa: '#4f8a2a' },
+  { id: 'macieira',      nome: 'Macieira',       fruteira: 'arvore',  fruta: 'maca',       nivel: 18, custo: 380,  tempo: 12 * 3600, rende: 5, colheitas: 3, conforto: 2, copa: '#3a8a2c' },
+  { id: 'laranjeira',    nome: 'Laranjeira',     fruteira: 'arvore',  fruta: 'laranja',    nivel: 19, custo: 400,  tempo: 14 * 3600, rende: 5, colheitas: 3, conforto: 2, copa: '#3a8a2c' },
   { id: 'pequizeiro',    nome: 'Pequizeiro',     fruteira: 'arvore',  fruta: 'pequi',      nivel: 15, custo: 300,  tempo: 16 * 3600, rende: 3, colheitas: 3, conforto: 2, copa: '#5a8a3a' },
+  { id: 'bananeira',     nome: 'Bananeira',      fruteira: 'arvore',  fruta: 'banana',     nivel: 22, custo: 460,  tempo: 9 * 3600,  rende: 6, colheitas: 3, conforto: 2, copa: '#4a9a3a' },
+  { id: 'coqueiro',      nome: 'Coqueiro',       fruteira: 'arvore',  fruta: 'coco',       nivel: 24, custo: 500,  tempo: 11 * 3600, rende: 3, colheitas: 3, conforto: 2, copa: '#3a8a2c' },
+  { id: 'goiabeira',     nome: 'Goiabeira',      fruteira: 'arvore',  fruta: 'goiaba',     nivel: 28, custo: 580,  tempo: 15 * 3600, rende: 5, colheitas: 3, conforto: 2, copa: '#5a9a3a' },
   { id: 'arcoflores',   nome: 'Arco de flores',            especial: true, trevo: true, conforto: 2 },
   { id: 'ipe',          nome: 'Ipê-amarelo',               especial: true, trevo: true, conforto: 3 },
   { id: 'fogueira',     nome: 'Fogueira de São João',      especial: true, trevo: true, conforto: 2 },
@@ -8743,6 +8643,16 @@ function drawFruta(id, x, y, s) {
     bola(0, 1, 4.6, f.cor); ctx.strokeStyle = 'rgba(120,20,10,.45)'; ctx.lineWidth = 0.6 * s;
     for (const a of [-0.9, -0.3, 0.3, 0.9]) { ctx.beginPath(); ctx.ellipse(x + a * 3 * s, y + 1 * s, 1.2 * s, 4.2 * s, 0, 0, 7); ctx.stroke(); }
   }
+  else if (id === 'morango') {
+    ctx.fillStyle = f.cor; ctx.beginPath(); ctx.moveTo(x, y - 3 * s); ctx.quadraticCurveTo(x + 5 * s, y, x, y + 6 * s); ctx.quadraticCurveTo(x - 5 * s, y, x, y - 3 * s); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f2d84a'; for (const [dx, dy] of [[-1.8, 0], [1.8, 0.5], [-1.2, 3], [1.2, 3.2], [0, 1.6]]) { ctx.beginPath(); ctx.ellipse(x + dx * s, y + dy * s, 0.5 * s, 0.8 * s, 0, 0, 7); ctx.fill(); }
+  }
+  else if (id === 'uva') for (const [dx, dy] of [[-2, -2], [2, -2], [0, -0.5], [-2.6, 1.5], [2.6, 1.5], [0, 2.5], [-1, 4.5], [1, 4.5]]) bola(dx, dy, 1.7, f.cor);
+  else if (id === 'banana') {
+    ctx.strokeStyle = f.cor; ctx.lineWidth = 3.2 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x + 2 * s, y + 8 * s, 7 * s, 3.7, 5.3); ctx.stroke(); ctx.lineCap = 'butt';
+  }
+  else if (id === 'coco') { bola(0, 1.5, 5.5, '#5a4230'); ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 0.5 * s; for (const a of [0, 1.2, 2.4, 3.6, 4.8]) { ctx.beginPath(); ctx.moveTo(x, y + 1.5 * s); ctx.lineTo(x + Math.cos(a) * 5 * s, y + 1.5 * s + Math.sin(a) * 5 * s); ctx.stroke(); } }
   else for (const [dx, dy] of [[-2.5, 2], [2.5, 2], [0, -1.5]]) bola(dx, dy, id === 'jabuticaba' ? 2.8 : 2.5, f.cor);
   ctx.fillStyle = '#4f9a2f'; ctx.beginPath(); ctx.ellipse(x + 2 * s, y - 5 * s, 2.6 * s, 1.2 * s, -0.5, 0, 7); ctx.fill();
 }
@@ -8813,6 +8723,47 @@ function drawFruteira(o, x, y, s, t, home) {
       ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 0.8 * s; for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(x + (-3 + k) * s, y - k * 5 * s); ctx.lineTo(x + (-1 + k) * s, y - (k * 5 + 3) * s); ctx.stroke(); }
       if (!seca) for (const [cx, cy, r] of [[-18, -40, 9], [-6, -36, 7], [4, -44, 10], [20, -44, 9], [12, -34, 6]]) bola(cx + sway / s, cy, r, '#5a8a3a');
       if (pronto) for (const [cx, cy] of [[-16, -32], [2, -36], [18, -36]]) fruta(cx, cy + 2, 0.5);
+      break;
+    }
+    case 'morangueiro': { // moita rasteira de folhas em roseta, morangos entre as folhas
+      for (const [cx, cy, a] of [[-9, -6, -0.6], [8, -8, 0.6], [-2, -12, 0], [10, -3, 1.1], [-11, -1, -1.1], [1, -4, 0.2]]) leaf(x + cx * s, y + cy * s, 8 * s, 5 * s, a, seca ? cinza : '#4f9434');
+      if (pronto) for (const [cx, cy] of [[-8, -3], [7, -5], [0, -8], [-3, 1], [4, 0]]) fruta(cx, cy, 0.4);
+      break;
+    }
+    case 'videira': { // espaldeira baixa com folhas largas e cachos de uva pendurados
+      tronco([[-16, 0], [-16, -22]], 2.2, '#8a5a33'); tronco([[16, 0], [16, -22]], 2.2, '#8a5a33');
+      ctx.strokeStyle = '#8a8a8a'; ctx.lineWidth = 0.8 * s; ctx.beginPath(); ctx.moveTo(x - 16 * s, y - 22 * s); ctx.lineTo(x + 16 * s, y - 22 * s); ctx.stroke();
+      tronco([[0, 0], [-4, -10], [0, -20], [sway / s, -22]], 1.6, seca ? '#8a7a5a' : '#4f7a2a');
+      if (!seca) for (const [lx, ly, a] of [[-12, -22, -0.5], [-3, -24, 0.2], [7, -23, -0.2], [14, -21, 0.5], [-8, -14, -0.8], [4, -12, 0.6]]) leaf(x + lx * s, y + ly * s, 7.5 * s, 4 * s, a, '#4f9a3a');
+      if (pronto) for (const cx of [-9, 2, 12]) fruta(cx + sway / s, -14, 0.55);
+      break;
+    }
+    case 'macieira': case 'laranjeira': case 'goiabeira': { // árvore de copa redonda e cheia, tronco curto
+      tronco([[0, 0], [0, -20]], 5.5, galho); tronco([[0, -16], [-8, -26]], 2.4, galho); tronco([[0, -18], [9, -27]], 2.4, galho);
+      if (!seca) { ctx.fillStyle = e.copa; ctx.beginPath(); ctx.ellipse(x + sway, y - 34 * s, 24 * s, 17 * s, 0, 0, 7); ctx.fill(); bola(-10, -38, 10, e.copa); bola(9, -39, 11, e.copa); bola(0, -46, 9, '#4fa83a'); }
+      if (pronto) for (const [cx, cy] of [[-15, -28], [-4, -34], [7, -32], [15, -26], [0, -22]]) fruta(cx, cy + 2, 0.5);
+      break;
+    }
+    case 'bananeira': { // pseudocaule com folhas grandes tipo pá, cacho de bananas
+      tronco([[0, 0], [0, -30]], 5, seca ? galho : '#7f9a4a');
+      if (!seca) for (const [a, len] of [[-1.3, 1], [-0.6, 1.15], [0.15, 1], [0.85, 1.15], [1.4, 0.9]]) {
+        const tx = x, ty = y - 30 * s;
+        ctx.save(); ctx.translate(tx, ty); ctx.rotate(a + sway / (18 * s));
+        ctx.fillStyle = a > 0 ? '#5cb04a' : '#4a9a3a'; ctx.beginPath(); ctx.ellipse(0, -12 * s * len, 6.5 * s, 14 * s * len, 0, 0, 7); ctx.fill();
+        ctx.restore();
+      }
+      if (pronto) for (const [cx, cy] of [[3, -18], [5, -14], [3, -10]]) fruta(cx, cy, 0.45);
+      break;
+    }
+    case 'coqueiro': { // tronco alto e fino inclinado, copa de palmas no topo, cocos no cacho
+      const topx = 8, topy = -46;
+      tronco([[0, 0], [4, -22], [topx, topy]], 3.4, seca ? galho : '#9a7a52');
+      if (!seca) for (const a of [-2.6, -2, -1.4, -0.8, -0.2, 0.4]) {
+        ctx.save(); ctx.translate(x + topx * s, y + topy * s); ctx.rotate(a + sway / (26 * s));
+        ctx.fillStyle = a < -1.4 ? '#4fa83a' : '#3a8a2c'; ctx.beginPath(); ctx.ellipse(0, -13 * s, 3.4 * s, 15 * s, 0, 0, 7); ctx.fill();
+        ctx.restore();
+      }
+      if (pronto) for (const [cx, cy] of [[topx - 4, topy + 6], [topx + 3, topy + 7], [topx - 1, topy + 9]]) fruta(cx, cy, 0.5);
       break;
     }
     default: {
@@ -9437,7 +9388,7 @@ function invasaoTick(forca) {
     if (agora - (state.invasaoUlt || 0) < INVASAO_CADA) return;
     if (Math.random() > 1 / 450) return; // passou das 12h: acontece num momento qualquer (≈ 15 min jogando, em média)
   }
-  const alvos = state.plots.map((p, i) => i).filter(i => { const p = state.plots[i]; return p.s === 'growing' && !p.podre && !p.poda; });
+  const alvos = state.plots.map((p, i) => i).filter(i => { const p = state.plots[i]; return p.s === 'growing' && !p.podre; });
   if (!alvos.length) return;
   state.invasaoUlt = agora; save();
   const tipo = state.level >= 12 && Math.random() < 0.35 ? 'javali' : 'rato', i = alvos[Math.floor(Math.random() * alvos.length)];
