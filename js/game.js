@@ -984,6 +984,7 @@ const NOVIDADES = [
   { v: 138, txt: 'Corrigido: no celular, um objeto movido bem pra longe (como a casa) podia ficar cortado na borda da tela, mesmo aparecendo certinho no computador. Agora o enquadramento sempre encolhe a roça o quanto for preciso pra tudo caber.' },
   { v: 139, txt: 'Corrigido: a correção anterior não estava encolhendo o bastante quando um objeto ficava bem longe da grade (o cálculo travava num zoom mínimo que ainda cortava). Agora encolhe de verdade até tudo caber, com casa movida pra direita, pro celular em pé ou não.' },
   { v: 140, txt: 'O selo do botão Negócios agora também avisa quando dá pra fazer algo na fábrica (espaço livre numa máquina + ingrediente na mão), não só quando algo já terminou de produzir ou tem pedido do caminhão pra entregar.' },
+  { v: 141, txt: 'Corrigido: a carne de javali, pega na caçada, entrava no celeiro mas não aparecia na lista (só contava no número do selo). Agora aparece certinho, com preço e tudo.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4450,7 +4451,7 @@ function renderPane() {
     }
   } else if (tab === 'celeiro') {
     html += chaveAviso('celeiro', 'Mostrar a quantidade de itens no botão do Celeiro');
-    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PEIXES.map(p => PRODUCT[p.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
+    const items = [...Object.values(PRODUCE), ...PRODUCTS, PRODUCT.carnejavali, ...PEIXES.map(p => PRODUCT[p.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
     let total = 0; for (const it of items) total += state.barn[it.id] * it.preco;
     html += `<h3>Celeiro</h3>`;
     if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha na roça e recolha ovos, leite, lã e trufas dos animais.</div>`;
