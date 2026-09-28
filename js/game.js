@@ -978,6 +978,7 @@ const NOVIDADES = [
   { v: 132, txt: 'No modo Mover, chegou o botão 📦 Guardar: dá para mandar o item direto pro inventário sem precisar cancelar e abrir o menu de novo.' },
   { v: 133, txt: 'Corrigido: no celular, rolar a tela pra cima/baixo em cima do lago da pescaria às vezes travava. Agora só trava o toque durante a fisgada e a briga (pra puxar rápido); no resto, dá pra rolar normalmente.' },
   { v: 134, txt: 'Corrigido: a tarrafa tinha parado de funcionar pra quem já jogava antes da última atualização. Agora seca certinho, separada em cada pesqueiro.' },
+  { v: 135, txt: 'Corrigido: o avisinho de peixe 🐟 em cima do pesqueiro só aparecia quando o ponto tinha acabado de descansar. Agora aparece sempre que der pra pescar de vara ali, mesmo que você ainda não tenha usado nenhuma pescaria.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -6911,8 +6912,8 @@ const VARA_POR_VEZ = 3;
 const restamVara = id => PONTO[id] && PONTO[id].solte ? Infinity : faltaPonto(id) ? 0 : Math.max(0, VARA_POR_VEZ - (pontosDe().usos[id] || 0));
 const tarrafaObj = () => (state.tarrafaEm && typeof state.tarrafaEm === 'object' ? state.tarrafaEm : (state.tarrafaEm = {}));
 const faltaTarrafa = (id = pontoSel()) => Math.max(0, (tarrafaObj()[id] || 0) - Date.now());
-// Algum ponto seu descansou e está pronto de novo (mostra um brilho no pesqueiro até você pescar lá).
-const pescaPronta = () => state && PONTOS.some(p => !p.solte && temPonto(p.id) && pontosDe().prox[p.id] && !faltaPonto(p.id) && !(pontosDe().usos[p.id] > 0));
+// Algum ponto seu tem pescaria de vara disponível agora (descansado ou nunca usado): mostra um brilho no pesqueiro.
+const pescaPronta = () => state && PONTOS.some(p => !p.solte && temPonto(p.id) && !faltaPonto(p.id) && restamVara(p.id) > 0);
 function comprarPonto(id) {
   const d = PONTO[id]; if (!d || temPonto(id)) return;
   if (state.level < d.nivel) return toast(`${d.emoji} ${d.nome}: libera no nível ${d.nivel}${d.custo ? ` e custa ${d.custo.toLocaleString('pt-BR')} moedas` : ' (de graça)'}.`);
