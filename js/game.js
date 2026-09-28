@@ -995,6 +995,7 @@ const NOVIDADES = [
   { v: 149, txt: 'Corrigido: com um tema de casa ativo, todos os abrigos do rancho ficavam da mesma cor. Agora cada bicho mantém a cor e o jeitão do seu abrigo. E o porco não tem mais casinha: só um lamaçal bem grande pra ele se lambuzar, com cocho do lado.' },
   { v: 150, txt: 'Foto de perfil com cara nova: 14 selos coloridos pra escolher (8 de cara, 6 liberando jogando), bem mais bonitos que antes. Toque na sua foto (lá em cima) pra trocar na hora. E chegou a aba Moldura da foto, com a moldura dourada de pioneiro pra quem já tinha ganhado.' },
   { v: 151, txt: 'Trocado o selo do Chupa-cabra: estava parecendo um demônio, agora é um alien 👽.' },
+  { v: 152, txt: 'O selo de Alienígena 👽 virou opção separada, e o Chupa-cabra agora é um morcego 🦇. Chegaram 3 molduras grátis pra foto (Campo, Céu e Pôr do sol) além da dourada de pioneiro. E corrigido: quem já era pioneiro de antes agora recebe a moldura dourada.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4134,7 +4135,8 @@ const FOTOS_PERFIL = [
   { id: 'abelha',     nome: 'Abelha',      emoji: '🐝', bg: ['#fff3b0', '#2a2410'], requer: () => !!(state.abrigos && state.abrigos.apiario), dica: 'Construa o Apiário' },
   { id: 'estrela',    nome: 'Estrela',     emoji: '⭐', bg: ['#e6dcff', '#4a2f8a'], requer: () => state.level >= 20, dica: 'Chegue ao nível 20' },
   { id: 'trevo',      nome: 'Trevo',       emoji: '🍀', bg: ['#d4f5c0', '#256a20'], requer: () => ((state.trevos && state.trevos.saldo) || 0) >= 20, dica: 'Tenha 20 trevos 🍀' },
-  { id: 'chupacabra', nome: 'Chupa-cabra', emoji: '👽', bg: ['#c8b0e6', '#241634'], requer: () => !!(state.caca && state.caca.trofeu), dica: 'Pegue o lendário Chupa-cabra' },
+  { id: 'chupacabra', nome: 'Chupa-cabra', emoji: '🦇', bg: ['#c8b0e6', '#241634'], requer: () => !!(state.caca && state.caca.trofeu), dica: 'Pegue o lendário Chupa-cabra' },
+  { id: 'alien',      nome: 'Alienígena',  emoji: '👽', bg: ['#c0f0d8', '#0f3a2e'] },
 ];
 const FOTO_PERFIL = Object.fromEntries(FOTOS_PERFIL.map(f => [f.id, f]));
 function fotoIconUrl(f) {
@@ -4183,6 +4185,9 @@ function renderFotosCfg() {
 // ---------- Moldura da foto: um anel decorativo ao redor da foto (algumas exclusivas) ----------
 const MOLDURAS = [
   { id: '',         nome: 'Nenhuma' },
+  { id: 'campo',    nome: 'Campo' },
+  { id: 'ceu',      nome: 'Céu' },
+  { id: 'sol',      nome: 'Pôr do sol' },
   { id: 'pioneiro', nome: 'Pioneiro', requer: () => !!(state.molduras && state.molduras.pioneiro), dica: 'Exclusiva de quem jogou no primeiro mês' },
 ];
 const MOLDURA = Object.fromEntries(MOLDURAS.map(m => [m.id, m]));
@@ -10065,7 +10070,17 @@ function obtidoEm(s) {
 }
 const PIONEIRO_ATE = new Date(2026, 9, 31, 23, 59, 59).getTime(); // até 31 de outubro de 2026
 function presentePioneiro() {
-  if (!state || state.pioneiro || Date.now() > PIONEIRO_ATE) return;
+  if (!state) return;
+  // A moldura de pioneiro chegou depois: quem já era pioneiro de antes não tinha ganhado. Dá retroativo.
+  if (state.pioneiro && !(state.molduras && state.molduras.pioneiro)) {
+    state.molduras = state.molduras || {}; state.molduras.pioneiro = true;
+    if (state.molduraSel === undefined) state.molduraSel = 'pioneiro';
+    const msg2 = '🏅 Você ganhou a moldura dourada de pioneiro na sua foto de perfil! Veja (e escolha outra, se quiser) em ⚙️ › Moldura da foto.';
+    addNews(msg2);
+    setTimeout(() => toast(msg2, 'good'), 2500);
+    done();
+  }
+  if (state.pioneiro || Date.now() > PIONEIRO_ATE) return;
   state.pioneiro = Date.now();
   state.enfeites.bandeira = (state.enfeites.bandeira || 0) + 1;
   state.enfeites.bolo = (state.enfeites.bolo || 0) + 1;

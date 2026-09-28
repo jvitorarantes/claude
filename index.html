@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="151">
-<script src="firebase-config.js?v=151"></script>
+<meta name="rf-version" content="152">
+<script src="firebase-config.js?v=152"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -334,8 +334,10 @@
   .row > img, .row .avatar { width: 48px; height: 48px; }
   .row .avatar svg { width: 30px; height: 30px; }
   .row .avatar { border-radius: 12px; object-fit: cover; display: grid; place-items: center; color: #fff; font: 400 24px Chewy, cursive; }
-  .avatar.moldura-pioneiro, .acct img.moldura-pioneiro { box-shadow: 0 0 0 2px #fff3c4, 0 0 0 4px #e0a800; }
-  .avatar-ring.moldura-pioneiro .face { box-shadow: 0 0 0 2px #fff3c4, 0 0 0 4px #e0a800; }
+  .avatar.moldura-pioneiro, .acct img.moldura-pioneiro, .avatar-ring.moldura-pioneiro .face, .moldurabtn.moldura-pioneiro .molduraprev { box-shadow: 0 0 0 2px #fff3c4, 0 0 0 4px #e0a800; }
+  .avatar.moldura-campo, .acct img.moldura-campo, .avatar-ring.moldura-campo .face, .moldurabtn.moldura-campo .molduraprev { box-shadow: 0 0 0 2px #eaffda, 0 0 0 4px #2f8a2f; }
+  .avatar.moldura-ceu, .acct img.moldura-ceu, .avatar-ring.moldura-ceu .face, .moldurabtn.moldura-ceu .molduraprev { box-shadow: 0 0 0 2px #d8f3ff, 0 0 0 4px #1f7ab8; }
+  .avatar.moldura-sol, .acct img.moldura-sol, .avatar-ring.moldura-sol .face, .moldurabtn.moldura-sol .molduraprev { box-shadow: 0 0 0 2px #ffe0c0, 0 0 0 4px #c8622a; }
   .fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px; }
   .fotobtn { display: grid; justify-items: center; gap: 3px; padding: 6px 4px; border-radius: 12px; border: 2px solid var(--wood-3); background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
   .fotobtn img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #fff; }
@@ -343,7 +345,6 @@
   .fotobtn[aria-pressed="true"] { border-color: #e0a800; background: #fff4c8; box-shadow: 0 0 0 2px #f2c14e; }
   .fotobtn.trava { opacity: .7; border-style: dashed; cursor: default; }
   .molduraprev { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(#fff6da, #e8d8b0); display: block; }
-  .moldurabtn.moldura-pioneiro .molduraprev { box-shadow: 0 0 0 2px #fff3c4, 0 0 0 4px #e0a800; }
   .row .name { font-weight: 800; overflow-wrap: anywhere; }
   .row .meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .btn {
@@ -941,8 +942,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=151"></script>
-<script src="js/cloud.js?v=151"></script>
-<script src="js/game.js?v=151"></script>
+<script src="js/audio.js?v=152"></script>
+<script src="js/cloud.js?v=152"></script>
+<script src="js/game.js?v=152"></script>
 </body>
 </html>
