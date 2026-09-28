@@ -170,7 +170,18 @@ const yardOrigemPadrao = id => { const k = ABRIGOS.findIndex(b => b.id === id); 
 function yardOf(id) {
   const custom = isHome() && state.animPos && state.animPos[id];
   const [u0, v0] = custom || yardOrigemPadrao(id);
-  return { u0, v0, u1: u0 + YARD_W, v1: v0 + YARD_D };
+  const rot = !!(isHome() && state.animRot && state.animRot[id]);
+  return { u0, v0, u1: u0 + YARD_W, v1: v0 + YARD_D, rot };
+}
+// Gira o conteúdo do cercado 90° (casinha, cocho etc. mudam de lado) sem mexer no cercado em si
+// (ele é quase quadrado). Troca temporariamente a função iso() por uma que transpõe (u,v) em volta
+// do canto do cercado — tudo que for desenhado com P()/iso() dentro de fn() sai rodado; feito assim
+// (em vez de reescrever cada abrigo) porque cada tipo de casinha tem um jeito de desenhar diferente.
+function comRotacaoAbrigo(y, fn) {
+  if (!y.rot) return fn();
+  const isoAntes = iso;
+  iso = (u, v) => isoAntes(y.u0 + (v - y.v0), y.v0 + (u - y.u0));
+  try { fn(); } finally { iso = isoAntes; }
 }
 const abrigoLv = (s, id) => (s.abrigos && s.abrigos[id]) || 0;
 const livesIn = (s, id) => s.animals.filter(a => inPen(a) && abrigoOf(a.k).id === id);
@@ -1060,6 +1071,7 @@ const NOVIDADES = [
   { v: 164, txt: 'Bloco de água mais barato: agora custa 30 moedas, o mesmo preço da cerca mais em conta.' },
   { v: 165, txt: 'Tirada a Celeste. Os peixinhos do laguinho ficaram maiores e agora nadam de bloco em bloco por todo o laguinho, em vez de pular parados num cantinho só.' },
   { v: 166, txt: 'Área do rancho bem maior pra arrastar os abrigos no Modo Mover, e a câmera agora acompanha se você mandar um bem longe. E não dá mais pra soltar um abrigo em cima do lugar reservado de outro que ainda não foi construído.' },
+  { v: 167, txt: 'Casinhas do rancho: agora dá pra girar (casinha, cocho etc. mudam de lado), segurar em cima abre o menu com a opção Mover, e os bichos vão junto quando você move a casinha deles.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1984,7 +1996,7 @@ const ROOM_AREA = { u0: 1.3, u1: 4.1, v0: 1.2, v1: 4.2 };
 function fixedSpot(a, list) {
   const same = list.filter(x => ANIMAL[x.k].fixo), n = same.indexOf(a);
   if (ANIMAL[a.k].lugar === 'casa') return [4.45, 1.5];
-  const y = yardOf('apiario'), [u, v] = HIVE_SPOTS[n % HIVE_SPOTS.length];
+  const y = yardOf('apiario'), [hu, hv] = HIVE_SPOTS[n % HIVE_SPOTS.length], [u, v] = y.rot ? [hv, hu] : [hu, hv];
   return [y.u0 + u, y.v0 + v];
 }
 function updateWander(list, dt, area) {
@@ -3540,6 +3552,8 @@ function drawRoca(s, t, home) {
 const SHED = { u: 0.3, v: 0.25, w: 1.7, d: 1.1 };
 const yardArea = id => {
   const y = yardOf(id);
+  // girado: a mesma área, só transposta (troca qual eixo fica perto da casinha), pra bater com comRotacaoAbrigo.
+  if (y.rot) return { u0: y.u0 + 1.65, u1: y.u1 - 0.4, v0: y.v0 + 0.45, v1: y.v1 - 0.4, trough: id !== 'apiario' && { u0: y.u0 + 0.95, u1: y.u0 + 1.15, v0: y.v0 + 2.45, v1: y.v0 + 3.45 } };
   return { u0: y.u0 + 0.45, u1: y.u1 - 0.4, v0: y.v0 + 1.65, v1: y.v1 - 0.4, trough: id !== 'apiario' && { u0: y.u0 + 2.45, u1: y.u0 + 3.45, v0: y.v0 + 0.95, v1: y.v0 + 1.15 } };
 };
 const HIVE_SPOTS = [[0.9, 1.95], [1.9, 1.95], [2.9, 1.95], [0.9, 2.9], [1.9, 2.9], [2.9, 2.9], [3.5, 2.4], [3.5, 3.3]];
@@ -3671,18 +3685,21 @@ function drawYard(b, s, t, home, dt, bubbles) {
   if (!lv) return drawEmptyYard(b, y, home);
   const e = 0.12, R = [y.u0 + e, y.v0 + e, y.u1 - e, y.v1 - e];
   quad(iso(R[0], R[1]), iso(R[2], R[1]), iso(R[2], R[3]), iso(R[0], R[3]), k.chao);
-  if (b.id === 'chiqueiro') {
-    // porco não tem casa, só um lamaçal bem grande no meio do chiqueiro
-    const q = iso(y.u0 + 1.5, y.v0 + 1.9);
-    ctx.fillStyle = '#8a6a44'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.85, W * 0.36, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.beginPath(); ctx.ellipse(q.x, q.y + W * 0.06, W * 0.7, W * 0.26, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(q.x - W * 0.22, q.y - W * 0.08, W * 0.3, W * 0.09, 0, 0, 7); ctx.fill();
-  }
-  if (b.id === 'galinheiro') { ctx.fillStyle = 'rgba(200,160,70,.5)'; for (let j = 0; j < 14; j++) { const q = iso(y.u0 + 0.5 + (j * 0.37) % 3, y.v0 + 1.7 + (j * 0.61) % 1.8); ctx.fillRect(q.x, q.y, W * 0.08, 1.5); } }
+  comRotacaoAbrigo(y, () => {
+    if (b.id === 'chiqueiro') {
+      // porco não tem casa, só um lamaçal bem grande no meio do chiqueiro
+      const q = iso(y.u0 + 1.5, y.v0 + 1.9);
+      ctx.fillStyle = '#8a6a44'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.85, W * 0.36, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.beginPath(); ctx.ellipse(q.x, q.y + W * 0.06, W * 0.7, W * 0.26, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(q.x - W * 0.22, q.y - W * 0.08, W * 0.3, W * 0.09, 0, 0, 7); ctx.fill();
+    }
+    if (b.id === 'galinheiro') { ctx.fillStyle = 'rgba(200,160,70,.5)'; for (let j = 0; j < 14; j++) { const q = iso(y.u0 + 0.5 + (j * 0.37) % 3, y.v0 + 1.7 + (j * 0.61) % 1.8); ctx.fillRect(q.x, q.y, W * 0.08, 1.5); } }
+    drawTrough(y, b.id);
+  });
   drawFenceRect(R[0], R[1], R[2], R[3], 'back');
-  drawTrough(y, b.id);
   // porco não tem casinha: só o chiqueiro com lama e cocho
-  const c = b.id === 'chiqueiro' ? iso(y.u0 + 1.5, y.v0 + 1.9) : drawShed(b.id, y.u0, y.v0, lv, t, s.skin);
+  let c;
+  comRotacaoAbrigo(y, () => { c = b.id === 'chiqueiro' ? iso(y.u0 + 1.5, y.v0 + 1.9) : drawShed(b.id, y.u0, y.v0, lv, t, s.skin); });
   const hov = hover && hover.kind === 'abrigo' && hover.id === b.id;
   if (hov) { ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)'; poly([iso(R[0], R[1]), iso(R[2], R[1]), iso(R[2], R[3]), iso(R[0], R[3])]); ctx.stroke(); }
   hits.push({ kind: 'abrigo', id: b.id, x: c.x, y: c.y, r: W * 0.55 });
@@ -5128,10 +5145,19 @@ function objAt(x, y) {
   }
   // sem casa/enfeite ali: um canteiro seu também tem o menu (para mudar de lugar)
   if (!best && scene === 'roca') { const i = cellAt(x, y); if (i >= 0 && state.plots[i].s !== 'locked') return { key: 'plot:' + i, plot: i, u: i % COLS + 0.5, v: Math.floor(i / COLS) + 0.5 }; }
+  // sem nada ali: uma casinha construída do rancho também tem o menu (segurar em cima pra mover)
+  if (!best && scene === 'animais') {
+    const [wu, wv] = screenToWorld(x, y);
+    for (const b of ABRIGOS) {
+      if (!abrigoLv(state, b.id)) continue;
+      const y0 = yardOf(b.id);
+      if (wu >= y0.u0 && wu < y0.u1 && wv >= y0.v0 && wv < y0.v1) return { key: 'abrigo:' + b.id, abrigoNome: ABRIGO[b.id].nome, u: (y0.u0 + y0.u1) / 2, v: (y0.v0 + y0.v1) / 2 };
+    }
+  }
   return best;
 }
 function abrirMenuObj(o, x, y) {
-  const m = $('#ctxMenu'), nome = o.plot !== undefined ? 'Canteiro' : o.id ? ENFEITE[o.id].nome : OBJ_INFO[o.key].nome;
+  const m = $('#ctxMenu'), nome = o.plot !== undefined ? 'Canteiro' : o.abrigoNome || (o.id ? ENFEITE[o.id].nome : OBJ_INFO[o.key].nome);
   m.innerHTML = `<b>${esc(nome)}</b><button type="button" data-ctx="mover">↔️ Mover</button>${o.id ? '<button type="button" data-ctx="guardar">📦 Guardar no inventário</button>' : ''}<button type="button" data-ctx="fechar">Cancelar</button>`;
   m.dataset.key = o.key;
   m.hidden = false;
@@ -5147,6 +5173,10 @@ $('#ctxMenu').addEventListener('click', e => {
     const i = Number(key.slice(5));
     moveMode = true; moving = { plot: i, uma: true, u: i % COLS + 0.5, v: Math.floor(i / COLS) + 0.5 }; renderMoveBtn(); renderTools();
     toast(moveDica('Canteiro'));
+  } else if (b.dataset.ctx === 'mover' && key.startsWith('abrigo:')) {
+    const id = key.slice(7), y0 = yardOf(id);
+    moveMode = true; moving = { key, uma: true, u: (y0.u0 + y0.u1) / 2, v: (y0.v0 + y0.v1) / 2, rot: y0.rot ? 1 : 0 }; renderMoveBtn(); renderTools();
+    toast(moveDica(ABRIGO[id].nome));
   } else if (b.dataset.ctx === 'mover') {
     const o = objList(state, scene).find(x => x.key === key);
     moveMode = true; moving = { key, uma: true, u: o ? o.u : 0, v: o ? o.v : 0, rot: o && o.rot }; renderMoveBtn(); renderTools();
@@ -8386,6 +8416,13 @@ function girarCerca() {
   moving.rot = moving.rot ? 0 : 1; [moving.u, moving.v] = encaixaCerca(moving.u + (moving.rot ? 0.5 : -0.5), moving.v + (moving.rot ? -0.5 : 0.5), moving.rot);
   sfx('click'); renderMoveBar();
 }
+// Gira a casinha do rancho 90° dentro do mesmo cercado (o cercado quase não muda de forma, mas a
+// casinha, o cocho etc. mudam de lado — comRotacaoAbrigo cuida do desenho).
+function girarAbrigo() {
+  if (!movAbrigoId()) return;
+  moving.rot = moving.rot ? 0 : 1;
+  sfx('click'); renderMoveBar();
+}
 function screenToWorld(x, y) {
   const a = (x - L.ox) / (L.W / 2), b = (y - L.oy) / (L.W / 4);
   return [Math.round((a + b) / 2 * 20) / 20, Math.round((b - a) / 2 * 20) / 20];
@@ -8420,7 +8457,7 @@ function moveClick(x, y) {
     const alvo = pick(x, y), cel = scene === 'roca' ? cellAt(x, y) : -1;
     if (alvo && alvo.kind === 'abrigo' && abrigoLv(state, alvo.id)) {
       const y0 = yardOf(alvo.id);
-      moving = { key: 'abrigo:' + alvo.id, u: (y0.u0 + y0.u1) / 2, v: (y0.v0 + y0.v1) / 2 };
+      moving = { key: 'abrigo:' + alvo.id, u: (y0.u0 + y0.u1) / 2, v: (y0.v0 + y0.v1) / 2, rot: y0.rot ? 1 : 0 };
       renderMoveBar();
       return toast(moveDica(ABRIGO[alvo.id].nome));
     }
@@ -8496,7 +8533,12 @@ function salvarMove() {
   } else if (moving.key.startsWith('enf:')) {
     const o = objetosDe(state, scene)[Number(moving.key.slice(4))]; if (o) { o.u = u; o.v = v; if (cerca) o.rot = moving.rot || 0; }
   } else if (abrigoId) {
+    const antes = yardOf(abrigoId);
     state.animPos = state.animPos || {}; state.animPos[abrigoId] = [u - YARD_W / 2, v - YARD_D / 2];
+    state.animRot = state.animRot || {}; state.animRot[abrigoId] = !!moving.rot;
+    // os bichos vão junto: desloca a posição de passeio deles pela mesma distância que a casinha andou
+    const depois = yardOf(abrigoId), du = depois.u0 - antes.u0, dv = depois.v0 - antes.v0;
+    if (du || dv) for (const a of livesIn(state, abrigoId)) { const m = amb[a.id]; if (m) { m.u += du; m.v += dv; m.tu += du; m.tv += dv; } }
   } else {
     state.pos = state.pos || {}; (state.pos[scene] = state.pos[scene] || {})[moving.key] = [u, v];
   }
@@ -8516,11 +8558,13 @@ function renderMoveBar() {
   bar.hidden = !on; document.body.classList.toggle('movendo', on); if (!on) return;
   const ok = movOk();
   const txt = !moving ? (pointer.touch ? 'Toque no item que quer mudar de lugar' : 'Clique no item que quer mudar de lugar')
-    : !ok ? (moving.plot !== undefined ? 'Aqui não dá: escolha um gramado livre' : movCerca() ? 'Aqui não dá: entre canteiros ou em cima de algo' : 'Aqui não dá: fora dos canteiros e cercados')
-    : movCerca() ? (pointer.touch ? 'Arraste a cerca e salve (Girar muda o lado)' : 'Clique para pôr a cerca · R gira') : pointer.touch ? 'Arraste o item e salve' : 'Clique para soltar aqui';
+    : !ok ? (moving.plot !== undefined ? 'Aqui não dá: escolha um gramado livre' : movCerca() ? 'Aqui não dá: entre canteiros ou em cima de algo' : movAbrigoId() ? 'Aqui não dá: o cercado não pode encostar em outro nem ficar longe demais do rancho' : 'Aqui não dá: fora dos canteiros e cercados')
+    : movCerca() ? (pointer.touch ? 'Arraste a cerca e salve (Girar muda o lado)' : 'Clique para pôr a cerca · R gira')
+    : movAbrigoId() ? (pointer.touch ? 'Arraste a casinha e salve (Girar muda a casinha de lado)' : 'Clique para soltar · R gira a casinha')
+    : pointer.touch ? 'Arraste o item e salve' : 'Clique para soltar aqui';
   if (bar.dataset.txt !== txt) { bar.dataset.txt = txt; $('#moveMsg').textContent = txt; }
   $('#moveOk').hidden = !moving; $('#moveOk').disabled = !ok;
-  const gira = $('#moveRot'); if (gira) gira.hidden = !movCerca();
+  const gira = $('#moveRot'); if (gira) gira.hidden = !movCerca() && !movAbrigoId();
   const guarda = $('#moveGuardar'); if (guarda) guarda.hidden = !(moving && moving.key && moving.key.startsWith('enf:'));
   $('#moveCancel').textContent = moving ? 'Cancelar' : 'Concluir';
   moveBarOk = ok;
@@ -8532,9 +8576,9 @@ function guardarMovendo() {
   moving = null; renderMoveBar();
 }
 $('#moveOk')?.addEventListener('click', salvarMove);
-$('#moveRot')?.addEventListener('click', girarCerca);
+$('#moveRot')?.addEventListener('click', () => { if (movAbrigoId()) girarAbrigo(); else girarCerca(); });
 $('#moveGuardar')?.addEventListener('click', guardarMovendo);
-window.addEventListener('keydown', e => { if ((e.key === 'r' || e.key === 'R') && moveMode && movCerca() && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) girarCerca(); });
+window.addEventListener('keydown', e => { if ((e.key === 'r' || e.key === 'R') && moveMode && (movCerca() || movAbrigoId()) && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { if (movAbrigoId()) girarAbrigo(); else girarCerca(); } });
 $('#moveCancel')?.addEventListener('click', cancelarMove);
 // Desenha os objetos da cena. "tras": os que ficam atrás da cerca (u ou v negativos); "frente": o resto.
 // d0/d1 (opcional): só os que estão nessa faixa de profundidade (u + v), para intercalar com os canteiros.
@@ -8655,8 +8699,10 @@ function drawMoving(sc, t) {
     const u0 = moving.u - YARD_W / 2, v0 = moving.v - YARD_D / 2, u1 = u0 + YARD_W, v1 = v0 + YARD_D, ok = movOk();
     quad(iso(u0, v0), iso(u1, v0), iso(u1, v1), iso(u0, v1), ok ? 'rgba(80,200,80,.3)' : 'rgba(220,60,50,.35)', ok ? 'rgba(255,255,255,.9)' : 'rgba(255,200,200,.9)', 2.5);
     ctx.globalAlpha = 0.85;
-    if (abrigoId === 'chiqueiro') { const q = iso(u0 + 1.5, v0 + 1.9); ctx.fillStyle = '#8a6a44'; ctx.beginPath(); ctx.ellipse(q.x, q.y, L.W * 0.85, L.W * 0.36, 0, 0, 7); ctx.fill(); }
-    else drawShed(abrigoId, u0, v0, abrigoLv(state, abrigoId), t, state.skin);
+    comRotacaoAbrigo({ u0, v0, rot: !!moving.rot }, () => {
+      if (abrigoId === 'chiqueiro') { const q = iso(u0 + 1.5, v0 + 1.9); ctx.fillStyle = '#8a6a44'; ctx.beginPath(); ctx.ellipse(q.x, q.y, L.W * 0.85, L.W * 0.36, 0, 0, 7); ctx.fill(); }
+      else drawShed(abrigoId, u0, v0, abrigoLv(state, abrigoId), t, state.skin);
+    });
     ctx.globalAlpha = 1;
     return;
   }
