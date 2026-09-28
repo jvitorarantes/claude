@@ -989,6 +989,8 @@ const NOVIDADES = [
   { v: 143, txt: 'Broto de cada semente diferenciado desde o primeiro instante que planta, não só depois que já cresceu um pouco.' },
   { v: 144, txt: 'A fileira de pontos de pesca e lugares de caçada agora esmaece na ponta quando tem mais pra rolar, pra não parecer cortada.' },
   { v: 145, txt: 'Corrigido: as mensagens prontas do chat com amigos não rolavam pro lado no toque do celular.' },
+  { v: 146, txt: 'Javali e rato bem maiores quando invadem a plantação, pra ficar fácil de ver e tocar neles. E a invasão agora pode acontecer a cada 8 horas, em vez de 12.' },
+  { v: 147, txt: 'Cada pesqueiro agora tem seu elenco próprio de peixes, sem repetir espécie de um lugar pro outro. E o 📖 Livro de peixes ganhou um botão pra mostrar só os peixes (e a isca de cada um) do lago onde você está.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -5758,6 +5760,7 @@ $('#pesca').addEventListener('click', e => {
   const tp = e.target.closest('[data-trevo-peixe]'); if (tp) { resgatarPeixe(tp.dataset.trevoPeixe); return renderPesca(); }
   if (e.target.closest('[data-trevo-todos]')) { resgatarTodosPeixes(); return renderPesca(); }
   if (e.target.closest('[data-trevo-dominio]')) { resgatarDominio(); return renderPesca(); }
+  if (e.target.closest('[data-livro-lago]')) { livroSoLago = !livroSoLago; return renderPesca(); }
   const pb = e.target.closest('[data-ponto]');
   if (pb && pontosArrastou) return;
   if (pb) {
@@ -6794,33 +6797,41 @@ function drawCritters(t, tod) {
 // ============================================================
 // Pescaria: lago da roça, isca, minijogo de fisgar e livro de peixes
 // ============================================================
+// Cada pesqueiro tem seu próprio elenco de peixes: nenhuma espécie se repete de um lugar pro outro
+// ("pontos" diz onde cada um morde). O lixo (lata/bota) é a exceção: aparece em qualquer lugar.
 const PEIXES = [
   { id: 'lata',     nome: 'Lata velha', preco: 2,    raro: 'lixo',     peso: 5,   nivel: 1, lixo: true, iscas: ['minhoca', 'milho'] },
   { id: 'bota',     nome: 'Bota velha', preco: 5,    raro: 'lixo',     peso: 4,   nivel: 1, lixo: true, iscas: ['minhoca', 'milho'] },
-  { id: 'lambari',  nome: 'Lambari',    preco: 30,   raro: 'comum',    peso: 30,  nivel: 1,  iscas: ['minhoca', 'milho'], cor: ['#c9d3dc', '#8fa3b5'], tam: 0.7 },
-  { id: 'tilapia',  nome: 'Tilápia',    preco: 50,   raro: 'comum',    peso: 25,  nivel: 1,  iscas: ['minhoca', 'milho'], cor: ['#9aa88f', '#6f7d64'], tam: 0.85 },
-  { id: 'traira',   nome: 'Traíra',     preco: 70,   raro: 'comum',    peso: 15,  nivel: 3,  iscas: ['minhoca', 'camarao'], cor: ['#7a6a4a', '#4f4430'], tam: 0.95 },
-  { id: 'pacu',     nome: 'Pacu',       preco: 90,   raro: 'incomum',  peso: 12,  nivel: 4,  iscas: ['milho'], cor: ['#8a8f99', '#e07a3a'], tam: 0.95, alto: true },
-  { id: 'tucunare', nome: 'Tucunaré',   preco: 160,  raro: 'raro',     peso: 8,   nivel: 6,  iscas: ['camarao', 'artificial'], cor: ['#e3bf3a', '#4f7a2a'], tam: 1, listras: true },
-  { id: 'pintado',  nome: 'Pintado',    preco: 220,  raro: 'raro',     peso: 6,   nivel: 9,  iscas: ['camarao'], cor: ['#c7c1b3', '#4a4a4a'], tam: 1.1, pintas: true },
-  { id: 'dourado',  nome: 'Dourado',    preco: 400,  raro: 'épico',    peso: 3,   nivel: 12, iscas: ['camarao', 'artificial'], cor: ['#f2b705', '#d9822b'], tam: 1.1 },
-  { id: 'pirarucu', nome: 'Pirarucu',   preco: 1000, raro: 'lendário', peso: 1,   nivel: 18, iscas: ['artificial'], cor: ['#6b5a4a', '#c8402f'], tam: 1.3 },
-  // Peixes de Goiás (bacias do Araguaia, Tocantins e Paranaíba). "pontos" = só morde nesses pontos de pesca.
-  { id: 'acara',    nome: 'Cará',        preco: 35,   raro: 'comum',    peso: 22,  nivel: 1,  iscas: ['minhoca'], cor: ['#b9a86a', '#7a6a3a'], tam: 0.7, alto: true, listras: true },
-  { id: 'piau',     nome: 'Piau',        preco: 45,   raro: 'comum',    peso: 20,  nivel: 2,  iscas: ['minhoca', 'milho'], cor: ['#c9c2a0', '#9a8a5a'], tam: 0.85, pintas: true },
-  { id: 'mandi',    nome: 'Mandi',       preco: 40,   raro: 'comum',    peso: 18,  nivel: 2,  iscas: ['minhoca'], cor: ['#d9c79a', '#a88a4a'], tam: 0.8, bigode: true },
-  { id: 'curimba',  nome: 'Curimbatá',   preco: 55,   raro: 'comum',    peso: 16,  nivel: 3,  iscas: ['milho'], cor: ['#b8bcc0', '#8a6a4a'], tam: 0.95 },
-  { id: 'cascudo',  nome: 'Cascudo',     preco: 80,   raro: 'incomum',  peso: 10,  nivel: 4,  iscas: ['minhoca', 'milho'], cor: ['#5a5040', '#3a3228'], tam: 0.85, armadura: true, pintas: true },
-  { id: 'piranha',  nome: 'Piranha',     preco: 85,   raro: 'incomum',  peso: 11,  nivel: 5,  iscas: ['minhoca', 'camarao'], cor: ['#9aa0a8', '#6a707a'], tam: 0.8, alto: true, dentes: true, barriga: '#e0503a' },
-  { id: 'corvina',  nome: 'Corvina',     preco: 110,  raro: 'incomum',  peso: 9,   nivel: 7,  iscas: ['camarao'], cor: ['#d9d9cf', '#a8a898'], tam: 1 },
-  { id: 'matrinxa', nome: 'Matrinxã',    preco: 120,  raro: 'incomum',  peso: 8,   nivel: 8,  iscas: ['milho'], cor: ['#c8ccd2', '#3a3a3a'], tam: 1, barriga: '#e8c070' },
-  { id: 'cachorra', nome: 'Peixe-cachorra', preco: 190, raro: 'raro',   peso: 6,   nivel: 10, iscas: ['camarao', 'artificial'], cor: ['#d0d4d8', '#e0a040'], tam: 1, longo: true, dentes: true, pontos: ['represa', 'rio', 'lagoa', 'araguaia', 'amazonas'] },
-  { id: 'aruana',   nome: 'Aruanã',      preco: 240,  raro: 'raro',     peso: 5,   nivel: 11, iscas: ['artificial'], cor: ['#c8c090', '#8a8a5a'], tam: 1.05, longo: true, pontos: ['araguaia', 'amazonas'] },
-  { id: 'barbado',  nome: 'Barbado',     preco: 260,  raro: 'raro',     peso: 5,   nivel: 13, iscas: ['camarao'], cor: ['#b0a898', '#7a7060'], tam: 1.05, bigode: true, pontos: ['rio', 'lagoa', 'araguaia', 'amazonas'] },
-  { id: 'tambaqui', nome: 'Tambaqui',    preco: 450,  raro: 'épico',    peso: 3,   nivel: 15, iscas: ['milho'], cor: ['#6a6a50', '#2a2a22'], tam: 1.15, alto: true, barriga: '#d8c060', pontos: ['araguaia', 'amazonas'] },
-  { id: 'pirarara', nome: 'Pirarara',    preco: 600,  raro: 'épico',    peso: 2,   nivel: 20, iscas: ['camarao'], cor: ['#4a4a44', '#e0502a'], tam: 1.2, bigode: true, barriga: '#e8d8a0', pontos: ['lagoa', 'araguaia', 'amazonas'] },
-  { id: 'jau',      nome: 'Jaú',         preco: 1200, raro: 'lendário', peso: 1,   nivel: 24, iscas: ['camarao', 'artificial'], cor: ['#7a6a4a', '#5a4a30'], tam: 1.3, bigode: true, pintas: true, pontos: ['lagoa', 'araguaia', 'amazonas'] },
-  { id: 'piraiba',  nome: 'Piraíba',     preco: 1500, raro: 'lendário', peso: 0.7, nivel: 28, iscas: ['artificial'], cor: ['#8a8e92', '#5a5e62'], tam: 1.4, bigode: true, pontos: ['araguaia', 'amazonas'] },
+  // Pesqueiro de casa (e Pesque e Solte, a mesma água)
+  { id: 'lambari',  nome: 'Lambari',    preco: 30,   raro: 'comum',    peso: 30,  nivel: 1,  iscas: ['minhoca', 'milho'], cor: ['#c9d3dc', '#8fa3b5'], tam: 0.7, pontos: ['casa', 'solte'] },
+  { id: 'tilapia',  nome: 'Tilápia',    preco: 50,   raro: 'comum',    peso: 25,  nivel: 1,  iscas: ['minhoca', 'milho'], cor: ['#9aa88f', '#6f7d64'], tam: 0.85, pontos: ['casa', 'solte'] },
+  { id: 'acara',    nome: 'Cará',        preco: 35,   raro: 'comum',    peso: 22,  nivel: 1,  iscas: ['minhoca'], cor: ['#b9a86a', '#7a6a3a'], tam: 0.7, alto: true, listras: true, pontos: ['casa', 'solte'] },
+  { id: 'piau',     nome: 'Piau',        preco: 45,   raro: 'comum',    peso: 20,  nivel: 2,  iscas: ['minhoca', 'milho'], cor: ['#c9c2a0', '#9a8a5a'], tam: 0.85, pintas: true, pontos: ['casa', 'solte'] },
+  { id: 'mandi',    nome: 'Mandi',       preco: 40,   raro: 'comum',    peso: 18,  nivel: 2,  iscas: ['minhoca'], cor: ['#d9c79a', '#a88a4a'], tam: 0.8, bigode: true, pontos: ['casa', 'solte'] },
+  // Córrego Cascavel
+  { id: 'traira',   nome: 'Traíra',     preco: 70,   raro: 'comum',    peso: 15,  nivel: 3,  iscas: ['minhoca', 'camarao', 'artificial'], cor: ['#7a6a4a', '#4f4430'], tam: 0.95, pontos: ['riacho'] },
+  { id: 'curimba',  nome: 'Curimbatá',   preco: 55,   raro: 'comum',    peso: 16,  nivel: 3,  iscas: ['milho'], cor: ['#b8bcc0', '#8a6a4a'], tam: 0.95, pontos: ['riacho'] },
+  { id: 'pacu',     nome: 'Pacu',       preco: 90,   raro: 'incomum',  peso: 12,  nivel: 4,  iscas: ['milho'], cor: ['#8a8f99', '#e07a3a'], tam: 0.95, alto: true, pontos: ['riacho'] },
+  { id: 'cascudo',  nome: 'Cascudo',     preco: 80,   raro: 'incomum',  peso: 10,  nivel: 4,  iscas: ['minhoca', 'milho'], cor: ['#5a5040', '#3a3228'], tam: 0.85, armadura: true, pintas: true, pontos: ['riacho'] },
+  // Rio Meia Ponte
+  { id: 'piranha',  nome: 'Piranha',     preco: 85,   raro: 'incomum',  peso: 11,  nivel: 5,  iscas: ['minhoca', 'camarao'], cor: ['#9aa0a8', '#6a707a'], tam: 0.8, alto: true, dentes: true, barriga: '#e0503a', pontos: ['represa'] },
+  { id: 'tucunare', nome: 'Tucunaré',   preco: 160,  raro: 'raro',     peso: 8,   nivel: 6,  iscas: ['camarao', 'artificial'], cor: ['#e3bf3a', '#4f7a2a'], tam: 1, listras: true, pontos: ['represa'] },
+  { id: 'corvina',  nome: 'Corvina',     preco: 110,  raro: 'incomum',  peso: 9,   nivel: 7,  iscas: ['camarao', 'milho'], cor: ['#d9d9cf', '#a8a898'], tam: 1, pontos: ['represa'] },
+  // Ribeirão João Leite
+  { id: 'matrinxa', nome: 'Matrinxã',    preco: 120,  raro: 'incomum',  peso: 8,   nivel: 8,  iscas: ['milho', 'minhoca'], cor: ['#c8ccd2', '#3a3a3a'], tam: 1, barriga: '#e8c070', pontos: ['rio'] },
+  { id: 'pintado',  nome: 'Pintado',    preco: 220,  raro: 'raro',     peso: 6,   nivel: 9,  iscas: ['camarao'], cor: ['#c7c1b3', '#4a4a4a'], tam: 1.1, pintas: true, pontos: ['rio'] },
+  { id: 'cachorra', nome: 'Peixe-cachorra', preco: 190, raro: 'raro',   peso: 6,   nivel: 10, iscas: ['camarao', 'artificial'], cor: ['#d0d4d8', '#e0a040'], tam: 1, longo: true, dentes: true, pontos: ['rio'] },
+  // Rio dos Bois
+  { id: 'aruana',   nome: 'Aruanã',      preco: 240,  raro: 'raro',     peso: 5,   nivel: 11, iscas: ['artificial'], cor: ['#c8c090', '#8a8a5a'], tam: 1.05, longo: true, pontos: ['lagoa'] },
+  { id: 'dourado',  nome: 'Dourado',    preco: 400,  raro: 'épico',    peso: 3,   nivel: 12, iscas: ['camarao', 'artificial'], cor: ['#f2b705', '#d9822b'], tam: 1.1, pontos: ['lagoa'] },
+  { id: 'barbado',  nome: 'Barbado',     preco: 260,  raro: 'raro',     peso: 5,   nivel: 13, iscas: ['camarao', 'minhoca', 'milho'], cor: ['#b0a898', '#7a7060'], tam: 1.05, bigode: true, pontos: ['lagoa'] },
+  // Rio Araguaia
+  { id: 'tambaqui', nome: 'Tambaqui',    preco: 450,  raro: 'épico',    peso: 3,   nivel: 15, iscas: ['milho', 'minhoca'], cor: ['#6a6a50', '#2a2a22'], tam: 1.15, alto: true, barriga: '#d8c060', pontos: ['araguaia'] },
+  { id: 'pirarucu', nome: 'Pirarucu',   preco: 1000, raro: 'lendário', peso: 1,   nivel: 18, iscas: ['artificial'], cor: ['#6b5a4a', '#c8402f'], tam: 1.3, pontos: ['araguaia'] },
+  { id: 'pirarara', nome: 'Pirarara',    preco: 600,  raro: 'épico',    peso: 2,   nivel: 20, iscas: ['camarao'], cor: ['#4a4a44', '#e0502a'], tam: 1.2, bigode: true, barriga: '#e8d8a0', pontos: ['araguaia'] },
+  // Rio Amazonas
+  { id: 'jau',      nome: 'Jaú',         preco: 1200, raro: 'lendário', peso: 1,   nivel: 24, iscas: ['camarao', 'artificial', 'minhoca'], cor: ['#7a6a4a', '#5a4a30'], tam: 1.3, bigode: true, pintas: true, pontos: ['amazonas'] },
+  { id: 'piraiba',  nome: 'Piraíba',     preco: 1500, raro: 'lendário', peso: 0.7, nivel: 28, iscas: ['artificial'], cor: ['#8a8e92', '#5a5e62'], tam: 1.4, bigode: true, pontos: ['amazonas'] },
 ];
 // Peixe grande ou comprido encolhe um pouco para caber no ícone.
 const cabePeixe = p => Math.min(1, 0.95 / ((p.tam || 1) * (p.longo ? 1.3 : 1)));
@@ -7174,12 +7185,15 @@ function renderPesca() {
   if (pescaLivro) setHtml($('#pescaLivro'), livroPeixes());
 }
 // Livro de peixes: o que já pegou (com figura), o que falta (sombra), raridade, quantos e do que precisa.
-let pescaLivro = false;
+let pescaLivro = false, livroSoLago = true;
 const peixeSombra = id => makeIcon('ps:' + id, () => { ctx.globalAlpha = 0.85; drawPeixe(ctx, 48, 48, 4.7 * cabePeixe(PEIXE[id]), Object.assign({}, PEIXE[id], { cor: ['#5b6470', '#4a525c'], listras: false, pintas: false, barriga: false, armadura: false })); ctx.globalAlpha = 1; });
 function livroPeixes() {
-  const lista = PEIXES.filter(p => !p.lixo), pegos = lista.filter(p => state.col[p.id]).length, pend = peixesAResgatar();
+  const todos = PEIXES.filter(p => !p.lixo), pt = PONTO[pontoSel()];
+  const lista = livroSoLago ? todos.filter(p => peixeNoPonto(p, pt.id)) : todos;
+  const pegos = todos.filter(p => state.col[p.id]).length, pend = peixesAResgatar();
   const soma = pend.reduce((t, p) => t + trevosDoPeixe(p), 0);
-  return `<p class="hint" style="margin:0 0 8px">Você já pegou <b>${pegos} de ${lista.length}</b> peixes. Cada espécie nova vale trevos 🍀 (comum 1, incomum 2, raro 3, épico 5, lendário 10). E cada peixe tem o seu domínio ★: pegando mais do mesmo, ele ganha estrelas (até 4), morde 15% mais por estrela e cada estrela vale trevos (1, 2, 3 e 5).</p>
+  return `<p class="hint" style="margin:0 0 8px">Você já pegou <b>${pegos} de ${todos.length}</b> peixes. Cada espécie nova vale trevos 🍀 (comum 1, incomum 2, raro 3, épico 5, lendário 10). E cada peixe tem o seu domínio ★: pegando mais do mesmo, ele ganha estrelas (até 4), morde 15% mais por estrela e cada estrela vale trevos (1, 2, 3 e 5).</p>
+    <p style="margin:0 0 8px;text-align:center"><button class="btn ${livroSoLago ? 'gold' : 'ghost'}" type="button" data-livro-lago="1">${livroSoLago ? `🎣 Só ${pt.nome} (${lista.length})` : `🌎 Todos os peixes (${todos.length})`}</button></p>
     ${pend.length ? `<p style="margin:0 0 8px;text-align:center"><button class="btn gold" type="button" data-trevo-todos="1">Resgatar tudo · 🍀 ${soma}</button></p>` : ''}<div class="livro">${lista.map(p => {
     const n = state.col[p.id] || 0, novo = (state.peixesNovos || []).includes(p.id), resg = trevosDoPeixe(p), est = estrelasDe(p), prox = (MAESTRIA[p.raro] || MAESTRIA.comum)[est];
     return `<div class="lvcard ${n ? '' : 'falta'}">${novo ? '<span class="lvnovo">NOVO!</span>' : ''}<img alt="" src="${n ? productIcon(p.id) : peixeSombra(p.id)}">
@@ -9575,13 +9589,13 @@ function drawMural(s, t, home) {
   hits.push({ kind: 'mural', n: fotos.length, x: m.x, y: m.y, r: W * 0.45 });
 }
 // ---------- Pragas que invadem a roça ----------
-// No máximo uma vez a cada 12 horas, e só com você na roça (jogo aberto). Toca um alarme, a tela fica com um
+// No máximo uma vez a cada 8 horas, e só com você na roça (jogo aberto). Toca um alarme, a tela fica com um
 // alerta vermelho e o bicho (rato; javali a partir do nível 12) corre até um canteiro. Aí:
 //  · a armadilha (se tiver e estiver carregada) pega o bicho — e recarrega;
 //  · senão, o cachorro da roça acordado (com ração) corre e espanta, em 3 de cada 4 vezes;
 //  · senão, você tem 60 segundos para clicar e espantar; se não, ele come um pouco de 1 planta (o javali, até 2) e vai embora.
 let invasor = null;
-const INVASAO_ESPERA = 60e3, INVASAO_CADA = 12 * 3600e3, ARMADILHA = { nivel: CACA_NIVEL, custo: 1500, recarga: 16 * 3600e3 };
+const INVASAO_ESPERA = 60e3, INVASAO_CADA = 8 * 3600e3, ARMADILHA = { nivel: CACA_NIVEL, custo: 1500, recarga: 16 * 3600e3 };
 const sessaoIni = Date.now();
 const armadilhaPronta = () => !!state.armadilha && Date.now() >= (state.armadilha.pronta || 0);
 function invasaoTick(forca) {
@@ -9590,7 +9604,7 @@ function invasaoTick(forca) {
   if (!forca) {
     if (scene !== 'roca' || document.hidden || !$('#pesca').hidden || !$('#caca').hidden || agora - sessaoIni < 60e3) return; // só com você olhando a roça
     if (agora - (state.invasaoUlt || 0) < INVASAO_CADA) return;
-    if (Math.random() > 1 / 450) return; // passou das 12h: acontece num momento qualquer (≈ 15 min jogando, em média)
+    if (Math.random() > 1 / 450) return; // passou das 8h: acontece num momento qualquer (≈ 15 min jogando, em média)
   }
   const alvos = state.plots.map((p, i) => i).filter(i => { const p = state.plots[i]; return p.s === 'growing' && !p.podre; });
   if (!alvos.length) return;
@@ -9641,7 +9655,7 @@ function espantarInvasor() {
 function drawInvasor(t) {
   passoInvasao(t);
   const v = invasor; if (!v) return;
-  const W = L.W, b = CACA_BICHO[v.tipo], esc = W / 100 * (v.tipo === 'javali' ? 0.95 : 1.4), dt = t - v.t0;
+  const W = L.W, b = CACA_BICHO[v.tipo], esc = W / 100 * (v.tipo === 'javali' ? 1.9 : 2.7), dt = t - v.t0;
   const lerp2 = (a, c, k) => [a[0] + (c[0] - a[0]) * k, a[1] + (c[1] - a[1]) * k];
   let pos = [v.u, v.v], correndo = false, dir = v.dir, alfa = 1;
   if (v.fase === 'chegando') { pos = lerp2(v.de, [v.u, v.v], Math.min(1, dt / 2200)); correndo = true; }
@@ -9658,7 +9672,7 @@ function drawInvasor(t) {
   ctx.restore(); ctx.globalAlpha = 1;
   // armadilha: a gaiolinha cai em cima do bicho
   if (v.fase === 'presa') {
-    const k = Math.min(1, dt / 250), gy = q.y - W * 0.6 * (1 - k), w = W * (v.tipo === 'javali' ? 0.42 : 0.3), h = w * 0.8;
+    const k = Math.min(1, dt / 250), gy = q.y - W * 0.6 * (1 - k), w = W * (v.tipo === 'javali' ? 0.84 : 0.58), h = w * 0.8;
     ctx.strokeStyle = '#5a646c'; ctx.lineWidth = 2.2; ctx.fillStyle = 'rgba(90,100,108,.15)';
     ctx.beginPath(); ctx.rect(q.x - w / 2, gy - h, w, h); ctx.fill(); ctx.stroke();
     for (let x = 1; x < 6; x++) { ctx.beginPath(); ctx.moveTo(q.x - w / 2 + (w * x) / 6, gy - h); ctx.lineTo(q.x - w / 2 + (w * x) / 6, gy); ctx.stroke(); }
