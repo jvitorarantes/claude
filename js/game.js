@@ -190,7 +190,7 @@ const DOG_FOOD = { custo: 50, horas: 8 };
 const DOG_NAMES = ['Totó', 'Rex', 'Pipoca', 'Thor', 'Mel', 'Bidu', 'Paçoca', 'Nina', 'Bolinha', 'Faísca', 'Pretinha', 'Caramelo'];
 // Nome de cada lugar com o artigo certo ("a roça", "o rancho"…)
 const SLOT = { roca: { a: 'a roça', aSua: 'a sua roça', daSua: 'da sua roça', A: 'A roça' }, animais: { a: 'o rancho', aSua: 'o seu rancho', daSua: 'do seu rancho', A: 'O rancho' } };
-const STEAL_MAX = { roca: 3, animais: 3 }; // itens por amigo por dia
+const STEAL_MAX = { roca: 3, animais: 3, pomar: 3 }; // itens por amigo por dia
 const STEAL_FARMS = 5;                       // roças diferentes onde dá para pegar por dia
 // Dia pelo relógio do aparelho: os limites voltam à meia-noite.
 const localDay = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / DAY);
@@ -947,6 +947,7 @@ const NOVIDADES = [
   { v: 117, txt: 'A Horta saiu da roça 🌳: morangueiro, videira, macieira, laranjeira, bananeira, coqueiro e goiabeira não ocupam mais canteiro! Agora são frutíferas do Pomar (Loja › Pomar): plante no gramado, dão morango, uva, maçã, laranja, banana, coco e goiaba de tempos em tempos e secam depois de umas colheitas, igualzinho às outras frutíferas. Quem já tinha uma plantada ganhou de volta no Inventário.' },
   { v: 118, txt: 'Caçada mais fácil de acertar 🎯: os pássaros (pombo e pardal) voam mais devagar e balançam menos no ar, e a pedrinha do estilingue chega mais rápido — menos "chute" e mais precisão.' },
   { v: 119, txt: 'Aviso quando o ponto de pesca descansar 🎣: o pesqueiro brilha na sua roça assim que ele voltar a pescar, e chegou o aviso 🎣 Ponto de pesca descansado nas notificações do celular (⚙️ › Notificações).' },
+  { v: 120, txt: 'Dá para pegar frutas do pomar dos amigos e da vila 🍇: quando estiver visitando, toque numa frutífera pronta para pegar uma fruta (até 3 por dia em cada roça, cuidado com o cachorro!).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1323,15 +1324,15 @@ function goHome() {
 
 const visitKey = id => (view.kind === 'friend' ? view.uid : view.id) + ':' + id;
 function help(pos) { state.stats.ajudas++; addXP(2, pos); addCoins(2, pos); track('ajudar'); helpBack(pos); }
-// Limite de itens por amigo por dia: 3 da plantação e 3 dos animais, em até 5 roças.
+// Limite de itens por amigo por dia: 3 da plantação, 3 dos animais e 3 do pomar, em até 5 roças.
 function stealLimit() {
   const today = localDay(), key = (view.kind === 'friend' ? view.uid : view.id) + ':' + today;
-  return state.limits[key] || (state.limits[key] = { d: today, roca: 0, animais: 0 });
+  return state.limits[key] || (state.limits[key] = { d: today, roca: 0, animais: 0, pomar: 0 });
 }
 // Em quantas roças você já pegou algo hoje.
-const farmsToday = () => Object.values(state.limits).filter(l => l && l.d === localDay() && l.roca + l.animais > 0).length;
+const farmsToday = () => Object.values(state.limits).filter(l => l && l.d === localDay() && l.roca + l.animais + (l.pomar || 0) > 0).length;
 function farmBlocked(lim) {
-  if (lim.roca + lim.animais > 0 || farmsToday() < STEAL_FARMS) return false;
+  if (lim.roca + lim.animais + (lim.pomar || 0) > 0 || farmsToday() < STEAL_FARMS) return false;
   toast(`Você já pegou de ${STEAL_FARMS} vizinhos hoje. À meia-noite libera de novo!`);
   return true;
 }
@@ -1424,9 +1425,9 @@ function applyVisits(list) {
     const p = Number.isInteger(v.plot) && v.plot >= 0 && v.plot < N ? state.plots[v.plot] : null;
     const a = typeof v.animal === 'string' ? state.animals.find(x => x.id === v.animal) : null;
     if (!state.friends.includes(v.from)) continue;
-    if (v.caught && (v.t === 'steal' || v.t === 'stealA')) {
+    if (v.caught && (v.t === 'steal' || v.t === 'stealA' || v.t === 'stealF')) {
       // Seu cachorro espantou (ou mordeu) um amigo que tentou pegar coisas.
-      const slot = v.t === 'steal' ? 'roca' : 'animais', d = state.dogs[slot];
+      const slot = v.t === 'steal' ? 'roca' : v.t === 'stealA' ? 'animais' : (v.sc === 'animais' ? 'animais' : 'roca'), d = state.dogs[slot];
       const coins = clamp(Math.round(Number(v.coins) || 0), 0, 10), nome = d ? d.nome : 'Seu cachorro';
       if (coins) state.coins += coins;
       addXP(d ? DOG[d.raca].xpPega : 5, null);
@@ -1466,6 +1467,10 @@ function applyVisits(list) {
     } else if (v.t === 'stealA' && a && ANIMAL[a.k].tipo === 'prod' && a.ready) {
       a.ready = false; a.g = 0; a.n++;
       note(`pegou 1 ${PRODUCT[ANIMAL[a.k].prod].nome} dos seus animais`, true);
+    } else if (v.t === 'stealF') {
+      const sc = v.sc === 'animais' ? 'animais' : 'roca', l = objetosDe(state, sc);
+      const o = l.find(x => v.fid && x.fid === v.fid) || (!v.fid && Number.isInteger(v.idx) ? l[v.idx] : null);
+      if (o && ENFEITE[o.id] && ENFEITE[o.id].fruteira) note(`pegou 1 ${FRUTA[ENFEITE[o.id].fruta].nome} do seu pomar`, true);
     }
   }
   for (const [who, list2] of Object.entries(msgs)) {
@@ -4475,7 +4480,7 @@ function renderPane() {
         }
       }
     }
-    html += `<p class="hint">Hoje você pegou coisas em ${farmsToday()} de ${STEAL_FARMS} roças. Em cada uma dá para pegar ${STEAL_MAX.roca} itens da plantação e ${STEAL_MAX.animais} dos animais. Tudo volta à meia-noite.</p>`;
+    html += `<p class="hint">Hoje você pegou coisas em ${farmsToday()} de ${STEAL_FARMS} roças. Em cada uma dá para pegar ${STEAL_MAX.roca} itens da plantação, ${STEAL_MAX.animais} dos animais e ${STEAL_MAX.pomar} frutas do pomar. Tudo volta à meia-noite.</p>`;
     html += `<h3>Vizinhos da vila</h3><p class="hint">Sempre tem alguém em casa por aqui. Cada vizinho tem um cachorro de guarda.</p>`;
     for (const n of NEIGHBORS) {
       const here = view.kind === 'npc' && view.id === n.id;
@@ -8640,6 +8645,19 @@ function actFruteira(sc, i) {
       help(pos); ganharPomar(1); addXP(3, pos); sfx('level'); popupAt(pos, 'Reviveu! 🌱', '#8fd16a');
       sendVisit({ t: 'help', what: 'fruteira', sc, fid: o.fid || '', idx: i });
       toast(`🤝 Você ajudou ${view.nome}: ${e.nome.toLowerCase()} voltou a dar frutas!`, 'good');
+      return done();
+    }
+    if (st.pronto) {
+      const key = visitKey('fr:' + (o.fid || i)), lim = stealLimit();
+      if (alreadyTook(o, key)) return toast('Você já pegou daqui. Não exagere!');
+      if (lim.pomar >= STEAL_MAX.pomar) return toast(`Você já pegou ${STEAL_MAX.pomar} frutas do pomar de ${view.nome} hoje. À meia-noite libera de novo!`);
+      if (farmBlocked(lim)) return;
+      const q = iso(o.u, o.v), pos = { x: q.x, y: q.y - L.W * 0.4 };
+      lim.pomar++; state.log[key] = Date.now();
+      if (guarded(sc, pos, { t: 'stealF', sc, fid: o.fid || '', idx: i })) return done();
+      sfx('harvest'); gain(f.id, 1, pos); state.stats.roubado++; addXP(1, pos); track('pegar');
+      sendVisit({ t: 'stealF', sc, fid: o.fid || '', idx: i });
+      toast(`🧺 Pegou 1 ${f.nome.toLowerCase()} do pomar de ${view.nome}!`, 'good');
       return done();
     }
     return toast(`${e.nome} de ${view.nome}: ${st.morta ? (o.placa ? 'secou e está pedindo ajuda.' : 'secou.') : st.txt}`);
