@@ -1050,6 +1050,7 @@ const NOVIDADES = [
   { v: 154, txt: 'Molduras da foto redesenhadas: em vez de um anel liso, agora têm galhos, pétalas e nuvens invadindo a foto de um jeito mais criativo. E chegou uma animaçãozinha (com confete!) toda vez que você sobe de nível.' },
   { v: 155, txt: 'A caçada agora deixa material: pássaro solta pena, lebre solta pata e o lendário Chupa-cabra solta presa (além da carne de javali, que já existia). Vendem no celeiro/banca, entram nos pedidos do caminhão, e dá pra fazer cocar, amuleto e colar na nova máquina Artesanato da caçada.' },
   { v: 156, txt: 'As casinhas dos animais não ficam mais presas na grade do rancho: entre no Modo Mover e arraste cada abrigo para onde quiser (sem encostar em outro).' },
+  { v: 157, txt: 'Chegou o Bloco de água na Loja › Enfeites: do tamanho de uma plantação, encaixa um do lado do outro e vira um laguinho, com peixinho pulando quando tem pelo menos dois juntos.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -5086,7 +5087,7 @@ cv.addEventListener('pointermove', e => {
   if (drag && drag.item) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) > 4) { drag.moved = true; try { cv.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ } }
-    if (drag.moved) { const [u, v] = screenToWorld(q.x, q.y); moving.u = Math.round((u + drag.item.du) * 20) / 20; moving.v = Math.round((v + drag.item.dv) * 20) / 20; if (movCerca()) [moving.u, moving.v] = encaixaCerca(moving.u, moving.v, moving.rot || 0); hover = null; }
+    if (drag.moved) { const [u, v] = screenToWorld(q.x, q.y); moving.u = Math.round((u + drag.item.du) * 20) / 20; moving.v = Math.round((v + drag.item.dv) * 20) / 20; if (movCerca()) [moving.u, moving.v] = encaixaCerca(moving.u, moving.v, moving.rot || 0); else if (movAgua()) [moving.u, moving.v] = encaixaAgua(moving.u, moving.v); hover = null; }
     return;
   }
   if (drag && L.canPan) {
@@ -5171,7 +5172,7 @@ cv.addEventListener('pointerup', () => clearTimeout(holdTimer));
 cv.addEventListener('pointerup', e => {
   endTouch(e);
   // soltou o item num lugar ruim? encaixa no lugar livre mais perto (se tiver um bem pertinho)
-  if (drag && drag.item && drag.moved && moving && moving.plot === undefined && !movCerca()) [moving.u, moving.v] = pontoLivre(scene, moving.u, moving.v, moving.key, raioMov(), 1.5);
+  if (drag && drag.item && drag.moved && moving && moving.plot === undefined && !movCerca() && !movAgua()) [moving.u, moving.v] = pontoLivre(scene, moving.u, moving.v, moving.key, raioMov(), 1.5);
   if (drag && !drag.moved) drag = null;
   else if (drag && drag.dead && !fingers.size) setTimeout(() => { if (drag && drag.dead) drag = null; }, 0);
 });
@@ -8186,6 +8187,7 @@ const ENFEITES = [
   { id: 'poco',       nome: 'Poço',                   nivel: 6,  custo: 1500, conforto: 2 },
   { id: 'fonte',      nome: 'Fonte',                  nivel: 10, custo: 3000, conforto: 2 },
   { id: 'moinho',     nome: 'Cata-vento',             nivel: 14, custo: 5000, conforto: 3 },
+  { id: 'agua',       nome: 'Bloco de água',          nivel: 4,  custo: 700,  conforto: 1, agua: true, desc: 'Do tamanho de uma plantação. Encoste um no outro para virar um laguinho, com peixinhos pulando.' },
   // Cerca: um pedaço de uma casa de comprimento, no estilo do tema da roça. Só enfeita (não dá XP).
   { id: 'cerca',      nome: 'Cerca da roça',          nivel: 1,  custo: 40,   conforto: 0, cerca: true, desc: 'No estilo do tema da roça (Loja › Temas).' },
   { id: 'cerca_arame',  nome: 'Cerca de arame farpado', nivel: 2,  custo: 30,  conforto: 0, cerca: true, estilo: { poste: '#8a6a44', topo: '#a4825a', trilho: '#6a6a6a', arame: true }, desc: 'Moirão de madeira e três fios de arame.' },
@@ -8322,6 +8324,16 @@ function drawPorteira(a, b, tipo, W) {
 // O que está sendo movido é uma cerca? (devolve o objeto guardado, se for um já colocado)
 const movCercaId = () => moving && (moving.novo || (moving.key && moving.key.startsWith('enf:') && (objetosDe(state, scene)[Number(moving.key.slice(4))] || {}).id)) || 'cerca';
 const movCerca = () => moving && (moving.novo ? ehCerca(moving.novo) : moving.key && moving.key.startsWith('enf:') && ehCerca((objetosDe(state, scene)[Number(moving.key.slice(4))] || {}).id));
+// Bloco de água: do tamanho de uma plantação, encaixado igual (célula inteira, centro em c+0,5/r+0,5).
+const ehAgua = id => !!(ENFEITE[id] && ENFEITE[id].agua);
+const movAgua = () => moving && (moving.novo ? ehAgua(moving.novo) : moving.key && moving.key.startsWith('enf:') && ehAgua((objetosDe(state, scene)[Number(moving.key.slice(4))] || {}).id));
+const encaixaAgua = (u, v) => [Math.floor(u) + 0.5, Math.floor(v) + 0.5];
+function validAgua(u, v) {
+  const c = Math.floor(u), r = Math.floor(v);
+  if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return false;
+  const i = r * COLS + c;
+  return state.plots[i].s === 'locked' && !objetoNaCelula(i);
+}
 // Uma casa do rancho sendo movida? moving.u/v é o centro do cercado (4 × 3,8), não um pontinho.
 const movAbrigoId = () => moving && moving.key && moving.key.startsWith('abrigo:') && moving.key.slice(7);
 // Cabe aí? Não pode encostar em outro cercado nem sair longe demais do rancho (mas dá pra espalhar uma casa a mais em volta).
@@ -8349,6 +8361,7 @@ function movOk() {
   if (!moving) return false;
   if (moving.plot !== undefined) return validCanteiro(moving.plot, celulaMov());
   if (movCerca()) return scene === 'roca' && validCerca(moving.u, moving.v, moving.rot || 0, moving.key);
+  if (movAgua()) return scene === 'roca' && validAgua(moving.u, moving.v);
   if (movAbrigoId()) return validYardPos(movAbrigoId(), moving.u, moving.v);
   return validSpot(scene, moving.u, moving.v, moving.key, raioMov());
 }
@@ -8409,15 +8422,17 @@ function moveClick(x, y) {
   }
   let [u, v] = screenToWorld(x, y);
   if (movCerca()) [u, v] = encaixaCerca(u, v, moving.rot || 0);
+  else if (movAgua()) [u, v] = encaixaAgua(u, v);
   if (pointer.touch) { moving.u = u; moving.v = v; return renderMoveBar(); } // toque só leva o item até lá
   moving.u = u; moving.v = v;
   salvarMove();
 }
 function salvarMove() {
   if (!moving) return;
-  const { u, v } = moving, cerca = movCerca(), abrigoId = movAbrigoId();
+  const { u, v } = moving, cerca = movCerca(), agua = movAgua(), abrigoId = movAbrigoId();
   if (!movOk()) return toast(moving.plot !== undefined ? 'Aqui não dá: o canteiro vai para um pedaço de gramado livre (sem enfeite nem folhas).'
     : cerca ? 'Aqui não dá: a cerca não pode ficar entre dois canteiros nem em cima de outra coisa.'
+    : agua ? 'Aqui não dá: o bloco de água precisa de uma casa de gramado livre.'
     : abrigoId ? 'Aqui não dá: o cercado não pode encostar em outro nem ficar longe demais do rancho.'
     : 'Aqui não dá: tem que ser no gramado, fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
   if (moving.plot !== undefined) {
@@ -8440,6 +8455,19 @@ function salvarMove() {
     }
     moving = null; moveMode = false; renderMoveBtn(); renderTools();
     return toast(`${nome} colocada! Acabou (compre mais na Loja › Enfeites).`, 'good');
+  }
+  if (agua && moving.novo) {
+    // bloco de água: põe um e já deixa o próximo prontinho do lado, para ir formando o laguinho
+    const id = moving.novo, nome = ENFEITE[id].nome;
+    if (!(state.enfeites[id] > 0)) { moving = null; return; }
+    (state.objetos.roca = objetosDe(state, 'roca')).push({ id, u, v });
+    state.enfeites[id]--; sfx('buy'); done();
+    if (state.enfeites[id] > 0) {
+      moving.u = u + 1; moving.v = v;
+      renderMoveBar(); return toast(`${nome} colocado! Sobram ${state.enfeites[id]}.`, 'good');
+    }
+    moving = null; moveMode = false; renderMoveBtn(); renderTools();
+    return toast(`${nome} colocado! Acabou (compre mais na Loja › Enfeites).`, 'good');
   }
   if (moving.novo) {
     if (!(state.enfeites[moving.novo] > 0)) { moving = null; return; }
@@ -8560,6 +8588,12 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       if (stage === 'tras' && sc === 'roca') cachorroDepois = true; // o cachorro vai na frente da cerca
       else drawDogSpot(slot, s, t, home);
     } else if (o.key === 'arv1' || o.key === 'arv2') drawTree(q.x, q.y, W * (sc === 'roca' ? (o.key === 'arv1' ? 1.0 : 0.8) : (o.key === 'arv1' ? 1.0 : 1.1)), t, sc === 'roca' && tm.coqueiro);
+    else if (ENFEITE[o.id].agua) {
+      drawAgua(s, sc, o, t);
+      const hov = !moveMode && hover && hover.kind === 'enfeite' && hover.sc === sc && hover.key === o.key;
+      if (hov) { const c = o.u - 0.5, r = o.v - 0.5; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; poly(diamond(c, r, 0.03)); ctx.stroke(); }
+      if (!moveMode) hits.push({ kind: 'enfeite', sc, key: o.key, id: o.id, x: q.x, y: q.y, r: W * 0.5 });
+    }
     else if (o.id) {
       const hov = !moveMode && hover && hover.kind === 'enfeite' && hover.sc === sc && hover.key === o.key;
       if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.35, W * 0.12, 0, 0, 7); ctx.stroke(); }
@@ -8577,6 +8611,7 @@ function drawMoving(sc, t) {
   // com o mouse em cima da cena, o item segue o mouse; no toque, fica onde foi arrastado
   if (!pointer.touch && pointer.inside) [moving.u, moving.v] = screenToWorld(pointer.x, pointer.y);
   if (movCerca()) [moving.u, moving.v] = encaixaCerca(moving.u, moving.v, moving.rot || 0);
+  else if (movAgua()) [moving.u, moving.v] = encaixaAgua(moving.u, moving.v);
   if (moving.plot !== undefined) {
     // canteiro: o pedaço de terra de destino fica verde (pode) ou vermelho (não pode)
     const j = celulaMov(), ok = validCanteiro(moving.plot, j);
@@ -8590,6 +8625,13 @@ function drawMoving(sc, t) {
     const ok = movOk(), [a, b] = pontasCerca(moving.u, moving.v, moving.rot || 0), qa = iso(...a), qb = iso(...b);
     line(qa, qb, ok ? 'rgba(80,200,80,.55)' : 'rgba(220,60,50,.55)', L.W * 0.12);
     ctx.globalAlpha = 0.8; drawCercaSeg(moving.u, moving.v, moving.rot || 0, state, movCercaId()); ctx.globalAlpha = 1;
+    return;
+  }
+  if (movAgua()) {
+    const ok = movOk(), c = Math.floor(moving.u), r = Math.floor(moving.v);
+    const [p1, p2, p3, p4] = diamond(c, r, 0.03);
+    quad(p1, p2, p3, p4, ok ? 'rgba(80,200,80,.3)' : 'rgba(220,60,50,.35)', ok ? 'rgba(255,255,255,.9)' : 'rgba(255,200,200,.9)', 2.5);
+    ctx.globalAlpha = 0.8; quad(p1, p2, p3, p4, '#4f95d8'); ctx.globalAlpha = 1;
     return;
   }
   const abrigoId = movAbrigoId();
@@ -8727,7 +8769,7 @@ function inventarioHTML() {
 function invPor(id, sc) {
   if (!(state.enfeites[id] > 0)) return;
   closePanel(); if (!isHome()) goHome(); setScene(sc);
-  const [u0, v0] = screenToWorld(L.cw / 2, L.ch * 0.55), [u, v] = ehCerca(id) ? encaixaCerca(u0, v0, 0) : pontoLivre(sc, u0, v0, null, 0.55);
+  const [u0, v0] = screenToWorld(L.cw / 2, L.ch * 0.55), [u, v] = ehCerca(id) ? encaixaCerca(u0, v0, 0) : ehAgua(id) ? encaixaAgua(u0, v0) : pontoLivre(sc, u0, v0, null, 0.55);
   moveMode = true; moving = { novo: id, u, v, rot: 0 }; renderMoveBtn(); renderTools();
   toast(moveDica(ENFEITE[id].nome));
 }
@@ -8736,6 +8778,31 @@ function invGuardar(sc, i) {
   state.objetos[sc] = l.filter((_, k) => k !== i);
   state.enfeites[o.id] = (state.enfeites[o.id] || 0) + 1;
   toast(`${ENFEITE[o.id].nome} guardado no inventário.`); done();
+}
+// Bloco de água: do tamanho de uma célula (igual um canteiro). Sem borda no lado que encosta em
+// outro bloco de água, pra virar um laguinho contínuo. Com peixinho pulando quando tem pelo menos 2 juntos.
+function drawAgua(s, sc, o, t) {
+  const objs = objetosDe(s, sc).filter(x => ehAgua(x.id));
+  const viz = (du, dv) => objs.some(x => Math.abs(x.u - (o.u + du)) < 0.1 && Math.abs(x.v - (o.v + dv)) < 0.1);
+  const c = o.u - 0.5, r = o.v - 0.5;
+  const [p1, p2, p3, p4] = diamond(c, r, 0.03);
+  quad(p1, p2, p3, p4, estacao().neve ? '#cfe6f5' : '#4f95d8');
+  if (!viz(0, -1)) line(p1, p2, 'rgba(255,255,255,.4)', 1.3);
+  if (!viz(1, 0)) line(p2, p3, 'rgba(255,255,255,.4)', 1.3);
+  if (!viz(0, 1)) line(p3, p4, 'rgba(255,255,255,.4)', 1.3);
+  if (!viz(-1, 0)) line(p4, p1, 'rgba(255,255,255,.4)', 1.3);
+  const m = { x: (p1.x + p3.x) / 2, y: (p1.y + p3.y) / 2 };
+  ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(m.x - L.W * 0.08, m.y - L.W * 0.06, L.W * 0.14, L.W * 0.06, 0, 0, 7); ctx.fill();
+  if (viz(1, 0) || viz(-1, 0) || viz(0, 1) || viz(0, -1)) drawPeixinhoLagoa(m.x, m.y, L.W, t, Math.round(o.u * 1300 + o.v * 700));
+}
+function drawPeixinhoLagoa(x, y, W, t, seed) {
+  const T = 2600, ph = (t + seed) % T;
+  if (ph > 480) return;
+  const p = ph / 480, arc = Math.sin(p * Math.PI);
+  if (p < 0.1 || p > 0.9) { ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.ellipse(x, y, W * 0.1, W * 0.04, 0, 0, 7); ctx.stroke(); }
+  ctx.save(); ctx.translate(x + (p - 0.5) * W * 0.35, y - arc * W * 0.42); ctx.rotate(-0.5 + arc * 0.5);
+  drawPeixe(ctx, 0, 0, W / 230, PEIXE.lambari);
+  ctx.restore();
 }
 // Desenho dos enfeites, com a base em (x, y). s = escala (1 = casa de 100px).
 function drawEnfeite(id, x, y, s, t) {
@@ -8747,6 +8814,16 @@ function drawEnfeite(id, x, y, s, t) {
     const a = { x: x - 26 * s, y: y - 2 * s }, b = { x: x + 26 * s, y: y - 8 * s };
     if (ENFEITE[id].porteira) drawPorteira(a, b, ENFEITE[id].porteira, L.W); else fenceRun(a, b, 2, false, ENFEITE[id].estilo);
     L.W = W0; return;
+  }
+  if (id === 'agua') {
+    // ícone: um quadradinho de água visto de cima, com um peixinho pulando
+    ctx.fillStyle = '#4f95d8'; ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1.5 * s;
+    ctx.beginPath(); ctx.roundRect(x - 24 * s, y - 20 * s, 48 * s, 40 * s, 4 * s); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.beginPath(); ctx.ellipse(x - 8 * s, y - 8 * s, 14 * s, 6 * s, 0, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(x + 6 * s, y + 2 * s); ctx.rotate(-0.3);
+    drawPeixe(ctx, 0, 0, s * 0.5, PEIXE.lambari);
+    ctx.restore();
+    return;
   }
   ctx.lineWidth = Math.max(1, 1.2 * s); ctx.strokeStyle = 'rgba(60,30,10,.5)';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, 26 * s, 8 * s, 0, 0, 7); ctx.fill();
