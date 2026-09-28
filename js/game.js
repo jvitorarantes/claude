@@ -981,6 +981,7 @@ const NOVIDADES = [
   { v: 135, txt: 'Corrigido: o avisinho de peixe 🐟 em cima do pesqueiro só aparecia quando o ponto tinha acabado de descansar. Agora aparece sempre que der pra pescar de vara ali, mesmo que você ainda não tenha usado nenhuma pescaria.' },
   { v: 136, txt: 'O avisinho de peixe 🐟 no pesqueiro agora também aparece quando a tarrafa está pronta, não só a vara.' },
   { v: 137, txt: 'A entrada do mato agora também ganha um avisinho 🐾, parecido com o da pescaria: aparece sempre que tem caçada disponível em algum dos seus lugares.' },
+  { v: 138, txt: 'Corrigido: no celular, um objeto movido bem pra longe (como a casa) podia ficar cortado na borda da tela, mesmo aparecendo certinho no computador. Agora o enquadramento sempre encolhe a roça o quanto for preciso pra tudo caber.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2028,11 +2029,12 @@ function layout(sc) {
     // (um pouco mais perto que antes: a roça aparece maior e é mais fácil de tocar)
     const antes = Math.max(full, Math.min(rw * 1.8 / span, ah * 0.86 / (span / 4 + 0.9), rw / 5, ah / 3.6));
     L.W = antes * 1.15;
-    // no computador, da casinha do cachorro (à esquerda) até o fim dos canteiros tem que caber na largura,
-    // sem ir para trás dos botões; nunca fica menor do que era antes
-    if (cw >= 700) {
+    // da casinha do cachorro (à esquerda) até o fim dos canteiros (ou de um objeto movido pra longe)
+    // tem que caber na largura, sem ir para trás dos botões; nunca fica menor do que era antes.
+    // (antes isso só rodava no computador: no celular um objeto movido bem pra direita, como a casa, podia ficar cortado)
+    {
       const esqU = Math.min((c0 - r1) / 2, ...objs.map(o => (o.u - o.v) / 2)) - 0.6, dirU = (c1 - r0) / 2 + 0.4;
-      L.W = Math.max(antes, Math.min(L.W, aw / (dirU - esqU)));
+      L.W = Math.max(antes, Math.min(L.W, rw / (dirU - esqU)));
     }
     const cc = (c0 + c1) / 2, rc = (r0 + r1) / 2;
     L.ox = cx - (cc - rc) * L.W / 2;
