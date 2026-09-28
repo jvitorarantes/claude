@@ -988,6 +988,7 @@ const NOVIDADES = [
   { v: 142, txt: 'Corrigido: o mesmo bug da carne de javali também acontecia com as frutas do pomar — entravam no celeiro e contavam no selo, mas sumiam da lista. Agora aparecem certinho.' },
   { v: 143, txt: 'Broto de cada semente diferenciado desde o primeiro instante que planta, não só depois que já cresceu um pouco.' },
   { v: 144, txt: 'A fileira de pontos de pesca e lugares de caçada agora esmaece na ponta quando tem mais pra rolar, pra não parecer cortada.' },
+  { v: 145, txt: 'Corrigido: as mensagens prontas do chat com amigos não rolavam pro lado no toque do celular.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
