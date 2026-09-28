@@ -1054,6 +1054,7 @@ const NOVIDADES = [
   { v: 158, txt: 'Se você tiver um laguinho (2+ blocos de água juntos), chegou Celeste, a sucuri: ela anda por perto, entra na água pra pescar, sai com o peixe e come. Clique nela para ver o que está fazendo.' },
   { v: 159, txt: 'Celeste, a sucuri do laguinho, agora leva seu tempo: passeia bem mais antes de entrar na água de novo, pesca com calma e demora pra comer. Menos corrida, mais charme.' },
   { v: 160, txt: 'Os blocos de água ganharam bordas arredondadas: as pontas que ficam pra fora do laguinho agora são curvas, em vez de quadradinhas.' },
+  { v: 161, txt: 'Celeste, a sucuri, ficou bem mais fofa: cabeça grande e redonda, olhões brilhantes, bochecha rosada, sorrisinho e uma linguinha que aparece de vez em quando.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -8899,19 +8900,40 @@ function drawSucuri(s, t, home) {
   const [u, v] = sucuriPos(sucuri, cx, cv, age);
   const q = iso(u, v);
   ctx.save(); ctx.translate(q.x, q.y);
-  const seg = 8, comp = W * 1.05;
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(W * 0.05, W * 0.11, W * 0.55, W * 0.14, 0, 0, 7); ctx.fill();
+  const seg = 8, comp = W * 1.05, hx = comp / 2 + W * 0.06; // hx: centro da cabeça
   for (let i = seg - 1; i >= 0; i--) {
-    const a = i / (seg - 1), sx = (a - 0.5) * comp, sy = Math.sin(a * 5 + t / 260) * W * 0.1, r = W * (0.1 - a * 0.025);
-    ctx.fillStyle = i % 2 === 0 ? '#2f6a2a' : '#3f8a38';
-    ctx.beginPath(); ctx.ellipse(sx, sy, r * 1.7, r, 0, 0, 7); ctx.fill();
-    if (i % 3 === 0) { ctx.fillStyle = 'rgba(230,220,150,.6)'; ctx.beginPath(); ctx.ellipse(sx, sy, r * 0.5, r * 0.35, 0, 0, 7); ctx.fill(); }
+    const a = i / (seg - 1), sx = (a - 0.5) * comp, sy = Math.sin(a * 5 + t / 260) * W * 0.1, r = W * (0.105 - a * 0.02);
+    ctx.fillStyle = i % 2 === 0 ? '#4fae42' : '#6bc957';
+    ctx.beginPath(); ctx.ellipse(sx, sy, r * 1.65, r * 1.05, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#eef7d8'; ctx.beginPath(); ctx.ellipse(sx, sy + r * 0.55, r * 1.1, r * 0.4, 0, 0, 7); ctx.fill(); // barriguinha clarinha
+    if (i % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(sx - r * 0.3, sy - r * 0.35, r * 0.4, r * 0.25, 0, 0, 7); ctx.fill(); }
   }
-  ctx.fillStyle = '#2f6a2a'; ctx.beginPath(); ctx.ellipse(comp / 2 + W * 0.03, 0, W * 0.13, W * 0.09, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.arc(comp / 2 + W * 0.08, -W * 0.03, W * 0.02, 0, 7); ctx.fill();
-  ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(comp / 2 + W * 0.08, -W * 0.03, W * 0.008, 0, 7); ctx.fill();
+  // cabecinha grande e redonda, bem fofa
+  ctx.fillStyle = '#4fae42'; ctx.beginPath(); ctx.ellipse(hx, 0, W * 0.155, W * 0.125, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#eef7d8'; ctx.beginPath(); ctx.ellipse(hx + W * 0.02, W * 0.05, W * 0.1, W * 0.05, 0, 0, 7); ctx.fill();
+  // bochechas rosadas
+  ctx.fillStyle = 'rgba(255,140,160,.45)';
+  ctx.beginPath(); ctx.ellipse(hx - W * 0.03, W * 0.045, W * 0.028, W * 0.02, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(hx + W * 0.1, W * 0.035, W * 0.026, W * 0.018, 0, 0, 7); ctx.fill();
+  // olhões bem grandes e fofos, com brilho
+  for (const ex of [hx - W * 0.015, hx + W * 0.075]) {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex, -W * 0.05, W * 0.042, W * 0.05, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(ex + W * 0.008, -W * 0.045, W * 0.026, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex - W * 0.002, -W * 0.06, W * 0.011, 0, 7); ctx.fill();
+  }
+  // sorrisinho
+  ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = W * 0.012; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(hx + W * 0.02, W * 0.09); ctx.quadraticCurveTo(hx + W * 0.09, W * 0.115, hx + W * 0.14, W * 0.06); ctx.stroke();
+  // linguinha, de vez em quando
+  if ((sucuri.fase === 'andando' || sucuri.fase === 'pescando') && Math.sin(t / 420) > 0.7) {
+    ctx.strokeStyle = '#e0506a'; ctx.lineWidth = W * 0.012;
+    ctx.beginPath(); ctx.moveTo(hx + W * 0.15, W * 0.02); ctx.lineTo(hx + W * 0.21, W * 0.005); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hx + W * 0.21, W * 0.005); ctx.lineTo(hx + W * 0.24, -W * 0.01); ctx.moveTo(hx + W * 0.21, W * 0.005); ctx.lineTo(hx + W * 0.24, W * 0.02); ctx.stroke();
+  }
   if (sucuri.fase === 'saindo' || sucuri.fase === 'comendo') {
     const escala = sucuri.fase === 'comendo' ? Math.max(0, 1 - p) : 1;
-    if (escala > 0) { ctx.save(); ctx.translate(comp / 2 + W * 0.18, 0); ctx.scale(escala, escala); drawPeixe(ctx, 0, 0, W / 260, PEIXE.lambari); ctx.restore(); }
+    if (escala > 0) { ctx.save(); ctx.translate(hx + W * 0.2, W * 0.04); ctx.scale(escala, escala); drawPeixe(ctx, 0, 0, W / 260, PEIXE.lambari); ctx.restore(); }
   }
   ctx.restore();
   if (home && !moveMode) hits.push({ kind: 'sucuri', x: q.x, y: q.y - W * 0.1, r: W * 0.5 });
