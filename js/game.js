@@ -1059,6 +1059,7 @@ const NOVIDADES = [
   { v: 163, txt: 'Celeste, a sucuri, ganhou um corpo de verdade: uma fita só afunilando da cabeça até a cauda, sem as bolinhas, em tom azul-esverdeado de bicho d\'água.' },
   { v: 164, txt: 'Bloco de água mais barato: agora custa 30 moedas, o mesmo preço da cerca mais em conta.' },
   { v: 165, txt: 'Tirada a Celeste. Os peixinhos do laguinho ficaram maiores e agora nadam de bloco em bloco por todo o laguinho, em vez de pular parados num cantinho só.' },
+  { v: 166, txt: 'Área do rancho bem maior pra arrastar os abrigos no Modo Mover, e a câmera agora acompanha se você mandar um bem longe. E não dá mais pra soltar um abrigo em cima do lugar reservado de outro que ainda não foi construído.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2126,11 +2127,15 @@ function layout(sc) {
     const falta = (cw < 700 ? 6 : I.l) - esq * L.W - L.ox, sobra = I.l + aw - (L.ox + (dirU - 0.4) * L.W);
     if (falta > 0 && (sobra > 0 || cw < 700)) L.ox += cw < 700 ? falta : Math.min(falta, sobra);
   } else if (sc === 'animais') {
-    // O rancho inteiro cabe na tela; no celular fica maior e dá para arrastar.
-    const bw = (RANCH_C + RANCH_R) / 2 + 0.8, bh = (RANCH_C + RANCH_R) / 4 + 1.6;
+    // O rancho inteiro cabe na tela; no celular fica maior e dá para arrastar. Abrigo movido pra fora
+    // da grade original entra na conta, senão o enquadramento não crescia pra mostrar ele.
+    let u0 = 0, u1 = RANCH_C, v0 = 0, v1 = RANCH_R;
+    for (const b of ABRIGOS) { const y = yardOf(b.id); u0 = Math.min(u0, y.u0); u1 = Math.max(u1, y.u1); v0 = Math.min(v0, y.v0); v1 = Math.max(v1, y.v1); }
+    const du = u1 - u0, dv = v1 - v0;
+    const bw = (du + dv) / 2 + 0.8, bh = (du + dv) / 4 + 1.6;
     L.W = Math.max(Math.min(aw / bw, ah / bh) * 1.08, cw < 700 ? 72 : 0);
-    L.ox = cx - (RANCH_C - RANCH_R) * L.W / 4 + 0.1 * L.W;
-    L.oy = I.t + ah / 2 - ((RANCH_C + RANCH_R) / 8 - 0.55) * L.W;
+    L.ox = cx - ((u0 + u1) - (v0 + v1)) * L.W / 4 + 0.1 * L.W;
+    L.oy = I.t + ah / 2 - (((u0 + u1) + (v0 + v1)) / 8 - 0.55) * L.W;
     box = { w: bw * L.W, h: bh * L.W };
   } else {
     L.W = Math.min(aw / 5.9, ah / 4.35);
@@ -8345,12 +8350,14 @@ function validAgua(u, v) {
 }
 // Uma casa do rancho sendo movida? moving.u/v é o centro do cercado (4 × 3,8), não um pontinho.
 const movAbrigoId = () => moving && moving.key && moving.key.startsWith('abrigo:') && moving.key.slice(7);
-// Cabe aí? Não pode encostar em outro cercado nem sair longe demais do rancho (mas dá pra espalhar uma casa a mais em volta).
+// Cabe aí? Não pode encostar em outro cercado (construído ou não — reserva o lugar dele também) nem
+// sair muito longe do rancho, mas agora dá pra espalhar bem mais ao redor da grade original.
 function validYardPos(id, cu, cv) {
   const u0 = cu - YARD_W / 2, v0 = cv - YARD_D / 2, u1 = u0 + YARD_W, v1 = v0 + YARD_D;
-  if (u0 < -YARD_W || v0 < -YARD_D || u1 > RANCH_C + YARD_W || v1 > RANCH_R + YARD_D) return false;
+  const folga = 3;
+  if (u0 < -YARD_W * folga || v0 < -YARD_D * folga || u1 > RANCH_C + YARD_W * folga || v1 > RANCH_R + YARD_D * folga) return false;
   for (const b of ABRIGOS) {
-    if (b.id === id || !abrigoLv(state, b.id)) continue;
+    if (b.id === id) continue;
     const y = yardOf(b.id);
     if (u0 < y.u1 && u1 > y.u0 && v0 < y.v1 && v1 > y.v0) return false;
   }
