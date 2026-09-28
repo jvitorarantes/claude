@@ -977,6 +977,7 @@ const NOVIDADES = [
   { v: 131, txt: 'A tarrafa 🕸️ agora seca separadamente em cada pesqueiro: jogar em um lago não afeta o tempo de espera dos outros. A lista de pesqueiros mostra o tempo da tarrafa de cada um.' },
   { v: 132, txt: 'No modo Mover, chegou o botão 📦 Guardar: dá para mandar o item direto pro inventário sem precisar cancelar e abrir o menu de novo.' },
   { v: 133, txt: 'Corrigido: no celular, rolar a tela pra cima/baixo em cima do lago da pescaria às vezes travava. Agora só trava o toque durante a fisgada e a briga (pra puxar rápido); no resto, dá pra rolar normalmente.' },
+  { v: 134, txt: 'Corrigido: a tarrafa tinha parado de funcionar pra quem já jogava antes da última atualização. Agora seca certinho, separada em cada pesqueiro.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -6908,7 +6909,8 @@ const faltaPonto = id => Math.max(0, (pontosDe().prox[id] || 0) - Date.now());
 // Cada ponto dá VARA_POR_VEZ pescarias de vara; depois descansa (2 horas, menos com o domínio).
 const VARA_POR_VEZ = 3;
 const restamVara = id => PONTO[id] && PONTO[id].solte ? Infinity : faltaPonto(id) ? 0 : Math.max(0, VARA_POR_VEZ - (pontosDe().usos[id] || 0));
-const faltaTarrafa = (id = pontoSel()) => Math.max(0, ((state.tarrafaEm && state.tarrafaEm[id]) || 0) - Date.now());
+const tarrafaObj = () => (state.tarrafaEm && typeof state.tarrafaEm === 'object' ? state.tarrafaEm : (state.tarrafaEm = {}));
+const faltaTarrafa = (id = pontoSel()) => Math.max(0, (tarrafaObj()[id] || 0) - Date.now());
 // Algum ponto seu descansou e está pronto de novo (mostra um brilho no pesqueiro até você pescar lá).
 const pescaPronta = () => state && PONTOS.some(p => !p.solte && temPonto(p.id) && pontosDe().prox[p.id] && !faltaPonto(p.id) && !(pontosDe().usos[p.id] > 0));
 function comprarPonto(id) {
@@ -6954,7 +6956,7 @@ function jogarTarrafa() {
   if (faltaTarrafa()) return toast(`A tarrafa deste pesqueiro está secando: dá para jogar de novo em ${fmt(faltaTarrafa() / 1000)}.`);
   const sorte = PONTO[pontoSel()].sorte;
   const peixes = Array.from({ length: TARRAFA_N }, () => sortearPeixe(null, sorte, true, pontoSel()));
-  state.tarrafaEm = state.tarrafaEm || {}; state.tarrafaEm[pontoSel()] = Date.now() + esperaTarrafa(); save();
+  tarrafaObj()[pontoSel()] = Date.now() + esperaTarrafa(); save();
   if (pescaLivro) livroVisto(); pescaLivro = false;
   pesca = { fase: 'tarrafa', t0: performance.now(), peixes };
   sfx('water'); renderPesca();
@@ -9792,7 +9794,7 @@ const TREVO_LOJA = [
   // úteis (dá para trocar quantas vezes quiser)
   { id: 'util:camarao',   nome: '10 camarões',              tipo: 'Útil', preco: 4,  repete: true, desc: 'Isca de camarão para a pescaria.', usar: () => { iscasDe().camarao = (iscasDe().camarao || 0) + 10; } },
   { id: 'util:artificial', nome: '5 iscas artificiais',     tipo: 'Útil', preco: 6,  repete: true, desc: 'Para tucunaré, dourado e pirarucu.', usar: () => { iscasDe().artificial = (iscasDe().artificial || 0) + 5; } },
-  { id: 'util:tarrafa',   nome: 'Tarrafa pronta agora',     tipo: 'Útil', preco: 8,  repete: true, desc: 'Seca a tarrafa deste pesqueiro na hora: pode jogar de novo.', pode: () => faltaTarrafa() > 0, naoPode: 'A tarrafa já está pronta!', usar: () => { if (state.tarrafaEm) state.tarrafaEm[pontoSel()] = 0; } },
+  { id: 'util:tarrafa',   nome: 'Tarrafa pronta agora',     tipo: 'Útil', preco: 8,  repete: true, desc: 'Seca a tarrafa deste pesqueiro na hora: pode jogar de novo.', pode: () => faltaTarrafa() > 0, naoPode: 'A tarrafa já está pronta!', usar: () => { tarrafaObj()[pontoSel()] = 0; } },
   { id: 'util:enxada',    nome: 'Enxada de arrancar',       tipo: 'Útil', preco: 3,  repete: true, desc: 'Tira um arbusto seco do pomar.', usar: () => { derrubarDe().enxada++; } },
   { id: 'util:motosserra', nome: 'Motosserra',              tipo: 'Útil', preco: 6,  repete: true, desc: 'Derruba uma árvore seca do pomar.', usar: () => { derrubarDe().motosserra++; } },
   { id: 'util:racao',     nome: '3 rações especiais',       tipo: 'Útil', preco: 6,  repete: true, desc: 'Cada uma faz um animal produzir em dobro.', usar: () => { state.racaoEsp = (state.racaoEsp || 0) + 3; } },
