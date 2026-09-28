@@ -70,6 +70,30 @@ const PRODUCTS = [
   { id: 'leitebufala', nome: 'Leite de búfala', preco: 500 },
 ];
 const PRODUCT = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
+// Materiais que os bichos da caçada deixam ao serem pegos (além das moedas): usados na fábrica, vendidos ou entregues no caminhão.
+const PRODUTOS_CACA = [
+  { id: 'carnejavali', nome: 'Carne de javali',      nomePl: 'carnes de javali',      preco: 60 },
+  { id: 'pena',        nome: 'Pena de ave',          nomePl: 'penas de ave',          preco: 15 },
+  { id: 'pata',        nome: 'Pata de lebre',        nomePl: 'patas de lebre',        preco: 30 },
+  { id: 'presa',       nome: 'Presa de chupa-cabra', nomePl: 'presas de chupa-cabra', preco: 300 },
+];
+for (const p of PRODUTOS_CACA) PRODUCT[p.id] = { ...p, caca: true };
+// Junta o que o bicho larga (carne, no caso do javali/javaporco, e o drop genérico dos outros) e devolve o textinho pro resultado.
+function aplicaDropsCaca(b) {
+  let txt = '';
+  if (b.carne) {
+    state.barn.carnejavali = (state.barn.carnejavali || 0) + b.carne;
+    txt += ` e ${b.carne} ${b.carne > 1 ? PRODUCT.carnejavali.nomePl : PRODUCT.carnejavali.nome.toLowerCase()}`;
+  }
+  if (b.drop) {
+    const p = PRODUCT[b.drop.id];
+    state.barn[b.drop.id] = (state.barn[b.drop.id] || 0) + b.drop.qtd;
+    txt += ` e ${b.drop.qtd} ${b.drop.qtd > 1 ? p.nomePl : p.nome.toLowerCase()}`;
+  }
+  return txt;
+}
+// Bicho de onde vem cada material (pra travar receita/pedido até você já ter caçado um).
+const BICHO_DO_DROP = {};
 // Frutas do pomar (vêm das frutíferas plantadas no gramado)
 const FRUTAS = [
   { id: 'pitanga',    nome: 'Pitanga',    preco: 25, cor: '#e0402a' },
@@ -1018,6 +1042,7 @@ const NOVIDADES = [
   { v: 152, txt: 'O selo de Alienígena 👽 virou opção separada, e o Chupa-cabra agora é um morcego 🦇. Chegaram 3 molduras grátis pra foto (Campo, Céu e Pôr do sol) além da dourada de pioneiro. E corrigido: quem já era pioneiro de antes agora recebe a moldura dourada.' },
   { v: 153, txt: 'Chegaram 5 molduras novas pra foto, liberando por nível: Flor (nível 5), Girassol (nível 10), Lavanda (nível 15), Borboleta (nível 22) e Arco-íris (nível 30).' },
   { v: 154, txt: 'Molduras da foto redesenhadas: em vez de um anel liso, agora têm galhos, pétalas e nuvens invadindo a foto de um jeito mais criativo. E chegou uma animaçãozinha (com confete!) toda vez que você sobe de nível.' },
+  { v: 155, txt: 'A caçada agora deixa material: pássaro solta pena, lebre solta pata e o lendário Chupa-cabra solta presa (além da carne de javali, que já existia). Vendem no celeiro/banca, entram nos pedidos do caminhão, e dá pra fazer cocar, amuleto e colar na nova máquina Artesanato da caçada.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2959,6 +2984,18 @@ function drawProduct(id, x, y, s) {
     ctx.fillStyle = '#e0b030'; ctx.beginPath(); ctx.ellipse(0, -1 * s, 2 * s, 2.6 * s, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#1f4fa0'; ctx.beginPath(); ctx.ellipse(0, -1 * s, 1.1 * s, 1.5 * s, 0, 0, 7); ctx.fill();
     ctx.restore();
+  } else if (id === 'pata') {
+    ctx.fillStyle = '#c8965a'; ctx.strokeStyle = '#8a6234';
+    ctx.beginPath(); ctx.ellipse(x, y + 2.5 * s, 4.2 * s, 3 * s, 0, 0, 7); ctx.fill(); ctx.stroke();
+    for (const dx of [-2.6, 0, 2.6]) { ctx.beginPath(); ctx.ellipse(x + dx * s, y - 2.2 * s, 1.5 * s, 2.1 * s, 0, 0, 7); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.ellipse(x - 1.5 * s, y + 1 * s, 1.2 * s, 0.8 * s, 0.3, 0, 7); ctx.fill();
+  } else if (id === 'presa') {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(0.15);
+    ctx.fillStyle = '#f2ecd8'; ctx.strokeStyle = '#a89a72';
+    ctx.beginPath(); ctx.moveTo(-2.6 * s, -6 * s); ctx.quadraticCurveTo(2.4 * s, -1 * s, 0.6 * s, 6.5 * s); ctx.quadraticCurveTo(-1.2 * s, 1 * s, -2.6 * s, -6 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(-1.4 * s, -2.5 * s, 0.8 * s, 2.3 * s, 0.2, 0, 7); ctx.fill();
+    ctx.fillStyle = '#8a1f2a'; ctx.beginPath(); ctx.arc(0.4 * s, 6 * s, 1 * s, 0, 7); ctx.fill();
+    ctx.restore();
   }
 }
 
@@ -4595,7 +4632,7 @@ function renderPane() {
     }
   } else if (tab === 'celeiro') {
     html += chaveAviso('celeiro', 'Mostrar a quantidade de itens no botão do Celeiro');
-    const items = [...Object.values(PRODUCE), ...PRODUCTS, PRODUCT.carnejavali, ...PEIXES.map(p => PRODUCT[p.id]), ...FRUTAS.map(f => PRODUCT[f.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
+    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PRODUTOS_CACA.map(p => PRODUCT[p.id]), ...PEIXES.map(p => PRODUCT[p.id]), ...FRUTAS.map(f => PRODUCT[f.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
     let total = 0; for (const it of items) total += state.barn[it.id] * it.preco;
     html += `<h3>Celeiro</h3>`;
     if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha na roça e recolha ovos, leite, lã e trufas dos animais.</div>`;
@@ -7577,7 +7614,7 @@ function vilaDe(npc) {
   return state.vila[npc];
 }
 // Prato de peixe só entra em pedidos se a pessoa já pescou aquele peixe alguma vez.
-const receitaPossivel = r => Object.keys(r.in).every(id => !PEIXE[id] || (state.col && state.col[id] > 0));
+const receitaPossivel = r => Object.keys(r.in).every(id => (!PEIXE[id] || (state.col && state.col[id] > 0)) && jaCacou(id));
 function itensDaVila() {
   const lista = [];
   for (const c of CROPS) if (c.nivel <= state.level) lista.push({ id: c.prod, min: 4, max: 12 });
@@ -7771,6 +7808,10 @@ const RECEITAS = [
   { id: 'pintadoass',  nome: 'Pintado assado',      nivel: 10, in: { pintado: 1, molho: 1 },             tempo: HOUR,     forma: 'prato',  cor: '#c7c1b3', peixe: 'pintado' },
   { id: 'douradobr',   nome: 'Dourado na brasa',    nivel: 13, in: { dourado: 1, cebola: 2 },            tempo: 90 * MIN, forma: 'prato',  cor: '#f2b705', peixe: 'dourado' },
   { id: 'casaca',      nome: 'Pirarucu de casaca',  nivel: 18, in: { pirarucu: 1, farofa: 2, banana: 3 }, tempo: 2 * HOUR, forma: 'prato',  cor: '#6b5a4a', peixe: 'pirarucu' },
+  // artesanato com o que a caçada deixa (pena, pata, presa)
+  { id: 'cocar',    nome: 'Cocar de penas',       nivel: 10, in: { pena: 4 },                            tempo: 45 * MIN, forma: 'novelo',   cor: '#3f9a5a' },
+  { id: 'amuleto',  nome: 'Amuleto de pata',      nivel: 10, in: { pata: 2 },                            tempo: HOUR,     forma: 'manteiga', cor: '#8a6234' },
+  { id: 'colar',    nome: 'Colar de presas',      nivel: 20, in: { presa: 1 },                           tempo: 2 * HOUR, forma: 'queijo',   cor: '#3a2a3a' },
 ];
 const RECEITA = Object.fromEntries(RECEITAS.map(r => [r.id, r]));
 // O produto vale 50% a mais que os ingredientes, e um pouco pelo tempo de fábrica.
@@ -7797,6 +7838,9 @@ const MAQUINAS = [
   { id: 'suqueira',   nome: 'Suqueira', emoji: '🧃',
     receitas: ['sucouva', 'sucolar'],
     slots: [{ nivel: 15, custo: 0 }, { nivel: 20, custo: 900 }] },
+  { id: 'artesanato', nome: 'Artesanato da caçada', emoji: '🪶',
+    receitas: ['cocar', 'amuleto', 'colar'],
+    slots: [{ nivel: 10, custo: 0 }, { nivel: 20, custo: 800 }] },
 ];
 const MAQUINA = Object.fromEntries(MAQUINAS.map(m => [m.id, m]));
 const MAQUINA_DE = Object.fromEntries(MAQUINAS.flatMap(m => m.receitas.map(r => [r, m.id])));
@@ -7968,7 +8012,8 @@ const blocoCaminhao = () => Math.floor(Date.now() / CAMINHAO_BLOCO);
 function itensPossiveis() {
   const l = CROPS.filter(c => c.nivel <= state.level).map(c => c.prod);
   const bichos = new Set(state.animals.filter(a => ANIMAL[a.k].tipo === 'prod' && ANIMAL[a.k].prod !== 'leitao').map(a => ANIMAL[a.k].prod));
-  return [...l, ...bichos, ...RECEITAS.filter(r => r.nivel <= state.level && receitaPossivel(r)).map(r => r.id)];
+  const caca = PRODUTOS_CACA.filter(p => jaCacou(p.id)).map(p => p.id);
+  return [...l, ...bichos, ...caca, ...RECEITAS.filter(r => r.nivel <= state.level && receitaPossivel(r)).map(r => r.id)];
 }
 function novoPedido() {
   const pool = itensPossiveis(), n = 1 + Math.floor(Math.random() * Math.min(3, 1 + state.level / 6)), itens = {};
@@ -9200,12 +9245,12 @@ const LUGAR_CACA = Object.fromEntries(LUGARES_CACA.map(l => [l.id, l]));
 const CACA_BICHOS = [
   // pragas: estilingue (pequenas) e espingarda (grandes)
   { id: 'rato',       nome: 'Rato do paiol',   raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'rato',  cor: '#8a8078', tam: 0.7,  vel: 1.1, hp: 1, moedas: 15,  peso: 10 },
-  { id: 'pombo',      nome: 'Pombo',           raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9aa3ad', tam: 0.75, vel: 0.9, hp: 1, moedas: 12,  peso: 10, voa: true },
-  { id: 'pardal',     nome: 'Pardal',          raro: 'incomum',  praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#a07a4a', tam: 0.6,  vel: 1.1, hp: 1, moedas: 22, peso: 5, voa: true },
-  { id: 'lebre',      nome: 'Lebre-europeia',  raro: 'incomum',  praga: true, armas: ['estilingue', 'espingarda'], nivel: 10, lug: 0, forma: 'lebre', cor: '#b08a5a', tam: 0.9, vel: 1.55, hp: 1, moedas: 40, peso: 6 },
+  { id: 'pombo',      nome: 'Pombo',           raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9aa3ad', tam: 0.75, vel: 0.9, hp: 1, moedas: 12,  peso: 10, voa: true, drop: { id: 'pena', qtd: 1 } },
+  { id: 'pardal',     nome: 'Pardal',          raro: 'incomum',  praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#a07a4a', tam: 0.6,  vel: 1.1, hp: 1, moedas: 22, peso: 5, voa: true, drop: { id: 'pena', qtd: 1 } },
+  { id: 'lebre',      nome: 'Lebre-europeia',  raro: 'incomum',  praga: true, armas: ['estilingue', 'espingarda'], nivel: 10, lug: 0, forma: 'lebre', cor: '#b08a5a', tam: 0.9, vel: 1.55, hp: 1, moedas: 40, peso: 6, drop: { id: 'pata', qtd: 1 } },
   { id: 'javali',     nome: 'Javali',          raro: 'raro',     praga: true, armas: ['espingarda'], nivel: 12, lug: 1, forma: 'porco', cor: '#5a4a3a', tam: 1.3,  vel: 1.0, hp: 2, moedas: 90,  carne: 2, peso: 7 },
   { id: 'javaporco',  nome: 'Javaporco',       raro: 'épico',    praga: true, armas: ['espingarda'], nivel: 15, lug: 2, forma: 'porco', cor: '#7a5a44', tam: 1.5,  vel: 1.15, hp: 3, moedas: 160, carne: 3, peso: 2.5, pintas: true },
-  { id: 'chupacabra', nome: 'Chupa-cabra',     raro: 'lendário', praga: true, armas: ['espingarda'], nivel: 20, lug: 3, forma: 'chupa', cor: '#6a7a6a', tam: 1.25, vel: 1.75, hp: 4, moedas: 1000, peso: 0.6 },
+  { id: 'chupacabra', nome: 'Chupa-cabra',     raro: 'lendário', praga: true, armas: ['espingarda'], nivel: 20, lug: 3, forma: 'chupa', cor: '#6a7a6a', tam: 1.25, vel: 1.75, hp: 4, moedas: 1000, peso: 0.6, drop: { id: 'presa', qtd: 1 } },
   // nativos: só na arapuca, e voltam para o mato
   { id: 'rolinha',    nome: 'Rolinha',         raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#c89a7a', tam: 0.6,  moedas: 5,  peso: 10 },
   { id: 'prea',       nome: 'Preá',            raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'rato',  cor: '#8a6a4a', tam: 0.7,  moedas: 5,  peso: 10, semRabo: true },
@@ -9218,6 +9263,9 @@ const CACA_BICHOS = [
   { id: 'mutum',      nome: 'Mutum',           raro: 'épico',    armas: ['arapuca'], nivel: 18, lug: 3, forma: 'ave',   cor: '#1e1e22', tam: 1.05, moedas: 40, peso: 1.2, crista: true },
 ];
 const CACA_BICHO = Object.fromEntries(CACA_BICHOS.map(b => [b.id, b]));
+for (const b of CACA_BICHOS) if (b.drop) (BICHO_DO_DROP[b.drop.id] || (BICHO_DO_DROP[b.drop.id] = [])).push(b.id);
+BICHO_DO_DROP.carnejavali = ['javali', 'javaporco'];
+const jaCacou = id => !BICHO_DO_DROP[id] || (state.caca && state.caca.col && BICHO_DO_DROP[id].some(b => state.caca.col[b] > 0));
 const ARMAS_CACA = {
   estilingue: { nome: 'Estilingue', nivel: 10, custo: 0,    mun: 'pedra',    munNome: 'pedrinhas', pacote: 10, munCusto: 20 },
   espingarda: { nome: 'Espingarda', nivel: 12, custo: 2500, mun: 'cartucho', munNome: 'cartuchos', pacote: 5,  munCusto: 120 },
@@ -9231,7 +9279,6 @@ const ISCAS_ARAPUCA = {
 };
 const frutaIsca = () => FRUTAS.map(f => f.id).filter(id => state.barn[id] > 0).sort((a, b) => state.barn[b] - state.barn[a])[0];
 const qtdIscaArap = id => id === 'milho' ? state.barn.milho || 0 : id === 'quirera' ? cacaDe().quirera || 0 : FRUTAS.reduce((t, f) => t + (state.barn[f.id] || 0), 0);
-PRODUCT.carnejavali = { id: 'carnejavali', nome: 'Carne de javali', preco: 60, caca: true };
 
 function cacaDe() {
   const c = state.caca || (state.caca = {});
@@ -9451,11 +9498,11 @@ function acertou(x, y, t) {
 function pegouBicho() {
   const b = caca.bicho, novo = registrarBicho(b);
   addCoins(b.moedas, null);
-  if (b.carne) { state.barn.carnejavali = (state.barn.carnejavali || 0) + b.carne; }
+  const dropTxt = aplicaDropsCaca(b);
   let extra = '';
   if (b.id === 'chupacabra' && !cacaDe().trofeu) { cacaDe().trofeu = 1; state.enfeites.trofeuchupa = (state.enfeites.trofeuchupa || 0) + 1; state.invNovos = (state.invNovos || 0) + 1; extra = ' 🏆 Ganhou o Troféu do Chupa-cabra (está no Inventário)!'; addNews('🏆 Você pegou o lendário Chupa-cabra! O troféu está no Inventário.'); }
   caca = { fase: 'resultado', bicho: b, novo,
-    msg: `🎯 Pegou ${um(b)} ${b.nome}! (${b.raro}) +${b.moedas.toLocaleString('pt-BR')} moedas de recompensa por tirar a praga${b.carne ? ` e ${b.carne} carnes de javali no celeiro` : ''}.${novo ? ' ✨ Novo no livro!' : ''}${extra}` };
+    msg: `🎯 Pegou ${um(b)} ${b.nome}! (${b.raro}) +${b.moedas.toLocaleString('pt-BR')} moedas de recompensa por tirar a praga${dropTxt ? dropTxt + ' no celeiro' : ''}.${novo ? ' ✨ Novo no livro!' : ''}${extra}` };
   sfx(novo || ['raro', 'épico', 'lendário'].includes(b.raro) ? 'level' : 'collect');
   try { if (navigator.vibrate) navigator.vibrate(50); } catch (e) { /* sem vibração */ }
   if (novo) toast(`✨ Bicho novo no livro: ${b.nome}!`, 'good');
@@ -9778,8 +9825,8 @@ function passoInvasao(t) {
     else { v.fase = 'espera'; v.limite = Date.now() + INVASAO_ESPERA; }
   } else if (v.fase === 'presa' && dt > 2600) {
     state.armadilha.pronta = Date.now() + ARMADILHA.recarga;
-    const b = CACA_BICHO[v.tipo]; addCoins(b.moedas, null); if (b.carne) state.barn.carnejavali = (state.barn.carnejavali || 0) + b.carne;
-    const msg = `🪤 A armadilha pegou ${nomePraga(v)} na plantação! +${b.moedas} moedas${b.carne ? ` e ${b.carne} carnes de javali` : ''}. Ela recarrega em ${fmt(ARMADILHA.recarga / 1000)}.`;
+    const b = CACA_BICHO[v.tipo]; addCoins(b.moedas, null); const dropTxt = aplicaDropsCaca(b);
+    const msg = `🪤 A armadilha pegou ${nomePraga(v)} na plantação! +${b.moedas} moedas${dropTxt}. Ela recarrega em ${fmt(ARMADILHA.recarga / 1000)}.`;
     toast(msg, 'good'); addNews(msg); invasor = null; done();
   } else if (v.fase === 'cachorro' && dt > 1500 && !v.fugindo) { v.fugindo = t; sfx('bark'); }
   else if (v.fase === 'cachorro' && v.fugindo && t - v.fugindo > 1800) {
