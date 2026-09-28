@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="142">
-<script src="firebase-config.js?v=142"></script>
+<meta name="rf-version" content="144">
+<script src="firebase-config.js?v=144"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -423,6 +423,9 @@
   #pescaCv, #pescaBtn { touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   #pesca.travapesca #pescaCv, #pesca.travapesca #pescaBtn { touch-action: none; }
   .pontos { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px; scrollbar-width: thin; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; cursor: grab; }
+  .pontos.fade-l { -webkit-mask-image: linear-gradient(to right, transparent, #000 22px); mask-image: linear-gradient(to right, transparent, #000 22px); }
+  .pontos.fade-r { -webkit-mask-image: linear-gradient(to left, transparent, #000 22px); mask-image: linear-gradient(to left, transparent, #000 22px); }
+  .pontos.fade-l.fade-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 22px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(to right, transparent, #000 22px, #000 calc(100% - 22px), transparent); }
   .dominio { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 0 12px 8px; font-size: 12.5px; color: var(--ink); }
   .dominio .dnv { font-weight: 800; } .dominio .dbar { flex: 1; min-width: 80px; height: 8px; border-radius: 6px; background: #e3dcc6; overflow: hidden; }
   .dominio .dbar i { display: block; height: 100%; background: linear-gradient(90deg, #f2c14e, #e0a800); }
@@ -917,8 +920,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=142"></script>
-<script src="js/cloud.js?v=142"></script>
-<script src="js/game.js?v=142"></script>
+<script src="js/audio.js?v=144"></script>
+<script src="js/cloud.js?v=144"></script>
+<script src="js/game.js?v=144"></script>
 </body>
 </html>

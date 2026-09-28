@@ -986,6 +986,8 @@ const NOVIDADES = [
   { v: 140, txt: 'O selo do botão Negócios agora também avisa quando dá pra fazer algo na fábrica (espaço livre numa máquina + ingrediente na mão), não só quando algo já terminou de produzir ou tem pedido do caminhão pra entregar.' },
   { v: 141, txt: 'Corrigido: a carne de javali, pega na caçada, entrava no celeiro mas não aparecia na lista (só contava no número do selo). Agora aparece certinho, com preço e tudo.' },
   { v: 142, txt: 'Corrigido: o mesmo bug da carne de javali também acontecia com as frutas do pomar — entravam no celeiro e contavam no selo, mas sumiam da lista. Agora aparecem certinho.' },
+  { v: 143, txt: 'Broto de cada semente diferenciado desde o primeiro instante que planta, não só depois que já cresceu um pouco.' },
+  { v: 144, txt: 'A fileira de pontos de pesca e lugares de caçada agora esmaece na ponta quando tem mais pra rolar, pra não parecer cortada.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2674,14 +2676,11 @@ function drawPlant(x, y, s, crop, stage, t, withered) {
     return;
   }
   if (stage === 0) {
-    // recém-plantado: covinha de terra fofa (mais clara) com um brotinho verde saindo
+    // recém-plantado: covinha de terra fofa (mais clara) com um brotinho da cara da planta, bem pequenininho
     ctx.fillStyle = 'rgba(40,20,5,.35)'; ctx.beginPath(); ctx.ellipse(x, y + 1 * s, 7.5 * s, 3 * s, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#b67a45'; ctx.beginPath(); ctx.ellipse(x, y - 0.5 * s, 6.5 * s, 3.4 * s, 0, Math.PI, 0); ctx.fill();
     ctx.fillStyle = '#c98f57'; ctx.beginPath(); ctx.ellipse(x - 1.5 * s, y - 1.5 * s, 3 * s, 1.4 * s, 0, 0, 7); ctx.fill();
-    const k = 0.85 + 0.15 * Math.sin(t / 900 + x * 0.1);
-    ctx.strokeStyle = GD; ctx.lineWidth = 1.2 * s; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(x, y - 2 * s); ctx.lineTo(x, y - 5 * s * k); ctx.stroke(); ctx.lineCap = 'butt';
-    leaf(x, y - 4.6 * s * k, 4.2 * s, 1.9 * s, -0.9 + sway, GL); leaf(x, y - 4.6 * s * k, 4.2 * s, 1.9 * s, 0.9 + sway, GL);
+    drawBroto(x, y, s * 0.5, crop, 1, sway);
   } else if (stage === 1 || stage === 2) {
     drawBroto(x, y, s, crop, stage, sway);
   } else {
@@ -7112,6 +7111,16 @@ let pontosArrastou = false;
     el.scrollLeft += e.deltaY; e.preventDefault();
   }, { passive: false });
 })();
+// Degradê nas pontas das fileiras horizontais (pontos de pesca, lugares de caçada): sem isso, o
+// próximo item cortado na borda parecia um bug, em vez de uma dica de "dá pra arrastar mais".
+function fadePontos(el) {
+  if (!el) return;
+  const folga = el.scrollWidth - el.clientWidth;
+  el.classList.toggle('fade-l', el.scrollLeft > 2);
+  el.classList.toggle('fade-r', el.scrollLeft < folga - 2);
+}
+document.querySelectorAll('.pontos').forEach(el => el.addEventListener('scroll', () => fadePontos(el), { passive: true }));
+window.addEventListener('resize', () => document.querySelectorAll('.pontos').forEach(fadePontos));
 // Só troca o HTML se mudou (assim o relógio atualiza sem "comer" o toque no botão).
 const setHtml = (el, html) => { if (el && el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
 function renderPesca() {
@@ -7137,6 +7146,7 @@ function renderPesca() {
     return `<button type="button" class="pontobtn ${meu ? '' : trava ? 'trava' : 'loja'} ${f ? 'descansa' : ''}" data-ponto="${d.id}" aria-pressed="${meu && d.id === pt.id}">
       <b>${d.emoji} ${d.nome}</b><small>${st}</small></button>`;
   }).join(''));
+  fadePontos($('#pescaPontos'));
   btn.classList.toggle('gold', pesca.fase === 'fisgou' || pesca.fase === 'pronto' || pesca.fase === 'resultado');
   btn.classList.toggle('pulsa', pesca.fase === 'fisgou');
   btn.classList.toggle('gold', pesca.fase === 'fisgou' || pesca.fase === 'pronto' || pesca.fase === 'resultado' || pesca.fase === 'brigando');
@@ -9312,6 +9322,7 @@ function renderCaca() {
     const st = meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎯 ${restamCaca(d.id)}/${CACA_POR_VEZ}`) : trava ? `🔒 Nv ${d.nivel} · ${d.custo ? moeda(d.custo) : 'grátis'}` : moeda(d.custo);
     return `<button type="button" class="pontobtn ${meu ? '' : trava ? 'trava' : 'loja'} ${f ? 'descansa' : ''}" data-lugar-caca="${d.id}" aria-pressed="${meu && d.id === l.id}"><b>${d.emoji} ${d.nome}</b><small>${st}</small></button>`;
   }).join(''));
+  fadePontos($('#cacaLugares'));
   setHtml($('#cacaArmas'), Object.entries(ARMAS_CACA).map(([id, d]) => {
     const tem = c.armas[id], trava = d.nivel > state.level;
     return `<button type="button" class="iscabtn armabtn" data-arma="${id}" aria-pressed="${c.arma === id}" title="${d.nome}"><img alt="" src="${armaIcon(id)}"><small>${tem ? `${munDe(id)} ${id === 'estilingue' ? '🪨' : '🧨'}` : trava ? `Nv ${d.nivel}` : d.custo.toLocaleString('pt-BR')}</small></button>`;
