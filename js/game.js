@@ -163,9 +163,15 @@ const ABRIGO = Object.fromEntries(ABRIGOS.map(b => [b.id, b]));
 const ABRIGO_CAP = [0, 4, 6, 8];               // animais que cabem em cada nível
 const ABRIGO_NIVEL = [0, 0, 3, 6];             // níveis de jogador a mais para aumentar
 const abrigoOf = k => ABRIGOS.find(b => b.bichos.includes(k));
-// O rancho é uma grade de 4 × 2 cercados, cada um com 4 × 3,8 casas.
+// O rancho começa como uma grade de 4 × 2 cercados, cada um com 4 × 3,8 casas — mas dá para
+// arrastar qualquer um (Modo Mover) para outro canto do rancho; a posição fica em state.animPos.
 const YARD_W = 4, YARD_D = 3.8, RANCH_C = YARD_W * 4, RANCH_R = YARD_D * 2;
-const yardOf = id => { const k = ABRIGOS.findIndex(b => b.id === id); return { u0: (k % 4) * YARD_W, v0: Math.floor(k / 4) * YARD_D, u1: (k % 4 + 1) * YARD_W, v1: (Math.floor(k / 4) + 1) * YARD_D }; };
+const yardOrigemPadrao = id => { const k = ABRIGOS.findIndex(b => b.id === id); return [(k % 4) * YARD_W, Math.floor(k / 4) * YARD_D]; };
+function yardOf(id) {
+  const custom = isHome() && state.animPos && state.animPos[id];
+  const [u0, v0] = custom || yardOrigemPadrao(id);
+  return { u0, v0, u1: u0 + YARD_W, v1: v0 + YARD_D };
+}
 const abrigoLv = (s, id) => (s.abrigos && s.abrigos[id]) || 0;
 const livesIn = (s, id) => s.animals.filter(a => inPen(a) && abrigoOf(a.k).id === id);
 const vagas = (s, id) => ABRIGO_CAP[abrigoLv(s, id)] - livesIn(s, id).length;
@@ -1043,6 +1049,7 @@ const NOVIDADES = [
   { v: 153, txt: 'Chegaram 5 molduras novas pra foto, liberando por nível: Flor (nível 5), Girassol (nível 10), Lavanda (nível 15), Borboleta (nível 22) e Arco-íris (nível 30).' },
   { v: 154, txt: 'Molduras da foto redesenhadas: em vez de um anel liso, agora têm galhos, pétalas e nuvens invadindo a foto de um jeito mais criativo. E chegou uma animaçãozinha (com confete!) toda vez que você sobe de nível.' },
   { v: 155, txt: 'A caçada agora deixa material: pássaro solta pena, lebre solta pata e o lendário Chupa-cabra solta presa (além da carne de javali, que já existia). Vendem no celeiro/banca, entram nos pedidos do caminhão, e dá pra fazer cocar, amuleto e colar na nova máquina Artesanato da caçada.' },
+  { v: 156, txt: 'As casinhas dos animais não ficam mais presas na grade do rancho: entre no Modo Mover e arraste cada abrigo para onde quiser (sem encostar em outro).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3681,7 +3688,7 @@ function drawPen(s, t, home, dt) {
   drawObjetos(s, 'animais', t, home, 'tras');
   const bubbles = [];
   const order = ABRIGOS.slice().sort((a, b) => { const p = yardOf(a.id), q = yardOf(b.id); return (p.u0 + p.v0) - (q.u0 + q.v0); });
-  for (const b of order) drawYard(b, s, t, home, dt, bubbles);
+  for (const b of order) { if (moving && moving.key === 'abrigo:' + b.id) continue; drawYard(b, s, t, home, dt, bubbles); }
   drawAvatares('animais', t);
   drawObjetos(s, 'animais', t, home, 'frente');
   drawMoving('animais', t);
@@ -4149,7 +4156,7 @@ function renderTools() {
   box.hidden = scene !== 'roca';
   hint.hidden = scene === 'roca';
   hint.textContent = scene === 'animais'
-    ? (isHome() ? 'Clique num animal para alimentar, recolher ou vender. Clique num abrigo para aumentar ou para construir um novo.' : 'Dê comida aos animais com fome para ajudar. Produto pronto dá para pegar um pouquinho.')
+    ? (isHome() ? 'Clique num animal para alimentar, recolher ou vender. Clique num abrigo para aumentar ou para construir um novo. No Modo Mover dá para arrastar os abrigos para outro canto do rancho.' : 'Dê comida aos animais com fome para ajudar. Produto pronto dá para pegar um pouquinho.')
     : (isHome() ? 'Os espaços com + são lugares para decoração. Cada peça dá conforto, e conforto aumenta o XP que você ganha. Gato, tartaruga e arara moram aqui: clique neles para fazer carinho.' : 'Esta é a casa do seu vizinho.');
   box.innerHTML = '';
   availTools().forEach((t, k) => {
@@ -8315,6 +8322,20 @@ function drawPorteira(a, b, tipo, W) {
 // O que está sendo movido é uma cerca? (devolve o objeto guardado, se for um já colocado)
 const movCercaId = () => moving && (moving.novo || (moving.key && moving.key.startsWith('enf:') && (objetosDe(state, scene)[Number(moving.key.slice(4))] || {}).id)) || 'cerca';
 const movCerca = () => moving && (moving.novo ? ehCerca(moving.novo) : moving.key && moving.key.startsWith('enf:') && ehCerca((objetosDe(state, scene)[Number(moving.key.slice(4))] || {}).id));
+// Uma casa do rancho sendo movida? moving.u/v é o centro do cercado (4 × 3,8), não um pontinho.
+const movAbrigoId = () => moving && moving.key && moving.key.startsWith('abrigo:') && moving.key.slice(7);
+// Cabe aí? Não pode encostar em outro cercado nem sair longe demais do rancho (mas dá pra espalhar uma casa a mais em volta).
+function validYardPos(id, cu, cv) {
+  const u0 = cu - YARD_W / 2, v0 = cv - YARD_D / 2, u1 = u0 + YARD_W, v1 = v0 + YARD_D;
+  if (u0 < -YARD_W || v0 < -YARD_D || u1 > RANCH_C + YARD_W || v1 > RANCH_R + YARD_D) return false;
+  for (const b of ABRIGOS) {
+    if (b.id === id || !abrigoLv(state, b.id)) continue;
+    const y = yardOf(b.id);
+    if (u0 < y.u1 && u1 > y.u0 && v0 < y.v1 && v1 > y.v0) return false;
+  }
+  const [kx, kv] = posOf(state, 'animais', 'canil');
+  return !(kx > u0 - 0.8 && kx < u1 + 0.8 && kv > v0 - 0.8 && kv < v1 + 0.8);
+}
 // Um canteiro só vai para um pedaço de terra livre (sem canteiro, enfeite ou folhas em cima).
 const celulaMov = () => { const c = Math.floor(moving.u), r = Math.floor(moving.v); return c >= 0 && r >= 0 && c < COLS && r < ROWS ? r * COLS + c : -1; };
 function validCanteiro(i, j) {
@@ -8328,6 +8349,7 @@ function movOk() {
   if (!moving) return false;
   if (moving.plot !== undefined) return validCanteiro(moving.plot, celulaMov());
   if (movCerca()) return scene === 'roca' && validCerca(moving.u, moving.v, moving.rot || 0, moving.key);
+  if (movAbrigoId()) return validYardPos(movAbrigoId(), moving.u, moving.v);
   return validSpot(scene, moving.u, moving.v, moving.key, raioMov());
 }
 function girarCerca() {
@@ -8367,6 +8389,12 @@ function pontoLivre(sc, u, v, key, raio, max = 6) {
 function moveClick(x, y) {
   if (!moving) {
     const alvo = pick(x, y), cel = scene === 'roca' ? cellAt(x, y) : -1;
+    if (alvo && alvo.kind === 'abrigo' && abrigoLv(state, alvo.id)) {
+      const y0 = yardOf(alvo.id);
+      moving = { key: 'abrigo:' + alvo.id, u: (y0.u0 + y0.u1) / 2, v: (y0.v0 + y0.v1) / 2 };
+      renderMoveBar();
+      return toast(moveDica(ABRIGO[alvo.id].nome));
+    }
     if ((!alvo || alvo.kind !== 'obj') && cel >= 0 && state.plots[cel].s !== 'locked') {
       // canteiro: vai inteiro para outro pedaço de terra, com o que estiver plantado
       moving = { plot: cel, u: cel % COLS + 0.5, v: Math.floor(cel / COLS) + 0.5 };
@@ -8387,9 +8415,11 @@ function moveClick(x, y) {
 }
 function salvarMove() {
   if (!moving) return;
-  const { u, v } = moving, cerca = movCerca();
+  const { u, v } = moving, cerca = movCerca(), abrigoId = movAbrigoId();
   if (!movOk()) return toast(moving.plot !== undefined ? 'Aqui não dá: o canteiro vai para um pedaço de gramado livre (sem enfeite nem folhas).'
-    : cerca ? 'Aqui não dá: a cerca não pode ficar entre dois canteiros nem em cima de outra coisa.' : 'Aqui não dá: tem que ser no gramado, fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
+    : cerca ? 'Aqui não dá: a cerca não pode ficar entre dois canteiros nem em cima de outra coisa.'
+    : abrigoId ? 'Aqui não dá: o cercado não pode encostar em outro nem ficar longe demais do rancho.'
+    : 'Aqui não dá: tem que ser no gramado, fora dos canteiros e cercados, sem encostar em outra coisa.', 'bad');
   if (moving.plot !== undefined) {
     const i = moving.plot, j = celulaMov();
     if (j !== i) { [state.plots[i], state.plots[j]] = [state.plots[j], state.plots[i]]; if (hover && hover.kind === 'plot') hover = null; }
@@ -8421,6 +8451,8 @@ function salvarMove() {
     moveMode = false; renderMoveBtn(); // pôr um item do inventário termina o modo
   } else if (moving.key.startsWith('enf:')) {
     const o = objetosDe(state, scene)[Number(moving.key.slice(4))]; if (o) { o.u = u; o.v = v; if (cerca) o.rot = moving.rot || 0; }
+  } else if (abrigoId) {
+    state.animPos = state.animPos || {}; state.animPos[abrigoId] = [u - YARD_W / 2, v - YARD_D / 2];
   } else {
     state.pos = state.pos || {}; (state.pos[scene] = state.pos[scene] || {})[moving.key] = [u, v];
   }
@@ -8558,6 +8590,16 @@ function drawMoving(sc, t) {
     const ok = movOk(), [a, b] = pontasCerca(moving.u, moving.v, moving.rot || 0), qa = iso(...a), qb = iso(...b);
     line(qa, qb, ok ? 'rgba(80,200,80,.55)' : 'rgba(220,60,50,.55)', L.W * 0.12);
     ctx.globalAlpha = 0.8; drawCercaSeg(moving.u, moving.v, moving.rot || 0, state, movCercaId()); ctx.globalAlpha = 1;
+    return;
+  }
+  const abrigoId = movAbrigoId();
+  if (abrigoId) {
+    const u0 = moving.u - YARD_W / 2, v0 = moving.v - YARD_D / 2, u1 = u0 + YARD_W, v1 = v0 + YARD_D, ok = movOk();
+    quad(iso(u0, v0), iso(u1, v0), iso(u1, v1), iso(u0, v1), ok ? 'rgba(80,200,80,.3)' : 'rgba(220,60,50,.35)', ok ? 'rgba(255,255,255,.9)' : 'rgba(255,200,200,.9)', 2.5);
+    ctx.globalAlpha = 0.85;
+    if (abrigoId === 'chiqueiro') { const q = iso(u0 + 1.5, v0 + 1.9); ctx.fillStyle = '#8a6a44'; ctx.beginPath(); ctx.ellipse(q.x, q.y, L.W * 0.85, L.W * 0.36, 0, 0, 7); ctx.fill(); }
+    else drawShed(abrigoId, u0, v0, abrigoLv(state, abrigoId), t, state.skin);
+    ctx.globalAlpha = 1;
     return;
   }
   const W = L.W, u = moving.u, v = moving.v, q = iso(u, v);
