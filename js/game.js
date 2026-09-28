@@ -971,6 +971,7 @@ const NOVIDADES = [
   { v: 124, txt: 'Roça mais leve pra bateria 🔋: o jogo desenha a tela a 30 quadros por segundo (de sobra pra uma roça) e para de desenhar quando a tela está bloqueada ou em outra aba. E chegou o botão "Jogar sem internet" na entrada: sem sinal, dá pra jogar na hora salvando só neste aparelho, e quando o sinal voltar é só entrar com o Google (aqui ou em ⚙️) que a roça sobe pra nuvem sozinha. Também chegou um toquinho de viola 🎻 quando chega novidade de um amigo.' },
   { v: 125, txt: 'Mais lugares na banca 🏪: além dos 6 de sempre, mais 4 liberam por nível (8, 12, 18 e 25) — e cada amigo de verdade que você tem adianta a liberação em 1 nível, até 5 níveis de desconto!' },
   { v: 126, txt: 'Aviso da pesca mais visível 🐟: quando um ponto de pesca descansar, agora aparece um balãozinho com um peixe em cima do pesqueiro, bem mais fácil de notar.' },
+  { v: 128, txt: 'Corrigido: girar o celular (retrato ↔ paisagem) no meio do jogo às vezes deixava a tela desalinhada. Agora reajusta sozinho sempre que a orientação ou o tamanho da tela muda.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1963,6 +1964,15 @@ function resize() {
   if (cv.height !== h) cv.height = h;
   L.cw = cw; L.ch = ch;
 }
+// Gira o celular (retrato ↔ paisagem) ou muda o tamanho da janela: refaz as contas do tamanho da
+// tela. Sem isso, só ficava do jeito certo se o jogo já tivesse sido aberto naquela posição.
+const pedeResize = () => { if (state) { resize(); pedirFitHud(); } };
+window.addEventListener('resize', pedeResize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', pedeResize);
+window.addEventListener('orientationchange', () => {
+  // no celular a tela às vezes só assenta no tamanho novo um instante depois de girar
+  pedeResize(); setTimeout(pedeResize, 100); setTimeout(pedeResize, 400);
+});
 const ZOOM_MIN = 0.6, ZOOM_MAX = 2.5;
 const zoomOf = sc => clamp(Number(settings.zoom && settings.zoom[sc]) || 1, ZOOM_MIN, ZOOM_MAX);
 function setZoom(z, sc = scene) {
