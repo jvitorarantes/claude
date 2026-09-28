@@ -992,6 +992,7 @@ const NOVIDADES = [
   { v: 146, txt: 'Javali e rato bem maiores quando invadem a plantação, pra ficar fácil de ver e tocar neles. E a invasão agora pode acontecer a cada 8 horas, em vez de 12.' },
   { v: 147, txt: 'Cada pesqueiro agora tem seu elenco próprio de peixes, sem repetir espécie de um lugar pro outro. E o 📖 Livro de peixes ganhou um botão pra mostrar só os peixes (e a isca de cada um) do lago onde você está.' },
   { v: 148, txt: 'Foto de perfil nova em ⚙️ › Sua foto: além da do Google, escolha entre ilustrações da Roça Feliz — ovo, milho, vaca e cachorro, de cara, mais três que você libera jogando: dourado (pesque 1 peixe), javali (caçe um) e o raríssimo Chupa-cabra. Quem jogou no primeiro mês ganhou também uma moldura dourada exclusiva na foto.' },
+  { v: 149, txt: 'Corrigido: com um tema de casa ativo, todos os abrigos do rancho ficavam da mesma cor. Agora cada bicho mantém a cor e o jeitão do seu abrigo. E o porco não tem mais casinha: só um lamaçal bem grande pra ele se lambuzar, com cocho do lado.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3471,12 +3472,12 @@ const SHED_LOOK = {
 };
 const sm0 = k => !!k.small;
 // Prédio com telhado de duas águas. A cumeeira corre no sentido u.
-// Abrigo com as cores do tema da casa (celeiro e telhado do tema), mantendo o formato de cada um.
+// Abrigo com o acabamento do tema da casa (friso e textura), mas cada bicho mantém sua cor e formato
+// próprios — senão, com um tema ativo, todos os abrigos ficavam da mesma cor e pareciam iguais.
 function lookDoAbrigo(id, skin) {
   const k = SHED_LOOK[id], tm = TEMA_CASA[skin] && skin !== 'classico' ? TEMA_CASA[skin] : null;
   if (!tm) return k;
-  return Object.assign({}, k, { wall: tm.celeiro, wallR: tomCor(tm.celeiro, -0.18), roof: k.aberto ? tm.celTelhado : tm.celTelhado, roofD: tomCor(tm.celTelhado, -0.28),
-    frisoCor: tm.friso, pedra: !!tm.pedra, tabuas: !!tm.tabuas });
+  return Object.assign({}, k, { frisoCor: tm.friso, pedra: !!tm.pedra || k.pedra, tabuas: !!tm.tabuas });
 }
 function drawShed(id, u0, v0, lv, t, skin) {
   const k = lookDoAbrigo(id, skin), sm = k.small ? 0.78 : 1;
@@ -3586,11 +3587,18 @@ function drawYard(b, s, t, home, dt, bubbles) {
   if (!lv) return drawEmptyYard(b, y, home);
   const e = 0.12, R = [y.u0 + e, y.v0 + e, y.u1 - e, y.v1 - e];
   quad(iso(R[0], R[1]), iso(R[2], R[1]), iso(R[2], R[3]), iso(R[0], R[3]), k.chao);
-  if (b.id === 'chiqueiro') { const q = iso(y.u0 + 1.4, y.v0 + 2.6); ctx.fillStyle = '#8a6a44'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.5, W * 0.2, 0, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.beginPath(); ctx.ellipse(q.x - W * 0.12, q.y - W * 0.04, W * 0.18, W * 0.05, 0, 0, 7); ctx.fill(); }
+  if (b.id === 'chiqueiro') {
+    // porco não tem casa, só um lamaçal bem grande no meio do chiqueiro
+    const q = iso(y.u0 + 1.5, y.v0 + 1.9);
+    ctx.fillStyle = '#8a6a44'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.85, W * 0.36, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.beginPath(); ctx.ellipse(q.x, q.y + W * 0.06, W * 0.7, W * 0.26, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(q.x - W * 0.22, q.y - W * 0.08, W * 0.3, W * 0.09, 0, 0, 7); ctx.fill();
+  }
   if (b.id === 'galinheiro') { ctx.fillStyle = 'rgba(200,160,70,.5)'; for (let j = 0; j < 14; j++) { const q = iso(y.u0 + 0.5 + (j * 0.37) % 3, y.v0 + 1.7 + (j * 0.61) % 1.8); ctx.fillRect(q.x, q.y, W * 0.08, 1.5); } }
   drawFenceRect(R[0], R[1], R[2], R[3], 'back');
   drawTrough(y, b.id);
-  const c = drawShed(b.id, y.u0, y.v0, lv, t, s.skin);
+  // porco não tem casinha: só o chiqueiro com lama e cocho
+  const c = b.id === 'chiqueiro' ? iso(y.u0 + 1.5, y.v0 + 1.9) : drawShed(b.id, y.u0, y.v0, lv, t, s.skin);
   const hov = hover && hover.kind === 'abrigo' && hover.id === b.id;
   if (hov) { ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)'; poly([iso(R[0], R[1]), iso(R[2], R[1]), iso(R[2], R[3]), iso(R[0], R[3])]); ctx.stroke(); }
   hits.push({ kind: 'abrigo', id: b.id, x: c.x, y: c.y, r: W * 0.55 });
