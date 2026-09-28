@@ -1055,6 +1055,7 @@ const NOVIDADES = [
   { v: 159, txt: 'Celeste, a sucuri do laguinho, agora leva seu tempo: passeia bem mais antes de entrar na água de novo, pesca com calma e demora pra comer. Menos corrida, mais charme.' },
   { v: 160, txt: 'Os blocos de água ganharam bordas arredondadas: as pontas que ficam pra fora do laguinho agora são curvas, em vez de quadradinhas.' },
   { v: 161, txt: 'Celeste, a sucuri, ficou bem mais fofa: cabeça grande e redonda, olhões brilhantes, bochecha rosada, sorrisinho e uma linguinha que aparece de vez em quando.' },
+  { v: 162, txt: 'Corrigido: dava pra notar a divisão entre blocos de água encostados (uma friestinha de grama e o brilho repetido em cada um). Agora ficam bem juntinhos, sem gap, com um brilho só pro laguinho inteiro.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -8785,6 +8786,18 @@ function invGuardar(sc, i) {
   state.enfeites[o.id] = (state.enfeites[o.id] || 0) + 1;
   toast(`${ENFEITE[o.id].nome} guardado no inventário.`); done();
 }
+// Todos os blocos de água conectados (4 direções) a partir de "o" — o mesmo laguinho.
+function aguaGrupo(objs, o) {
+  const vistos = new Set(), fila = [o], grupo = [];
+  while (fila.length) {
+    const c = fila.pop(), k = c.u + ',' + c.v; if (vistos.has(k)) continue; vistos.add(k); grupo.push(c);
+    for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const viz = objs.find(x => Math.abs(x.u - (c.u + du)) < 0.1 && Math.abs(x.v - (c.v + dv)) < 0.1);
+      if (viz) fila.push(viz);
+    }
+  }
+  return grupo;
+}
 // Ponto na aresta from→to, a uma distância r de "from" (ou o próprio "from" se r for 0/falsy).
 function aguaApara(from, to, r) {
   if (!r) return from;
@@ -8799,7 +8812,10 @@ function drawAgua(s, sc, o, t) {
   const objs = objetosDe(s, sc).filter(x => ehAgua(x.id));
   const viz = (du, dv) => objs.some(x => Math.abs(x.u - (o.u + du)) < 0.1 && Math.abs(x.v - (o.v + dv)) < 0.1);
   const c = o.u - 0.5, r = o.v - 0.5;
-  const [p1, p2, p3, p4] = diamond(c, r, 0.03);
+  // Só encolhe (0,03) no lado exposto (sem vizinho) — no lado que encosta em outro bloco, vai até a
+  // borda exata da célula, senão sobrava uma friestinha de grama entre os dois e dava pra notar a divisão.
+  const IN = 0.03, iL = viz(-1, 0) ? 0 : IN, iR = viz(1, 0) ? 0 : IN, iT = viz(0, -1) ? 0 : IN, iB = viz(0, 1) ? 0 : IN;
+  const p1 = iso(c + iL, r + iT), p2 = iso(c + 1 - iR, r + iT), p3 = iso(c + 1 - iR, r + 1 - iB), p4 = iso(c + iL, r + 1 - iB);
   const cor = estacao().neve ? '#cfe6f5' : '#4f95d8', raio = L.W * 0.16;
   // cada corte (round1..4) só arredonda se as DUAS arestas que se encontram ali não tiverem vizinho
   const rd1 = (!viz(0, -1) && !viz(-1, 0)) ? raio : 0;
@@ -8828,8 +8844,18 @@ function drawAgua(s, sc, o, t) {
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(cur.x, cur.y, b.x, b.y); ctx.stroke();
   }
   const m = { x: (p1.x + p3.x) / 2, y: (p1.y + p3.y) / 2 };
-  ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(m.x - L.W * 0.08, m.y - L.W * 0.06, L.W * 0.14, L.W * 0.06, 0, 0, 7); ctx.fill();
-  if (viz(1, 0) || viz(-1, 0) || viz(0, 1) || viz(0, -1)) drawPeixinhoLagoa(m.x, m.y, L.W, t, Math.round(o.u * 1300 + o.v * 700));
+  const conectado = viz(1, 0) || viz(-1, 0) || viz(0, 1) || viz(0, -1);
+  // O brilho é só um por laguinho (não um por bloco), senão dá pra perceber onde cada bloco termina.
+  if (!conectado) { ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(m.x - L.W * 0.08, m.y - L.W * 0.06, L.W * 0.14, L.W * 0.06, 0, 0, 7); ctx.fill(); }
+  else {
+    const grupo = aguaGrupo(objs, o);
+    if (grupo.every(x => x.u > o.u || (x.u === o.u && x.v >= o.v))) {
+      const gu = grupo.reduce((a, x) => a + x.u, 0) / grupo.length, gv = grupo.reduce((a, x) => a + x.v, 0) / grupo.length;
+      const gc = iso(gu, gv), k = Math.sqrt(grupo.length);
+      ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.ellipse(gc.x - L.W * 0.1 * k, gc.y - L.W * 0.08 * k, L.W * 0.16 * k, L.W * 0.07 * k, 0, 0, 7); ctx.fill();
+    }
+  }
+  if (conectado) drawPeixinhoLagoa(m.x, m.y, L.W, t, Math.round(o.u * 1300 + o.v * 700));
 }
 function drawPeixinhoLagoa(x, y, W, t, seed) {
   const T = 2600, ph = (t + seed) % T;
