@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="149">
-<script src="firebase-config.js?v=149"></script>
+<meta name="rf-version" content="150">
+<script src="firebase-config.js?v=150"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -92,7 +92,7 @@
     padding: 4px 14px 4px 4px; color: #fff1d6; box-shadow: 0 4px 0 rgba(0,0,0,.25);
     max-width: calc(100% - 120px);
   }
-  .avatar-ring { position: relative; width: 58px; height: 58px; flex: none; }
+  .avatar-ring { position: relative; width: 58px; height: 58px; flex: none; cursor: pointer; }
   .avatar-ring .face {
     width: 58px; height: 58px; border-radius: 50%; border: 3px solid #ffe08a; background: #ffe9b8; overflow: hidden;
     display: grid; place-items: center; font: 400 28px/1 Chewy, cursive; color: #7a4a22;
@@ -342,6 +342,8 @@
   .fotobtn small { font-size: 10.5px; font-weight: 700; text-align: center; }
   .fotobtn[aria-pressed="true"] { border-color: #e0a800; background: #fff4c8; box-shadow: 0 0 0 2px #f2c14e; }
   .fotobtn.trava { opacity: .7; border-style: dashed; cursor: default; }
+  .molduraprev { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(#fff6da, #e8d8b0); display: block; }
+  .moldurabtn.moldura-pioneiro .molduraprev { box-shadow: 0 0 0 2px #fff3c4, 0 0 0 4px #e0a800; }
   .row .name { font-weight: 800; overflow-wrap: anywhere; }
   .row .meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .btn {
@@ -879,6 +881,11 @@
       <div class="fotos" id="fotosCfg"></div>
     </section>
     <section>
+      <h3>Moldura da foto</h3>
+      <p class="hint" style="margin:0 0 6px;color:var(--muted);font-size:13px">Um anel em volta da sua foto. Algumas são exclusivas.</p>
+      <div class="fotos" id="molduraCfg"></div>
+    </section>
+    <section>
       <h3>Nomes</h3>
       <div class="setrow"><label for="nomeFazenda">Nome da fazenda</label><input class="txtin" id="nomeFazenda" maxlength="24" placeholder="Roça Feliz" autocomplete="off"></div>
       <div class="setrow"><label for="nomeAvatar">Nome do avatar</label><input class="txtin" id="nomeAvatar" maxlength="24" autocomplete="off"></div>
@@ -934,8 +941,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=149"></script>
-<script src="js/cloud.js?v=149"></script>
-<script src="js/game.js?v=149"></script>
+<script src="js/audio.js?v=150"></script>
+<script src="js/cloud.js?v=150"></script>
+<script src="js/game.js?v=150"></script>
 </body>
 </html>

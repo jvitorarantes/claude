@@ -993,6 +993,7 @@ const NOVIDADES = [
   { v: 147, txt: 'Cada pesqueiro agora tem seu elenco próprio de peixes, sem repetir espécie de um lugar pro outro. E o 📖 Livro de peixes ganhou um botão pra mostrar só os peixes (e a isca de cada um) do lago onde você está.' },
   { v: 148, txt: 'Foto de perfil nova em ⚙️ › Sua foto: além da do Google, escolha entre ilustrações da Roça Feliz — ovo, milho, vaca e cachorro, de cara, mais três que você libera jogando: dourado (pesque 1 peixe), javali (caçe um) e o raríssimo Chupa-cabra. Quem jogou no primeiro mês ganhou também uma moldura dourada exclusiva na foto.' },
   { v: 149, txt: 'Corrigido: com um tema de casa ativo, todos os abrigos do rancho ficavam da mesma cor. Agora cada bicho mantém a cor e o jeitão do seu abrigo. E o porco não tem mais casinha: só um lamaçal bem grande pra ele se lambuzar, com cocho do lado.' },
+  { v: 150, txt: 'Foto de perfil com cara nova: 14 selos coloridos pra escolher (8 de cara, 6 liberando jogando), bem mais bonitos que antes. Toque na sua foto (lá em cima) pra trocar na hora. E chegou a aba Moldura da foto, com a moldura dourada de pioneiro pra quem já tinha ganhado.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1550,7 +1551,7 @@ async function cloudSave() {
     // friends e sent ficam fora do JSON para as regras do Firestore decidirem quem pode ver a roça.
     const rev = await Cloud.saveFarmSeguro(user.uid, {
       stateJson: JSON.stringify(Object.assign({}, state, { rev: base + 1, pendente: false })), name: user.name || '', photo: fotoParaSalvar(),
-      moldura: !!(state.molduras && state.molduras.pioneiro),
+      moldura: molduraAtual(),
       level: state.level, code: state.code || '', updatedAt: Date.now(), apelido: state.apelido || '', fazenda: state.fazenda || '',
       friends: state.friends.slice(), sent: Object.keys(state.sent), session: SESSION,
     }, base);
@@ -1746,7 +1747,7 @@ function onRequests(list) {
   requests = list
     .map(r => r.data)
     .filter(r => r && typeof r.from === 'string' && r.from !== user.uid && !state.friends.includes(r.from))
-    .map(r => ({ from: r.from, name: String(r.fromName || 'Alguém').slice(0, 60), photo: typeof r.fromPhoto === 'string' ? r.fromPhoto : '', moldura: !!r.fromMoldura, at: r.at || 0, reatar: !!r.reatar }));
+    .map(r => ({ from: r.from, name: String(r.fromName || 'Alguém').slice(0, 60), photo: typeof r.fromPhoto === 'string' ? r.fromPhoto : '', moldura: typeof r.fromMoldura === 'string' ? r.fromMoldura : '', at: r.at || 0, reatar: !!r.reatar }));
   // Se a pessoa já é amiga (ex.: pediu de novo ou pediu para reatar), o pedido é só apagado
   // e a amizade é confirmada na lista oficial (isso conserta o lado de cá).
   for (const r of list) if (r.data && state.friends.includes(r.data.from)) { oficializar(r.data.from); Cloud.deleteRequest(user.uid, r.data.from).catch(() => {}); }
@@ -1768,7 +1769,7 @@ async function addFriend(code) {
     if (state.sent[uid]) return toast('Você já mandou um pedido para essa pessoa.');
     state.sent[uid] = { at: Date.now(), code };
     await cloudSave(); // libera a sua roça para essa pessoa espiar antes de aceitar
-    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: fotoParaSalvar(), fromMoldura: !!(state.molduras && state.molduras.pioneiro), at: Date.now() });
+    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: fotoParaSalvar(), fromMoldura: molduraAtual(), at: Date.now() });
     avisarAmigo(uid, 'pedido', `${meuApelido()} quer ser seu amigo na Roça Feliz!`);
     toast('Pedido enviado! A amizade começa quando a pessoa aceitar.', 'good');
     done();
@@ -1851,7 +1852,7 @@ function fetchFriendInfo(uid, forca) {
   if (!user || (fi !== undefined && !(fi && fi.at && !fi.buscando && (forca || Date.now() - fi.at > 120e3)))) return;
   if (fi && fi.at) fi.buscando = true; else friendInfo[uid] = 'loading';
   Cloud.loadFarm(uid).then(f => {
-    friendInfo[uid] = f ? { name: limpaNome(f.apelido) || firstName(f.name || 'Amigo'), fazenda: limpaNome(f.fazenda) || 'Roça Feliz', photo: f.photo || '', moldura: !!f.moldura, level: f.level || 1, ajuda: pedidosAjuda(f), at: Date.now() } : null;
+    friendInfo[uid] = f ? { name: limpaNome(f.apelido) || firstName(f.name || 'Amigo'), fazenda: limpaNome(f.fazenda) || 'Roça Feliz', photo: f.photo || '', moldura: typeof f.moldura === 'string' ? f.moldura : '', level: f.level || 1, ajuda: pedidosAjuda(f), at: Date.now() } : null;
     renderTabs();
   }).catch(e => {
     // Não conseguiu ler (sem internet, login ainda carregando, ou a pessoa desfez a amizade):
@@ -4117,25 +4118,44 @@ function setScene(sc) {
   renderTools(); renderSceneInfo(); pedirFitHud();
 }
 
-// ---------- Foto de perfil: a do Google, ou uma ilustração da Roça Feliz (algumas você libera jogando) ----------
+// ---------- Foto de perfil: a do Google, ou um selo colorido da Roça Feliz (alguns você libera jogando) ----------
 const FOTOS_PERFIL = [
-  { id: 'ovo',        nome: 'Ovo',         icon: () => productIcon('ovo') },
-  { id: 'milho',      nome: 'Milho',       icon: () => cropIcon('milho') },
-  { id: 'vaca',       nome: 'Vaca',        icon: () => animalIcon('vaca') },
-  { id: 'cao',        nome: 'Cachorro',    icon: () => dogIcon('caramelo') },
-  { id: 'peixe',      nome: 'Dourado',     icon: () => productIcon('dourado'), requer: () => (state.stats.peixes || 0) > 0, dica: 'Pesque 1 peixe' },
-  { id: 'javali',     nome: 'Javali',      icon: () => bichoIcon('javali'), requer: () => !!(state.caca && state.caca.col && state.caca.col.javali), dica: 'Caçe um javali' },
-  { id: 'chupacabra', nome: 'Chupa-cabra', icon: () => bichoIcon('chupacabra'), requer: () => !!(state.caca && state.caca.trofeu), dica: 'Pegue o lendário Chupa-cabra' },
+  { id: 'ovo',        nome: 'Ovo',         emoji: '🥚', bg: ['#fff6da', '#ffcf5c'] },
+  { id: 'milho',      nome: 'Milho',       emoji: '🌽', bg: ['#fff3b0', '#e0a010'] },
+  { id: 'vaca',       nome: 'Vaca',        emoji: '🐄', bg: ['#ffffff', '#e8a8b8'] },
+  { id: 'cao',        nome: 'Cachorro',    emoji: '🐶', bg: ['#ffe4b8', '#b8763a'] },
+  { id: 'galinha',    nome: 'Galinha',     emoji: '🐔', bg: ['#ffd9ad', '#d8402f'] },
+  { id: 'girassol',   nome: 'Girassol',    emoji: '🌻', bg: ['#fff3b0', '#e07a1a'] },
+  { id: 'morango',    nome: 'Morango',     emoji: '🍓', bg: ['#ffd0dd', '#c81f42'] },
+  { id: 'cavalo',     nome: 'Cavalo',      emoji: '🐴', bg: ['#ead6ac', '#7a4a22'] },
+  { id: 'peixe',      nome: 'Peixe',       emoji: '🐟', bg: ['#c8ecf7', '#256fa0'] },
+  { id: 'javali',     nome: 'Javali',      emoji: '🐗', bg: ['#dcecc0', '#3f5e1e'], requer: () => !!(state.caca && state.caca.col && state.caca.col.javali), dica: 'Caçe um javali' },
+  { id: 'abelha',     nome: 'Abelha',      emoji: '🐝', bg: ['#fff3b0', '#2a2410'], requer: () => !!(state.abrigos && state.abrigos.apiario), dica: 'Construa o Apiário' },
+  { id: 'estrela',    nome: 'Estrela',     emoji: '⭐', bg: ['#e6dcff', '#4a2f8a'], requer: () => state.level >= 20, dica: 'Chegue ao nível 20' },
+  { id: 'trevo',      nome: 'Trevo',       emoji: '🍀', bg: ['#d4f5c0', '#256a20'], requer: () => ((state.trevos && state.trevos.saldo) || 0) >= 20, dica: 'Tenha 20 trevos 🍀' },
+  { id: 'chupacabra', nome: 'Chupa-cabra', emoji: '👹', bg: ['#c8b0e6', '#241634'], requer: () => !!(state.caca && state.caca.trofeu), dica: 'Pegue o lendário Chupa-cabra' },
 ];
 const FOTO_PERFIL = Object.fromEntries(FOTOS_PERFIL.map(f => [f.id, f]));
+function fotoIconUrl(f) {
+  return makeIcon('foto2:' + f.id, () => {
+    const g = ctx.createRadialGradient(40, 32, 4, 48, 48, 66);
+    g.addColorStop(0, f.bg[0]); g.addColorStop(1, f.bg[1]);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(48, 48, 48, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.ellipse(33, 26, 19, 11, -0.4, 0, 7); ctx.fill();
+    ctx.font = '58px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(f.emoji, 48, 55);
+  });
+}
+for (const f of FOTOS_PERFIL) f.icon = () => fotoIconUrl(f);
 const fotoLiberada = f => !f.requer || f.requer();
-// A foto que EU mostro agora: a ilustração escolhida (se já liberada) ou a do Google.
+// A foto que EU mostro agora: o selo escolhido (se já liberado) ou a foto do Google.
 const fotoAtual = () => {
   const f = state && state.fotoPerfil && FOTO_PERFIL[state.fotoPerfil];
   if (f && fotoLiberada(f)) return f.icon();
   return (user && user.photo) || '';
 };
-// O que salvar/mandar pra nuvem: um link de verdade, ou "icone:xxx" pra um amigo saber desenhar a ilustração certa.
+// O que salvar/mandar pra nuvem: um link de verdade, ou "icone:xxx" pra um amigo saber desenhar o selo certo.
 const fotoParaSalvar = () => {
   const f = state && state.fotoPerfil && FOTO_PERFIL[state.fotoPerfil];
   return f && fotoLiberada(f) ? 'icone:' + f.id : ((user && user.photo) || '');
@@ -4157,6 +4177,33 @@ function renderFotosCfg() {
       : `<button type="button" class="fotobtn trava" disabled title="🔒 ${esc(f.dica || '')}"><img alt="" src="${f.icon()}" style="opacity:.4"><small>🔒 ${esc(f.nome)}</small></button>`);
   }
   box.innerHTML = opcoes.join('');
+  renderMolduraCfg();
+}
+// ---------- Moldura da foto: um anel decorativo ao redor da foto (algumas exclusivas) ----------
+const MOLDURAS = [
+  { id: '',         nome: 'Nenhuma' },
+  { id: 'pioneiro', nome: 'Pioneiro', requer: () => !!(state.molduras && state.molduras.pioneiro), dica: 'Exclusiva de quem jogou no primeiro mês' },
+];
+const MOLDURA = Object.fromEntries(MOLDURAS.map(m => [m.id, m]));
+// A moldura escolhida (só vale se ainda estiver liberada); '' = nenhuma.
+const molduraAtual = () => {
+  const id = state && state.molduraSel;
+  const m = id != null && MOLDURA[id];
+  return m && (!m.requer || m.requer()) ? id : '';
+};
+function renderMolduraCfg() {
+  const box = $('#molduraCfg'); if (!box || !state) return;
+  const sel = molduraAtual();
+  box.innerHTML = MOLDURAS.map(m => (!m.requer || m.requer())
+    ? `<button type="button" class="fotobtn moldurabtn ${m.id ? 'moldura-' + m.id : ''}" data-moldura="${m.id}" aria-pressed="${sel === m.id}"><span class="molduraprev"></span><small>${esc(m.nome)}</small></button>`
+    : `<button type="button" class="fotobtn trava" disabled title="🔒 ${esc(m.dica || '')}"><span class="molduraprev"></span><small>🔒 ${esc(m.nome)}</small></button>`
+  ).join('');
+}
+function escolherMoldura(id) {
+  const m = id ? MOLDURA[id] : MOLDURA[''];
+  if (id && (!m || (m.requer && !m.requer()))) return;
+  state.molduraSel = id || '';
+  renderMolduraCfg(); renderHUD(); renderAccount(); done(); sfx('click');
 }
 function escolherFoto(id) {
   const f = id ? FOTO_PERFIL[id] : null;
@@ -4177,7 +4224,7 @@ function renderHUD() {
   const face = foto ? `<img alt="" referrerpolicy="no-referrer" src="${esc(foto)}">` : esc(user ? nome[0] : '☺');
   if ($('#face').dataset.k !== face) { $('#face').innerHTML = face; $('#face').dataset.k = face; }
   const ring = $('#face').closest('.avatar-ring');
-  if (ring) ring.classList.toggle('moldura-pioneiro', !!(state.molduras && state.molduras.pioneiro));
+  if (ring) { for (const m of MOLDURAS) if (m.id) ring.classList.remove('moldura-' + m.id); const sel = molduraAtual(); if (sel) ring.classList.add('moldura-' + sel); }
 }
 
 function renderPenActions() {
@@ -4212,7 +4259,7 @@ function renderAccount() {
   if (!Cloud.available) { el.innerHTML = '<span class="acct-note">Salvo neste navegador</span>'; return; }
   if (cloudStatus === 'loading') { el.innerHTML = '<span class="acct-note">Conectando…</span>'; return; }
   if (user) {
-    const foto = fotoAtual(), moldura = state && state.molduras && state.molduras.pioneiro ? ' moldura-pioneiro' : '';
+    const foto = fotoAtual(), sel = molduraAtual(), moldura = sel ? ' moldura-' + sel : '';
     el.innerHTML = `${foto ? `<img class="${moldura.trim()}" alt="" referrerpolicy="no-referrer" src="${esc(foto)}">` : ''}
       <span class="who"><span>${esc(firstName(user.name))}</span><small>${esc(syncStatus)}</small></span>
       <button class="btn ghost" type="button" data-logout>Sair</button>`;
@@ -4574,7 +4621,7 @@ function renderPane() {
           <button class="btn ghost" data-copy-code type="button">Copiar</button></div>
         <form class="addform" id="addFriend"><input id="friendCode" maxlength="7" placeholder="Código do amigo" autocomplete="off" aria-label="Código do amigo"><button class="btn" type="submit">Adicionar</button></form>`;
       const avatar = (photo, name, color, moldura) => {
-        const src = resolveFoto(photo), cls = 'avatar' + (moldura ? ' moldura-pioneiro' : '');
+        const src = resolveFoto(photo), cls = 'avatar' + (moldura ? ' moldura-' + moldura : '');
         return src ? `<img class="${cls}" alt="" referrerpolicy="no-referrer" src="${esc(src)}">`
           : `<div class="${cls}" style="background:${color}">${esc((name || '?')[0])}</div>`;
       };
@@ -5389,12 +5436,17 @@ $('#presente').addEventListener('click', e => {
 $('#nomeForm').addEventListener('submit', saveName);
 $('#nome').addEventListener('click', e => { if (e.target === $('#nome') || e.target.closest('[data-close]')) fecharNome(); });
 $('#giftOpen').addEventListener('click', openGift);
+$('#face').closest('.avatar-ring').addEventListener('click', () => {
+  openSettings();
+  setTimeout(() => $('#fotosCfg').scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+});
 $('#gift').addEventListener('click', e => { if (e.target === $('#gift') || e.target.closest('[data-close]')) closeGift(); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gift').hidden) closeGift(); });
 $('#settings').addEventListener('click', e => {
   if (e.target === $('#settings') || e.target.closest('[data-close]')) return closeSettings();
   if (avatarClick(e)) return;
   const fb = e.target.closest('[data-foto]'); if (fb && !fb.disabled) return escolherFoto(fb.dataset.foto);
+  const mb = e.target.closest('[data-moldura]'); if (mb && !mb.disabled) return escolherMoldura(mb.dataset.moldura);
   if (e.target.closest('#verTutorial')) return iniciarTutorial();
   if (e.target.closest('[data-push-on]')) return ativarNotificacoes();
   if (e.target.closest('#verCopias')) return verCopias();
@@ -5651,7 +5703,7 @@ async function reatarAmizade(uid, silencioso) {
   const hoje = localDay(); state.reatar = state.reatar || {};
   if (state.reatar[uid] === hoje) { if (!silencioso) toast('O pedido para reatar a amizade já foi enviado hoje. Peça para seu amigo abrir o jogo e aceitar em Amigos.'); return; }
   try {
-    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: fotoParaSalvar(), fromMoldura: !!(state.molduras && state.molduras.pioneiro), at: Date.now(), reatar: true });
+    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: fotoParaSalvar(), fromMoldura: molduraAtual(), at: Date.now(), reatar: true });
     avisarAmigo(uid, 'pedido', `${meuApelido()} quer reatar a amizade na Roça Feliz!`);
     state.reatar[uid] = hoje; done();
     const f = friendInfo[uid], nome = firstName(f && f.name && !f.erro ? f.name : 'seu amigo');
@@ -10018,6 +10070,7 @@ function presentePioneiro() {
   state.enfeites.bolo = (state.enfeites.bolo || 0) + 1;
   state.skins.pioneiro = true; state.skin = 'pioneiro';
   state.molduras = state.molduras || {}; state.molduras.pioneiro = true;
+  if (state.molduraSel === undefined) state.molduraSel = 'pioneiro'; // já vem escolhida, mas dá pra tirar em ⚙️ › Sua foto
   state.invNovos = (state.invNovos || 0) + 2; // os enfeites vão para o inventário, você escolhe onde pôr
   const msg = 'Presente de pioneiro! Por jogar no primeiro mês da Roça Feliz você ganhou a Bandeira dos Pioneiros e um Bolo de boas-vindas (estão no Inventário), o tema azul e dourado para o celeiro e a casa, e uma moldura dourada exclusiva na sua foto de perfil.';
   addNews(msg);
