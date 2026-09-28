@@ -946,6 +946,7 @@ const NOVIDADES = [
   { v: 116, txt: 'Chegou o MAXIXE 🥒 (nível 8): a rama se espalha no chão e dá maxixes verdinhos cheios de espinhos moles.' },
   { v: 117, txt: 'A Horta saiu da roça 🌳: morangueiro, videira, macieira, laranjeira, bananeira, coqueiro e goiabeira não ocupam mais canteiro! Agora são frutíferas do Pomar (Loja › Pomar): plante no gramado, dão morango, uva, maçã, laranja, banana, coco e goiaba de tempos em tempos e secam depois de umas colheitas, igualzinho às outras frutíferas. Quem já tinha uma plantada ganhou de volta no Inventário.' },
   { v: 118, txt: 'Caçada mais fácil de acertar 🎯: os pássaros (pombo e pardal) voam mais devagar e balançam menos no ar, e a pedrinha do estilingue chega mais rápido — menos "chute" e mais precisão.' },
+  { v: 119, txt: 'Aviso quando o ponto de pesca descansar 🎣: o pesqueiro brilha na sua roça assim que ele voltar a pescar, e chegou o aviso 🎣 Ponto de pesca descansado nas notificações do celular (⚙️ › Notificações).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3331,6 +3332,7 @@ function drawRoca(s, t, home) {
   drawSky(t, tod); drawGround();
   // lago (grande no tema "Lago dos patos"; nos outros, um pesqueiro menor). Na sua roça, clique para pescar.
   if (temaDe(s).lago) { const q = iso(...LAGO_POS); drawLake(q.x, q.y, W * 0.72, t);
+    if (home && pescaPronta()) for (let k = 0; k < 3; k++) { const a = t / 700 + k * 2.1, tw = Math.abs(Math.sin(t / 300 + k * 2)); star(q.x + Math.cos(a) * W * 0.3, q.y - W * 0.32 + Math.sin(a * 1.3) * W * 0.14, W * 0.05 * tw + 1); }
     if (home && !moveMode) { hits.push({ kind: 'lago', x: q.x, y: q.y, r: W * 0.6 });
       if (hover && hover.kind === 'lago') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.75, W * 0.3, 0, 0, 7); ctx.stroke(); } } }
   // casa, celeiro, casinha, árvores e enfeites: cada um no seu lugar (dá para mudar no modo Mover)
@@ -5014,6 +5016,7 @@ const PUSH_TIPOS = [
   ['animais', '🐔 Produtos dos animais'],
   ['fabrica', '🏭 Fábrica terminou'],
   ['caminhao', '🚚 Pedidos novos no caminhão'],
+  ['pesca', '🎣 Ponto de pesca descansado'],
   ['amigos', '🎁 Amigos: visitas, presentes e pedidos'],
 ];
 const VAPID = () => window.FIREBASE_VAPID_KEY || '';
@@ -5034,6 +5037,7 @@ function agendaPush() {
   }
   for (const x of (state.fab && state.fab.fila) || []) if (RECEITA[x.r]) add(x.fim, 'fabrica', `${RECEITA[x.r].nome} ficou pronto na fábrica!`);
   add((blocoCaminhao() + 1) * CAMINHAO_BLOCO, 'caminhao', `Chegaram ${CAMINHAO_N} pedidos novos no caminhão!`);
+  for (const p of PONTOS) { const prox = !p.solte && temPonto(p.id) && pontosDe().prox[p.id]; if (prox) add(prox, 'pesca', `${p.emoji} ${p.nome} descansou! Pode pescar de novo.`); }
   // um aviso por tipo a cada 20 minutos no máximo
   lista.sort((a, b) => a.t - b.t);
   const ult = {}, out = [];
@@ -6847,6 +6851,8 @@ const faltaPonto = id => Math.max(0, (pontosDe().prox[id] || 0) - Date.now());
 const VARA_POR_VEZ = 3;
 const restamVara = id => PONTO[id] && PONTO[id].solte ? Infinity : faltaPonto(id) ? 0 : Math.max(0, VARA_POR_VEZ - (pontosDe().usos[id] || 0));
 const faltaTarrafa = () => Math.max(0, (state.tarrafaEm || 0) - Date.now());
+// Algum ponto seu descansou e está pronto de novo (mostra um brilho no pesqueiro até você pescar lá).
+const pescaPronta = () => state && PONTOS.some(p => !p.solte && temPonto(p.id) && pontosDe().prox[p.id] && !faltaPonto(p.id) && !(pontosDe().usos[p.id] > 0));
 function comprarPonto(id) {
   const d = PONTO[id]; if (!d || temPonto(id)) return;
   if (state.level < d.nivel) return toast(`${d.emoji} ${d.nome}: libera no nível ${d.nivel}${d.custo ? ` e custa ${d.custo.toLocaleString('pt-BR')} moedas` : ' (de graça)'}.`);
@@ -8146,6 +8152,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       ctx.fillStyle = '#7a4a22'; ctx.fillRect(q.x + W * 0.4, q.y - W * 0.34, W * 0.035, W * 0.3);
       ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(q.x + W * 0.28, q.y - W * 0.46, W * 0.28, W * 0.14, 3); ctx.fill(); ctx.stroke();
       ctx.font = `${Math.round(W * 0.1)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎣', q.x + W * 0.42, q.y - W * 0.39);
+      if (home && pescaPronta()) for (let k = 0; k < 3; k++) { const a = t / 700 + k * 2.1, tw = Math.abs(Math.sin(t / 300 + k * 2)); star(q.x + Math.cos(a) * W * 0.22, q.y - W * 0.58 + Math.sin(a * 1.3) * W * 0.1, W * 0.05 * tw + 1); }
       if (!moveMode && home) {
         if (hover && hover.kind === 'lago') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.52, W * 0.21, 0, 0, 7); ctx.stroke(); }
         hits.push({ kind: 'lago', x: q.x, y: q.y - W * 0.05, r: W * 0.45 });
