@@ -362,7 +362,23 @@ function migrate(s) {
   delete s.lugares;
   s.invNovos = Math.max(0, Number(s.invNovos) || 0);
   s.banca = Array.isArray(s.banca) ? s.banca.filter(x => x && item(x.item) && x.qtd > 0) : [];
-  s.fab = s.fab && Array.isArray(s.fab.fila) ? { fila: s.fab.fila.filter(x => x && RECEITA[x.r]).slice(0, FILA_TOPO) } : { fila: [] };
+  if (s.fab && Array.isArray(s.fab.fila)) {
+    // A fábrica virou máquinas separadas: redistribui o que estava na fila única e dá de graça
+    // os espaços que já valiam pro nível (quem já tinha, não perde).
+    const old = s.fab.fila.filter(x => x && RECEITA[x.r]);
+    const maquinas = {};
+    for (const M of MAQUINAS) maquinas[M.id] = { fila: [], extra: 0 };
+    for (const x of old) { const mid = MAQUINA_DE[x.r]; if (mid) maquinas[mid].fila.push(x); }
+    for (const M of MAQUINAS) for (let k = 1; k < M.slots.length; k++) if (s.level >= M.slots[k].nivel) maquinas[M.id].extra = k;
+    s.fab = { maquinas };
+    s.news = [{ at: Date.now(), msg: 'A Fábrica mudou 🏭: agora cada tipo de produto tem sua própria máquina (Moinho & Padaria, Cozinha do Rio, Conservas, Laticínios, Suqueira), cada uma com seus espaços. O que estava na fila continua produzindo, e você ganhou de graça os espaços que já valiam pro seu nível — dá pra comprar mais em cada máquina agora!' }].concat(Array.isArray(s.news) ? s.news : []);
+  } else {
+    s.fab = s.fab && s.fab.maquinas && typeof s.fab.maquinas === 'object' ? s.fab : { maquinas: {} };
+    for (const M of MAQUINAS) {
+      const m = s.fab.maquinas[M.id];
+      s.fab.maquinas[M.id] = m && Array.isArray(m.fila) ? { fila: m.fila.filter(x => x && RECEITA[x.r]), extra: Math.max(0, Math.min(M.slots.length - 1, Number(m.extra) || 0)) } : { fila: [], extra: 0 };
+    }
+  }
   if (s.truck && !Array.isArray(s.truck.pedidos)) s.truck = null;
   const dogs = s.dogs && typeof s.dogs === 'object' ? s.dogs : {};
   s.dogs = {};
@@ -585,7 +601,7 @@ function addXP(n, pos) {
     sfx('level');
     const bonus = state.level * 50; state.coins += bonus;
     const novas = [...CROPS, ...ANIMALS, ...DECOR].filter(c => c.nivel === state.level).map(c => c.nome);
-    if (filaMax(state.level) > filaMax(state.level - 1)) novas.push('1 espaço a mais na fábrica');
+    for (const M of MAQUINAS) if (M.slots[0].nivel === state.level) novas.push(`${M.nome} (fábrica)`);
     for (const [id, n] of AV_OPC.mao) if (AV_NIVEL[id] === state.level) { novas.push(`${n.toLowerCase()} para o avatar (⚙️ › Seu avatar)`); addNews(`🎁 Item novo para o avatar: ${n}! Coloque na mão dele em ⚙️ › Seu avatar.`); }
     toast(`Nível ${state.level}! +${bonus} moedas` + (novas.length ? ` · novidades: ${novas.join(', ')}` : ''), 'good');
   }
@@ -951,6 +967,7 @@ const NOVIDADES = [
   { v: 120, txt: 'Dá para pegar frutas do pomar dos amigos e da vila 🍇: quando estiver visitando, toque numa frutífera pronta para pegar uma fruta (até 3 por dia em cada roça, cuidado com o cachorro!).' },
   { v: 121, txt: 'Fertilizantes mais fortes e mais baratos 🌱: básico corta 25%, rápido 50% e premium 75% do tempo da planta (antes era 10/25/50%), e ficaram bem mais baratos — agora compensa usar até nas plantas simples. E chegou o CACAU 🍫 (nível 32, 48h), a plantação mais demorada da Roça Feliz.' },
   { v: 122, txt: 'O limite de pegar coisas visitando ficou mais simples: agora é 4 itens da plantação e do pomar juntos (antes eram 3 + 3 separados) e 3 dos animais, por amigo por dia.' },
+  { v: 123, txt: 'Fábrica remodelada 🏭: agora são 5 máquinas (Moinho & Padaria, Cozinha do Rio, Conservas, Laticínios e Suqueira), cada uma com seus próprios espaços de produção! O primeiro libera sozinho no nível certo, os outros você compra com moedas. Quem já tinha nível suficiente ganhou os espaços de graça.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4518,7 +4535,8 @@ $('#pane').addEventListener('click', e => {
   if (d.renomearDog) return trocarNome({ dog: d.renomearDog });
   if (d.fseg) { fabSeg = d.fseg; renderPane(); $('#pane').scrollTop = 0; return; }
   if (d.fabricar) return fabricar(d.fabricar);
-  if ('fabRecolher' in d) return recolherFab();
+  if (d.fabRecolher) return recolherFab(d.fabRecolher);
+  if (d.fabSlot) return comprarSlotFab(d.fabSlot);
   if (d.bancaRem) return bancaRemove(d.bancaRem);
   if ('bancaNovo' in d) return abrirBancaModal();
   if (d.bancaComprar) return bancaComprar(d.bancaComprar);
@@ -5043,7 +5061,7 @@ function agendaPush() {
     const d = ANIMAL[a.k];
     if (d && d.tipo === 'prod' && a.fed && !a.ready && PRODUCT[d.prod]) add(agora + (d.tempo - a.g) / acelera(state, d.prod) * 1000, 'animais', `${PRODUCT[d.prod].nome} pronto para recolher!`);
   }
-  for (const x of (state.fab && state.fab.fila) || []) if (RECEITA[x.r]) add(x.fim, 'fabrica', `${RECEITA[x.r].nome} ficou pronto na fábrica!`);
+  for (const m of Object.values((state.fab && state.fab.maquinas) || {})) for (const x of m.fila) if (RECEITA[x.r]) add(x.fim, 'fabrica', `${RECEITA[x.r].nome} ficou pronto na fábrica!`);
   add((blocoCaminhao() + 1) * CAMINHAO_BLOCO, 'caminhao', `Chegaram ${CAMINHAO_N} pedidos novos no caminhão!`);
   for (const p of PONTOS) { const prox = !p.solte && temPonto(p.id) && pontosDe().prox[p.id]; if (prox) add(prox, 'pesca', `${p.emoji} ${p.nome} descansou! Pode pescar de novo.`); }
   // um aviso por tipo a cada 20 minutos no máximo
@@ -7523,32 +7541,63 @@ for (const r of RECEITAS) {
   r.preco = Math.round(base * 1.5 + r.tempo / 60);
   PRODUCT[r.id] = { id: r.id, nome: r.nome, preco: r.preco, fabrica: true };
 }
-// Espaços da fábrica: 3 no começo e mais 1 a cada 10 níveis (até 8). Todos produzem ao mesmo tempo.
-const FILA_BASE = 3, FILA_TOPO = 8, FILA_CADA = 10;
-const filaMax = (lv = state.level) => Math.min(FILA_TOPO, FILA_BASE + Math.floor(lv / FILA_CADA));
-const nivelDaVaga = k => (k - FILA_BASE + 1) * FILA_CADA;
-const fab = () => state.fab || (state.fab = { fila: [] });
+// Cada máquina tem sua receitas e seus próprios espaços: o 1º libera sozinho no nível,
+// os seguintes se compram (nível + moedas). Todos os espaços de uma máquina produzem ao mesmo tempo.
+const MAQUINAS = [
+  { id: 'padaria',    nome: 'Moinho & Padaria', emoji: '🌾',
+    receitas: ['farinha', 'farofa', 'pipoca', 'pao', 'bolo', 'arrozfeijao', 'pacoca', 'rapadura'],
+    slots: [{ nivel: 2, custo: 0 }, { nivel: 4, custo: 300 }, { nivel: 8, custo: 900 }, { nivel: 15, custo: 2200 }] },
+  { id: 'cozinha',    nome: 'Cozinha do Rio', emoji: '🐟',
+    receitas: ['peixefrito', 'caldo', 'moqueca', 'pintadoass', 'douradobr', 'casaca'],
+    slots: [{ nivel: 3, custo: 0 }, { nivel: 7, custo: 400 }, { nivel: 13, custo: 1300 }, { nivel: 20, custo: 2800 }] },
+  { id: 'conservas',  nome: 'Conservas', emoji: '🍯',
+    receitas: ['molho', 'geleia', 'novelo'],
+    slots: [{ nivel: 5, custo: 0 }, { nivel: 10, custo: 500 }, { nivel: 16, custo: 1300 }] },
+  { id: 'laticinios', nome: 'Laticínios', emoji: '🧀',
+    receitas: ['manteiga', 'queijo'],
+    slots: [{ nivel: 10, custo: 0 }, { nivel: 14, custo: 650 }] },
+  { id: 'suqueira',   nome: 'Suqueira', emoji: '🧃',
+    receitas: ['sucouva', 'sucolar'],
+    slots: [{ nivel: 15, custo: 0 }, { nivel: 20, custo: 900 }] },
+];
+const MAQUINA = Object.fromEntries(MAQUINAS.map(m => [m.id, m]));
+const MAQUINA_DE = Object.fromEntries(MAQUINAS.flatMap(m => m.receitas.map(r => [r, m.id])));
+const filaDe = mid => { const f = state.fab || (state.fab = { maquinas: {} }); return f.maquinas[mid] || (f.maquinas[mid] = { fila: [], extra: 0 }); };
+// Quantos espaços a máquina já tem prontos pra usar (o 1º por nível, os outros comprados).
+const slotsMax = mid => { const st = MAQUINA[mid].slots, m = filaDe(mid); return (state.level >= st[0].nivel ? 1 : 0) + Math.min(m.extra || 0, st.length - 1); };
+// O próximo espaço a comprar nessa máquina (null se já tem todos).
+const proxSlotFab = mid => { const st = MAQUINA[mid].slots, m = filaDe(mid), k = (state.level >= st[0].nivel ? 1 : 0) + (m.extra || 0); return st[k] || null; };
+function comprarSlotFab(mid) {
+  const M = MAQUINA[mid], nx = proxSlotFab(mid);
+  if (!nx) return;
+  if (state.level < nx.nivel) return toast(`Esse espaço da ${M.nome} libera no nível ${nx.nivel}.`);
+  if (state.coins < nx.custo) return toast(`Esse espaço da ${M.nome} custa ${nx.custo.toLocaleString('pt-BR')} moedas.`, 'bad');
+  state.coins -= nx.custo; filaDe(mid).extra = (filaDe(mid).extra || 0) + 1;
+  sfx('buy'); toast(`Novo espaço na ${M.nome}!`, 'good'); done();
+}
 const temIngredientes = (r, n = 1) => Object.entries(r.in).every(([id, q]) => (state.barn[id] || 0) >= q * n);
 function fabricar(id) {
-  const r = RECEITA[id], f = fab();
+  const r = RECEITA[id], mid = MAQUINA_DE[id], M = MAQUINA[mid], m = filaDe(mid), max = slotsMax(mid);
   if (state.level < r.nivel) return toast(`${r.nome} libera no nível ${r.nivel}.`);
-  if (f.fila.length >= filaMax()) return toast(`Os ${filaMax()} espaços da fábrica estão ocupados. Recolha o que ficou pronto${filaMax() < FILA_TOPO ? ` (no nível ${nivelDaVaga(filaMax())} ganha mais um espaço)` : ''}.`);
+  if (!max) return toast(`A ${M.nome} libera no nível ${M.slots[0].nivel}.`);
+  if (m.fila.length >= max) return toast(`Os ${max} espaços da ${M.nome} estão ocupados. Recolha o que ficou pronto ou compre mais espaço.`);
   if (!temIngredientes(r)) return toast(`Faltam ingredientes para ${r.nome.toLowerCase()}.`, 'bad');
   for (const [iid, q] of Object.entries(r.in)) { state.barn[iid] -= q; if (!state.barn[iid]) delete state.barn[iid]; }
   // cada espaço trabalha sozinho: começa na hora
   const ini = Date.now();
-  f.fila.push({ r: id, fim: ini + r.tempo * 1000 });
-  sfx('buy'); toast(`${r.nome} na fábrica! Fica pronto em ${fmt((ini + r.tempo * 1000 - Date.now()) / 1000)}.`, 'good');
+  m.fila.push({ r: id, fim: ini + r.tempo * 1000 });
+  sfx('buy'); toast(`${r.nome} na ${M.nome}! Fica pronto em ${fmt(r.tempo)}.`, 'good');
   done();
 }
-const prontosFab = () => (state && state.fab ? state.fab.fila.filter(x => x.fim <= Date.now()).length : 0);
-function recolherFab() {
-  const f = fab(), agora = Date.now(), prontos = f.fila.filter(x => x.fim <= agora);
+const prontosFabDe = mid => filaDe(mid).fila.filter(x => x.fim <= Date.now()).length;
+const prontosFab = () => (state && state.fab && state.fab.maquinas ? MAQUINAS.reduce((t, M) => t + prontosFabDe(M.id), 0) : 0);
+function recolherFab(mid) {
+  const m = filaDe(mid), agora = Date.now(), prontos = m.fila.filter(x => x.fim <= agora);
   if (!prontos.length) return;
-  f.fila = f.fila.filter(x => x.fim > agora);
+  m.fila = m.fila.filter(x => x.fim > agora);
   for (const x of prontos) { const r = RECEITA[x.r]; state.barn[r.id] = (state.barn[r.id] || 0) + 1; addXP(Math.max(2, Math.round(r.tempo / 600)), null); track('fabricar'); if (Object.keys(r.in).some(id => PEIXE[id])) track('cozinhar'); }
   sfx('collect');
-  toast(`Recolheu da fábrica: ${prontos.map(x => RECEITA[x.r].nome.toLowerCase()).join(', ')}.`, 'good');
+  toast(`Recolheu da ${MAQUINA[mid].nome}: ${prontos.map(x => RECEITA[x.r].nome.toLowerCase()).join(', ')}.`, 'good');
   done();
 }
 
@@ -7709,24 +7758,29 @@ function fabricaHTML() {
   rollCaminhao();
   let html = `<div class="seg small" role="tablist">${segs.map(([id, n, c]) => `<button type="button" role="tab" data-fseg="${id}" aria-selected="${fabSeg === id}">${n}${c ? `<span class="badge ready">${c}</span>` : ''}</button>`).join('')}</div>`;
   if (fabSeg === 'fabrica') {
-    const f = fab(), agora = Date.now();
-    html += `<p class="hint">Transforme colheitas e produtos dos animais em coisas que valem mais. Todos os espaços produzem ao mesmo tempo. Você tem ${filaMax()}${filaMax() < FILA_TOPO ? ` e ganha mais um no nível ${nivelDaVaga(filaMax())}` : ''}.</p>`;
-    html += `<div class="fila">${Array.from({ length: Math.min(FILA_TOPO, filaMax() + 1) }, (_, k) => {
-      if (k >= filaMax()) return `<div class="fslot vazio trancado">🔒 nível ${nivelDaVaga(k)}</div>`;
-      const x = f.fila[k];
-      if (!x) return '<div class="fslot vazio">vazio</div>';
-      const r = RECEITA[x.r], pronto = x.fim <= agora;
-      return `<div class="fslot ${pronto ? 'pronto' : ''}"><img alt="" src="${productIcon(r.id)}"><small>${pronto ? 'Pronto!' : fmt((x.fim - agora) / 1000)}</small></div>`;
-    }).join('')}</div>`;
-    if (prontosFab()) html += `<button class="btn gold" data-fab-recolher>Recolher ${prontosFab() > 1 ? `tudo (${prontosFab()})` : 'o que ficou pronto'}</button>`;
-    html += `<h3>Receitas</h3>`;
-    const vis = RECEITAS.filter(r => r.nivel <= state.level), prox = RECEITAS.filter(r => r.nivel > state.level).slice(0, 2);
-    for (const r of [...vis, ...prox]) {
-      const locked = r.nivel > state.level, ok = !locked && temIngredientes(r) && f.fila.length < filaMax();
-      const ing = Object.entries(r.in).map(([id, q]) => `<span class="${(state.barn[id] || 0) >= q ? '' : 'falta'}">${q} ${item(id) ? item(id).nome.toLowerCase() : id} (${state.barn[id] || 0})</span>`).join(' + ');
-      html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${productIcon(r.id)}"><div><div class="name">${r.nome}${state.barn[r.id] ? ` <span class="meta">(${state.barn[r.id]} no celeiro)</span>` : ''}</div>
-        <div class="meta">${ing}<br>${fmt(r.tempo)} · vende por ${r.preco.toLocaleString('pt-BR')}</div></div>
-        ${locked ? `<button class="btn" disabled>Nível ${r.nivel}</button>` : `<button class="btn" data-fabricar="${r.id}" ${ok ? '' : 'disabled'}>Fazer</button>`}</div>`;
+    html += `<p class="hint">Cada máquina transforma colheitas e produtos dos animais em coisas que valem mais, e tem seus próprios espaços: o primeiro libera sozinho no nível certo, os outros você compra. Todos os espaços de uma máquina produzem ao mesmo tempo.</p>`;
+    for (const M of MAQUINAS) {
+      const m = filaDe(M.id), agora = Date.now(), max = slotsMax(M.id), nx = proxSlotFab(M.id);
+      html += `<h3>${M.emoji} ${M.nome}</h3>`;
+      if (!max) { html += `<p class="hint">Libera no nível ${M.slots[0].nivel}.</p>`; continue; }
+      html += `<div class="fila">${Array.from({ length: max + (nx ? 1 : 0) }, (_, k) => {
+        if (k >= max) return `<button type="button" class="fslot vazio trancado" data-fab-slot="${M.id}">🔒 ${state.level < nx.nivel ? `nível ${nx.nivel}` : moeda(nx.custo)}</button>`;
+        const x = m.fila[k];
+        if (!x) return '<div class="fslot vazio">vazio</div>';
+        const r = RECEITA[x.r], pronto = x.fim <= agora;
+        return `<div class="fslot ${pronto ? 'pronto' : ''}"><img alt="" src="${productIcon(r.id)}"><small>${pronto ? 'Pronto!' : fmt((x.fim - agora) / 1000)}</small></div>`;
+      }).join('')}</div>`;
+      const prontosM = prontosFabDe(M.id);
+      if (prontosM) html += `<button class="btn gold" data-fab-recolher="${M.id}">Recolher ${prontosM > 1 ? `tudo (${prontosM})` : 'o que ficou pronto'}</button>`;
+      const receitasM = M.receitas.map(id => RECEITA[id]);
+      const vis = receitasM.filter(r => r.nivel <= state.level), prox = receitasM.filter(r => r.nivel > state.level).slice(0, 1);
+      for (const r of [...vis, ...prox]) {
+        const locked = r.nivel > state.level, ok = !locked && temIngredientes(r) && m.fila.length < max;
+        const ing = Object.entries(r.in).map(([id, q]) => `<span class="${(state.barn[id] || 0) >= q ? '' : 'falta'}">${q} ${item(id) ? item(id).nome.toLowerCase() : id} (${state.barn[id] || 0})</span>`).join(' + ');
+        html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${productIcon(r.id)}"><div><div class="name">${r.nome}${state.barn[r.id] ? ` <span class="meta">(${state.barn[r.id]} no celeiro)</span>` : ''}</div>
+          <div class="meta">${ing}<br>${fmt(r.tempo)} · vende por ${moeda(r.preco)}</div></div>
+          ${locked ? `<button class="btn" disabled>Nível ${r.nivel}</button>` : `<button class="btn" data-fabricar="${r.id}" ${ok ? '' : 'disabled'}>Fazer</button>`}</div>`;
+      }
     }
   } else if (fabSeg === 'banca') {
     const banca = state.banca || [];
