@@ -970,6 +970,7 @@ const NOVIDADES = [
   { v: 123, txt: 'Fábrica remodelada 🏭: agora são 5 máquinas (Moinho & Padaria, Cozinha do Rio, Conservas, Laticínios e Suqueira), cada uma com seus próprios espaços de produção! O primeiro libera sozinho no nível certo, os outros você compra com moedas. Quem já tinha nível suficiente ganhou os espaços de graça.' },
   { v: 124, txt: 'Roça mais leve pra bateria 🔋: o jogo desenha a tela a 30 quadros por segundo (de sobra pra uma roça) e para de desenhar quando a tela está bloqueada ou em outra aba. E chegou o botão "Jogar sem internet" na entrada: sem sinal, dá pra jogar na hora salvando só neste aparelho, e quando o sinal voltar é só entrar com o Google (aqui ou em ⚙️) que a roça sobe pra nuvem sozinha. Também chegou um toquinho de viola 🎻 quando chega novidade de um amigo.' },
   { v: 125, txt: 'Mais lugares na banca 🏪: além dos 6 de sempre, mais 4 liberam por nível (8, 12, 18 e 25) — e cada amigo de verdade que você tem adianta a liberação em 1 nível, até 5 níveis de desconto!' },
+  { v: 126, txt: 'Aviso da pesca mais visível 🐟: quando um ponto de pesca descansar, agora aparece um balãozinho com um peixe em cima do pesqueiro, bem mais fácil de notar.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3172,6 +3173,13 @@ function drawBubbleAt(x, y, kind, obj, t, seed) {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.2 * s; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(x - 3.6 * s, y + 0.2 * s); ctx.lineTo(x - 1 * s, y + 3 * s); ctx.lineTo(x + 4 * s, y - 2.8 * s); ctx.stroke();
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+  } else if (kind === 'pesca') {
+    // Ponto de pesca descansado: um peixinho pronto pra fisgar.
+    ctx.fillStyle = '#4fa8e0'; ctx.strokeStyle = '#2a6a9a'; ctx.lineWidth = 0.9 * s;
+    ctx.beginPath(); ctx.ellipse(x - 1 * s, y, 6 * s, 3.6 * s, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 5 * s, y); ctx.lineTo(x + 8.5 * s, y - 3.2 * s); ctx.lineTo(x + 8.5 * s, y + 3.2 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 4.2 * s, y - 0.8 * s, 1 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#123'; ctx.beginPath(); ctx.arc(x - 4 * s, y - 0.8 * s, 0.5 * s, 0, 7); ctx.fill();
   } else if (kind === 'poda') {
     // tesoura de poda
     ctx.strokeStyle = '#6b7780'; ctx.lineWidth = 1.8 * s; ctx.lineCap = 'round';
@@ -3365,7 +3373,7 @@ function drawRoca(s, t, home) {
   drawSky(t, tod); drawGround();
   // lago (grande no tema "Lago dos patos"; nos outros, um pesqueiro menor). Na sua roça, clique para pescar.
   if (temaDe(s).lago) { const q = iso(...LAGO_POS); drawLake(q.x, q.y, W * 0.72, t);
-    if (home && pescaPronta()) for (let k = 0; k < 3; k++) { const a = t / 700 + k * 2.1, tw = Math.abs(Math.sin(t / 300 + k * 2)); star(q.x + Math.cos(a) * W * 0.3, q.y - W * 0.32 + Math.sin(a * 1.3) * W * 0.14, W * 0.05 * tw + 1); }
+    if (home && pescaPronta()) drawBubbleAt(q.x, q.y - W * 0.55, 'pesca', null, t, 99);
     if (home && !moveMode) { hits.push({ kind: 'lago', x: q.x, y: q.y, r: W * 0.6 });
       if (hover && hover.kind === 'lago') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.75, W * 0.3, 0, 0, 7); ctx.stroke(); } } }
   // casa, celeiro, casinha, árvores e enfeites: cada um no seu lugar (dá para mudar no modo Mover)
@@ -8229,7 +8237,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       ctx.fillStyle = '#7a4a22'; ctx.fillRect(q.x + W * 0.4, q.y - W * 0.34, W * 0.035, W * 0.3);
       ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(q.x + W * 0.28, q.y - W * 0.46, W * 0.28, W * 0.14, 3); ctx.fill(); ctx.stroke();
       ctx.font = `${Math.round(W * 0.1)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎣', q.x + W * 0.42, q.y - W * 0.39);
-      if (home && pescaPronta()) for (let k = 0; k < 3; k++) { const a = t / 700 + k * 2.1, tw = Math.abs(Math.sin(t / 300 + k * 2)); star(q.x + Math.cos(a) * W * 0.22, q.y - W * 0.58 + Math.sin(a * 1.3) * W * 0.1, W * 0.05 * tw + 1); }
+      if (home && pescaPronta()) drawBubbleAt(q.x, q.y - W * 0.75, 'pesca', null, t, 99);
       if (!moveMode && home) {
         if (hover && hover.kind === 'lago') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.52, W * 0.21, 0, 0, 7); ctx.stroke(); }
         hits.push({ kind: 'lago', x: q.x, y: q.y - W * 0.05, r: W * 0.45 });
