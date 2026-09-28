@@ -994,6 +994,7 @@ const NOVIDADES = [
   { v: 148, txt: 'Foto de perfil nova em ⚙️ › Sua foto: além da do Google, escolha entre ilustrações da Roça Feliz — ovo, milho, vaca e cachorro, de cara, mais três que você libera jogando: dourado (pesque 1 peixe), javali (caçe um) e o raríssimo Chupa-cabra. Quem jogou no primeiro mês ganhou também uma moldura dourada exclusiva na foto.' },
   { v: 149, txt: 'Corrigido: com um tema de casa ativo, todos os abrigos do rancho ficavam da mesma cor. Agora cada bicho mantém a cor e o jeitão do seu abrigo. E o porco não tem mais casinha: só um lamaçal bem grande pra ele se lambuzar, com cocho do lado.' },
   { v: 150, txt: 'Foto de perfil com cara nova: 14 selos coloridos pra escolher (8 de cara, 6 liberando jogando), bem mais bonitos que antes. Toque na sua foto (lá em cima) pra trocar na hora. E chegou a aba Moldura da foto, com a moldura dourada de pioneiro pra quem já tinha ganhado.' },
+  { v: 151, txt: 'Trocado o selo do Chupa-cabra: estava parecendo um demônio, agora é um alien 👽.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4133,7 +4134,7 @@ const FOTOS_PERFIL = [
   { id: 'abelha',     nome: 'Abelha',      emoji: '🐝', bg: ['#fff3b0', '#2a2410'], requer: () => !!(state.abrigos && state.abrigos.apiario), dica: 'Construa o Apiário' },
   { id: 'estrela',    nome: 'Estrela',     emoji: '⭐', bg: ['#e6dcff', '#4a2f8a'], requer: () => state.level >= 20, dica: 'Chegue ao nível 20' },
   { id: 'trevo',      nome: 'Trevo',       emoji: '🍀', bg: ['#d4f5c0', '#256a20'], requer: () => ((state.trevos && state.trevos.saldo) || 0) >= 20, dica: 'Tenha 20 trevos 🍀' },
-  { id: 'chupacabra', nome: 'Chupa-cabra', emoji: '👹', bg: ['#c8b0e6', '#241634'], requer: () => !!(state.caca && state.caca.trofeu), dica: 'Pegue o lendário Chupa-cabra' },
+  { id: 'chupacabra', nome: 'Chupa-cabra', emoji: '👽', bg: ['#c8b0e6', '#241634'], requer: () => !!(state.caca && state.caca.trofeu), dica: 'Pegue o lendário Chupa-cabra' },
 ];
 const FOTO_PERFIL = Object.fromEntries(FOTOS_PERFIL.map(f => [f.id, f]));
 function fotoIconUrl(f) {
