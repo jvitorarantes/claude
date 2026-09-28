@@ -996,6 +996,7 @@ const NOVIDADES = [
   { v: 150, txt: 'Foto de perfil com cara nova: 14 selos coloridos pra escolher (8 de cara, 6 liberando jogando), bem mais bonitos que antes. Toque na sua foto (lá em cima) pra trocar na hora. E chegou a aba Moldura da foto, com a moldura dourada de pioneiro pra quem já tinha ganhado.' },
   { v: 151, txt: 'Trocado o selo do Chupa-cabra: estava parecendo um demônio, agora é um alien 👽.' },
   { v: 152, txt: 'O selo de Alienígena 👽 virou opção separada, e o Chupa-cabra agora é um morcego 🦇. Chegaram 3 molduras grátis pra foto (Campo, Céu e Pôr do sol) além da dourada de pioneiro. E corrigido: quem já era pioneiro de antes agora recebe a moldura dourada.' },
+  { v: 153, txt: 'Chegaram 5 molduras novas pra foto, liberando por nível: Flor (nível 5), Girassol (nível 10), Lavanda (nível 15), Borboleta (nível 22) e Arco-íris (nível 30).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4185,10 +4186,15 @@ function renderFotosCfg() {
 // ---------- Moldura da foto: um anel decorativo ao redor da foto (algumas exclusivas) ----------
 const MOLDURAS = [
   { id: '',         nome: 'Nenhuma' },
-  { id: 'campo',    nome: 'Campo' },
-  { id: 'ceu',      nome: 'Céu' },
-  { id: 'sol',      nome: 'Pôr do sol' },
-  { id: 'pioneiro', nome: 'Pioneiro', requer: () => !!(state.molduras && state.molduras.pioneiro), dica: 'Exclusiva de quem jogou no primeiro mês' },
+  { id: 'campo',     nome: 'Campo' },
+  { id: 'ceu',       nome: 'Céu' },
+  { id: 'sol',       nome: 'Pôr do sol' },
+  { id: 'flor',      nome: 'Flor',       requer: () => state.level >= 5,  dica: 'Chegue ao nível 5' },
+  { id: 'girassol',  nome: 'Girassol',   requer: () => state.level >= 10, dica: 'Chegue ao nível 10' },
+  { id: 'lavanda',   nome: 'Lavanda',    requer: () => state.level >= 15, dica: 'Chegue ao nível 15' },
+  { id: 'borboleta', nome: 'Borboleta',  requer: () => state.level >= 22, dica: 'Chegue ao nível 22' },
+  { id: 'arcoiris',  nome: 'Arco-íris',  requer: () => state.level >= 30, dica: 'Chegue ao nível 30' },
+  { id: 'pioneiro',  nome: 'Pioneiro',   requer: () => !!(state.molduras && state.molduras.pioneiro), dica: 'Exclusiva de quem jogou no primeiro mês' },
 ];
 const MOLDURA = Object.fromEntries(MOLDURAS.map(m => [m.id, m]));
 // A moldura escolhida (só vale se ainda estiver liberada); '' = nenhuma.
