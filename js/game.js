@@ -948,6 +948,7 @@ const NOVIDADES = [
   { v: 82, txt: 'Tutorial rápido 📘: quer relembrar como tudo funciona? Abra ⚙️ › Ajuda › Ver tutorial. E quem começa agora já escolhe o nome da fazenda e monta o avatar logo na chegada.' },
   { v: 94, txt: 'Domínio de cada peixe ★: pegando mais do mesmo peixe, ele ganha até 4 estrelas no 📖 Livro de peixes. Cada estrela faz ele morder 15% mais e vale trevos para resgatar (1, 2, 3 e 5). E agora completar todas as missões do dia dá 🍀 2 trevos, e todas as da semana dão 🍀 6!' },
   { v: 109, txt: 'A enxada de arrancar também ganhou desenho de enxada de verdade (antes aparecia um machado).' },
+  { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
   { v: 112, txt: 'Mudanças na caçada e nas pragas: a Caçada agora libera no nível 10. Pragas na plantação só aparecem no máximo uma vez a cada 12 horas, com você na roça: toca um alarme, a tela fica vermelha e você vê o bicho chegando. O cachorro de guarda corre atrás dele, e tem a nova 🪤 Armadilha de pragas (Loja › Itens), que pega um bicho por vez e depois recarrega.' },
   { v: 111, txt: 'Caçada ainda melhor 🎯: cada bicho novo vira uma 📷 foto no mural da sua casa (uma por bicho). Dá para ter uma 2ª arapuca e escolher a isca: milho, quirera (atrai bicho incomum) ou fruta do pomar (atrai os raros). Cada bicho tem seu domínio ★ com estrelas e trevos. E, de vez em quando, um rato ou javali entra na plantação: clique para espantar! Se ninguém espantar, ele come só um pouquinho de 1 ou 2 plantas. Com o cachorro da roça de guarda, isso quase não acontece.' },
   { v: 110, txt: 'Chegou a CAÇADA 🎯 (a partir do nível 10)! Clique na trilha do mato na sua roça. Cace pragas com o estilingue e a espingarda (rato, pombo, pardal, lebre-europeia, javali, javaporco… e o lendário CHUPA-CABRA, que anda pela Serra Dourada e pela Chapada, mais à noite 👀). Arme a 🪤 arapuca com milho para pegar bichos do mato (preá, tatu, paca, mutum…): eles vão para o Livro da caçada e são soltos. Tem lugares para comprar, domínio de caçada, trevos, missões e conquistas.' },
@@ -4285,14 +4286,14 @@ function renderPane() {
       {
         const tem = state.enfeites.cerca || 0, postos = objetosDe(state, 'roca').filter(o => o.id === 'cerca').length, e = ENFEITE.cerca;
         html += `<h3>Cercas</h3><div class="row wide"><img alt="" src="${enfeiteIcon('cerca')}"><div><div class="name">Cerca</div><div class="meta">Pedaço de cerca para a roça, no estilo do tema (Loja › Temas). Ponha quantos quiser seguidos, girando para fechar os cantos.${tem ? ` · no inventário: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
-          <div class="actions"><button class="btn" data-enfeite-comprar="cerca" ${state.coins < e.custo ? 'disabled' : ''}>1 · ${moeda(e.custo)}</button><button class="btn" data-enfeite-comprar="cerca" data-qtd="10" ${state.coins < e.custo * 10 ? 'disabled' : ''}>10 · ${moeda(e.custo * 10)}</button></div></div><h3>Enfeites</h3>`;
+          <div class="actions">${tem ? `<button class="btn gold" data-enfeite-usar="cerca">📦 Usar · tem ${tem}</button>` : ''}<button class="btn ${tem ? 'ghost' : ''}" data-enfeite-comprar="cerca" data-mais="1" ${state.coins < e.custo ? 'disabled' : ''}>${tem ? '+ ' : ''}1 · ${moeda(e.custo)}</button><button class="btn ${tem ? 'ghost' : ''}" data-enfeite-comprar="cerca" data-qtd="10" data-mais="1" ${state.coins < e.custo * 10 ? 'disabled' : ''}>${tem ? '+ ' : ''}10 · ${moeda(e.custo * 10)}</button></div></div><h3>Enfeites</h3>`;
       }
       for (const e of ENFEITES.filter(x => !x.especial && !x.fruteira && !x.cerca)) {
         const tem = state.enfeites[e.id] || 0, postos = ['roca', 'animais'].reduce((t, sc) => t + objetosDe(state, sc).filter(o => o.id === e.id).length, 0);
         const locked = e.nivel > state.level;
         html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}">
           <div><div class="name">${e.nome}</div><div class="meta">+${e.conforto}% de XP${tem ? ` · no inventário: <b>${tem}</b>` : ''}${postos ? ` · colocados: ${postos}` : ''}</div></div>
-          ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
+          ${locked && !tem ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : botaoEnfeiteLoja(e, !locked)}</div>`;
       }
     } else if (shopSeg === 'pomar') {
       html += pomarLojaHTML();
@@ -4485,6 +4486,7 @@ $('#pane').addEventListener('click', e => {
   if (d.abrirLivro) { closePanel(); if (!isHome()) goHome(); abrirPesca(); pescaLivro = true; return renderPesca(); }
   if (d.entrarCasa) { closePanel(); return setScene('casa'); }
   if ('skin' in d) { state.skin = d.skin || null; toast(d.skin ? 'Celeiro e casa dos Pioneiros!' : 'Celeiro e casa clássicos.', 'good'); if (isHome()) setScene('roca'); return done(); }
+  if (d.enfeiteUsar || (d.enfeiteComprar && !d.mais && state.enfeites[d.enfeiteComprar] > 0)) { const id = d.enfeiteUsar || d.enfeiteComprar; toast(`📦 Usando ${ENFEITE[id].nome.toLowerCase()} do inventário (você tem ${state.enfeites[id]}).`); return invPor(id, ehCerca(id) || scene !== 'animais' ? 'roca' : 'animais'); }
   if (d.enfeiteComprar) return comprarEnfeite(d.enfeiteComprar, Number(d.qtd) || 1);
   if (d.invPor) return invPor(d.invPor, d.sc);
   if (d.venderDec) return venderDecoracao(d.venderDec);
@@ -8137,6 +8139,12 @@ function venderDecoracao(key) {
   toast(`Vendeu ${nome.toLowerCase()} por ${preco.toLocaleString('pt-BR')} moedas.`, 'good');
   done();
 }
+// Na Loja: se já tem o item no inventário, o botão principal usa o do inventário (e um botãozinho compra mais).
+function botaoEnfeiteLoja(e, podeComprar = true, qtd = 1) {
+  const tem = state.enfeites[e.id] || 0, custo = e.custo * qtd, comprar = mais => `<button class="btn ${mais ? 'ghost mais' : ''}" data-enfeite-comprar="${e.id}"${qtd > 1 ? ` data-qtd="${qtd}"` : ''}${mais ? ' data-mais="1"' : ''} ${state.coins < custo ? 'disabled' : ''}>${mais ? '+ ' : ''}${qtd > 1 ? qtd + ' · ' : ''}${moeda(custo)}</button>`;
+  if (!tem) return podeComprar ? comprar(false) : '';
+  return `<div class="stack"><button class="btn gold" data-enfeite-usar="${e.id}">📦 Usar · tem ${tem}</button>${podeComprar ? comprar(true) : ''}</div>`;
+}
 // Limite de cada frutífera: contando as plantadas (roça e rancho) e as guardadas no inventário.
 const LIMITE_FRUTEIRA = { arbusto: 4, arvore: 3 };
 const fruteirasDe = id => ['roca', 'animais'].reduce((n, sc) => n + objetosDe(state, sc).filter(o => o.id === id).length, 0) + (state.enfeites[id] || 0);
@@ -8585,7 +8593,7 @@ function pomarLojaHTML() {
       const f = FRUTA[e.fruta], locked = e.nivel > state.level, tem = state.enfeites[e.id] || 0, lim = LIMITE_FRUTEIRA[e.fruteira], ja = fruteirasDe(e.id), cheio = ja >= lim;
       html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${enfeiteIcon(e.id)}"><div><div class="name">${e.nome}</div>
         <div class="meta">${rendeDe(e)} ${f.nome.toLowerCase()}s (vale ${f.preco}) a cada ${fmt(e.tempo)} · ${colheitasDe(e)} colheitas: rende ${(rendeDe(e) * f.preco * colheitasDe(e)).toLocaleString('pt-BR')} moedas (${(rendeDe(e) * f.preco * colheitasDe(e) / e.custo).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}× o preço)<br>Você tem <b>${ja} de ${lim}</b>${tem ? ` (${tem} no inventário)` : ''}</div></div>
-        ${locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : cheio ? `<button class="btn" disabled data-fruteira-cheia="${e.id}">Limite ${lim}</button>` : `<button class="btn" data-enfeite-comprar="${e.id}" ${state.coins < e.custo ? 'disabled' : ''}>${moeda(e.custo)}</button>`}</div>`;
+        ${tem ? botaoEnfeiteLoja(e, !locked && !cheio) : locked ? `<button class="btn" disabled>Nível ${e.nivel}</button>` : cheio ? `<button class="btn" disabled data-fruteira-cheia="${e.id}">Limite ${lim}</button>` : botaoEnfeiteLoja(e)}</div>`;
     }
   }
   return html;
