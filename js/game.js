@@ -991,6 +991,7 @@ const NOVIDADES = [
   { v: 145, txt: 'Corrigido: as mensagens prontas do chat com amigos não rolavam pro lado no toque do celular.' },
   { v: 146, txt: 'Javali e rato bem maiores quando invadem a plantação, pra ficar fácil de ver e tocar neles. E a invasão agora pode acontecer a cada 8 horas, em vez de 12.' },
   { v: 147, txt: 'Cada pesqueiro agora tem seu elenco próprio de peixes, sem repetir espécie de um lugar pro outro. E o 📖 Livro de peixes ganhou um botão pra mostrar só os peixes (e a isca de cada um) do lago onde você está.' },
+  { v: 148, txt: 'Foto de perfil nova em ⚙️ › Sua foto: além da do Google, escolha entre ilustrações da Roça Feliz — ovo, milho, vaca e cachorro, de cara, mais três que você libera jogando: dourado (pesque 1 peixe), javali (caçe um) e o raríssimo Chupa-cabra. Quem jogou no primeiro mês ganhou também uma moldura dourada exclusiva na foto.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1547,7 +1548,8 @@ async function cloudSave() {
     const base = state.rev || 0;
     // friends e sent ficam fora do JSON para as regras do Firestore decidirem quem pode ver a roça.
     const rev = await Cloud.saveFarmSeguro(user.uid, {
-      stateJson: JSON.stringify(Object.assign({}, state, { rev: base + 1, pendente: false })), name: user.name || '', photo: user.photo || '',
+      stateJson: JSON.stringify(Object.assign({}, state, { rev: base + 1, pendente: false })), name: user.name || '', photo: fotoParaSalvar(),
+      moldura: !!(state.molduras && state.molduras.pioneiro),
       level: state.level, code: state.code || '', updatedAt: Date.now(), apelido: state.apelido || '', fazenda: state.fazenda || '',
       friends: state.friends.slice(), sent: Object.keys(state.sent), session: SESSION,
     }, base);
@@ -1743,7 +1745,7 @@ function onRequests(list) {
   requests = list
     .map(r => r.data)
     .filter(r => r && typeof r.from === 'string' && r.from !== user.uid && !state.friends.includes(r.from))
-    .map(r => ({ from: r.from, name: String(r.fromName || 'Alguém').slice(0, 60), photo: typeof r.fromPhoto === 'string' ? r.fromPhoto : '', at: r.at || 0, reatar: !!r.reatar }));
+    .map(r => ({ from: r.from, name: String(r.fromName || 'Alguém').slice(0, 60), photo: typeof r.fromPhoto === 'string' ? r.fromPhoto : '', moldura: !!r.fromMoldura, at: r.at || 0, reatar: !!r.reatar }));
   // Se a pessoa já é amiga (ex.: pediu de novo ou pediu para reatar), o pedido é só apagado
   // e a amizade é confirmada na lista oficial (isso conserta o lado de cá).
   for (const r of list) if (r.data && state.friends.includes(r.data.from)) { oficializar(r.data.from); Cloud.deleteRequest(user.uid, r.data.from).catch(() => {}); }
@@ -1765,7 +1767,7 @@ async function addFriend(code) {
     if (state.sent[uid]) return toast('Você já mandou um pedido para essa pessoa.');
     state.sent[uid] = { at: Date.now(), code };
     await cloudSave(); // libera a sua roça para essa pessoa espiar antes de aceitar
-    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: user.photo || '', at: Date.now() });
+    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: fotoParaSalvar(), fromMoldura: !!(state.molduras && state.molduras.pioneiro), at: Date.now() });
     avisarAmigo(uid, 'pedido', `${meuApelido()} quer ser seu amigo na Roça Feliz!`);
     toast('Pedido enviado! A amizade começa quando a pessoa aceitar.', 'good');
     done();
@@ -1848,7 +1850,7 @@ function fetchFriendInfo(uid, forca) {
   if (!user || (fi !== undefined && !(fi && fi.at && !fi.buscando && (forca || Date.now() - fi.at > 120e3)))) return;
   if (fi && fi.at) fi.buscando = true; else friendInfo[uid] = 'loading';
   Cloud.loadFarm(uid).then(f => {
-    friendInfo[uid] = f ? { name: limpaNome(f.apelido) || firstName(f.name || 'Amigo'), fazenda: limpaNome(f.fazenda) || 'Roça Feliz', photo: f.photo || '', level: f.level || 1, ajuda: pedidosAjuda(f), at: Date.now() } : null;
+    friendInfo[uid] = f ? { name: limpaNome(f.apelido) || firstName(f.name || 'Amigo'), fazenda: limpaNome(f.fazenda) || 'Roça Feliz', photo: f.photo || '', moldura: !!f.moldura, level: f.level || 1, ajuda: pedidosAjuda(f), at: Date.now() } : null;
     renderTabs();
   }).catch(e => {
     // Não conseguiu ler (sem internet, login ainda carregando, ou a pessoa desfez a amizade):
@@ -4107,6 +4109,53 @@ function setScene(sc) {
   renderTools(); renderSceneInfo(); pedirFitHud();
 }
 
+// ---------- Foto de perfil: a do Google, ou uma ilustração da Roça Feliz (algumas você libera jogando) ----------
+const FOTOS_PERFIL = [
+  { id: 'ovo',        nome: 'Ovo',         icon: () => productIcon('ovo') },
+  { id: 'milho',      nome: 'Milho',       icon: () => cropIcon('milho') },
+  { id: 'vaca',       nome: 'Vaca',        icon: () => animalIcon('vaca') },
+  { id: 'cao',        nome: 'Cachorro',    icon: () => dogIcon('caramelo') },
+  { id: 'peixe',      nome: 'Dourado',     icon: () => productIcon('dourado'), requer: () => (state.stats.peixes || 0) > 0, dica: 'Pesque 1 peixe' },
+  { id: 'javali',     nome: 'Javali',      icon: () => bichoIcon('javali'), requer: () => !!(state.caca && state.caca.col && state.caca.col.javali), dica: 'Caçe um javali' },
+  { id: 'chupacabra', nome: 'Chupa-cabra', icon: () => bichoIcon('chupacabra'), requer: () => !!(state.caca && state.caca.trofeu), dica: 'Pegue o lendário Chupa-cabra' },
+];
+const FOTO_PERFIL = Object.fromEntries(FOTOS_PERFIL.map(f => [f.id, f]));
+const fotoLiberada = f => !f.requer || f.requer();
+// A foto que EU mostro agora: a ilustração escolhida (se já liberada) ou a do Google.
+const fotoAtual = () => {
+  const f = state && state.fotoPerfil && FOTO_PERFIL[state.fotoPerfil];
+  if (f && fotoLiberada(f)) return f.icon();
+  return (user && user.photo) || '';
+};
+// O que salvar/mandar pra nuvem: um link de verdade, ou "icone:xxx" pra um amigo saber desenhar a ilustração certa.
+const fotoParaSalvar = () => {
+  const f = state && state.fotoPerfil && FOTO_PERFIL[state.fotoPerfil];
+  return f && fotoLiberada(f) ? 'icone:' + f.id : ((user && user.photo) || '');
+};
+// Transforma o que veio de um amigo (link ou "icone:xxx") numa src de <img> de verdade.
+const resolveFoto = src => {
+  if (!src) return '';
+  if (src.startsWith('icone:')) { const f = FOTO_PERFIL[src.slice(6)]; return f ? f.icon() : ''; }
+  return src;
+};
+function renderFotosCfg() {
+  const box = $('#fotosCfg'); if (!box || !state) return;
+  const sel = state.fotoPerfil || '';
+  const opcoes = [];
+  if (user && user.photo) opcoes.push(`<button type="button" class="fotobtn" data-foto="" aria-pressed="${!sel}"><img alt="" referrerpolicy="no-referrer" src="${esc(user.photo)}"><small>Do Google</small></button>`);
+  for (const f of FOTOS_PERFIL) {
+    opcoes.push(fotoLiberada(f)
+      ? `<button type="button" class="fotobtn" data-foto="${f.id}" aria-pressed="${sel === f.id}"><img alt="" src="${f.icon()}"><small>${esc(f.nome)}</small></button>`
+      : `<button type="button" class="fotobtn trava" disabled title="🔒 ${esc(f.dica || '')}"><img alt="" src="${f.icon()}" style="opacity:.4"><small>🔒 ${esc(f.nome)}</small></button>`);
+  }
+  box.innerHTML = opcoes.join('');
+}
+function escolherFoto(id) {
+  const f = id ? FOTO_PERFIL[id] : null;
+  if (id && (!f || !fotoLiberada(f))) return;
+  state.fotoPerfil = id || null;
+  renderFotosCfg(); renderHUD(); renderAccount(); done(); sfx('click');
+}
 function renderHUD() {
   $('#lvl').textContent = state.level;
   const n = need(state.level);
@@ -4116,8 +4165,11 @@ function renderHUD() {
   $('#trevos').textContent = (state.trevos && state.trevos.saldo) || 0;
   const nome = state.apelido || (user ? firstName(user.name) : 'Roça Feliz');
   if ($('#pname').textContent !== nome) $('#pname').textContent = nome;
-  const face = user && user.photo ? `<img alt="" referrerpolicy="no-referrer" src="${esc(user.photo)}">` : esc(user ? nome[0] : '☺');
+  const foto = fotoAtual();
+  const face = foto ? `<img alt="" referrerpolicy="no-referrer" src="${esc(foto)}">` : esc(user ? nome[0] : '☺');
   if ($('#face').dataset.k !== face) { $('#face').innerHTML = face; $('#face').dataset.k = face; }
+  const ring = $('#face').closest('.avatar-ring');
+  if (ring) ring.classList.toggle('moldura-pioneiro', !!(state.molduras && state.molduras.pioneiro));
 }
 
 function renderPenActions() {
@@ -4152,7 +4204,8 @@ function renderAccount() {
   if (!Cloud.available) { el.innerHTML = '<span class="acct-note">Salvo neste navegador</span>'; return; }
   if (cloudStatus === 'loading') { el.innerHTML = '<span class="acct-note">Conectando…</span>'; return; }
   if (user) {
-    el.innerHTML = `${user.photo ? `<img alt="" referrerpolicy="no-referrer" src="${esc(user.photo)}">` : ''}
+    const foto = fotoAtual(), moldura = state && state.molduras && state.molduras.pioneiro ? ' moldura-pioneiro' : '';
+    el.innerHTML = `${foto ? `<img class="${moldura.trim()}" alt="" referrerpolicy="no-referrer" src="${esc(foto)}">` : ''}
       <span class="who"><span>${esc(firstName(user.name))}</span><small>${esc(syncStatus)}</small></span>
       <button class="btn ghost" type="button" data-logout>Sair</button>`;
     return;
@@ -4512,13 +4565,15 @@ function renderPane() {
       html += `<div class="codebox"><div><div class="meta">Seu código de amigo</div><strong>${esc(state.code || '······')}</strong></div>
           <button class="btn ghost" data-copy-code type="button">Copiar</button></div>
         <form class="addform" id="addFriend"><input id="friendCode" maxlength="7" placeholder="Código do amigo" autocomplete="off" aria-label="Código do amigo"><button class="btn" type="submit">Adicionar</button></form>`;
-      const avatar = (photo, name, color) => photo
-        ? `<img class="avatar" alt="" referrerpolicy="no-referrer" src="${esc(photo)}">`
-        : `<div class="avatar" style="background:${color}">${esc((name || '?')[0])}</div>`;
+      const avatar = (photo, name, color, moldura) => {
+        const src = resolveFoto(photo), cls = 'avatar' + (moldura ? ' moldura-pioneiro' : '');
+        return src ? `<img class="${cls}" alt="" referrerpolicy="no-referrer" src="${esc(src)}">`
+          : `<div class="${cls}" style="background:${color}">${esc((name || '?')[0])}</div>`;
+      };
       if (requests.length) {
         html += `<h3>Pedidos de amizade</h3>`;
         for (const r of requests) {
-          html += `<div class="row sel">${avatar(r.photo, r.name, '#d9a441')}
+          html += `<div class="row sel">${avatar(r.photo, r.name, '#d9a441', r.moldura)}
             <div><div class="name">${esc(r.name)}</div><div class="meta">${r.reatar ? 'quer reatar a amizade (ela sumiu por um erro antigo do jogo)' : 'quer ser seu amigo'}</div></div>
             <div class="stack"><button class="btn" data-accept="${esc(r.from)}">Aceitar</button><button class="btn ghost" data-refuse="${esc(r.from)}">Recusar</button></div></div>`;
         }
@@ -4536,7 +4591,7 @@ function renderPane() {
         if (f === 'loading') { html += `<div class="row"><div class="avatar" style="background:#c9c3a8"></div><div class="meta">Carregando…</div><div></div></div>`; continue; }
         const name = f ? f.name : 'Amigo';
         const armed = unfriendArmed === uid;
-        html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a')}
+        html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a', f && f.moldura)}
           <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${bolinhaStatus(uid)} · ${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `${esc(f.fazenda || 'Roça Feliz')} · nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : (f && f.erro ? `<button class="btn" data-reatar="${esc(uid)}">Reatar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`)}
           ${here ? '' : `<button class="btn ${pedeAjuda(uid) ? 'socorro' : 'ghost'}" data-ajudar-friend="${esc(uid)}" ${pedeAjuda(uid) ? '' : 'disabled title="Nenhuma frutífera pedindo ajuda agora"'}>🆘 Precisa de ajuda${pedeAjuda(uid) > 1 ? ` (${pedeAjuda(uid)})` : ''}</button>`}
@@ -5075,7 +5130,7 @@ for (const id of ['#nomeFazenda', '#nomeAvatar']) {
 $('#nomesSalvar').addEventListener('click', salvarNomes);
 $('#nomesCancelar').addEventListener('click', () => { limparEdicaoNomes(); $('#nomeFazenda').value = state.fazenda || ''; $('#nomeAvatar').value = state.apelido || ''; renderNomes(); });
 function renderSettings() {
-  renderNomes(); renderAvatarCfg(); renderPushCfg();
+  renderNomes(); renderAvatarCfg(); renderFotosCfg(); renderPushCfg();
   $('#optMusic').checked = settings.music;
   $('#optSfx').checked = settings.sfx;
   $('#volMusic').value = Math.round(settings.musicVol * 100); $('#volMusicOut').textContent = $('#volMusic').value;
@@ -5331,6 +5386,7 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gift').
 $('#settings').addEventListener('click', e => {
   if (e.target === $('#settings') || e.target.closest('[data-close]')) return closeSettings();
   if (avatarClick(e)) return;
+  const fb = e.target.closest('[data-foto]'); if (fb && !fb.disabled) return escolherFoto(fb.dataset.foto);
   if (e.target.closest('#verTutorial')) return iniciarTutorial();
   if (e.target.closest('[data-push-on]')) return ativarNotificacoes();
   if (e.target.closest('#verCopias')) return verCopias();
@@ -5587,7 +5643,7 @@ async function reatarAmizade(uid, silencioso) {
   const hoje = localDay(); state.reatar = state.reatar || {};
   if (state.reatar[uid] === hoje) { if (!silencioso) toast('O pedido para reatar a amizade já foi enviado hoje. Peça para seu amigo abrir o jogo e aceitar em Amigos.'); return; }
   try {
-    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: user.photo || '', at: Date.now(), reatar: true });
+    await Cloud.sendRequest(uid, { from: user.uid, fromName: meuApelido(), fromPhoto: fotoParaSalvar(), fromMoldura: !!(state.molduras && state.molduras.pioneiro), at: Date.now(), reatar: true });
     avisarAmigo(uid, 'pedido', `${meuApelido()} quer reatar a amizade na Roça Feliz!`);
     state.reatar[uid] = hoje; done();
     const f = friendInfo[uid], nome = firstName(f && f.name && !f.erro ? f.name : 'seu amigo');
@@ -9953,8 +10009,9 @@ function presentePioneiro() {
   state.enfeites.bandeira = (state.enfeites.bandeira || 0) + 1;
   state.enfeites.bolo = (state.enfeites.bolo || 0) + 1;
   state.skins.pioneiro = true; state.skin = 'pioneiro';
+  state.molduras = state.molduras || {}; state.molduras.pioneiro = true;
   state.invNovos = (state.invNovos || 0) + 2; // os enfeites vão para o inventário, você escolhe onde pôr
-  const msg = 'Presente de pioneiro! Por jogar no primeiro mês da Roça Feliz você ganhou a Bandeira dos Pioneiros e um Bolo de boas-vindas (estão no Inventário) e o tema azul e dourado para o celeiro e a casa.';
+  const msg = 'Presente de pioneiro! Por jogar no primeiro mês da Roça Feliz você ganhou a Bandeira dos Pioneiros e um Bolo de boas-vindas (estão no Inventário), o tema azul e dourado para o celeiro e a casa, e uma moldura dourada exclusiva na sua foto de perfil.';
   addNews(msg);
   setTimeout(() => toast(msg, 'good'), 2500);
   done();
