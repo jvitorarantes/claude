@@ -697,7 +697,7 @@ function actPlot(i) {
   if (ripe(p) && tool === 'hand') return harvest(p, pos);
   if (p.s === 'withered' && has('hoe')) { Object.assign(p, emptyPlot('plowed')); sfx('hoe'); useFx('hoe', pos); addXP(1, pos); return done(); }
   if (p.s === 'growing' && tool === 'hoe') {
-    // O rastelo (ferramenta 'hoe'; no save continua tools.enxada) arranca qualquer plantação. Pede um segundo clique.
+    // O enxadão (ferramenta 'hoe'; no save continua tools.enxada) arranca qualquer plantação. Pede um segundo clique.
     if (buyPending && buyPending.i === 'hoe' + i && performance.now() < buyPending.until) {
       buyPending = null; Object.assign(p, emptyPlot('plowed')); sfx('hoe'); useFx('hoe', pos);
       return done();
@@ -709,7 +709,7 @@ function actPlot(i) {
   // Terra vazia sem semente na mão: abre a Loja para escolher o que plantar (nada é plantado sozinho).
   if (p.s === 'plowed' && tool === 'hand') { openPanel('loja', 'sementes'); return toast('Escolha uma semente na Loja e clique na terra para plantar.'); }
   const hints = {
-    hoe: 'O rastelo limpa plantas secas e arranca plantações.', water: 'Essa terra não precisa de água.',
+    hoe: 'O enxadão limpa plantas secas e arranca plantações.', water: 'Essa terra não precisa de água.',
     pest: 'Não há pragas aqui.', weed: 'Não há mato aqui.', seed: 'Só dá para plantar em terra arada.',
   };
   if (hints[tool]) toast(hints[tool]);
@@ -1080,6 +1080,7 @@ const NOVIDADES = [
   { v: 172, txt: 'Com o celular na vertical, Roça/Rancho/Casa e Presente/Mover voltaram a ficar numa coluna vertical do lado esquerdo (em vez de uma fileira embaixo). E o botão de rastelar folhas trocou a vassoura pelo ícone do rastelo de verdade, agora chamado "Rastelar": clicando sem folha nenhuma, ele avisa em vez de simplesmente ficar apagado.' },
   { v: 173, txt: 'Ajuste fino no celular na vertical: a coluna Roça/Rancho/Casa/Presente/Mover desceu um pouco e a barra de ferramentas subiu um pouquinho, pra ficar mais confortável de alcançar.' },
   { v: 174, txt: 'Corrigido: se algo interrompesse o avatar rastelando (visitar outro amigo, recarregar a página), o monte de folhas ficava preso pra sempre, sem contar como folha e sem dar pra clicar. Agora ele libera sozinho. E o preço das expansões de canteiro mudou para 1.000 moedas por canteiro em qualquer nível.' },
+  { v: 175, txt: 'A ferramenta de arrancar plantação/árvore virou "Enxadão" (não tinha por que ter dois "Rastelo" na mesma barra). E corrigido: o clique no Bloco de água estava com uma área grande demais, invadindo os canteiros vizinhos.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4134,7 +4135,7 @@ const TOOL_ICONS = {
 };
 const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 const TOOLS = [
-  { id: 'hand', nome: 'Mão' }, { id: 'hoe', nome: 'Rastelo' }, { id: 'water', nome: 'Regar' },
+  { id: 'hand', nome: 'Mão' }, { id: 'hoe', nome: 'Enxadão' }, { id: 'water', nome: 'Regar' },
   { id: 'pest', nome: 'Inseticida' }, { id: 'seed', nome: 'Semente' },
   { id: 'fert', nome: 'Adubo' },
 ];
@@ -4576,7 +4577,7 @@ function renderPane() {
         <div><div class="name">Armadilha de pragas</div><div class="meta">Fica perto da plantação e pega o rato ou javali que invadir (um por vez, e dá a recompensa). Depois recarrega em ${fmt(ARMADILHA.recarga / 1000)}.${state.armadilha ? ` ${armadilhaPronta() ? '<b>Carregada.</b>' : `Pronta em ${fmt((state.armadilha.pronta - Date.now()) / 1000)}.`}` : ''}</div></div>
         ${state.armadilha ? '<button class="btn ghost" disabled>Sua</button>' : state.level < ARMADILHA.nivel ? `<button class="btn" disabled>Nível ${ARMADILHA.nivel}</button>` : `<button class="btn" data-comprar-armadilha="1" ${state.coins < ARMADILHA.custo ? 'disabled' : ''}>${moeda(ARMADILHA.custo)}</button>`}</div>`;
       html += `<div class="row ${state.tools.enxada ? 'sel' : ''}"><div class="avatar" style="background:#8a5a33">${TOOL_ICONS.hoe}</div>
-        <div><div class="name">Rastelo</div><div class="meta">100 moedas · limpa a terra e arranca qualquer plantação ou árvore do canteiro</div></div>
+        <div><div class="name">Enxadão</div><div class="meta">100 moedas · limpa a terra e arranca qualquer plantação ou árvore do canteiro</div></div>
         ${state.tools.enxada ? '<button class="btn ghost" disabled>Sua</button>' : `<button class="btn" data-buy-hoe ${state.coins < 100 ? 'disabled' : ''}>${moeda(100)}</button>`}</div>`;
       html += `<div class="row"><img alt="" src="${bowlIcon()}">
         <div><div class="name">Ração especial</div><div class="meta">${RACAO_ESP} moedas · a próxima produção do animal rende em dobro. É usada quando você alimenta um animal clicando nele. Você tem <b>${state.racaoEsp}</b></div></div>
@@ -4928,8 +4929,8 @@ $('#pane').addEventListener('click', e => {
     else { state.coins -= RACAO_ESP * n; state.racaoEsp += n; sfx('buy'); toast(`+${n} ração especial`, 'good'); done(); }
   }
   else if ('buyHoe' in d) {
-    if (state.coins < 100) toast('O rastelo custa 100 moedas.', 'bad');
-    else { state.coins -= 100; state.tools.enxada = true; sfx('buy'); toast('Rastelo comprado! Agora ele aparece nas ferramentas.', 'good'); renderTools(); done(); }
+    if (state.coins < 100) toast('O enxadão custa 100 moedas.', 'bad');
+    else { state.coins -= 100; state.tools.enxada = true; sfx('buy'); toast('Enxadão comprado! Agora ele aparece nas ferramentas.', 'good'); renderTools(); done(); }
   }
   else if (d.buyDog) buyDog(d.buyDog, d.slot);
   else if (d.dogFood) buyDogFood(Number(d.dogFood) || 1);
@@ -5018,7 +5019,7 @@ function tipPlot(i) {
     return home ? 'Pasto.' : null;
   }
   if (p.s === 'plowed') return home ? `<b>Terra arada</b><br>${state.tool === 'seed' ? `Clique para plantar ${CROP[state.seed].nome}.` : 'Clique para escolher uma semente na Loja.'}` : '<b>Terra arada</b>';
-  if (p.s === 'withered') return '<b>Planta seca</b><br>Use a Mão ou o rastelo para limpar.';
+  if (p.s === 'withered') return '<b>Planta seca</b><br>Use a Mão ou o enxadão para limpar.';
   const crop = CROP[p.c], st = stageOf(p), T = phaseTempo(p), k = Math.min(1, p.g / T);
   if (p.podre) return `<b>${crop.nome} podre</b><br>Ficou mais de 24h sem colher.<br>${home ? `Clique para usar uma poção (você tem ${state.pocao || 0}) ou peça ajuda a um amigo.` : 'Clique para salvar a planta do seu amigo!'}`;
   let h = `<b>${crop.nome}</b> · ${STAGE_NAMES[st]}`;
@@ -8699,7 +8700,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       drawAgua(s, sc, o, t);
       const hov = !moveMode && hover && hover.kind === 'enfeite' && hover.sc === sc && hover.key === o.key;
       if (hov) { const c = o.u - 0.5, r = o.v - 0.5; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; poly(diamond(c, r, 0.03)); ctx.stroke(); }
-      if (!moveMode) hits.push({ kind: 'enfeite', sc, key: o.key, id: o.id, x: q.x, y: q.y, r: W * 0.5 });
+      if (!moveMode) hits.push({ kind: 'enfeite', sc, key: o.key, id: o.id, x: q.x, y: q.y, r: W * 0.26 });
     }
     else if (o.id) {
       const hov = !moveMode && hover && hover.kind === 'enfeite' && hover.sc === sc && hover.key === o.key;
