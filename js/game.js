@@ -1073,6 +1073,7 @@ const NOVIDADES = [
   { v: 166, txt: 'Área do rancho bem maior pra arrastar os abrigos no Modo Mover, e a câmera agora acompanha se você mandar um bem longe. E não dá mais pra soltar um abrigo em cima do lugar reservado de outro que ainda não foi construído.' },
   { v: 167, txt: 'Casinhas do rancho: agora dá pra girar (casinha, cocho etc. mudam de lado), segurar em cima abre o menu com a opção Mover, e os bichos vão junto quando você move a casinha deles.' },
   { v: 168, txt: 'No Modo Mover chegaram 🗑️ Remover tudo (manda tudo pro inventário de uma vez) e 📐 Layouts (salve até 3 arranjos diferentes de cada cena e aplique quando quiser). Roça e Rancho têm os seus próprios, sem se misturar.' },
+  { v: 169, txt: 'Cada layout salvo agora mostra uma fotinha (um mapinha visto de cima com um pontinho colorido por item), pra você reconhecer o arranjo antes de aplicar.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -8893,13 +8894,29 @@ function aplicarLayout(sc, slot) {
 }
 function abrirLayouts() { $('#layouts').hidden = false; renderLayouts(); }
 function fecharLayouts() { $('#layouts').hidden = true; }
+// Fotinha do layout: um mapinha visto de cima, com um pontinho colorido por item na posição salva.
+function layoutPreviewIcon(sc, L) {
+  const key = 'layout:' + sc + ':' + L.objetos.map(o => `${o.id}@${o.u},${o.v}`).join('|');
+  return makeIcon(key, () => {
+    const B = sc === 'animais' ? [RANCH_C, RANCH_R] : [COLS, ROWS];
+    ctx.fillStyle = '#bfe08a'; ctx.fillRect(3, 3, 90, 90);
+    ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 2; ctx.strokeRect(3, 3, 90, 90);
+    for (const o of L.objetos) {
+      const px = 3 + clamp(o.u / B[0], 0, 1) * 90, py = 3 + clamp(o.v / B[1], 0, 1) * 90;
+      const cor = ehAgua(o.id) ? '#4f95d8' : ehCerca(o.id) ? '#8a5a33' : (ENFEITE[o.id] && ENFEITE[o.id].fruteira) ? '#4f9a2f' : '#e0a800';
+      ctx.fillStyle = cor; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(px, py, 3.4, 0, 7); ctx.fill(); ctx.stroke();
+    }
+  });
+}
 function renderLayouts() {
   if ($('#layouts').hidden) return;
   const sc = scene, nomeCena = sc === 'animais' ? 'do rancho' : 'da roça';
   let html = `<h3 style="margin-top:0">Layouts ${nomeCena}</h3>`;
   layoutsDe(sc).forEach((L, k) => {
+    const capa = L && L.objetos.length ? `<img alt="" src="${layoutPreviewIcon(sc, L)}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;flex:none">`
+      : `<div class="avatar" style="background:${L ? '#4f9a2f' : '#b7b39c'};flex:none">${k + 1}</div>`;
     html += `<div style="display:flex;gap:10px;align-items:center;background:var(--card);border:2px solid var(--panel-2);border-radius:12px;padding:8px 10px;margin-bottom:8px">
-      <div class="avatar" style="background:${L ? '#4f9a2f' : '#b7b39c'};flex:none">${k + 1}</div>
+      ${capa}
       <div style="flex:1;min-width:0">
         <div class="name">${L ? esc(L.nome) : `Layout ${k + 1}`}</div><div class="meta">${L ? `${L.objetos.length} ${L.objetos.length === 1 ? 'item' : 'itens'}` : 'Vazio'}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
