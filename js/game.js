@@ -1075,6 +1075,7 @@ const NOVIDADES = [
   { v: 168, txt: 'No Modo Mover chegaram 🗑️ Remover tudo (manda tudo pro inventário de uma vez) e 📐 Layouts (salve até 3 arranjos diferentes de cada cena e aplique quando quiser). Roça e Rancho têm os seus próprios, sem se misturar.' },
   { v: 169, txt: 'Cada layout salvo agora mostra uma fotinha (um mapinha visto de cima com um pontinho colorido por item), pra você reconhecer o arranjo antes de aplicar.' },
   { v: 170, txt: 'Chegou o botão 🧹 Rastelo na roça: clique e o avatar vai sozinho até o monte de folhas mais perto pra rastelar. Sem folha nenhuma, avisa que não tem nada pra fazer agora.' },
+  { v: 171, txt: 'Corrigido: na roça, o botão de rastelar folhas estava criando uma barra extra que empurrava os ícones da lateral e ficava tudo sobreposto. Agora ele mora junto com as ferramentas, num só carrossel.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4207,6 +4208,25 @@ function renderTools() {
     b.addEventListener('click', () => setTool(t.id));
     box.appendChild(b);
   });
+  if (scene === 'roca' && isHome() && !isGated()) {
+    const b = document.createElement('button');
+    b.className = 'roundbtn tool'; b.type = 'button'; b.id = 'rasteloBtn';
+    b.innerHTML = `<span class="ic">🧹</span><span class="lb">Limpar</span>`;
+    b.title = 'Manda o avatar rastelar as folhas espalhadas';
+    b.addEventListener('click', irRastelar);
+    box.appendChild(b);
+    atualizarRastelo();
+  }
+}
+// Atualiza o texto/estado do botão de rastelar folhas sem recriar o #tools inteiro (evita perder a rolagem/seleção a cada tick).
+function atualizarRastelo() {
+  const b = $('#rasteloBtn'); if (!b) return;
+  const n = folhasDe().filter(f => !f.alvo).length;
+  const key = 'folhas:' + n;
+  if (b.dataset.key === key) return;
+  b.dataset.key = key;
+  b.disabled = !n;
+  b.querySelector('.lb').textContent = n ? `Limpar (${n})` : 'Limpar';
 }
 function setTool(id) {
   if (!isHome() && HOME_ONLY.includes(id)) return;
@@ -4342,17 +4362,9 @@ function renderHUD() {
 function renderPenActions() {
   const el = $('#penActions');
   if (!el) return;
-  const show = (scene === 'animais' || scene === 'roca') && isHome() && !isGated();
+  const show = scene === 'animais' && isHome() && !isGated();
   el.hidden = !show;
   if (!show) return;
-  if (scene === 'roca') {
-    const n = folhasDe().filter(f => !f.alvo).length;
-    const key = 'folhas:' + n;
-    if (el.dataset.key === key) return;
-    el.dataset.key = key;
-    el.innerHTML = `<button class="btn" type="button" data-rastelo ${n ? '' : 'disabled'}>🧹 Rastelo${n ? ` (${n})` : ''}</button>`;
-    return;
-  }
   const hungry = state.animals.filter(isHungry), ready = state.animals.filter(a => ANIMAL[a.k].tipo === 'prod' && a.ready);
   const cost = hungry.reduce((t, a) => t + ANIMAL[a.k].racao, 0);
   const key = hungry.length + ':' + cost + ':' + ready.length;
@@ -4374,6 +4386,7 @@ function irRastelar() {
 }
 function renderSceneInfo() {
   renderPenActions();
+  if (scene === 'roca') atualizarRastelo();
   const s = S(), el = $('#sceneInfo');
   const est = estacao(), owner = `${est.icone} ${est.nome}${raining() ? (est.neve ? ' · nevando' : ' · chovendo') : ''} · ` + (isHome() ? `${minhaFazenda()} · ` : `${deQuem(view)} (nível ${view.nivel}) · `);
   if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length}${isHome() ? ` de ${allowedLots()}` : ''} canteiros`;
@@ -4988,7 +5001,6 @@ $('#goHome').addEventListener('click', () => goHome());
 $('#penActions').addEventListener('click', e => {
   if (e.target.closest('[data-feed-all]')) feedAll();
   else if (e.target.closest('[data-collect-all]')) collectAll();
-  else if (e.target.closest('[data-rastelo]')) irRastelar();
 });
 
 // ============================================================
