@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="167">
-<script src="firebase-config.js?v=167"></script>
+<meta name="rf-version" content="168">
+<script src="firebase-config.js?v=168"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -807,7 +807,7 @@
     </div>
     <div class="movebar over" id="moveBar" hidden>
       <span id="moveMsg"></span>
-      <div class="mvbtns"><button class="btn" type="button" id="moveCancel">Cancelar</button><button class="btn" type="button" id="moveRot" hidden>⟳ Girar</button><button class="btn" type="button" id="moveGuardar" hidden>📦 Guardar</button><button class="btn gold" type="button" id="moveOk">✔ Salvar aqui</button></div>
+      <div class="mvbtns"><button class="btn" type="button" id="moveCancel">Cancelar</button><button class="btn" type="button" id="moveLayouts" hidden>📐 Layouts</button><button class="btn" type="button" id="moveClear" hidden>🗑️ Remover tudo</button><button class="btn" type="button" id="moveRot" hidden>⟳ Girar</button><button class="btn" type="button" id="moveGuardar" hidden>📦 Guardar</button><button class="btn gold" type="button" id="moveOk">✔ Salvar aqui</button></div>
     </div>
     <div class="bottombar over">
       <div class="hintline" id="sceneHint" hidden></div>
@@ -840,6 +840,16 @@
       <div style="display:flex;align-items:center;gap:12px"><img id="nomeImg" alt="" width="72" height="72"><p id="nomeTxt" style="margin:0;font-weight:700"></p></div>
       <form class="addform" id="nomeForm"><input id="nomeInput" maxlength="18" aria-label="Nome do bicho" style="text-transform:none;letter-spacing:0"><button class="btn gold" type="submit">Salvar</button></form>
       <p class="hint" id="nomeCusto" hidden style="margin:6px 0 0;color:var(--muted);font-size:13px"></p>
+    </section>
+  </div>
+</div>
+
+<div class="modal" id="layouts" hidden role="dialog" aria-modal="true" aria-labelledby="layoutsTitle">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="layoutsTitle">Layouts</h2><button class="iconbtn" type="button" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <section>
+      <p class="hint" style="margin:0 0 10px;color:var(--muted);font-size:13px">Guarde até 3 arranjos diferentes dos enfeites, cercas e blocos de água daqui e aplique quando quiser. Cada cena (Roça e Rancho) tem os seus 3, sem misturar.</p>
+      <div id="layoutsBody"></div>
     </section>
   </div>
 </div>
@@ -1011,8 +1021,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=167"></script>
-<script src="js/cloud.js?v=167"></script>
-<script src="js/game.js?v=167"></script>
+<script src="js/audio.js?v=168"></script>
+<script src="js/cloud.js?v=168"></script>
+<script src="js/game.js?v=168"></script>
 </body>
 </html>

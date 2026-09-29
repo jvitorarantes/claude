@@ -1072,6 +1072,7 @@ const NOVIDADES = [
   { v: 165, txt: 'Tirada a Celeste. Os peixinhos do laguinho ficaram maiores e agora nadam de bloco em bloco por todo o laguinho, em vez de pular parados num cantinho só.' },
   { v: 166, txt: 'Área do rancho bem maior pra arrastar os abrigos no Modo Mover, e a câmera agora acompanha se você mandar um bem longe. E não dá mais pra soltar um abrigo em cima do lugar reservado de outro que ainda não foi construído.' },
   { v: 167, txt: 'Casinhas do rancho: agora dá pra girar (casinha, cocho etc. mudam de lado), segurar em cima abre o menu com a opção Mover, e os bichos vão junto quando você move a casinha deles.' },
+  { v: 168, txt: 'No Modo Mover chegaram 🗑️ Remover tudo (manda tudo pro inventário de uma vez) e 📐 Layouts (salve até 3 arranjos diferentes de cada cena e aplique quando quiser). Roça e Rancho têm os seus próprios, sem se misturar.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -8566,6 +8567,8 @@ function renderMoveBar() {
   $('#moveOk').hidden = !moving; $('#moveOk').disabled = !ok;
   const gira = $('#moveRot'); if (gira) gira.hidden = !movCerca() && !movAbrigoId();
   const guarda = $('#moveGuardar'); if (guarda) guarda.hidden = !(moving && moving.key && moving.key.startsWith('enf:'));
+  const limpa = $('#moveClear'); if (limpa) limpa.hidden = !!moving;
+  const layoutsBtn = $('#moveLayouts'); if (layoutsBtn) layoutsBtn.hidden = !!moving;
   $('#moveCancel').textContent = moving ? 'Cancelar' : 'Concluir';
   moveBarOk = ok;
 }
@@ -8578,6 +8581,8 @@ function guardarMovendo() {
 $('#moveOk')?.addEventListener('click', salvarMove);
 $('#moveRot')?.addEventListener('click', () => { if (movAbrigoId()) girarAbrigo(); else girarCerca(); });
 $('#moveGuardar')?.addEventListener('click', guardarMovendo);
+$('#moveClear')?.addEventListener('click', () => removerTudoEnfeites(scene));
+$('#moveLayouts')?.addEventListener('click', abrirLayouts);
 window.addEventListener('keydown', e => { if ((e.key === 'r' || e.key === 'R') && moveMode && (movCerca() || movAbrigoId()) && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { if (movAbrigoId()) girarAbrigo(); else girarCerca(); } });
 $('#moveCancel')?.addEventListener('click', cancelarMove);
 // Desenha os objetos da cena. "tras": os que ficam atrás da cerca (u ou v negativos); "frente": o resto.
@@ -8841,6 +8846,80 @@ function invGuardar(sc, i) {
   state.enfeites[o.id] = (state.enfeites[o.id] || 0) + 1;
   toast(`${ENFEITE[o.id].nome} guardado no inventário.`); done();
 }
+// ---------- Remover tudo (Modo Mover) e Layouts: guarda até 3 arranjos por cena (roça e rancho não se misturam) ----------
+function removerTudoEnfeites(sc) {
+  const l = objetosDe(state, sc);
+  if (!l.length) return toast('Não tem nada pra remover aqui.');
+  for (const o of l) state.enfeites[o.id] = (state.enfeites[o.id] || 0) + 1;
+  state.objetos[sc] = [];
+  sfx('buy'); toast(`Tudo guardado no inventário (${l.length} ${l.length === 1 ? 'item' : 'itens'}).`, 'good'); done(); renderMoveBar();
+}
+const layoutsDe = sc => { const L = state.layouts || (state.layouts = {}); return L[sc] || (L[sc] = [null, null, null]); };
+function salvarLayout(sc, slot) {
+  const l = objetosDe(state, sc);
+  if (!l.length) return toast('Coloque alguma coisa na cena antes de salvar um layout.');
+  const nome = (layoutsDe(sc)[slot] && layoutsDe(sc)[slot].nome) || `Layout ${slot + 1}`;
+  layoutsDe(sc)[slot] = { nome, objetos: JSON.parse(JSON.stringify(l)) };
+  sfx('buy'); toast(`${nome} salvo com o arranjo de agora!`, 'good'); done(); renderLayouts();
+}
+function apagarLayout(sc, slot) {
+  layoutsDe(sc)[slot] = null; done(); renderLayouts();
+}
+function renomearLayout(sc, slot, nome) {
+  const L = layoutsDe(sc)[slot]; if (!L) return;
+  L.nome = (nome || '').trim().slice(0, 24) || `Layout ${slot + 1}`; done(); renderLayouts();
+}
+// Aplica um layout salvo: devolve o que está na cena pro inventário e recoloca o arranjo salvo,
+// usando o que tiver disponível (o que sobrou de material, se algo foi vendido depois de salvar).
+function aplicarLayout(sc, slot) {
+  const L = layoutsDe(sc)[slot];
+  if (!L) return toast('Esse layout está vazio. Salve um arranjo nele primeiro.');
+  const atuais = objetosDe(state, sc);
+  const disponivel = {};
+  for (const o of atuais) disponivel[o.id] = (disponivel[o.id] || 0) + 1;
+  for (const [id, q] of Object.entries(state.enfeites || {})) disponivel[id] = (disponivel[id] || 0) + q;
+  const usados = {}, novos = [];
+  let faltou = 0;
+  for (const o of L.objetos) {
+    usados[o.id] = (usados[o.id] || 0) + 1;
+    if (usados[o.id] <= (disponivel[o.id] || 0)) novos.push(JSON.parse(JSON.stringify(o)));
+    else faltou++;
+  }
+  for (const o of atuais) state.enfeites[o.id] = (state.enfeites[o.id] || 0) + 1;
+  for (const o of novos) { state.enfeites[o.id] = (state.enfeites[o.id] || 0) - 1; if (state.enfeites[o.id] <= 0) delete state.enfeites[o.id]; }
+  state.objetos[sc] = novos;
+  sfx('buy'); toast(`${L.nome} aplicado!${faltou ? ` (faltou material pra ${faltou} ${faltou === 1 ? 'item' : 'itens'})` : ''}`, 'good');
+  done(); renderMoveBar(); fecharLayouts();
+}
+function abrirLayouts() { $('#layouts').hidden = false; renderLayouts(); }
+function fecharLayouts() { $('#layouts').hidden = true; }
+function renderLayouts() {
+  if ($('#layouts').hidden) return;
+  const sc = scene, nomeCena = sc === 'animais' ? 'do rancho' : 'da roça';
+  let html = `<h3 style="margin-top:0">Layouts ${nomeCena}</h3>`;
+  layoutsDe(sc).forEach((L, k) => {
+    html += `<div style="display:flex;gap:10px;align-items:center;background:var(--card);border:2px solid var(--panel-2);border-radius:12px;padding:8px 10px;margin-bottom:8px">
+      <div class="avatar" style="background:${L ? '#4f9a2f' : '#b7b39c'};flex:none">${k + 1}</div>
+      <div style="flex:1;min-width:0">
+        <div class="name">${L ? esc(L.nome) : `Layout ${k + 1}`}</div><div class="meta">${L ? `${L.objetos.length} ${L.objetos.length === 1 ? 'item' : 'itens'}` : 'Vazio'}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          ${L ? `<button class="btn gold" type="button" data-layout-aplicar="${k}">Aplicar</button>` : ''}
+          <button class="btn ghost" type="button" data-layout-salvar="${k}">${L ? 'Sobrescrever' : 'Salvar aqui'}</button>
+          ${L ? `<button class="btn ghost" type="button" data-layout-renomear="${k}">✏️</button><button class="btn ghost" type="button" data-layout-apagar="${k}">Apagar</button>` : ''}
+        </div>
+      </div></div>`;
+  });
+  $('#layoutsBody').innerHTML = html;
+}
+$('#layouts').addEventListener('click', e => {
+  if (e.target === $('#layouts') || e.target.closest('[data-close]')) return fecharLayouts();
+  const b = e.target.closest('button[data-layout-aplicar], button[data-layout-salvar], button[data-layout-apagar], button[data-layout-renomear]'); if (!b) return;
+  const sc = scene;
+  if (b.dataset.layoutAplicar !== undefined) aplicarLayout(sc, Number(b.dataset.layoutAplicar));
+  else if (b.dataset.layoutSalvar !== undefined) salvarLayout(sc, Number(b.dataset.layoutSalvar));
+  else if (b.dataset.layoutApagar !== undefined) apagarLayout(sc, Number(b.dataset.layoutApagar));
+  else if (b.dataset.layoutRenomear !== undefined) { const slot = Number(b.dataset.layoutRenomear), atual = layoutsDe(sc)[slot]; const nome = window.prompt('Nome do layout:', atual ? atual.nome : ''); if (nome !== null) renomearLayout(sc, slot, nome); }
+});
 // Todos os blocos de água conectados (4 direções) a partir de "o" — o mesmo laguinho.
 function aguaGrupo(objs, o) {
   const vistos = new Set(), fila = [o], grupo = [];
