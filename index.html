@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="171">
-<script src="firebase-config.js?v=171"></script>
+<meta name="rf-version" content="172">
+<script src="firebase-config.js?v=172"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -660,7 +660,7 @@
     .panel { top: 54px; right: 72px; bottom: 8px; }
     .banner, .toasts { top: 64px; }
   }
-  /* Celular em pé: menu numa fileira no alto; lugares, presente e zoom numa fileira embaixo */
+  /* Celular em pé: menu numa fileira no alto; lugares e presente numa coluna vertical à esquerda */
   @media (max-width: 699px) and (orientation: portrait) {
     .topright .iconbtn { width: 40px; height: 40px; }
     .menu { top: 78px; left: 4px; right: 4px; display: flex; justify-content: space-around; gap: 0; }
@@ -668,11 +668,8 @@
     .menu .roundbtn .ic { width: 36px; height: 36px; }
     .menu .roundbtn .ic svg { width: 22px; height: 22px; }
     .menu .roundbtn .lb { font-size: 8.5px; max-width: 48px; }
-    .scenes { top: auto; bottom: 94px; left: 4px; display: flex; gap: 0; }
-    .giftwrap { top: auto; bottom: 94px; left: 150px; display: flex; gap: 0; }
-    .scenes .roundbtn { width: 48px; }
-    .giftwrap .roundbtn { width: 58px; }
-    .giftwrap .roundbtn .lb { max-width: 60px; }
+    .scenes { top: 138px; left: 4px; display: grid; gap: 4px; }
+    .giftwrap { top: 336px; left: 4px; display: grid; gap: 4px; }
     .zoom { top: auto; bottom: 160px; right: 4px; display: grid; gap: 3px; }
     .zoom #zoomIn { order: 1; } .zoom #zoomReset { order: 2; } .zoom #zoomOut { order: 3; }
     .panel { top: 138px; left: 4px; right: 4px; bottom: 4px; }
@@ -1021,8 +1018,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=171"></script>
-<script src="js/cloud.js?v=171"></script>
-<script src="js/game.js?v=171"></script>
+<script src="js/audio.js?v=172"></script>
+<script src="js/cloud.js?v=172"></script>
+<script src="js/game.js?v=172"></script>
 </body>
 </html>

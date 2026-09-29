@@ -1076,6 +1076,7 @@ const NOVIDADES = [
   { v: 169, txt: 'Cada layout salvo agora mostra uma fotinha (um mapinha visto de cima com um pontinho colorido por item), pra você reconhecer o arranjo antes de aplicar.' },
   { v: 170, txt: 'Chegou o botão 🧹 Rastelo na roça: clique e o avatar vai sozinho até o monte de folhas mais perto pra rastelar. Sem folha nenhuma, avisa que não tem nada pra fazer agora.' },
   { v: 171, txt: 'Corrigido: na roça, o botão de rastelar folhas estava criando uma barra extra que empurrava os ícones da lateral e ficava tudo sobreposto. Agora ele mora junto com as ferramentas, num só carrossel.' },
+  { v: 172, txt: 'Com o celular na vertical, Roça/Rancho/Casa e Presente/Mover voltaram a ficar numa coluna vertical do lado esquerdo (em vez de uma fileira embaixo). E o botão de rastelar folhas trocou a vassoura pelo ícone do rastelo de verdade, agora chamado "Rastelar": clicando sem folha nenhuma, ele avisa em vez de simplesmente ficar apagado.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4211,22 +4212,22 @@ function renderTools() {
   if (scene === 'roca' && isHome() && !isGated()) {
     const b = document.createElement('button');
     b.className = 'roundbtn tool'; b.type = 'button'; b.id = 'rasteloBtn';
-    b.innerHTML = `<span class="ic">🧹</span><span class="lb">Limpar</span>`;
+    b.innerHTML = `<span class="ic">${TOOL_ICONS.hoe}</span><span class="lb">Rastelar</span>`;
     b.title = 'Manda o avatar rastelar as folhas espalhadas';
     b.addEventListener('click', irRastelar);
     box.appendChild(b);
     atualizarRastelo();
   }
 }
-// Atualiza o texto/estado do botão de rastelar folhas sem recriar o #tools inteiro (evita perder a rolagem/seleção a cada tick).
+// Atualiza o texto do botão de rastelar folhas sem recriar o #tools inteiro (evita perder a rolagem/seleção a cada tick).
+// Fica sempre clicável: sem folha nenhuma, o clique mostra um aviso (ver irRastelar) em vez de só desabilitar o botão.
 function atualizarRastelo() {
   const b = $('#rasteloBtn'); if (!b) return;
   const n = folhasDe().filter(f => !f.alvo).length;
   const key = 'folhas:' + n;
   if (b.dataset.key === key) return;
   b.dataset.key = key;
-  b.disabled = !n;
-  b.querySelector('.lb').textContent = n ? `Limpar (${n})` : 'Limpar';
+  b.querySelector('.lb').textContent = n ? `Rastelar (${n})` : 'Rastelar';
 }
 function setTool(id) {
   if (!isHome() && HOME_ONLY.includes(id)) return;
