@@ -311,15 +311,16 @@ const ORDER = orderFor(COLS, ROWS);
 
 const need = l => 100 + 50 * (l - 1);
 // Expansões: cada uma libera mais canteiros, que você coloca onde quiser (encostados na sua terra).
+// Cada canteiro novo custa sempre 1000 moedas, não importa o nível (preco = 1000 × canteiros ganhos na expansão).
 const EXPANSOES = [
-  { nivel: 1,  preco: 0,      total: 6 },
-  { nivel: 5,  preco: 2000,   total: 12 },
-  { nivel: 10, preco: 8000,   total: 20 },
-  { nivel: 15, preco: 20000,  total: 30 },
-  { nivel: 20, preco: 50000,  total: 42 },
-  { nivel: 30, preco: 120000, total: 60 },
-  { nivel: 40, preco: 250000, total: 80 },
-  { nivel: 50, preco: 500000, total: 100 },
+  { nivel: 1,  preco: 0,     total: 6 },
+  { nivel: 5,  preco: 6000,  total: 12 },
+  { nivel: 10, preco: 8000,  total: 20 },
+  { nivel: 15, preco: 10000, total: 30 },
+  { nivel: 20, preco: 12000, total: 42 },
+  { nivel: 30, preco: 18000, total: 60 },
+  { nivel: 40, preco: 20000, total: 80 },
+  { nivel: 50, preco: 20000, total: 100 },
 ];
 const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganhar XP infinito com o feijão)
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -1078,6 +1079,7 @@ const NOVIDADES = [
   { v: 171, txt: 'Corrigido: na roça, o botão de rastelar folhas estava criando uma barra extra que empurrava os ícones da lateral e ficava tudo sobreposto. Agora ele mora junto com as ferramentas, num só carrossel.' },
   { v: 172, txt: 'Com o celular na vertical, Roça/Rancho/Casa e Presente/Mover voltaram a ficar numa coluna vertical do lado esquerdo (em vez de uma fileira embaixo). E o botão de rastelar folhas trocou a vassoura pelo ícone do rastelo de verdade, agora chamado "Rastelar": clicando sem folha nenhuma, ele avisa em vez de simplesmente ficar apagado.' },
   { v: 173, txt: 'Ajuste fino no celular na vertical: a coluna Roça/Rancho/Casa/Presente/Mover desceu um pouco e a barra de ferramentas subiu um pouquinho, pra ficar mais confortável de alcançar.' },
+  { v: 174, txt: 'Corrigido: se algo interrompesse o avatar rastelando (visitar outro amigo, recarregar a página), o monte de folhas ficava preso pra sempre, sem contar como folha e sem dar pra clicar. Agora ele libera sozinho. E o preço das expansões de canteiro mudou para 1.000 moedas por canteiro em qualquer nível.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -6640,6 +6642,10 @@ function folhasDe() { return state.folhas = Array.isArray(state.folhas) ? state.
 function folhasTick() {
   if (!state || kicked) return;
   const l = folhasDe(), agora = Date.now();
+  // Se o monte ficou marcado como "sendo rastelado" mas a tarefa do avatar sumiu (visitou outra
+  // fazenda, recarregou a página, etc.), libera ele de novo em vez de deixar preso pra sempre.
+  const w = avWalk['roca:eu'];
+  for (const f of l) if (f.alvo && (!w || !w.tarefa || w.tarefa.id !== f.id)) f.alvo = false;
   if (!state.folhasProx) { state.folhasProx = agora + 3 * 60e3; return; }
   let n = 0, mudou = false;
   while (agora >= state.folhasProx && n++ < FOLHAS_MAX) { if (l.length < FOLHAS_MAX && novaFolha()) mudou = true; state.folhasProx += folhasIntervalo(); }
