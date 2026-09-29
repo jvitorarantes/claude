@@ -1074,6 +1074,7 @@ const NOVIDADES = [
   { v: 167, txt: 'Casinhas do rancho: agora dá pra girar (casinha, cocho etc. mudam de lado), segurar em cima abre o menu com a opção Mover, e os bichos vão junto quando você move a casinha deles.' },
   { v: 168, txt: 'No Modo Mover chegaram 🗑️ Remover tudo (manda tudo pro inventário de uma vez) e 📐 Layouts (salve até 3 arranjos diferentes de cada cena e aplique quando quiser). Roça e Rancho têm os seus próprios, sem se misturar.' },
   { v: 169, txt: 'Cada layout salvo agora mostra uma fotinha (um mapinha visto de cima com um pontinho colorido por item), pra você reconhecer o arranjo antes de aplicar.' },
+  { v: 170, txt: 'Chegou o botão 🧹 Rastelo na roça: clique e o avatar vai sozinho até o monte de folhas mais perto pra rastelar. Sem folha nenhuma, avisa que não tem nada pra fazer agora.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4341,9 +4342,17 @@ function renderHUD() {
 function renderPenActions() {
   const el = $('#penActions');
   if (!el) return;
-  const show = scene === 'animais' && isHome() && !isGated();
+  const show = (scene === 'animais' || scene === 'roca') && isHome() && !isGated();
   el.hidden = !show;
   if (!show) return;
+  if (scene === 'roca') {
+    const n = folhasDe().filter(f => !f.alvo).length;
+    const key = 'folhas:' + n;
+    if (el.dataset.key === key) return;
+    el.dataset.key = key;
+    el.innerHTML = `<button class="btn" type="button" data-rastelo ${n ? '' : 'disabled'}>🧹 Rastelo${n ? ` (${n})` : ''}</button>`;
+    return;
+  }
   const hungry = state.animals.filter(isHungry), ready = state.animals.filter(a => ANIMAL[a.k].tipo === 'prod' && a.ready);
   const cost = hungry.reduce((t, a) => t + ANIMAL[a.k].racao, 0);
   const key = hungry.length + ':' + cost + ':' + ready.length;
@@ -4351,6 +4360,17 @@ function renderPenActions() {
   el.dataset.key = key;
   el.innerHTML = `<button class="btn" type="button" data-feed-all ${hungry.length ? '' : 'disabled'} aria-label="Alimentar todos${hungry.length ? ` (${hungry.length}) por ${cost} moedas` : ''}">Alimentar<span class="wide"> todos</span>${hungry.length ? ` (${hungry.length}) · <span class="coin"></span>${cost.toLocaleString('pt-BR')}` : ''}</button>
     <button class="btn gold" type="button" data-collect-all ${ready.length ? '' : 'disabled'}>Recolher<span class="wide"> tudo</span>${ready.length ? ` (${ready.length})` : ''}</button>`;
+}
+// Manda o avatar rastelar o monte de folhas mais perto (ou avisa se não tiver nenhum).
+function irRastelar() {
+  if (!isHome() || scene !== 'roca') return;
+  const livres = folhasDe().filter(f => !f.alvo);
+  if (!livres.length) return toast('Não tem nenhuma folha pra rastelar agora. 🍂');
+  const w = avWalk['roca:eu'];
+  if (w && w.tarefa) return toast('Calma: o avatar ainda está rastelando o outro monte!');
+  let alvo = livres[0], melhorDist = Infinity;
+  if (w) for (const f of livres) { const d = Math.hypot(f.u - w.fu, f.v - w.fv); if (d < melhorDist) { melhorDist = d; alvo = f; } }
+  rastelarFolhas(alvo.id);
 }
 function renderSceneInfo() {
   renderPenActions();
@@ -4968,6 +4988,7 @@ $('#goHome').addEventListener('click', () => goHome());
 $('#penActions').addEventListener('click', e => {
   if (e.target.closest('[data-feed-all]')) feedAll();
   else if (e.target.closest('[data-collect-all]')) collectAll();
+  else if (e.target.closest('[data-rastelo]')) irRastelar();
 });
 
 // ============================================================
