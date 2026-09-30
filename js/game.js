@@ -1102,6 +1102,7 @@ const NOVIDADES = [
   { v: 181, txt: 'Chegou o botão 🧺 Colher na roça: colhe de uma vez todo canteiro pronto, sem precisar clicar um por um. Sem nada pronto, avisa que não tem nada pra fazer agora.' },
   { v: 182, txt: 'Caçada rendendo mais: todo bicho vale bem mais moedas, e cada entrada no mato agora dá pra caçar 5 vezes (antes eram 3). E chegaram mais peixes pros rios: tuvira e mandubé no Córrego Cascavel e no Rio Meia Ponte, papa-terra no Ribeirão João Leite, tambacu no Rio dos Bois, e a cachara no Rio Amazonas, junto do jaú e da piraíba.' },
   { v: 183, txt: 'Ajustada a caçada: volta a começar com 3 entradas por vez, subindo 1 a cada 6 níveis (a partir do nível 10, quando ela libera) até o máximo de 6.' },
+  { v: 184, txt: 'A pescaria agora funciona igual à caçada: começa com 3 pescarias por ponto, subindo 1 a cada 10 níveis (que é quando libera ponto novo) até o máximo de 6.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -7284,9 +7285,10 @@ const temPonto = id => !!PONTO[id] && (PONTO[id].custo === 0 ? state.level >= PO
 const SOLTE_MOEDAS = 10, SOLTE_XP = 1;
 const pontoSel = () => { const id = state.pontoSel; return PONTO[id] && temPonto(id) ? id : 'casa'; };
 const faltaPonto = id => Math.max(0, (pontosDe().prox[id] || 0) - Date.now());
-// Cada ponto dá VARA_POR_VEZ pescarias de vara; depois descansa (2 horas, menos com o domínio).
-const VARA_POR_VEZ = 3;
-const restamVara = id => PONTO[id] && PONTO[id].solte ? Infinity : faltaPonto(id) ? 0 : Math.max(0, VARA_POR_VEZ - (pontosDe().usos[id] || 0));
+// Cada ponto dá varaPorVez() pescarias de vara; depois descansa (2 horas, menos com o domínio).
+// Começa em 3 e sobe 1 a cada 10 níveis (bate com o nível dos pontos novos: 10, 20, 30), até o máximo de 6.
+const varaPorVez = () => clamp(3 + Math.floor(state.level / 10), 3, 6);
+const restamVara = id => PONTO[id] && PONTO[id].solte ? Infinity : faltaPonto(id) ? 0 : Math.max(0, varaPorVez() - (pontosDe().usos[id] || 0));
 const tarrafaObj = () => (state.tarrafaEm && typeof state.tarrafaEm === 'object' ? state.tarrafaEm : (state.tarrafaEm = {}));
 const faltaTarrafa = (id = pontoSel()) => Math.max(0, (tarrafaObj()[id] || 0) - Date.now());
 // Algum ponto seu tem pescaria de vara ou tarrafa disponível agora (descansado ou nunca usado): mostra um brilho no pesqueiro.
@@ -7435,7 +7437,7 @@ function concluirPesca() {
     const p = pesca.peixe, novo = guardarPeixe(p);
     const pp = pontosDe(), pid = pesca.ponto || 'casa';
     pp.usos[pid] = (pp.usos[pid] || 0) + 1;
-    if (pp.usos[pid] >= VARA_POR_VEZ) { pp.usos[pid] = 0; pp.prox[pid] = Date.now() + esperaVara(); } // o ponto descansa (2 horas, menos com domínio)
+    if (pp.usos[pid] >= varaPorVez()) { pp.usos[pid] = 0; pp.prox[pid] = Date.now() + esperaVara(); } // o ponto descansa (2 horas, menos com domínio)
     const um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' && p.id !== 'papaterra' ? 'a' : ''}`;
     pesca = { fase: 'resultado', t0: performance.now(), peixe: p, novo, msg: p.lixo ? `Ih… veio uma ${p.nome.toLowerCase()}. 😅`
       : novo ? `✨ Peixe novo! Pegou ${um} ${p.nome} pela primeira vez (${p.raro}) — já está no 📖 Livro de peixes!` : `Pegou ${um} ${p.nome}! (${p.raro})` };
@@ -7489,7 +7491,7 @@ function renderPesca() {
   // só trava o toque (sem rolar) durante as fases de reação rápida; no resto, dá pra rolar a tela com o dedo em cima do lago
   $('#pesca').classList.toggle('travapesca', pesca.fase === 'fisgou' || pesca.fase === 'brigando');
   btn.textContent = pesca.fase === 'esperando' ? 'Esperando…' : pesca.fase === 'fisgou' ? 'PUXA! 🎣' : pesca.fase === 'brigando' ? `PUXA no verde! 🟢 ${pesca.acertos}/${pesca.precisa}` : pesca.fase === 'tarrafa' ? 'Puxando a rede…'
-    : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : !pt.solte && qtdIsca(iscaSel()) <= 0 ? `Sem isca ${ISCA[iscaSel()].emoji}` : `${pesca.fase === 'resultado' ? 'Lançar de novo' : 'Lançar a linha'}${pt.solte ? '' : ` (${restamVara(pt.id)}/${VARA_POR_VEZ})`}`;
+    : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : !pt.solte && qtdIsca(iscaSel()) <= 0 ? `Sem isca ${ISCA[iscaSel()].emoji}` : `${pesca.fase === 'resultado' ? 'Lançar de novo' : 'Lançar a linha'}${pt.solte ? '' : ` (${restamVara(pt.id)}/${varaPorVez()})`}`;
   btn.disabled = livre && !!descansa;
   const tb = $('#pescaTarrafa'), ft = faltaTarrafa();
   setHtml(tb, ft ? `🕸️ Tarrafa<br><small>em ${fmt(ft / 1000)}</small>` : `🕸️ Tarrafa<br><small>pega ${TARRAFA_N} peixes</small>`);
@@ -7501,7 +7503,7 @@ function renderPesca() {
   setHtml($('#pescaPontos'), PONTOS.map(d => {
     const meu = temPonto(d.id), trava = d.nivel > state.level, f = meu ? faltaPonto(d.id) : 0;
     const ft = meu && !d.solte ? faltaTarrafa(d.id) : 0, tarr = meu && !d.solte ? ` · 🕸️ ${ft ? fmt(ft / 1000) : 'pronta'}` : '';
-    const st = (d.solte && meu ? `Sempre aberto · ${moeda(SOLTE_MOEDAS)}` : meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎣 ${restamVara(d.id)}/${VARA_POR_VEZ}`) : trava ? `🔒 Nv ${d.nivel} · ${d.custo ? moeda(d.custo) : 'grátis'}` : moeda(d.custo)) + tarr;
+    const st = (d.solte && meu ? `Sempre aberto · ${moeda(SOLTE_MOEDAS)}` : meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎣 ${restamVara(d.id)}/${varaPorVez()}`) : trava ? `🔒 Nv ${d.nivel} · ${d.custo ? moeda(d.custo) : 'grátis'}` : moeda(d.custo)) + tarr;
     return `<button type="button" class="pontobtn ${meu ? '' : trava ? 'trava' : 'loja'} ${f ? 'descansa' : ''}" data-ponto="${d.id}" aria-pressed="${meu && d.id === pt.id}">
       <b>${d.emoji} ${d.nome}</b><small>${st}</small></button>`;
   }).join(''));
@@ -7514,7 +7516,7 @@ function renderPesca() {
     : pesca.fase === 'pronto' && pesca.aviso ? pesca.aviso
     : pesca.fase === 'pronto' && descansa ? `${pt.nome} está descansando. Escolha outro ponto ou jogue a tarrafa!`
     : pesca.fase === 'pronto' && pt.solte ? `🔄 Pesque e Solte: pesque quanto quiser, sem gastar isca! Cada peixe é solto de volta no rio e dá só ${SOLTE_MOEDAS} moedas e ${SOLTE_XP} XP — não vai para o celeiro, o livro, as conquistas nem as missões.`
-    : pesca.fase === 'pronto' ? `${pt.emoji} ${pt.nome}: ${VARA_POR_VEZ} pescarias por vez. Toque em "Lançar a linha" e espere a boia afundar. Aí, puxe rápido!`
+    : pesca.fase === 'pronto' ? `${pt.emoji} ${pt.nome}: ${varaPorVez()} pescarias por vez. Toque em "Lançar a linha" e espere a boia afundar. Aí, puxe rápido!`
     : pesca.fase === 'esperando' ? 'Shhh… espere a boia afundar de verdade.' : pesca.fase === 'fisgou' ? 'Afundou! Puxa agora!' : pesca.msg || '';
   // escolha da isca
   const sel = iscaSel();
