@@ -804,7 +804,10 @@ function buyExpansion() {
   done();
 }
 
-function harvest(p, pos) {
+function harvest(p, pos) { harvestPlot(p, pos); done(); }
+// O miolo da colheita, sem chamar done() — assim a Colheita rápida pode colher vários canteiros
+// e salvar/renderizar só uma vez no final, em vez de um done() por canteiro.
+function harvestPlot(p, pos) {
   const crop = CROP[p.c], ouro = !!p.ouro, qty = rollYield(p) * (ouro ? OURO_VEZES : 1);
   sfx('harvest');
   gain(crop.prod, qty, pos);
@@ -820,6 +823,14 @@ function harvest(p, pos) {
   if (xpAllowed(crop.id)) { state.xpDay.c[crop.id] = (state.xpDay.c[crop.id] || 0) + 1; addXP(crop.xp, pos); }
   else if (state.xpDay.c[crop.id] === XP_CAP) { state.xpDay.c[crop.id]++; toast(`Hoje ${crop.nome.toLowerCase()} já deu todo o XP (${XP_CAP} colheitas). Ainda rende moedas; o XP volta amanhã.`); }
   Object.assign(p, { s: 'withered', g: 0, w: 0, b: 0, dry: false, th: [] });
+}
+// Colheita rápida: colhe de uma vez todo canteiro pronto da sua roça.
+function harvestAll() {
+  if (!isHome()) return;
+  const list = state.plots.map((p, i) => ({ p, i })).filter(x => ripe(x.p));
+  if (!list.length) return toast('Nada pronto pra colher agora. 🌱');
+  for (const { p, i } of list) harvestPlot(p, cellCenter(i));
+  toast(`Colheu ${list.length} ${list.length > 1 ? 'canteiros' : 'canteiro'}.`, 'good');
   done();
 }
 
@@ -1088,6 +1099,7 @@ const NOVIDADES = [
   { v: 178, txt: 'Ajustado o ícone do Enxadão: a lâmina estava apontando pro lado errado (na mesma direção do cabo). Agora fica perpendicular ao cabo, do jeito que uma enxada de verdade é.' },
   { v: 179, txt: 'O ícone do Enxadão estava puxado pro lado dentro do círculo. Recentralizado.' },
   { v: 180, txt: 'Clicar de novo no Adubo já selecionado agora troca o tipo (básico → rápido → premium → básico…), pra escolher qual usar sem precisar abrir a Loja.' },
+  { v: 181, txt: 'Chegou o botão 🧺 Colher na roça: colhe de uma vez todo canteiro pronto, sem precisar clicar um por um. Sem nada pronto, avisa que não tem nada pra fazer agora.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4229,6 +4241,13 @@ function renderTools() {
     b.addEventListener('click', irRastelar);
     box.appendChild(b);
     atualizarRastelo();
+    const c = document.createElement('button');
+    c.className = 'roundbtn tool'; c.type = 'button'; c.id = 'colherBtn';
+    c.innerHTML = `<span class="ic">🧺</span><span class="lb">Colher</span>`;
+    c.title = 'Colhe de uma vez todo canteiro pronto';
+    c.addEventListener('click', harvestAll);
+    box.appendChild(c);
+    atualizarColher();
   }
 }
 // Atualiza o texto do botão de rastelar folhas sem recriar o #tools inteiro (evita perder a rolagem/seleção a cada tick).
@@ -4240,6 +4259,15 @@ function atualizarRastelo() {
   if (b.dataset.key === key) return;
   b.dataset.key = key;
   b.querySelector('.lb').textContent = n ? `Rastelar (${n})` : 'Rastelar';
+}
+// Atualiza o texto do botão de colheita rápida sem recriar o #tools inteiro.
+function atualizarColher() {
+  const b = $('#colherBtn'); if (!b) return;
+  const n = state.plots.filter(ripe).length;
+  const key = 'colher:' + n;
+  if (b.dataset.key === key) return;
+  b.dataset.key = key;
+  b.querySelector('.lb').textContent = n ? `Colher (${n})` : 'Colher';
 }
 function setTool(id) {
   if (!isHome() && HOME_ONLY.includes(id)) return;
@@ -4404,7 +4432,7 @@ function irRastelar() {
 }
 function renderSceneInfo() {
   renderPenActions();
-  if (scene === 'roca') atualizarRastelo();
+  if (scene === 'roca') { atualizarRastelo(); atualizarColher(); }
   const s = S(), el = $('#sceneInfo');
   const est = estacao(), owner = `${est.icone} ${est.nome}${raining() ? (est.neve ? ' · nevando' : ' · chovendo') : ''} · ` + (isHome() ? `${minhaFazenda()} · ` : `${deQuem(view)} (nível ${view.nivel}) · `);
   if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length}${isHome() ? ` de ${allowedLots()}` : ''} canteiros`;
