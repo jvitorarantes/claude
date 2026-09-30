@@ -1087,6 +1087,7 @@ const NOVIDADES = [
   { v: 177, txt: 'O Enxadão tinha ganhado só o nome novo, mas o ícone continuava sendo o do rastelo. Agora tem o desenho certo (uma lâmina de enxada), separado do ícone do botão Rastelar.' },
   { v: 178, txt: 'Ajustado o ícone do Enxadão: a lâmina estava apontando pro lado errado (na mesma direção do cabo). Agora fica perpendicular ao cabo, do jeito que uma enxada de verdade é.' },
   { v: 179, txt: 'O ícone do Enxadão estava puxado pro lado dentro do círculo. Recentralizado.' },
+  { v: 180, txt: 'Clicar de novo no Adubo já selecionado agora troca o tipo (básico → rápido → premium → básico…), pra escolher qual usar sem precisar abrir a Loja.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4242,6 +4243,11 @@ function atualizarRastelo() {
 }
 function setTool(id) {
   if (!isHome() && HOME_ONLY.includes(id)) return;
+  // Clicar de novo no Adubo já selecionado troca pro próximo tipo (básico → rápido → premium → básico…).
+  if (id === 'fert' && state.tool === 'fert') {
+    const idx = FERTS.findIndex(f => f.id === state.fertSel);
+    state.fertSel = FERTS[(idx + 1) % FERTS.length].id;
+  }
   state.tool = id; renderTools(); renderPane();
 }
 function setScene(sc) {
