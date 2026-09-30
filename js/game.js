@@ -732,7 +732,7 @@ function addXP(n, pos) {
     state.xp -= need(state.level); state.level++;
     sfx('level');
     lvlUpFX();
-    const bonus = state.level * 50; state.coins += bonus;
+    const bonus = state.level * 100; state.coins += bonus;
     const trevos = Math.floor(state.level / 3) + 2; trevosDe().saldo += trevos;
     const premio = sortearPremioNivel(); state.barn[premio.id] = (state.barn[premio.id] || 0) + 1;
     lvlupCard(bonus, trevos, premio);
@@ -1178,6 +1178,7 @@ const NOVIDADES = [
   { v: 185, txt: 'Agora dá para ter até 3 gatos em casa, cada um com um pelo diferente (laranja, cinza e preto). O primeiro que sobrar você compra, o próximo já vem na cor que falta.' },
   { v: 186, txt: 'Seus gatos agora trazem presentinho a cada 12h (novelo de lã, rato caçado, lagartixa seca, sininho perdido ou, raramente, um presente misterioso) direto pro celeiro: vende de 220 a 480 moedas cada.' },
   { v: 187, txt: 'Subir de nível ficou mais festivo: além das moedas de sempre, agora aparece um cartão no meio da tela mostrando os prêmios — moedas, alguns trevos 🍀 (mais conforme o nível sobe) e uma medalha ou troféu que dá pra vender no celeiro.' },
+  { v: 188, txt: 'O bônus de moedas ao subir de nível dobrou: agora é nível × 100 (antes era × 50).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
