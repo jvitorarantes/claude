@@ -1100,6 +1100,7 @@ const NOVIDADES = [
   { v: 179, txt: 'O ícone do Enxadão estava puxado pro lado dentro do círculo. Recentralizado.' },
   { v: 180, txt: 'Clicar de novo no Adubo já selecionado agora troca o tipo (básico → rápido → premium → básico…), pra escolher qual usar sem precisar abrir a Loja.' },
   { v: 181, txt: 'Chegou o botão 🧺 Colher na roça: colhe de uma vez todo canteiro pronto, sem precisar clicar um por um. Sem nada pronto, avisa que não tem nada pra fazer agora.' },
+  { v: 182, txt: 'Caçada rendendo mais: todo bicho vale bem mais moedas, e cada entrada no mato agora dá pra caçar 5 vezes (antes eram 3). E chegaram mais peixes pros rios: tuvira e mandubé no Córrego Cascavel e no Rio Meia Ponte, papa-terra no Ribeirão João Leite, tambacu no Rio dos Bois, e a cachara no Rio Amazonas, junto do jaú e da piraíba.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -7153,24 +7154,29 @@ const PEIXES = [
   { id: 'curimba',  nome: 'Curimbatá',   preco: 55,   raro: 'comum',    peso: 16,  nivel: 3,  iscas: ['milho'], cor: ['#b8bcc0', '#8a6a4a'], tam: 0.95, pontos: ['riacho'] },
   { id: 'pacu',     nome: 'Pacu',       preco: 90,   raro: 'incomum',  peso: 12,  nivel: 4,  iscas: ['milho'], cor: ['#8a8f99', '#e07a3a'], tam: 0.95, alto: true, pontos: ['riacho'] },
   { id: 'cascudo',  nome: 'Cascudo',     preco: 80,   raro: 'incomum',  peso: 10,  nivel: 4,  iscas: ['minhoca', 'milho'], cor: ['#5a5040', '#3a3228'], tam: 0.85, armadura: true, pintas: true, pontos: ['riacho'] },
+  { id: 'tuvira',   nome: 'Tuvira',      preco: 65,   raro: 'comum',    peso: 14,  nivel: 3,  iscas: ['minhoca'], cor: ['#6a6a52', '#3a3a2a'], tam: 0.8, longo: true, pontos: ['riacho'] },
   // Rio Meia Ponte
   { id: 'piranha',  nome: 'Piranha',     preco: 85,   raro: 'incomum',  peso: 11,  nivel: 5,  iscas: ['minhoca', 'camarao'], cor: ['#9aa0a8', '#6a707a'], tam: 0.8, alto: true, dentes: true, barriga: '#e0503a', pontos: ['represa'] },
   { id: 'tucunare', nome: 'Tucunaré',   preco: 160,  raro: 'raro',     peso: 8,   nivel: 6,  iscas: ['camarao', 'artificial'], cor: ['#e3bf3a', '#4f7a2a'], tam: 1, listras: true, pontos: ['represa'] },
   { id: 'corvina',  nome: 'Corvina',     preco: 110,  raro: 'incomum',  peso: 9,   nivel: 7,  iscas: ['camarao', 'milho'], cor: ['#d9d9cf', '#a8a898'], tam: 1, pontos: ['represa'] },
+  { id: 'mandube',  nome: 'Mandubé',     preco: 130,  raro: 'incomum',  peso: 8,   nivel: 7,  iscas: ['minhoca', 'camarao'], cor: ['#c9b98a', '#8a704a'], tam: 0.9, bigode: true, pontos: ['represa'] },
   // Ribeirão João Leite
   { id: 'matrinxa', nome: 'Matrinxã',    preco: 120,  raro: 'incomum',  peso: 8,   nivel: 8,  iscas: ['milho', 'minhoca'], cor: ['#c8ccd2', '#3a3a3a'], tam: 1, barriga: '#e8c070', pontos: ['rio'] },
   { id: 'pintado',  nome: 'Pintado',    preco: 220,  raro: 'raro',     peso: 6,   nivel: 9,  iscas: ['camarao'], cor: ['#c7c1b3', '#4a4a4a'], tam: 1.1, pintas: true, pontos: ['rio'] },
+  { id: 'papaterra', nome: 'Papa-terra', preco: 200,  raro: 'raro',     peso: 6,   nivel: 9,  iscas: ['camarao', 'milho'], cor: ['#c9c9c2', '#8a8a80'], tam: 1, longo: true, pontos: ['rio'] },
   { id: 'cachorra', nome: 'Peixe-cachorra', preco: 190, raro: 'raro',   peso: 6,   nivel: 10, iscas: ['camarao', 'artificial'], cor: ['#d0d4d8', '#e0a040'], tam: 1, longo: true, dentes: true, pontos: ['rio'] },
   // Rio dos Bois
   { id: 'aruana',   nome: 'Aruanã',      preco: 240,  raro: 'raro',     peso: 5,   nivel: 11, iscas: ['artificial'], cor: ['#c8c090', '#8a8a5a'], tam: 1.05, longo: true, pontos: ['lagoa'] },
   { id: 'dourado',  nome: 'Dourado',    preco: 400,  raro: 'épico',    peso: 3,   nivel: 12, iscas: ['camarao', 'artificial'], cor: ['#f2b705', '#d9822b'], tam: 1.1, pontos: ['lagoa'] },
   { id: 'barbado',  nome: 'Barbado',     preco: 260,  raro: 'raro',     peso: 5,   nivel: 13, iscas: ['camarao', 'minhoca', 'milho'], cor: ['#b0a898', '#7a7060'], tam: 1.05, bigode: true, pontos: ['lagoa'] },
+  { id: 'tambacu',  nome: 'Tambacu',    preco: 350,  raro: 'raro',     peso: 5,   nivel: 13, iscas: ['milho', 'minhoca'], cor: ['#6a6a50', '#3a3a2a'], tam: 1.1, alto: true, barriga: '#d8c060', pontos: ['lagoa'] },
   // Rio Araguaia
   { id: 'tambaqui', nome: 'Tambaqui',    preco: 450,  raro: 'épico',    peso: 3,   nivel: 15, iscas: ['milho', 'minhoca'], cor: ['#6a6a50', '#2a2a22'], tam: 1.15, alto: true, barriga: '#d8c060', pontos: ['araguaia'] },
   { id: 'pirarucu', nome: 'Pirarucu',   preco: 1000, raro: 'lendário', peso: 1,   nivel: 18, iscas: ['artificial'], cor: ['#6b5a4a', '#c8402f'], tam: 1.3, pontos: ['araguaia'] },
   { id: 'pirarara', nome: 'Pirarara',    preco: 600,  raro: 'épico',    peso: 2,   nivel: 20, iscas: ['camarao'], cor: ['#4a4a44', '#e0502a'], tam: 1.2, bigode: true, barriga: '#e8d8a0', pontos: ['araguaia'] },
   // Rio Amazonas
   { id: 'jau',      nome: 'Jaú',         preco: 1200, raro: 'lendário', peso: 1,   nivel: 24, iscas: ['camarao', 'artificial', 'minhoca'], cor: ['#7a6a4a', '#5a4a30'], tam: 1.3, bigode: true, pintas: true, pontos: ['amazonas'] },
+  { id: 'cachara',  nome: 'Cachara',     preco: 1350, raro: 'lendário', peso: 0.8, nivel: 26, iscas: ['camarao', 'artificial'], cor: ['#8a7a5a', '#4a3a28'], tam: 1.3, bigode: true, pintas: true, longo: true, pontos: ['amazonas'] },
   { id: 'piraiba',  nome: 'Piraíba',     preco: 1500, raro: 'lendário', peso: 0.7, nivel: 28, iscas: ['artificial'], cor: ['#8a8e92', '#5a5e62'], tam: 1.4, bigode: true, pontos: ['amazonas'] },
 ];
 // Peixe grande ou comprido encolhe um pouco para caber no ícone.
@@ -7411,7 +7417,7 @@ function puxada() {
 function errouPuxada(b, txt) {
   b.erros++; b.acertos = Math.max(0, b.acertos - 1); sfx('error'); falaBriga(b, txt, '#e0503a');
   if (b.erros >= 3) {
-    const p = b.peixe, um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''}`;
+    const p = b.peixe, um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' && p.id !== 'papaterra' ? 'a' : ''}`;
     pesca = { fase: 'resultado', t0: performance.now(), msg: p.lixo ? 'A linha afrouxou e o enrosco escapou. 😅 Tente de novo!' : `A linha afrouxou e o peixe escapou… era ${um} ${p.nome}! 😩 Tente de novo.` };
     return renderPesca();
   }
@@ -7429,7 +7435,7 @@ function concluirPesca() {
     const pp = pontosDe(), pid = pesca.ponto || 'casa';
     pp.usos[pid] = (pp.usos[pid] || 0) + 1;
     if (pp.usos[pid] >= VARA_POR_VEZ) { pp.usos[pid] = 0; pp.prox[pid] = Date.now() + esperaVara(); } // o ponto descansa (2 horas, menos com domínio)
-    const um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''}`;
+    const um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' && p.id !== 'papaterra' ? 'a' : ''}`;
     pesca = { fase: 'resultado', t0: performance.now(), peixe: p, novo, msg: p.lixo ? `Ih… veio uma ${p.nome.toLowerCase()}. 😅`
       : novo ? `✨ Peixe novo! Pegou ${um} ${p.nome} pela primeira vez (${p.raro}) — já está no 📖 Livro de peixes!` : `Pegou ${um} ${p.nome}! (${p.raro})` };
     sfx(p.lixo ? 'error' : novo || ['raro', 'épico', 'lendário'].includes(p.raro) ? 'level' : 'collect');
@@ -7441,7 +7447,7 @@ function concluirPesca() {
 // as conquistas, as missões nem o domínio de pesca.
 function soltarPeixe(p) {
   addCoins(SOLTE_MOEDAS, null); addXP(SOLTE_XP, null);
-  const um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' ? 'a' : ''}`;
+  const um = `um${p.nome.endsWith('a') && p.id !== 'pirarucu' && p.id !== 'papaterra' ? 'a' : ''}`;
   pesca = { fase: 'resultado', t0: performance.now(), peixe: p, solto: true, ponto: 'solte',
     msg: `🔄 Pegou ${um} ${p.nome} e soltou de volta no rio! +${SOLTE_MOEDAS} moedas e +${SOLTE_XP} XP. (Pesque e solte: o peixe não vai para o celeiro, o livro nem as conquistas.)` };
   sfx('coin'); done(); renderPesca();
@@ -9685,7 +9691,7 @@ function comprarFerramenta(id) {
 // recompensa (e carne, no caso do javali). Os bichos nativos só caem na arapuca: são registrados no
 // livro e soltos de volta no mato. O lendário é o Chupa-cabra: aparece na serra e na chapada, mais à noite.
 // ============================================================
-const CACA_NIVEL = 10, CACA_POR_VEZ = 3, CACA_MS = 2 * 3600e3, ARAPUCA_MS = 4 * 3600e3;
+const CACA_NIVEL = 10, CACA_POR_VEZ = 5, CACA_MS = 2 * 3600e3, ARAPUCA_MS = 4 * 3600e3;
 const LUGARES_CACA = [
   { id: 'capoeira', nome: 'Capoeira do fundo',     emoji: '🌿', nivel: 10, custo: 0,     sorte: 1,   chao: '#86c050', mato: '#3f8a2a', morro: '#9ccf6a' },
   { id: 'mata',     nome: 'Mata ciliar',           emoji: '🌳', nivel: 12, custo: 2500,  sorte: 1.3, chao: '#6fae44', mato: '#2f6f22', morro: '#7fb85a' },
@@ -9697,23 +9703,23 @@ const LUGAR_CACA = Object.fromEntries(LUGARES_CACA.map(l => [l.id, l]));
 // lug = a partir de qual lugar aparece (0 = capoeira… 4 = chapada)
 const CACA_BICHOS = [
   // pragas: estilingue (pequenas) e espingarda (grandes)
-  { id: 'rato',       nome: 'Rato do paiol',   raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'rato',  cor: '#8a8078', tam: 0.7,  vel: 1.1, hp: 1, moedas: 15,  peso: 10 },
-  { id: 'pombo',      nome: 'Pombo',           raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9aa3ad', tam: 0.75, vel: 0.9, hp: 1, moedas: 12,  peso: 10, voa: true, drop: { id: 'pena', qtd: 1 } },
-  { id: 'pardal',     nome: 'Pardal',          raro: 'incomum',  praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#a07a4a', tam: 0.6,  vel: 1.1, hp: 1, moedas: 22, peso: 5, voa: true, drop: { id: 'pena', qtd: 1 } },
-  { id: 'lebre',      nome: 'Lebre-europeia',  raro: 'incomum',  praga: true, armas: ['estilingue', 'espingarda'], nivel: 10, lug: 0, forma: 'lebre', cor: '#b08a5a', tam: 0.9, vel: 1.55, hp: 1, moedas: 40, peso: 6, drop: { id: 'pata', qtd: 1 } },
-  { id: 'javali',     nome: 'Javali',          raro: 'raro',     praga: true, armas: ['espingarda'], nivel: 12, lug: 1, forma: 'porco', cor: '#5a4a3a', tam: 1.3,  vel: 1.0, hp: 2, moedas: 90,  carne: 2, peso: 7 },
-  { id: 'javaporco',  nome: 'Javaporco',       raro: 'épico',    praga: true, armas: ['espingarda'], nivel: 15, lug: 2, forma: 'porco', cor: '#7a5a44', tam: 1.5,  vel: 1.15, hp: 3, moedas: 160, carne: 3, peso: 2.5, pintas: true },
-  { id: 'chupacabra', nome: 'Chupa-cabra',     raro: 'lendário', praga: true, armas: ['espingarda'], nivel: 20, lug: 3, forma: 'chupa', cor: '#6a7a6a', tam: 1.25, vel: 1.75, hp: 4, moedas: 1000, peso: 0.6, drop: { id: 'presa', qtd: 1 } },
+  { id: 'rato',       nome: 'Rato do paiol',   raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'rato',  cor: '#8a8078', tam: 0.7,  vel: 1.1, hp: 1, moedas: 25,  peso: 10 },
+  { id: 'pombo',      nome: 'Pombo',           raro: 'comum',    praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9aa3ad', tam: 0.75, vel: 0.9, hp: 1, moedas: 20,  peso: 10, voa: true, drop: { id: 'pena', qtd: 2 } },
+  { id: 'pardal',     nome: 'Pardal',          raro: 'incomum',  praga: true, armas: ['estilingue'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#a07a4a', tam: 0.6,  vel: 1.1, hp: 1, moedas: 35, peso: 5, voa: true, drop: { id: 'pena', qtd: 2 } },
+  { id: 'lebre',      nome: 'Lebre-europeia',  raro: 'incomum',  praga: true, armas: ['estilingue', 'espingarda'], nivel: 10, lug: 0, forma: 'lebre', cor: '#b08a5a', tam: 0.9, vel: 1.55, hp: 1, moedas: 65, peso: 6, drop: { id: 'pata', qtd: 2 } },
+  { id: 'javali',     nome: 'Javali',          raro: 'raro',     praga: true, armas: ['espingarda'], nivel: 12, lug: 1, forma: 'porco', cor: '#5a4a3a', tam: 1.3,  vel: 1.0, hp: 2, moedas: 150,  carne: 3, peso: 7 },
+  { id: 'javaporco',  nome: 'Javaporco',       raro: 'épico',    praga: true, armas: ['espingarda'], nivel: 15, lug: 2, forma: 'porco', cor: '#7a5a44', tam: 1.5,  vel: 1.15, hp: 3, moedas: 260, carne: 4, peso: 2.5, pintas: true },
+  { id: 'chupacabra', nome: 'Chupa-cabra',     raro: 'lendário', praga: true, armas: ['espingarda'], nivel: 20, lug: 3, forma: 'chupa', cor: '#6a7a6a', tam: 1.25, vel: 1.75, hp: 4, moedas: 1600, peso: 0.6, drop: { id: 'presa', qtd: 2 } },
   // nativos: só na arapuca, e voltam para o mato
-  { id: 'rolinha',    nome: 'Rolinha',         raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#c89a7a', tam: 0.6,  moedas: 5,  peso: 10 },
-  { id: 'prea',       nome: 'Preá',            raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'rato',  cor: '#8a6a4a', tam: 0.7,  moedas: 5,  peso: 10, semRabo: true },
-  { id: 'codorna',    nome: 'Codorna',         raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9a7a52', tam: 0.65, moedas: 5,  peso: 8, gorda: true },
-  { id: 'inhambu',    nome: 'Inhambu',         raro: 'incomum',  armas: ['arapuca'], nivel: 10,  lug: 1, forma: 'ave',   cor: '#7a6a4a', tam: 0.75, moedas: 10, peso: 6, gorda: true },
-  { id: 'tatu',       nome: 'Tatu-galinha',    raro: 'incomum',  armas: ['arapuca'], nivel: 10,  lug: 1, forma: 'tatu',  cor: '#a09080', tam: 0.9,  moedas: 10, peso: 6 },
-  { id: 'cutia',      nome: 'Cutia',           raro: 'incomum',  armas: ['arapuca'], nivel: 12, lug: 1, forma: 'rato',  cor: '#c8843a', tam: 0.9,  moedas: 10, peso: 5, semRabo: true },
-  { id: 'paca',       nome: 'Paca',            raro: 'raro',     armas: ['arapuca'], nivel: 12, lug: 2, forma: 'rato',  cor: '#7a5230', tam: 1,    moedas: 20, peso: 3, semRabo: true, pintas: true },
-  { id: 'jacu',       nome: 'Jacu',            raro: 'raro',     armas: ['arapuca'], nivel: 14, lug: 2, forma: 'ave',   cor: '#2e2a2a', tam: 0.95, moedas: 20, peso: 3, papo: true },
-  { id: 'mutum',      nome: 'Mutum',           raro: 'épico',    armas: ['arapuca'], nivel: 18, lug: 3, forma: 'ave',   cor: '#1e1e22', tam: 1.05, moedas: 40, peso: 1.2, crista: true },
+  { id: 'rolinha',    nome: 'Rolinha',         raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#c89a7a', tam: 0.6,  moedas: 10,  peso: 10 },
+  { id: 'prea',       nome: 'Preá',            raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'rato',  cor: '#8a6a4a', tam: 0.7,  moedas: 10,  peso: 10, semRabo: true },
+  { id: 'codorna',    nome: 'Codorna',         raro: 'comum',    armas: ['arapuca'], nivel: 10,  lug: 0, forma: 'ave',   cor: '#9a7a52', tam: 0.65, moedas: 10,  peso: 8, gorda: true },
+  { id: 'inhambu',    nome: 'Inhambu',         raro: 'incomum',  armas: ['arapuca'], nivel: 10,  lug: 1, forma: 'ave',   cor: '#7a6a4a', tam: 0.75, moedas: 18, peso: 6, gorda: true },
+  { id: 'tatu',       nome: 'Tatu-galinha',    raro: 'incomum',  armas: ['arapuca'], nivel: 10,  lug: 1, forma: 'tatu',  cor: '#a09080', tam: 0.9,  moedas: 18, peso: 6 },
+  { id: 'cutia',      nome: 'Cutia',           raro: 'incomum',  armas: ['arapuca'], nivel: 12, lug: 1, forma: 'rato',  cor: '#c8843a', tam: 0.9,  moedas: 18, peso: 5, semRabo: true },
+  { id: 'paca',       nome: 'Paca',            raro: 'raro',     armas: ['arapuca'], nivel: 12, lug: 2, forma: 'rato',  cor: '#7a5230', tam: 1,    moedas: 35, peso: 3, semRabo: true, pintas: true },
+  { id: 'jacu',       nome: 'Jacu',            raro: 'raro',     armas: ['arapuca'], nivel: 14, lug: 2, forma: 'ave',   cor: '#2e2a2a', tam: 0.95, moedas: 35, peso: 3, papo: true },
+  { id: 'mutum',      nome: 'Mutum',           raro: 'épico',    armas: ['arapuca'], nivel: 18, lug: 3, forma: 'ave',   cor: '#1e1e22', tam: 1.05, moedas: 70, peso: 1.2, crista: true },
 ];
 const CACA_BICHO = Object.fromEntries(CACA_BICHOS.map(b => [b.id, b]));
 for (const b of CACA_BICHOS) if (b.drop) (BICHO_DO_DROP[b.drop.id] || (BICHO_DO_DROP[b.drop.id] = [])).push(b.id);
