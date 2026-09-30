@@ -112,6 +112,20 @@ function gatosTick() {
   }
   if (mudou) done();
 }
+// Prêmios de subir de nível: 1 item sorteado (dá pra vender no celeiro), junto com moedas e trevos.
+const PREMIOS_NIVEL = [
+  { id: 'medalhabronze', nome: 'Medalha de bronze', nomePl: 'medalhas de bronze', preco: 120, peso: 10 },
+  { id: 'medalhaprata',  nome: 'Medalha de prata',  nomePl: 'medalhas de prata',  preco: 220, peso: 6 },
+  { id: 'medalhaouro',   nome: 'Medalha de ouro',   nomePl: 'medalhas de ouro',   preco: 380, peso: 3 },
+  { id: 'trofeu',        nome: 'Troféu de nível',   nomePl: 'troféus de nível',   preco: 600, peso: 1 },
+];
+for (const p of PREMIOS_NIVEL) PRODUCT[p.id] = { ...p, nivel: true };
+function sortearPremioNivel() {
+  const tot = PREMIOS_NIVEL.reduce((t, p) => t + p.peso, 0);
+  let r = Math.random() * tot;
+  for (const p of PREMIOS_NIVEL) { r -= p.peso; if (r <= 0) return p; }
+  return PREMIOS_NIVEL[0];
+}
 // Junta o que o bicho larga (carne, no caso do javali/javaporco, e o drop genérico dos outros) e devolve o textinho pro resultado.
 function aplicaDropsCaca(b) {
   let txt = '';
@@ -697,6 +711,19 @@ function lvlUpFX() {
     setTimeout(() => s.remove(), 950);
   }
 }
+// Cartão no meio da tela com os prêmios de subir de nível (moedas, trevos e o item sorteado).
+let lvlupTimer = 0;
+function lvlupCard(bonus, trevos, premio) {
+  const card = $('#lvlupCard'); if (!card) return;
+  $('#lvlupN').textContent = state.level;
+  $('#lvlupRewards').innerHTML = `
+    <div class="lvlup-item"><span class="lvlup-emoji">🪙</span>+${bonus.toLocaleString('pt-BR')}</div>
+    <div class="lvlup-item"><span class="lvlup-emoji">🍀</span>+${trevos}</div>
+    <div class="lvlup-item"><img alt="" src="${itemIcon(premio.id)}">${premio.nome}</div>`;
+  clearTimeout(lvlupTimer);
+  card.classList.remove('show'); void card.offsetWidth; card.classList.add('show');
+  lvlupTimer = setTimeout(() => card.classList.remove('show'), 2600);
+}
 function addXP(n, pos) {
   n = Math.max(n, Math.round(n * (1 + comfort(state) / 100)));
   state.xp += n;
@@ -706,10 +733,13 @@ function addXP(n, pos) {
     sfx('level');
     lvlUpFX();
     const bonus = state.level * 50; state.coins += bonus;
+    const trevos = Math.floor(state.level / 3) + 2; trevosDe().saldo += trevos;
+    const premio = sortearPremioNivel(); state.barn[premio.id] = (state.barn[premio.id] || 0) + 1;
+    lvlupCard(bonus, trevos, premio);
     const novas = [...CROPS, ...ANIMALS, ...DECOR].filter(c => c.nivel === state.level).map(c => c.nome);
     for (const M of MAQUINAS) if (M.slots[0].nivel === state.level) novas.push(`${M.nome} (fábrica)`);
     for (const [id, n] of AV_OPC.mao) if (AV_NIVEL[id] === state.level) { novas.push(`${n.toLowerCase()} para o avatar (⚙️ › Seu avatar)`); addNews(`🎁 Item novo para o avatar: ${n}! Coloque na mão dele em ⚙️ › Seu avatar.`); }
-    toast(`Nível ${state.level}! +${bonus} moedas` + (novas.length ? ` · novidades: ${novas.join(', ')}` : ''), 'good');
+    toast(`Nível ${state.level}! +${bonus} moedas · +${trevos} 🍀 · +1 ${premio.nome.toLowerCase()}` + (novas.length ? ` · novidades: ${novas.join(', ')}` : ''), 'good');
   }
 }
 function addCoins(n, pos) {
@@ -1147,6 +1177,7 @@ const NOVIDADES = [
   { v: 184, txt: 'A pescaria agora funciona igual à caçada: começa com 3 pescarias por ponto, subindo 1 a cada 10 níveis (que é quando libera ponto novo) até o máximo de 6.' },
   { v: 185, txt: 'Agora dá para ter até 3 gatos em casa, cada um com um pelo diferente (laranja, cinza e preto). O primeiro que sobrar você compra, o próximo já vem na cor que falta.' },
   { v: 186, txt: 'Seus gatos agora trazem presentinho a cada 12h (novelo de lã, rato caçado, lagartixa seca, sininho perdido ou, raramente, um presente misterioso) direto pro celeiro: vende de 220 a 480 moedas cada.' },
+  { v: 187, txt: 'Subir de nível ficou mais festivo: além das moedas de sempre, agora aparece um cartão no meio da tela mostrando os prêmios — moedas, alguns trevos 🍀 (mais conforme o nível sobe) e uma medalha ou troféu que dá pra vender no celeiro.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3145,6 +3176,21 @@ function drawProduct(id, x, y, s) {
     ctx.beginPath(); ctx.moveTo(x - 2.6 * s, y - 4 * s); ctx.quadraticCurveTo(x, y - 8 * s, x + 2.6 * s, y - 4 * s); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = `700 ${8 * s}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('?', x - 3.2 * s, y + 2.5 * s);
+  } else if (id === 'medalhabronze' || id === 'medalhaprata' || id === 'medalhaouro') {
+    const cores = { medalhabronze: ['#b8712f', '#8a5220'], medalhaprata: ['#c9ccd2', '#9698a0'], medalhaouro: ['#f2c230', '#c8941a'] }[id];
+    ctx.fillStyle = '#c8402f'; ctx.beginPath(); ctx.moveTo(x - 3 * s, y - 9 * s); ctx.lineTo(x - 0.8 * s, y - 2 * s); ctx.lineTo(x - 4 * s, y - 2.5 * s); ctx.fill();
+    ctx.fillStyle = '#8a1f2a'; ctx.beginPath(); ctx.moveTo(x + 3 * s, y - 9 * s); ctx.lineTo(x + 4 * s, y - 2.5 * s); ctx.lineTo(x + 0.8 * s, y - 2 * s); ctx.fill();
+    ctx.fillStyle = cores[0]; ctx.strokeStyle = cores[1]; ctx.lineWidth = Math.max(1, 0.8 * s);
+    ctx.beginPath(); ctx.arc(x, y + 1 * s, 6 * s, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.arc(x - 1.8 * s, y - 1 * s, 1.6 * s, 0, 7); ctx.fill();
+    ctx.strokeStyle = cores[1]; ctx.lineWidth = 0.7 * s; ctx.beginPath(); ctx.arc(x, y + 1 * s, 3.4 * s, 0, 7); ctx.stroke();
+  } else if (id === 'trofeu') {
+    ctx.fillStyle = '#e8c33a'; ctx.strokeStyle = '#a8811a'; ctx.lineWidth = Math.max(1, 0.6 * s);
+    ctx.beginPath(); ctx.moveTo(x - 4 * s, y - 6 * s); ctx.lineTo(x + 4 * s, y - 6 * s); ctx.lineTo(x + 3 * s, y - 1 * s); ctx.quadraticCurveTo(x, y + 1 * s, x - 3 * s, y - 1 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 4 * s, y - 5.5 * s); ctx.quadraticCurveTo(x - 8 * s, y - 5 * s, x - 6 * s, y - 1 * s); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 4 * s, y - 5.5 * s); ctx.quadraticCurveTo(x + 8 * s, y - 5 * s, x + 6 * s, y - 1 * s); ctx.stroke();
+    ctx.fillRect(x - 1 * s, y - 1 * s, 2 * s, 3 * s);
+    ctx.beginPath(); ctx.moveTo(x - 3 * s, y + 2 * s); ctx.lineTo(x + 3 * s, y + 2 * s); ctx.lineTo(x + 2.4 * s, y + 4 * s); ctx.lineTo(x - 2.4 * s, y + 4 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
   }
 }
 
@@ -4847,7 +4893,7 @@ function renderPane() {
     }
   } else if (tab === 'celeiro') {
     html += chaveAviso('celeiro', 'Mostrar a quantidade de itens no botão do Celeiro');
-    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PRODUTOS_CACA.map(p => PRODUCT[p.id]), ...PEIXES.map(p => PRODUCT[p.id]), ...FRUTAS.map(f => PRODUCT[f.id]), ...PRESENTES_GATO.map(p => PRODUCT[p.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
+    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PRODUTOS_CACA.map(p => PRODUCT[p.id]), ...PEIXES.map(p => PRODUCT[p.id]), ...FRUTAS.map(f => PRODUCT[f.id]), ...PRESENTES_GATO.map(p => PRODUCT[p.id]), ...PREMIOS_NIVEL.map(p => PRODUCT[p.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
     let total = 0; for (const it of items) total += state.barn[it.id] * it.preco;
     html += `<h3>Celeiro</h3>`;
     if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha na roça e recolha ovos, leite, lã e trufas dos animais.</div>`;

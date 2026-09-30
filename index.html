@@ -12,8 +12,8 @@
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- Versão do jogo: é o mesmo número do ?v= dos scripts lá embaixo. Aumente os dois juntos. -->
-<meta name="rf-version" content="186">
-<script src="firebase-config.js?v=186"></script>
+<meta name="rf-version" content="187">
+<script src="firebase-config.js?v=187"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Baloo+2:wght@400;600;800&display=swap">
@@ -109,6 +109,19 @@
   .avatar-ring.lvlup .face { animation: ringGlow .8s ease; }
   @keyframes lvlConfetti { 0% { transform: translate(-50%, -50%) translate(0, 0) scale(1) rotate(0deg); opacity: 1; } 100% { transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(.3) rotate(var(--rot)); opacity: 0; } }
   .lvlconfetti { position: absolute; left: 50%; top: 50%; font-size: 16px; pointer-events: none; z-index: 5; animation: lvlConfetti .9s ease-out forwards; }
+  /* Cartão de nível: aparece no meio da tela ao subir de nível, com os prêmios (moedas, trevos, item). */
+  #lvlupCard {
+    position: fixed; left: 50%; top: 20%; z-index: 40; pointer-events: none;
+    background: var(--wood); color: #fff; border: 3px solid var(--gold); border-radius: 18px;
+    padding: 12px 20px; text-align: center; box-shadow: 0 8px 0 rgba(0,0,0,.22), 0 0 30px rgba(242,183,5,.45);
+    opacity: 0; transform: translate(-50%, -12px) scale(.82);
+    transition: opacity .35s ease, transform .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  #lvlupCard.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  #lvlupCard .lvlup-title { font-size: 20px; font-weight: 800; color: #ffe9a8; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
+  #lvlupCard .lvlup-rewards { display: flex; gap: 14px; justify-content: center; margin-top: 6px; }
+  #lvlupCard .lvlup-item { display: grid; justify-items: center; gap: 2px; font-size: 12px; font-weight: 700; }
+  #lvlupCard .lvlup-item img, #lvlupCard .lvlup-item .lvlup-emoji { width: 30px; height: 30px; object-fit: contain; font-size: 24px; line-height: 30px; }
   .pinfo { display: grid; gap: 2px; min-width: 0; }
   .pname { font-weight: 800; font-size: 15px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .xpbar { position: relative; height: 14px; width: 150px; max-width: 40vw; border-radius: 8px; background: rgba(0,0,0,.35); overflow: hidden; border: 1px solid rgba(255,255,255,.3); }
@@ -772,6 +785,7 @@
       <button class="btn" id="goHome" type="button">Voltar para minha roça</button>
     </div>
     <div class="toasts" id="toasts"></div>
+    <div id="lvlupCard" aria-hidden="true"><div class="lvlup-title">🎉 Nível <span id="lvlupN"></span>!</div><div class="lvlup-rewards" id="lvlupRewards"></div></div>
     <div class="loading" id="loading" role="status" aria-live="polite" hidden>
       <div class="loadbox">
         <canvas class="loadcv" id="loadCv" aria-hidden="true"></canvas>
@@ -1019,8 +1033,8 @@
 </div>
 
 <!-- Ao mudar os scripts, aumente o ?v= (e o rf-version lá em cima) para o navegador não misturar arquivos novos e velhos. -->
-<script src="js/audio.js?v=186"></script>
-<script src="js/cloud.js?v=186"></script>
-<script src="js/game.js?v=186"></script>
+<script src="js/audio.js?v=187"></script>
+<script src="js/cloud.js?v=187"></script>
+<script src="js/game.js?v=187"></script>
 </body>
 </html>
