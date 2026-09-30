@@ -78,6 +78,40 @@ const PRODUTOS_CACA = [
   { id: 'presa',       nome: 'Presa de chupa-cabra', nomePl: 'presas de chupa-cabra', preco: 300 },
 ];
 for (const p of PRODUTOS_CACA) PRODUCT[p.id] = { ...p, caca: true };
+// Presentinhos que cada gato traz de vez em quando (a cada 12h): vende no celeiro que nem qualquer produto.
+const GATO_PRESENTE_MS = 12 * 3600e3;
+const PRESENTES_GATO = [
+  { id: 'novelo',             nome: 'Novelo de lã',        nomePl: 'novelos de lã',         preco: 220, peso: 10 },
+  { id: 'ratocacado',         nome: 'Rato caçado',         nomePl: 'ratos caçados',         preco: 250, peso: 8 },
+  { id: 'lagartixa',          nome: 'Lagartixa seca',      nomePl: 'lagartixas secas',      preco: 260, peso: 8 },
+  { id: 'sininho',            nome: 'Sininho perdido',     nomePl: 'sininhos perdidos',     preco: 320, peso: 5 },
+  { id: 'presentemisterioso', nome: 'Presente misterioso', nomePl: 'presentes misteriosos', preco: 480, peso: 2 },
+];
+for (const p of PRESENTES_GATO) PRODUCT[p.id] = { ...p, gato: true };
+function sortearPresenteGato() {
+  const tot = PRESENTES_GATO.reduce((t, p) => t + p.peso, 0);
+  let r = Math.random() * tot;
+  for (const p of PRESENTES_GATO) { r -= p.peso; if (r <= 0) return p; }
+  return PRESENTES_GATO[0];
+}
+// Cada gato tem seu próprio relógio (presenteProx); quem já tinha gato antes desta versão ganha o primeiro em 12h.
+function gatosTick() {
+  if (!state) return;
+  const agora = Date.now();
+  let mudou = false;
+  for (const g of state.animals) {
+    if (g.k !== 'gato') continue;
+    if (!g.presenteProx) { g.presenteProx = agora + GATO_PRESENTE_MS; continue; }
+    if (agora < g.presenteProx) continue;
+    const p = sortearPresenteGato();
+    state.barn[p.id] = (state.barn[p.id] || 0) + 1;
+    g.presenteProx = agora + GATO_PRESENTE_MS;
+    mudou = true;
+    const msg = `🐱 ${g.nome || 'Seu gato'} trouxe ${p.nome.endsWith('a') ? 'uma' : 'um'} ${p.nome.toLowerCase()} de presente! Foi para o celeiro.`;
+    toast(msg, 'good'); addNews(msg);
+  }
+  if (mudou) done();
+}
 // Junta o que o bicho larga (carne, no caso do javali/javaporco, e o drop genérico dos outros) e devolve o textinho pro resultado.
 function aplicaDropsCaca(b) {
   let txt = '';
@@ -1112,6 +1146,7 @@ const NOVIDADES = [
   { v: 183, txt: 'Ajustada a caçada: volta a começar com 3 entradas por vez, subindo 1 a cada 6 níveis (a partir do nível 10, quando ela libera) até o máximo de 6.' },
   { v: 184, txt: 'A pescaria agora funciona igual à caçada: começa com 3 pescarias por ponto, subindo 1 a cada 10 níveis (que é quando libera ponto novo) até o máximo de 6.' },
   { v: 185, txt: 'Agora dá para ter até 3 gatos em casa, cada um com um pelo diferente (laranja, cinza e preto). O primeiro que sobrar você compra, o próximo já vem na cor que falta.' },
+  { v: 186, txt: 'Seus gatos agora trazem presentinho a cada 12h (novelo de lã, rato caçado, lagartixa seca, sininho perdido ou, raramente, um presente misterioso) direto pro celeiro: vende de 220 a 480 moedas cada.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1258,7 +1293,11 @@ function buyAnimal(k) {
   if (state.coins < d.custo) return toast(`${d.nome} custa ${d.custo} moedas.`, 'bad');
   state.coins -= d.custo;
   const novo = newAnimal(k);
-  if (k === 'gato') { const usadas = state.animals.filter(a => a.k === 'gato').map(a => a.cor); novo.cor = (GATO_CORES.find(c => !usadas.includes(c.id)) || GATO_CORES[0]).id; }
+  if (k === 'gato') {
+    const usadas = state.animals.filter(a => a.k === 'gato').map(a => a.cor);
+    novo.cor = (GATO_CORES.find(c => !usadas.includes(c.id)) || GATO_CORES[0]).id;
+    novo.presenteProx = Date.now() + GATO_PRESENTE_MS;
+  }
   state.animals.push(novo);
   sfx('buy');
   addXP(4, null);
@@ -3071,6 +3110,41 @@ function drawProduct(id, x, y, s) {
     ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(-1.4 * s, -2.5 * s, 0.8 * s, 2.3 * s, 0.2, 0, 7); ctx.fill();
     ctx.fillStyle = '#8a1f2a'; ctx.beginPath(); ctx.arc(0.4 * s, 6 * s, 1 * s, 0, 7); ctx.fill();
     ctx.restore();
+  } else if (id === 'novelo') {
+    ctx.fillStyle = '#d8384a'; ctx.strokeStyle = '#9a1f2e'; ctx.lineWidth = Math.max(1, 0.6 * s);
+    ctx.beginPath(); ctx.arc(x, y, 6 * s, 0, 7); ctx.fill(); ctx.stroke();
+    for (const a of [-0.7, 0, 0.7]) { ctx.beginPath(); ctx.ellipse(x, y, 6 * s, 2.4 * s, a + 1.1, 0, Math.PI); ctx.stroke(); }
+    ctx.strokeStyle = '#f2b0b8'; ctx.lineWidth = 1 * s;
+    ctx.beginPath(); ctx.moveTo(x + 5 * s, y + 3 * s); ctx.quadraticCurveTo(x + 9 * s, y + 6 * s, x + 8 * s, y + 10 * s); ctx.stroke();
+  } else if (id === 'ratocacado') {
+    ctx.save(); ctx.translate(x, y + 2 * s); ctx.rotate(-0.1);
+    ctx.strokeStyle = '#9a9088'; ctx.lineWidth = 1 * s;
+    ctx.beginPath(); ctx.moveTo(6 * s, 1 * s); ctx.quadraticCurveTo(11 * s, 4 * s, 9 * s, 8 * s); ctx.stroke();
+    ctx.fillStyle = '#8a8078'; ctx.beginPath(); ctx.ellipse(0, 0, 6.5 * s, 3.6 * s, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-6 * s, -2.5 * s, 2.6 * s, 2.2 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e8b0b0'; ctx.beginPath(); ctx.arc(-7.4 * s, -3.6 * s, 1.1 * s, 0, 7); ctx.arc(-4.8 * s, -4 * s, 1 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(-6.6 * s, -1.5 * s, 0.5 * s, 0, 7); ctx.fill();
+    ctx.restore();
+  } else if (id === 'lagartixa') {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-0.2);
+    ctx.strokeStyle = '#b8a468'; ctx.lineWidth = 2 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-7 * s, 3 * s); ctx.quadraticCurveTo(-2 * s, -2 * s, 2 * s, 1 * s); ctx.quadraticCurveTo(5 * s, 3 * s, 8 * s, -1 * s); ctx.stroke();
+    for (const [dx, dy] of [[-4, 3], [0, -1], [3, 3]]) { ctx.beginPath(); ctx.moveTo(dx * s, dy * s); ctx.lineTo((dx - 2) * s, (dy + 3) * s); ctx.moveTo(dx * s, dy * s); ctx.lineTo((dx + 1) * s, (dy + 3.2) * s); ctx.stroke(); }
+    ctx.fillStyle = '#c9b878'; ctx.beginPath(); ctx.arc(-7.5 * s, 3.2 * s, 1.6 * s, 0, 7); ctx.fill();
+    ctx.restore();
+  } else if (id === 'sininho') {
+    ctx.fillStyle = '#e8c33a'; ctx.strokeStyle = '#a8811a'; ctx.lineWidth = Math.max(1, 0.6 * s);
+    ctx.beginPath(); ctx.arc(x, y + 1 * s, 5.5 * s, 0.15, Math.PI - 0.15); ctx.quadraticCurveTo(x - 6 * s, y - 4 * s, x, y - 6 * s); ctx.quadraticCurveTo(x + 6 * s, y - 4 * s, x + 5.4 * s, y + 3.5 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#8a6a10'; ctx.beginPath(); ctx.arc(x, y + 6.5 * s, 1.3 * s, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#8a6a10'; ctx.beginPath(); ctx.arc(x, y - 7 * s, 1.4 * s, 0, 7); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(x - 2 * s, y - 2 * s, 1 * s, 2 * s, 0.3, 0, 7); ctx.fill();
+  } else if (id === 'presentemisterioso') {
+    ctx.fillStyle = '#6b3a8a'; ctx.strokeStyle = '#3f2058'; ctx.lineWidth = Math.max(1, 0.6 * s);
+    ctx.beginPath(); ctx.roundRect(x - 6 * s, y - 4 * s, 12 * s, 9 * s, 1 * s); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f2c230'; ctx.fillRect(x - 1.1 * s, y - 4 * s, 2.2 * s, 9 * s);
+    ctx.beginPath(); ctx.moveTo(x - 2.6 * s, y - 4 * s); ctx.quadraticCurveTo(x, y - 8 * s, x + 2.6 * s, y - 4 * s); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = `700 ${8 * s}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('?', x - 3.2 * s, y + 2.5 * s);
   }
 }
 
@@ -4773,7 +4847,7 @@ function renderPane() {
     }
   } else if (tab === 'celeiro') {
     html += chaveAviso('celeiro', 'Mostrar a quantidade de itens no botão do Celeiro');
-    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PRODUTOS_CACA.map(p => PRODUCT[p.id]), ...PEIXES.map(p => PRODUCT[p.id]), ...FRUTAS.map(f => PRODUCT[f.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
+    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PRODUTOS_CACA.map(p => PRODUCT[p.id]), ...PEIXES.map(p => PRODUCT[p.id]), ...FRUTAS.map(f => PRODUCT[f.id]), ...PRESENTES_GATO.map(p => PRODUCT[p.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
     let total = 0; for (const it of items) total += state.barn[it.id] * it.preco;
     html += `<h3>Celeiro</h3>`;
     if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha na roça e recolha ovos, leite, lã e trufas dos animais.</div>`;
@@ -10662,7 +10736,7 @@ function frame(now) {
     if (!isGated() && L.cw > 20 && now - lastDraw >= DRAW_MS) { draw(now, dt); lastDraw = now; }
     if (now - lastUI > 250) { updateTip(); lastUI = now; }
     if (now - lastInfo > 2000) {
-      tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao(); folhasTick(); invasaoTick();
+      tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao(); folhasTick(); invasaoTick(); gatosTick();
       // a fábrica e o caminhão têm relógio: atualiza a janela (menos a banca, que tem formulário)
       if (!$('#panel').hidden && tab === 'fabrica' && fabSeg !== 'banca' && isHome()) { const y = $('#pane').scrollTop; renderPane(); $('#pane').scrollTop = y; } renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
   }
