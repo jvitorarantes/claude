@@ -143,6 +143,14 @@ const ANIMALS = [
   { id: 'arara',     tipo: 'pet',  nome: 'Arara',     f: 1, nivel: 22, custo: 8000, lugar: 'casa', fixo: true },
 ];
 const ANIMAL = Object.fromEntries(ANIMALS.map(a => [a.id, a]));
+// Até 3 gatos por jogador, cada um com um pelo diferente (o próximo comprado pega a cor que ainda não tem).
+const GATO_CORES = [
+  { id: 'laranja', nome: 'Laranja', pel: '#e8963f', escuro: '#c06a22', claro: '#e08a3a' },
+  { id: 'cinza',   nome: 'Cinza',   pel: '#9aa0a8', escuro: '#6a707a', claro: '#8a909a' },
+  { id: 'preto',   nome: 'Preto',   pel: '#3a3a3a', escuro: '#242424', claro: '#333333' },
+];
+const GATO_MAX = GATO_CORES.length;
+const corGato = a => GATO_CORES.find(c => c.id === a.cor) || GATO_CORES[0];
 const RACAO_ESP = 100; // ração especial: a próxima produção rende em dobro
 const vetCost = d => Math.round(d.custo * 0.25);
 const inPen = a => ANIMAL[a.k].tipo !== 'pet' || ANIMAL[a.k].lugar === 'curral';
@@ -1103,6 +1111,7 @@ const NOVIDADES = [
   { v: 182, txt: 'Caçada rendendo mais: todo bicho vale bem mais moedas, e cada entrada no mato agora dá pra caçar 5 vezes (antes eram 3). E chegaram mais peixes pros rios: tuvira e mandubé no Córrego Cascavel e no Rio Meia Ponte, papa-terra no Ribeirão João Leite, tambacu no Rio dos Bois, e a cachara no Rio Amazonas, junto do jaú e da piraíba.' },
   { v: 183, txt: 'Ajustada a caçada: volta a começar com 3 entradas por vez, subindo 1 a cada 6 níveis (a partir do nível 10, quando ela libera) até o máximo de 6.' },
   { v: 184, txt: 'A pescaria agora funciona igual à caçada: começa com 3 pescarias por ponto, subindo 1 a cada 10 níveis (que é quando libera ponto novo) até o máximo de 6.' },
+  { v: 185, txt: 'Agora dá para ter até 3 gatos em casa, cada um com um pelo diferente (laranja, cinza e preto). O primeiro que sobrar você compra, o próximo já vem na cor que falta.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1240,7 +1249,8 @@ function actDecor(id) {
 
 function buyAnimal(k) {
   const d = ANIMAL[k];
-  if (d.lugar === 'casa' && state.animals.some(a => a.k === k)) return toast(`Você já tem ${d.f ? 'uma' : 'um'} ${d.nome.toLowerCase()} em casa.`);
+  if (k === 'gato') { if (state.animals.filter(a => a.k === 'gato').length >= GATO_MAX) return toast(`Você já tem o máximo de ${GATO_MAX} gatos em casa.`); }
+  else if (d.lugar === 'casa' && state.animals.some(a => a.k === k)) return toast(`Você já tem ${d.f ? 'uma' : 'um'} ${d.nome.toLowerCase()} em casa.`);
   if (state.level < d.nivel) return toast(`${d.nome} libera no nível ${d.nivel}.`);
   const ab = d.lugar !== 'casa' && abrigoOf(k);
   if (ab && !abrigoLv(state, ab.id)) return toast(`${d.nome} precisa de um${ab.o === 'a' ? 'a' : ''} ${ab.nome.toLowerCase()}. Construa na aba Abrigos.`, 'bad');
@@ -1248,6 +1258,7 @@ function buyAnimal(k) {
   if (state.coins < d.custo) return toast(`${d.nome} custa ${d.custo} moedas.`, 'bad');
   state.coins -= d.custo;
   const novo = newAnimal(k);
+  if (k === 'gato') { const usadas = state.animals.filter(a => a.k === 'gato').map(a => a.cor); novo.cor = (GATO_CORES.find(c => !usadas.includes(c.id)) || GATO_CORES[0]).id; }
   state.animals.push(novo);
   sfx('buy');
   addXP(4, null);
@@ -1265,7 +1276,7 @@ let nomeDe = null;   // { animal: id } ou { dog: slot }, com troca: true quando 
 function askName(a) {
   const d = ANIMAL[a.k], l = NOMES[d.f ? 'f' : 'm'];
   nomeDe = { animal: a.id, troca: false };
-  $('#nomeImg').src = animalIcon(d.id);
+  $('#nomeImg').src = petIcon(a);
   $('#nomeTxt').textContent = `${d.f ? 'Sua nova' : 'Seu novo'} ${d.nome.toLowerCase()} chegou! Como ${d.f ? 'ela' : 'ele'} vai se chamar?`;
   $('#nomeInput').value = l[Math.floor(Math.random() * l.length)];
   abrirNome();
@@ -1283,7 +1294,7 @@ function trocarNome(alvo) {
   if (alvo.animal) {
     const a = state.animals.find(x => x.id === alvo.animal); if (!a) return;
     const d = ANIMAL[a.k];
-    $('#nomeImg').src = animalIcon(d.id);
+    $('#nomeImg').src = petIcon(a);
     $('#nomeTxt').textContent = `Qual vai ser o novo nome de ${a.nome || d.nome} (${d.nome.toLowerCase()})?`;
     $('#nomeInput').value = a.nome || d.nome;
   } else {
@@ -2069,7 +2080,7 @@ function drawAnimalAt(a, m, base, t) {
     ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.ellipse(p.x, p.y, W * 0.26, W * 0.09, 0, 0, 7); ctx.stroke();
   }
-  drawAnimal(kind, p.x, p.y, sc, t, m.dir, m.moving);
+  drawAnimal(kind, p.x, p.y, sc, t, m.dir, m.moving, kind === 'gato' ? corGato(a) : undefined);
   const h = ANIMAL_H[kind] * sc;
   m.topo = { x: p.x, y: p.y - h - W * 0.05 };
   hits.push({ kind: 'animal', id: a.id, x: p.x, y: p.y - h * 0.5, r: Math.max(W * 0.3, h * 0.85) });
@@ -3066,7 +3077,7 @@ function drawProduct(id, x, y, s) {
 // ============================================================
 // Animais (desenhados virados para a direita; dir=-1 espelha)
 // ============================================================
-function drawAnimal(k, x, y, s, t, dir, moving) {
+function drawAnimal(k, x, y, s, t, dir, moving, cor) {
   const step = moving ? Math.sin(t / 90) : 0;
   ctx.save(); ctx.translate(x, y); ctx.scale(dir, 1);
   ctx.fillStyle = 'rgba(0,0,0,.16)';
@@ -3263,14 +3274,15 @@ function drawAnimal(k, x, y, s, t, dir, moving) {
     ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(10.8 * s, -49.8 * s, 0.7 * s, 0, 7); ctx.fill();
     ctx.lineCap = 'butt';
   } else if (k === 'gato') {
+    const gc = cor || GATO_CORES[0];
     const tail = Math.sin(t / 400) * 0.4;
-    ctx.strokeStyle = '#e08a3a'; ctx.lineWidth = 1.8 * s; ctx.lineCap = 'round';
+    ctx.strokeStyle = gc.claro; ctx.lineWidth = 1.8 * s; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(-6 * s, -8 * s); ctx.quadraticCurveTo(-11 * s, -10 * s, -10 * s + tail * 4 * s, -17 * s); ctx.stroke();
-    for (const [lx, ph] of [[-4, 1], [-1.5, -1], [2.5, -1], [5, 1]]) leg(lx + step * ph * 0.6, 4, '#e08a3a', 1.6);
-    ctx.fillStyle = '#e8963f'; ctx.beginPath(); ctx.ellipse(0, -7 * s, 7.5 * s, 3.8 * s, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#c06a22'; ctx.lineWidth = 0.9 * s;
+    for (const [lx, ph] of [[-4, 1], [-1.5, -1], [2.5, -1], [5, 1]]) leg(lx + step * ph * 0.6, 4, gc.claro, 1.6);
+    ctx.fillStyle = gc.pel; ctx.beginPath(); ctx.ellipse(0, -7 * s, 7.5 * s, 3.8 * s, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = gc.escuro; ctx.lineWidth = 0.9 * s;
     for (const dx of [-3.5, -1, 1.5]) { ctx.beginPath(); ctx.moveTo(dx * s, -10.4 * s); ctx.lineTo(dx * s + 0.6 * s, -7.5 * s); ctx.stroke(); }
-    ctx.fillStyle = '#e8963f'; ctx.beginPath(); ctx.arc(7 * s, -11 * s, 3.6 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = gc.pel; ctx.beginPath(); ctx.arc(7 * s, -11 * s, 3.6 * s, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.moveTo(4.8 * s, -13.3 * s); ctx.lineTo(5.4 * s, -16.8 * s); ctx.lineTo(7.2 * s, -14.2 * s); ctx.fill();
     ctx.beginPath(); ctx.moveTo(7.6 * s, -14.3 * s); ctx.lineTo(9.2 * s, -16.6 * s); ctx.lineTo(9.8 * s, -13 * s); ctx.fill();
     ctx.fillStyle = '#2f6e1e'; ctx.beginPath(); ctx.arc(8.4 * s, -11.6 * s, 0.75 * s, 0, 7); ctx.fill();
@@ -4099,6 +4111,9 @@ const animalIcon = id => makeIcon('a:' + id, () => {
   const x = SMALL_ANIMALS.includes(k) || k === 'tartaruga' ? 46 : k === 'pavao' ? 56 : k === 'abelha' || k === 'arara' ? 48 : k === 'avestruz' ? 42 : 38;
   drawAnimal(k, x, 88, sc, 0, 1, false);
 });
+// Ícone do gato na cor certa (um por cor, cacheado) — para diferenciar cada um dos até 3 gatos nas listas.
+const gatoIcon = corId => makeIcon('gato:' + corId, () => drawAnimal('gato', 46, 88, 3.4, 0, 1, false, GATO_CORES.find(c => c.id === corId) || GATO_CORES[0]));
+const petIcon = a => a.k === 'gato' ? gatoIcon(corGato(a).id) : animalIcon(a.k);
 const productIcon = id => makeIcon('p:' + id, () => drawProduct(id, 48, 48, 5.5));
 const decorIcon = mid => makeIcon('d:' + mid, () => {
   const mod = MODELO[mid], id = mod.lugar;
@@ -4648,9 +4663,10 @@ function renderPane() {
     } else if (shopSeg === 'animais') {
       html += `<p class="hint">Cada bicho mora no seu abrigo, que você constrói e aumenta na aba Abrigos. Sem comida o animal só para de produzir. Animais de produção vivem alguns dias; depois vão embora e é preciso comprar outro.</p>`;
       const row = (d, meta, btn) => `<div class="row ${d.nivel > state.level ? 'locked' : ''}"><img alt="" src="${animalIcon(d.id)}">
-        <div><div class="name">${d.nome}${state.animals.some(x => x.k === d.id) ? ` <span class="meta">(${state.animals.filter(x => x.k === d.id).length})</span>` : ''}</div><div class="meta">${meta}</div></div>${btn}</div>`;
+        <div><div class="name">${d.nome}${state.animals.some(x => x.k === d.id) ? ` <span class="meta">(${state.animals.filter(x => x.k === d.id).length}${d.id === 'gato' ? '/' + GATO_MAX : ''})</span>` : ''}</div><div class="meta">${meta}</div></div>${btn}</div>`;
       const buyBtn = d => {
         if (d.nivel > state.level) return `<button class="btn" disabled>Nível ${d.nivel}</button>`;
+        if (d.id === 'gato' && state.animals.filter(x => x.k === 'gato').length >= GATO_MAX) return `<button class="btn ghost" disabled>Máximo (${GATO_MAX})</button>`;
         const ab = d.lugar !== 'casa' && abrigoOf(d.id);
         if (ab && !abrigoLv(state, ab.id)) return `<button class="btn ghost" data-seg="abrigos" data-focus="${ab.id}">Precisa ${ab.o === 'a' ? 'da' : 'do'} ${ab.nome.toLowerCase()}</button>`;
         if (ab && vagas(state, ab.id) <= 0) return `<button class="btn ghost" data-seg="abrigos" data-focus="${ab.id}">${ab.nome} ${ab.o === 'a' ? 'cheia' : 'cheio'}</button>`;
@@ -4671,7 +4687,7 @@ function renderPane() {
       const pets = state.animals.filter(a => ANIMAL[a.k].tipo === 'pet');
       if (pets.length) {
         html += `<h3>Nomes dos seus bichos</h3>`;
-        for (const a of pets) html += `<div class="row"><img alt="" src="${animalIcon(a.k)}"><div><div class="name">${esc(a.nome || ANIMAL[a.k].nome)}</div><div class="meta">${ANIMAL[a.k].nome}</div></div>
+        for (const a of pets) html += `<div class="row"><img alt="" src="${petIcon(a)}"><div><div class="name">${esc(a.nome || ANIMAL[a.k].nome)}</div><div class="meta">${ANIMAL[a.k].nome}${a.k === 'gato' ? ' · ' + corGato(a).nome : ''}</div></div>
           <button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${moeda(CUSTO_NOME_BICHO)}</small></button></div>`;
       }
       const meus = state.animals.filter(a => ANIMAL[a.k].tipo === 'prod').sort((x, y) => lifeLeft(x) - lifeLeft(y));
