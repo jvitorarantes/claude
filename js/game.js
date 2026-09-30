@@ -1101,6 +1101,7 @@ const NOVIDADES = [
   { v: 180, txt: 'Clicar de novo no Adubo já selecionado agora troca o tipo (básico → rápido → premium → básico…), pra escolher qual usar sem precisar abrir a Loja.' },
   { v: 181, txt: 'Chegou o botão 🧺 Colher na roça: colhe de uma vez todo canteiro pronto, sem precisar clicar um por um. Sem nada pronto, avisa que não tem nada pra fazer agora.' },
   { v: 182, txt: 'Caçada rendendo mais: todo bicho vale bem mais moedas, e cada entrada no mato agora dá pra caçar 5 vezes (antes eram 3). E chegaram mais peixes pros rios: tuvira e mandubé no Córrego Cascavel e no Rio Meia Ponte, papa-terra no Ribeirão João Leite, tambacu no Rio dos Bois, e a cachara no Rio Amazonas, junto do jaú e da piraíba.' },
+  { v: 183, txt: 'Ajustada a caçada: volta a começar com 3 entradas por vez, subindo 1 a cada 6 níveis (a partir do nível 10, quando ela libera) até o máximo de 6.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -9691,7 +9692,9 @@ function comprarFerramenta(id) {
 // recompensa (e carne, no caso do javali). Os bichos nativos só caem na arapuca: são registrados no
 // livro e soltos de volta no mato. O lendário é o Chupa-cabra: aparece na serra e na chapada, mais à noite.
 // ============================================================
-const CACA_NIVEL = 10, CACA_POR_VEZ = 5, CACA_MS = 2 * 3600e3, ARAPUCA_MS = 4 * 3600e3;
+const CACA_NIVEL = 10, CACA_POR_VEZ_MAX = 6, CACA_MS = 2 * 3600e3, ARAPUCA_MS = 4 * 3600e3;
+// Começa com 3 entradas por vez e sobe 1 a cada 6 níveis acima do nível 10 (quando libera a caçada), até 6 no máximo.
+const cacaPorVez = () => clamp(3 + Math.floor(Math.max(0, state.level - CACA_NIVEL) / 6), 3, CACA_POR_VEZ_MAX);
 const LUGARES_CACA = [
   { id: 'capoeira', nome: 'Capoeira do fundo',     emoji: '🌿', nivel: 10, custo: 0,     sorte: 1,   chao: '#86c050', mato: '#3f8a2a', morro: '#9ccf6a' },
   { id: 'mata',     nome: 'Mata ciliar',           emoji: '🌳', nivel: 12, custo: 2500,  sorte: 1.3, chao: '#6fae44', mato: '#2f6f22', morro: '#7fb85a' },
@@ -9756,7 +9759,7 @@ function cacaDe() {
 }
 const temLugarCaca = id => { const l = LUGAR_CACA[id]; return !!l && (l.custo === 0 ? state.level >= l.nivel : (state.caca && state.caca.lugares || []).includes(id)); };
 const faltaLugarCaca = id => Math.max(0, (cacaDe().prox[id] || 0) - Date.now());
-const restamCaca = id => faltaLugarCaca(id) ? 0 : Math.max(0, CACA_POR_VEZ - (cacaDe().usos[id] || 0));
+const restamCaca = id => faltaLugarCaca(id) ? 0 : Math.max(0, cacaPorVez() - (cacaDe().usos[id] || 0));
 const munDe = arma => cacaDe().mun[ARMAS_CACA[arma].mun] || 0;
 // Algum lugar seu tem caçada disponível agora (descansado ou nunca usado): mostra um brilho na entrada do mato.
 const cacaPronta = () => state && LUGARES_CACA.some(l => temLugarCaca(l.id) && !faltaLugarCaca(l.id) && restamCaca(l.id) > 0);
@@ -9902,7 +9905,7 @@ function entrarNoMato() {
   if (faltaLugarCaca(l.id)) return toast(`${l.nome} está sossegado: os bichos voltam em ${fmt(faltaLugarCaca(l.id) / 1000)}. Tente outro lugar ou a arapuca!`);
   if (munDe(c.arma) <= 0) { caca = { fase: 'pronto', aviso: `Acabou a munição! Compre mais ${a.munNome} aqui embaixo.` }; sfx('error'); return renderCaca(); }
   c.usos[l.id] = (c.usos[l.id] || 0) + 1;
-  if (c.usos[l.id] >= CACA_POR_VEZ) { c.usos[l.id] = 0; c.prox[l.id] = Date.now() + esperaCaca(); }
+  if (c.usos[l.id] >= cacaPorVez()) { c.usos[l.id] = 0; c.prox[l.id] = Date.now() + esperaCaca(); }
   save();
   const t = performance.now();
   caca = { fase: 'procurando', t0: t, aparece: t + 1200 + Math.random() * 1600, arma: c.arma, lugar: l.id, bicho: sortearBicho(c.arma, l.id) };
@@ -9972,7 +9975,7 @@ function renderCaca() {
   const c = cacaDe(), l = LUGAR_CACA[c.lugar], a = ARMAS_CACA[c.arma], btn = $('#cacaBtn');
   const livre = caca.fase === 'pronto' || caca.fase === 'resultado', descansa = faltaLugarCaca(l.id);
   btn.textContent = caca.fase === 'procurando' ? 'Procurando… 👀' : caca.fase === 'mira' ? `🎯 Toque no bicho! (${munDe(caca.arma)} ${ARMAS_CACA[caca.arma].munNome})`
-    : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : munDe(c.arma) <= 0 ? `Sem ${a.munNome}` : `${caca.fase === 'resultado' ? 'Caçar de novo' : 'Entrar no mato'} (${restamCaca(l.id)}/${CACA_POR_VEZ})`;
+    : descansa ? `⏳ Volta em ${fmt(descansa / 1000)}` : munDe(c.arma) <= 0 ? `Sem ${a.munNome}` : `${caca.fase === 'resultado' ? 'Caçar de novo' : 'Entrar no mato'} (${restamCaca(l.id)}/${cacaPorVez()})`;
   btn.disabled = (livre && !!descansa) || caca.fase === 'mira' || caca.fase === 'procurando';
   // arapucas (até 2) e a isca
   const arBtn = k => {
@@ -9989,7 +9992,7 @@ function renderCaca() {
   setHtml($('#cacaDominio'), dominioCacaHTML());
   setHtml($('#cacaLugares'), LUGARES_CACA.map(d => {
     const meu = temLugarCaca(d.id), trava = d.nivel > state.level, f = meu ? faltaLugarCaca(d.id) : 0;
-    const st = meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎯 ${restamCaca(d.id)}/${CACA_POR_VEZ}`) : trava ? `🔒 Nv ${d.nivel} · ${d.custo ? moeda(d.custo) : 'grátis'}` : moeda(d.custo);
+    const st = meu ? (f ? `⏳ ${fmt(f / 1000)}` : `Pronto! 🎯 ${restamCaca(d.id)}/${cacaPorVez()}`) : trava ? `🔒 Nv ${d.nivel} · ${d.custo ? moeda(d.custo) : 'grátis'}` : moeda(d.custo);
     return `<button type="button" class="pontobtn ${meu ? '' : trava ? 'trava' : 'loja'} ${f ? 'descansa' : ''}" data-lugar-caca="${d.id}" aria-pressed="${meu && d.id === l.id}"><b>${d.emoji} ${d.nome}</b><small>${st}</small></button>`;
   }).join(''));
   fadePontos($('#cacaLugares'));
@@ -10004,7 +10007,7 @@ function renderCaca() {
     : caca.fase === 'mira' ? `Olha ${um(caca.bicho) === 'uma' ? 'a' : 'o'} ${caca.bicho.nome}! Toque nele para atirar${caca.bicho.hp > 1 ? ` (aguenta ${caca.bicho.hp} tiros)` : ''}.`
     : caca.fase === 'pronto' && caca.aviso ? caca.aviso
     : caca.fase === 'pronto' && descansa ? `${l.nome} está sossegado. Escolha outro lugar ou arme a arapuca!`
-    : caca.fase === 'pronto' ? `${l.emoji} ${l.nome}: ${CACA_POR_VEZ} entradas no mato por vez. Quando o bicho aparecer, toque nele!${l.id === 'serra' || l.id === 'chapada' ? ' Dizem que à noite o Chupa-cabra anda por aqui… 👀' : ''}`
+    : caca.fase === 'pronto' ? `${l.emoji} ${l.nome}: ${cacaPorVez()} entradas no mato por vez. Quando o bicho aparecer, toque nele!${l.id === 'serra' || l.id === 'chapada' ? ' Dizem que à noite o Chupa-cabra anda por aqui… 👀' : ''}`
     : caca.msg || '';
   $('#cacaLivro').hidden = !cacaLivro; $('#cacaCv').hidden = cacaLivro;
   const nn = c.novos.length;
