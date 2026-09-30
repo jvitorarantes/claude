@@ -1084,6 +1084,7 @@ const NOVIDADES = [
   { v: 174, txt: 'Corrigido: se algo interrompesse o avatar rastelando (visitar outro amigo, recarregar a página), o monte de folhas ficava preso pra sempre, sem contar como folha e sem dar pra clicar. Agora ele libera sozinho. E o preço das expansões de canteiro mudou para 1.000 moedas por canteiro em qualquer nível.' },
   { v: 175, txt: 'A ferramenta de arrancar plantação/árvore virou "Enxadão" (não tinha por que ter dois "Rastelo" na mesma barra). E corrigido: o clique no Bloco de água estava com uma área grande demais, invadindo os canteiros vizinhos.' },
   { v: 176, txt: 'Agora dá para vender o cachorro de guarda (na casinha ou na Loja › Cães): o preço cai um pouco a cada dia de vida que passa, igual aos outros bichos de companhia.' },
+  { v: 177, txt: 'O Enxadão tinha ganhado só o nome novo, mas o ícone continuava sendo o do rastelo. Agora tem o desenho certo (uma lâmina de enxada), separado do ícone do botão Rastelar.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3303,7 +3304,7 @@ function drawBubbleAt(x, y, kind, obj, t, seed) {
     ctx.fillStyle = '#3aa0e8'; ctx.beginPath(); ctx.moveTo(x, y - 7 * s);
     ctx.bezierCurveTo(x + 6 * s, y, x + 5 * s, y + 6 * s, x, y + 6 * s); ctx.bezierCurveTo(x - 5 * s, y + 6 * s, x - 6 * s, y, x, y - 7 * s); ctx.fill();
   } else if (kind === 'pest') drawBug(x, y, s * 1.3, 0, 0);
-  else if (kind === 'rastelo') { const im = toolImg('hoe'); if (im) ctx.drawImage(im, x - 8.5 * s, y - 8.5 * s, 17 * s, 17 * s); }
+  else if (kind === 'rastelo') { const im = toolImg('rastelo'); if (im) ctx.drawImage(im, x - 8.5 * s, y - 8.5 * s, 17 * s, 17 * s); }
   else if (kind === 'weed') drawWeed(x, y + 5 * s, s * 1.1);
   else if (kind === 'hoe') {
     line({ x: x - 6 * s, y: y + 6 * s }, { x: x + 4 * s, y: y - 5 * s }, '#8a5a2b', 2 * s);
@@ -4131,7 +4132,8 @@ const fertIcon = id => makeIcon('f:' + id, () => {
 // ============================================================
 const TOOL_ICONS = {
   hand: '<svg viewBox="0 0 24 24" fill="#ffd9b0" stroke="#6b4220" stroke-width="1.6" stroke-linejoin="round"><path d="M8 13V6a1.5 1.5 0 0 1 3 0v5V4.5a1.5 1.5 0 0 1 3 0V11V5.5a1.5 1.5 0 0 1 3 0V12V8.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-5-2.7L4.3 14a1.6 1.6 0 0 1 2.6-1.8L8 13.5z"/></svg>',
-  hoe: '<svg viewBox="0 0 24 24"><path d="M3.5 21.5 16 8" stroke="#8a5a2b" stroke-width="2.4" stroke-linecap="round"/><path d="M12.3 4.3 19.7 11.7" stroke="#5d6770" stroke-width="2.4" stroke-linecap="round"/><path d="M13.2 5.2l2.4-2.4M15.2 7.2l2.4-2.4M17.2 9.2l2.4-2.4M19.2 11.2l2.4-2.4" stroke="#5d6770" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  hoe: '<svg viewBox="0 0 24 24"><path d="M3.5 21.5 14.5 10.5" stroke="#8a5a2b" stroke-width="2.6" stroke-linecap="round"/><path d="M12.6 12 20 4.8 22.4 7 15.6 13.8 13.2 14.8Z" fill="#6b747c" stroke="#3a4247" stroke-width="0.9" stroke-linejoin="round"/></svg>',
+  rastelo: '<svg viewBox="0 0 24 24"><path d="M3.5 21.5 16 8" stroke="#8a5a2b" stroke-width="2.4" stroke-linecap="round"/><path d="M12.3 4.3 19.7 11.7" stroke="#5d6770" stroke-width="2.4" stroke-linecap="round"/><path d="M13.2 5.2l2.4-2.4M15.2 7.2l2.4-2.4M17.2 9.2l2.4-2.4M19.2 11.2l2.4-2.4" stroke="#5d6770" stroke-width="1.5" stroke-linecap="round"/></svg>',
   water: '<svg viewBox="0 0 24 24" stroke="#1d5f8f" stroke-width="1.4" stroke-linejoin="round"><path d="M6 10h9v9a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z" fill="#5cb4ee"/><path d="M15 12l5-5 1.5 1.5-5.5 6" fill="#5cb4ee"/><path d="M8 10a2.5 2.5 0 0 1 5 0" fill="none"/><path d="M21 11.5v1.5M19 13v1.5" stroke="#3aa0e8" stroke-linecap="round"/></svg>',
   pest: '<svg viewBox="0 0 24 24" stroke="#3b2a18" stroke-width="1.4" stroke-linejoin="round"><rect x="7" y="8" width="9" height="13" rx="2" fill="#e05a3a"/><path d="M9 8V5h5v3" fill="#bbb"/><path d="M14 5h3l2-1" fill="none"/><path d="M19 7l2-1M19 9l2 0" stroke="#7aa" stroke-linecap="round"/><circle cx="11.5" cy="14.5" r="2.2" fill="#fff"/></svg>',
   weed: '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round"><path d="M12 21v-7M12 14c-3 0-5-2-5-5 3 0 5 2 5 5zM12 14c3 0 5-2 5-5-3 0-5 2-5 5z" stroke="#2f6e1e" stroke-width="1.8" fill="#6cc24a"/><path d="M12 7V2M9.5 4.5 12 2l2.5 2.5" stroke="#6b4220" stroke-width="1.8"/></svg>',
@@ -4219,7 +4221,7 @@ function renderTools() {
   if (scene === 'roca' && isHome() && !isGated()) {
     const b = document.createElement('button');
     b.className = 'roundbtn tool'; b.type = 'button'; b.id = 'rasteloBtn';
-    b.innerHTML = `<span class="ic">${TOOL_ICONS.hoe}</span><span class="lb">Rastelar</span>`;
+    b.innerHTML = `<span class="ic">${TOOL_ICONS.rastelo}</span><span class="lb">Rastelar</span>`;
     b.title = 'Manda o avatar rastelar as folhas espalhadas';
     b.addEventListener('click', irRastelar);
     box.appendChild(b);
