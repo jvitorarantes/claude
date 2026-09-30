@@ -229,6 +229,8 @@ const DOGS = [
 ];
 const DOG = Object.fromEntries(DOGS.map(d => [d.id, d]));
 const DOG_FOOD = { custo: 50, horas: 8 };
+// Vender um cachorro vale bem menos que a compra, e cai a cada dia de vida que passa (igual aos bichos de companhia).
+const dogSellPrice = d => { const b = DOG[d.raca]; return Math.max(1, Math.round(b.custo * 0.4 * clamp((d.born + b.vida * DAY - Date.now()) / (b.vida * DAY), 0, 1))); };
 const DOG_NAMES = ['Totó', 'Rex', 'Pipoca', 'Thor', 'Mel', 'Bidu', 'Paçoca', 'Nina', 'Bolinha', 'Faísca', 'Pretinha', 'Caramelo'];
 // Nome de cada lugar com o artigo certo ("a roça", "o rancho"…)
 const SLOT = { roca: { a: 'a roça', aSua: 'a sua roça', daSua: 'da sua roça', A: 'A roça' }, animais: { a: 'o rancho', aSua: 'o seu rancho', daSua: 'do seu rancho', A: 'O rancho' } };
@@ -1081,6 +1083,7 @@ const NOVIDADES = [
   { v: 173, txt: 'Ajuste fino no celular na vertical: a coluna Roça/Rancho/Casa/Presente/Mover desceu um pouco e a barra de ferramentas subiu um pouquinho, pra ficar mais confortável de alcançar.' },
   { v: 174, txt: 'Corrigido: se algo interrompesse o avatar rastelando (visitar outro amigo, recarregar a página), o monte de folhas ficava preso pra sempre, sem contar como folha e sem dar pra clicar. Agora ele libera sozinho. E o preço das expansões de canteiro mudou para 1.000 moedas por canteiro em qualquer nível.' },
   { v: 175, txt: 'A ferramenta de arrancar plantação/árvore virou "Enxadão" (não tinha por que ter dois "Rastelo" na mesma barra). E corrigido: o clique no Bloco de água estava com uma área grande demais, invadindo os canteiros vizinhos.' },
+  { v: 176, txt: 'Agora dá para vender o cachorro de guarda (na casinha ou na Loja › Cães): o preço cai um pouco a cada dia de vida que passa, igual aos outros bichos de companhia.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4484,10 +4487,12 @@ function caesHTML(naLoja) {
     const d = state.dogs[slot];
     if (!d) { html += `<div class="row"><div class="avatar" style="background:#b7b39c">?</div><div><div class="name">${slot === 'roca' ? 'Roça' : 'Rancho'} sem cachorro</div><div class="meta">${naLoja ? 'Escolha uma raça aqui embaixo.' : 'Compre um na Loja › Cães.'}</div></div>${naLoja ? '<div></div>' : `<button class="btn ghost" data-ir-caes="1">Ver raças</button>`}</div>`; continue; }
     const b = DOG[d.raca], awake = dogAwake(d), dias = Math.max(1, Math.ceil((d.born + b.vida * DAY - Date.now()) / DAY));
+    const armed = buyPending && buyPending.i === 'vendaDog' + slot && performance.now() < buyPending.until;
     html += `<div class="row ${awake ? '' : 'sel'}"><img alt="" src="${dogIcon(d.raca)}">
       <div><div class="name">${esc(d.nome)} · ${slot === 'roca' ? 'roça' : 'rancho'}</div>
       <div class="meta">Raça: <b>${b.nome}</b> · vive mais ${dias} ${dias > 1 ? 'dias' : 'dia'}<br>${awake ? `Acordado · ração por mais ${fmt((d.fedUntil - Date.now()) / 1000)}` : '<b>Dormindo de fome!</b> Não está vigiando.'}</div></div>
-      <div class="stack">${awake ? '' : `<button class="btn" data-feed-dog="${slot}">Dar ração</button>`}<button class="btn ghost" data-renomear-dog="${slot}">Trocar nome<br><small>${moeda(CUSTO_NOME_BICHO)}</small></button></div></div>`;
+      <div class="stack">${awake ? '' : `<button class="btn" data-feed-dog="${slot}">Dar ração</button>`}<button class="btn ghost" data-renomear-dog="${slot}">Trocar nome<br><small>${moeda(CUSTO_NOME_BICHO)}</small></button>
+      <button class="btn ${armed ? 'danger' : 'ghost'}" data-sell-dog="${slot}" title="Vender">${armed ? 'Confirmar' : 'Vender ' + moeda(dogSellPrice(d))}</button></div></div>`;
   }
   html += `<div class="row"><img alt="" src="${bowlIcon()}">
     <div><div class="name">Ração de cachorro</div><div class="meta">${DOG_FOOD.custo} moedas · dura ${DOG_FOOD.horas}h · você tem <b>${state.dogFood}</b></div></div>
@@ -4908,6 +4913,21 @@ $('#pane').addEventListener('click', e => {
     state.animals = state.animals.filter(x => x !== a); delete amb[a.id];
     state.coins += price; sfx('coin'); track('vender', price);
     toast(`Vendeu ${ANIMAL[a.k].f ? 'a' : 'o'} ${nome}${a.nome && a.nome !== ANIMAL[a.k].nome ? ` ${a.nome}` : ''} por ${price.toLocaleString('pt-BR')} moedas.`, 'good');
+    done(); return renderPane();
+  }
+  if (d.sellDog) {
+    const slot = d.sellDog, dog = state.dogs[slot]; if (!dog) return;
+    const key = 'vendaDog' + slot;
+    if (!(buyPending && buyPending.i === key && performance.now() < buyPending.until)) {
+      buyPending = { i: key, until: performance.now() + 4000 }; renderPane();
+      setTimeout(() => { if (buyPending && buyPending.i === key) { buyPending = null; renderPane(); } }, 4000);
+      return;
+    }
+    buyPending = null;
+    const price = dogSellPrice(dog), b = DOG[dog.raca];
+    state.dogs[slot] = null;
+    state.coins += price; sfx('coin'); track('vender', price);
+    toast(`Vendeu ${dog.nome}, ${b.nome.toLowerCase()}, por ${price.toLocaleString('pt-BR')} moedas. ${SLOT[slot].A} ficou sem cachorro de guarda.`, 'good');
     done(); return renderPane();
   }
   if (d.seg) { shopSeg = d.seg; renderPane(); $('#pane').scrollTop = 0; if (d.focus) focusRow('abrigo-' + d.focus); }
