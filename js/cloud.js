@@ -180,9 +180,18 @@
     }
     return out;
   }
+  // Ranking global: os jogadores com mais pontos de TODOS (não só amigos), ordenado por pts (índice padrão
+  // do Firestore, sem precisar de índice composto). Pega um pouco mais que o pedido porque "pts" pode ser
+  // de uma semana anterior (quem não abriu o jogo ainda esta semana) — o jogo filtra isso ao montar a lista.
+  async function lerRankingGlobal(limite) {
+    const out = {};
+    const qs = await db.collection('ranking').orderBy('pts', 'desc').limit(limite || 100).get();
+    qs.docs.forEach(d => { out[d.id] = d.data(); });
+    return out;
+  }
 
   window.RFCloud = {
-    salvarRanking, lerRanking, sessaoAtual,
+    salvarRanking, lerRanking, lerRankingGlobal, sessaoAtual,
     marcarPresenca, watchPresenca,
     enviarMsg, watchChat, apagarMsg,
     ativarPush, desativarPush, salvarPush, mandarAviso, saveFarmSeguro, salvarBackup, listarBackups, apagarBackup,

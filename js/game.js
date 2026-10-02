@@ -4,8 +4,9 @@
 // ============================================================
 // Dados do jogo
 // ============================================================
-const COLS = 10, ROWS = 10, N = COLS * ROWS;
-const START_LOTS = [0, 1, 2, 10, 11, 12]; // os 6 canteiros iniciais, no canto perto do celeiro
+// Mapa da roça: 14×14 (era 10×10) pra caber as expansões novas até 160 canteiros.
+const COLS = 14, ROWS = 14, N = COLS * ROWS;
+const START_LOTS = [0, 1, 2, COLS, COLS + 1, COLS + 2]; // os 6 canteiros iniciais, no canto perto do celeiro (2 linhas de 3)
 const ROOM = 5;
 const HOUR = 3600, DAY = 86400e3; // HOUR em segundos (tempos de produção), DAY em milissegundos (idades)
 const SAVE_KEY = 'roca-feliz-v3', OLD_SAVE_KEYS = ['roca-feliz-v2', 'roca-feliz-v1'], SETTINGS_KEY = 'roca-feliz-config';
@@ -88,26 +89,33 @@ const PRESENTES_GATO = [
   { id: 'presentemisterioso', nome: 'Presente misterioso', nomePl: 'presentes misteriosos', preco: 480, peso: 2 },
 ];
 for (const p of PRESENTES_GATO) PRODUCT[p.id] = { ...p, gato: true };
-function sortearPresenteGato() {
-  const tot = PRESENTES_GATO.reduce((t, p) => t + p.peso, 0);
+// Pavão e cavalo também deixam um item de vez em quando, no mesmo ritmo dos gatos (reaproveita o sistema acima).
+const PRESENTES_PAVAO = [PRODUCT.pena];
+const PRESENTES_CAVALO = [{ id: 'ferradura', nome: 'Ferradura', nomePl: 'ferraduras', preco: 90, peso: 1 }];
+for (const p of PRESENTES_CAVALO) PRODUCT[p.id] = { ...p, pet: true };
+const PET_PRESENTES = { gato: PRESENTES_GATO, pavao: PRESENTES_PAVAO, cavalo: PRESENTES_CAVALO };
+const PET_EMOJI = { gato: '🐱', pavao: '🦚', cavalo: '🐴' };
+function sortearPresentePet(pool) {
+  const tot = pool.reduce((t, p) => t + (p.peso || 1), 0);
   let r = Math.random() * tot;
-  for (const p of PRESENTES_GATO) { r -= p.peso; if (r <= 0) return p; }
-  return PRESENTES_GATO[0];
+  for (const p of pool) { r -= (p.peso || 1); if (r <= 0) return p; }
+  return pool[0];
 }
-// Cada gato tem seu próprio relógio (presenteProx); quem já tinha gato antes desta versão ganha o primeiro em 12h.
-function gatosTick() {
+// Cada gato/pavão/cavalo tem seu próprio relógio (presenteProx); quem já tinha antes desta versão ganha o primeiro em 12h.
+function petsTick() {
   if (!state) return;
   const agora = Date.now();
   let mudou = false;
   for (const g of state.animals) {
-    if (g.k !== 'gato') continue;
+    const pool = PET_PRESENTES[g.k]; if (!pool) continue;
     if (!g.presenteProx) { g.presenteProx = agora + GATO_PRESENTE_MS; continue; }
     if (agora < g.presenteProx) continue;
-    const p = sortearPresenteGato();
+    const p = sortearPresentePet(pool);
     state.barn[p.id] = (state.barn[p.id] || 0) + 1;
     g.presenteProx = agora + GATO_PRESENTE_MS;
     mudou = true;
-    const msg = `🐱 ${g.nome || 'Seu gato'} trouxe ${p.nome.endsWith('a') ? 'uma' : 'um'} ${p.nome.toLowerCase()} de presente! Foi para o celeiro.`;
+    const nome = g.nome || `Seu(sua) ${ANIMAL[g.k].nome.toLowerCase()}`;
+    const msg = `${PET_EMOJI[g.k] || '🐾'} ${nome} ${g.k === 'gato' ? 'trouxe' : 'deixou'} ${p.nome.endsWith('a') ? 'uma' : 'um'} ${p.nome.toLowerCase()}! Foi para o celeiro.`;
     toast(msg, 'good'); addNews(msg);
   }
   if (mudou) done();
@@ -367,7 +375,8 @@ function orderFor(cols, rows) {
 }
 const ORDER = orderFor(COLS, ROWS);
 
-const need = l => 100 + 50 * (l - 1);
+// XP pra subir de nível: dobrado (era 100 + 50 por nível) pra alongar a progressão, mesma forma linear de antes.
+const need = l => 200 + 100 * (l - 1);
 // Expansões: cada uma libera mais canteiros, que você coloca onde quiser (encostados na sua terra).
 // Cada canteiro novo custa sempre 1000 moedas, não importa o nível (preco = 1000 × canteiros ganhos na expansão).
 const EXPANSOES = [
@@ -379,6 +388,8 @@ const EXPANSOES = [
   { nivel: 30, preco: 18000, total: 60 },
   { nivel: 40, preco: 20000, total: 80 },
   { nivel: 50, preco: 20000, total: 100 },
+  { nivel: 60, preco: 30000, total: 130 },
+  { nivel: 70, preco: 30000, total: 160 },
 ];
 const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganhar XP infinito com o feijão)
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -432,6 +443,18 @@ function migrate(s) {
     const keep = { friends: s.friends, sent: s.sent, code: s.code, owner: s.owner, news: s.news, newsSeen: s.newsSeen };
     s = Object.assign(newState(), keep);
     s.news = [{ at: Date.now(), msg: 'A Roça Feliz foi renovada! Tem 27 plantações novas, árvores frutíferas e expansões. Você recomeça com 2.000 moedas.' }].concat(Array.isArray(s.news) ? s.news : []);
+  }
+  // O mapa da roça cresceu de 10×10 pra 14×14 (mais área pra construir). Quem já jogava tem o save
+  // com 100 canteiros na grade antiga: remapeia cada um pra mesma linha/coluna na grade nova (o
+  // resto da terra nova fica bloqueado, do jeitinho que já era antes de qualquer expansão).
+  const OLD_COLS = 10, OLD_ROWS = 10, OLD_N = OLD_COLS * OLD_ROWS;
+  if (s.v === 3 && Array.isArray(s.plots) && s.plots.length === OLD_N && N !== OLD_N) {
+    const novos = Array.from({ length: N }, () => emptyPlot());
+    for (let i = 0; i < OLD_N; i++) {
+      const c = i % OLD_COLS, r = Math.floor(i / OLD_COLS);
+      if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
+    }
+    s.plots = novos;
   }
   if (s.v !== 3 || !Array.isArray(s.plots) || s.plots.length !== N) return null;
   s.animals = Array.isArray(s.animals) ? s.animals.filter(a => a && ANIMAL[a.k]) : [];
@@ -905,6 +928,17 @@ function harvestAll() {
   toast(`Colheu ${list.length} ${list.length > 1 ? 'canteiros' : 'canteiro'}.`, 'good');
   done();
 }
+// Limpeza rápida: limpa de uma vez toda terra seca da sua roça (mesma ação do enxadão, uma por uma).
+function clearAllWithered() {
+  if (!isHome()) return;
+  if (!state.tools.enxada) return toast('Você precisa do Enxadão para limpar a terra automaticamente. Compre na Loja › Ferramentas.', 'bad');
+  const list = state.plots.map((p, i) => ({ p, i })).filter(x => x.p.s === 'withered');
+  if (!list.length) return toast('Nenhuma terra seca pra limpar agora. 🌾');
+  for (const { p, i } of list) { Object.assign(p, emptyPlot('plowed')); useFx('hoe', cellCenter(i)); addXP(1, cellCenter(i)); }
+  sfx('hoe');
+  toast(`Limpou ${list.length} ${list.length > 1 ? 'terras secas' : 'terra seca'}.`, 'good');
+  done();
+}
 
 
 // Clique num bicho: ele solta uma frase (balãozinho) e o seu barulho.
@@ -1179,6 +1213,7 @@ const NOVIDADES = [
   { v: 186, txt: 'Seus gatos agora trazem presentinho a cada 12h (novelo de lã, rato caçado, lagartixa seca, sininho perdido ou, raramente, um presente misterioso) direto pro celeiro: vende de 220 a 480 moedas cada.' },
   { v: 187, txt: 'Subir de nível ficou mais festivo: além das moedas de sempre, agora aparece um cartão no meio da tela mostrando os prêmios — moedas, alguns trevos 🍀 (mais conforme o nível sobe) e uma medalha ou troféu que dá pra vender no celeiro.' },
   { v: 188, txt: 'O bônus de moedas ao subir de nível dobrou: agora é nível × 100 (antes era × 50).' },
+  { v: 189, txt: 'Atualização grande: ranking global 🌎 (além do de amigos), pena do pavão e ferradura do cavalo pra vender, mais espécies de peixe e de caça (10 em cada lago/mato), mapa maior (14×14, com a terra fora da área comprada marcada visualmente), mais XP pra subir de nível, e o botão 🚜 agora oferece colheita automática e limpeza automática de terra seca. Corrigido o travamento no Rio Amazonas ao abrir o livro de peixes, a animação do rastelo ao ir limpar folhas, e o esconderijo dos bichos na caçada. Frutífera ajudada por um amigo agora rende só mais uma colheita e seca de vez.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1328,8 +1363,8 @@ function buyAnimal(k) {
   if (k === 'gato') {
     const usadas = state.animals.filter(a => a.k === 'gato').map(a => a.cor);
     novo.cor = (GATO_CORES.find(c => !usadas.includes(c.id)) || GATO_CORES[0]).id;
-    novo.presenteProx = Date.now() + GATO_PRESENTE_MS;
   }
+  if (PET_PRESENTES[k]) novo.presenteProx = Date.now() + GATO_PRESENTE_MS;
   state.animals.push(novo);
   sfx('buy');
   addXP(4, null);
@@ -3192,6 +3227,11 @@ function drawProduct(id, x, y, s) {
     ctx.beginPath(); ctx.moveTo(x + 4 * s, y - 5.5 * s); ctx.quadraticCurveTo(x + 8 * s, y - 5 * s, x + 6 * s, y - 1 * s); ctx.stroke();
     ctx.fillRect(x - 1 * s, y - 1 * s, 2 * s, 3 * s);
     ctx.beginPath(); ctx.moveTo(x - 3 * s, y + 2 * s); ctx.lineTo(x + 3 * s, y + 2 * s); ctx.lineTo(x + 2.4 * s, y + 4 * s); ctx.lineTo(x - 2.4 * s, y + 4 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (id === 'ferradura') {
+    ctx.strokeStyle = '#8a8e92'; ctx.lineWidth = 3.2 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y - 1 * s, 5.5 * s, 0.35, Math.PI - 0.35); ctx.stroke();
+    ctx.fillStyle = '#5a5e62';
+    for (const dx of [-4.6, 4.6]) for (const dy of [1, 4.5]) { ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, 0.7 * s, 0, 7); ctx.fill(); }
   }
 }
 
@@ -3554,6 +3594,15 @@ function drawPlot(i, p, t, home) {
       ctx.fillStyle = '#4a2a10'; ctx.font = `800 ${Math.round(clamp(W * 0.11, 9, 15))}px 'Baloo 2', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('Colocar', m.x, m.y - W * 0.405);
       ctx.fillText('aqui?', m.x, m.y - W * 0.29);
+    } else if (home) {
+      // Terra que ainda não dá pra construir (fora da expansão comprada, ou não encosta na sua terra):
+      // uma leve trama escura marca bem a diferença do gramado livre, sem confundir com canteiro comprável.
+      quad(p1, p2, p3, p4, 'rgba(40,30,20,.16)');
+      ctx.save(); ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath(); ctx.clip();
+      ctx.strokeStyle = 'rgba(40,30,20,.3)'; ctx.lineWidth = 1;
+      const x0 = Math.min(p1.x, p2.x, p3.x, p4.x), x1 = Math.max(p1.x, p2.x, p3.x, p4.x), y0 = Math.min(p1.y, p2.y, p3.y, p4.y), y1 = Math.max(p1.y, p2.y, p3.y, p4.y);
+      for (let lx = x0 - (y1 - y0); lx < x1; lx += 6) { ctx.beginPath(); ctx.moveTo(lx, y0); ctx.lineTo(lx + (y1 - y0), y1); ctx.stroke(); }
+      ctx.restore();
     }
     if (hov) quad(p1, p2, p3, p4, null, 'rgba(255,255,255,.9)', 2);
     return;
@@ -4382,9 +4431,9 @@ function renderTools() {
     atualizarRastelo();
     const c = document.createElement('button');
     c.className = 'roundbtn tool'; c.type = 'button'; c.id = 'colherBtn';
-    c.innerHTML = `<span class="ic">🧺</span><span class="lb">Colher</span>`;
-    c.title = 'Colhe de uma vez todo canteiro pronto';
-    c.addEventListener('click', harvestAll);
+    c.innerHTML = `<span class="ic">🚜</span><span class="lb">Colher</span>`;
+    c.title = 'Colheita e limpeza automáticas';
+    c.addEventListener('click', e => abrirMenuColher(e.currentTarget));
     box.appendChild(c);
     atualizarColher();
   }
@@ -4407,6 +4456,16 @@ function atualizarColher() {
   if (b.dataset.key === key) return;
   b.dataset.key = key;
   b.querySelector('.lb').textContent = n ? `Colher (${n})` : 'Colher';
+}
+// Menu do botão 🚜: escolher entre colheita automática (canteiros prontos) e limpeza automática (terra seca).
+function abrirMenuColher(btn) {
+  const m = $('#ctxMenu'), r = btn.getBoundingClientRect();
+  const nColher = state.plots.filter(ripe).length, nLimpar = state.plots.filter(p => p.s === 'withered').length;
+  m.innerHTML = `<b>Ações automáticas</b><button type="button" data-ctx="colher">🧺 Colheita automática${nColher ? ` (${nColher})` : ''}</button><button type="button" data-ctx="limpar">🧹 Limpeza automática de terras${nLimpar ? ` (${nLimpar})` : ''}</button><button type="button" data-ctx="fechar">Cancelar</button>`;
+  m.dataset.key = ''; m.hidden = false;
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = `${clamp(r.left + r.width / 2 - w / 2, 6, L.cw - w - 6)}px`; m.style.top = `${clamp(r.top - h - 10, 6, L.ch - h - 6)}px`;
+  sfx('click');
 }
 function setTool(id) {
   if (!isHome() && HOME_ONLY.includes(id)) return;
@@ -4804,7 +4863,7 @@ function renderPane() {
         html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · ração ${d.racao} por dia<br>cresce em ${fmt(d.tempo)} e vende por ${d.venda.toLocaleString('pt-BR')}<br>lucro ${(d.venda - d.custo - d.racao * Math.ceil(d.tempo / (24 * HOUR))).toLocaleString('pt-BR')} · ${d.xp} XP na venda`, buyBtn(d));
       }
       html += `<h3>Companhia</h3>`;
-      for (const d of visible('pet')) html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · mora ${d.lugar === 'casa' ? 'dentro de casa' : (abrigoOf(d.id).o === 'a' ? 'na ' : 'no ') + abrigoOf(d.id).nome.toLowerCase()}<br>não come nem produz · carinho dá 2 XP por dia`, buyBtn(d));
+      for (const d of visible('pet')) html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · mora ${d.lugar === 'casa' ? 'dentro de casa' : (abrigoOf(d.id).o === 'a' ? 'na ' : 'no ') + abrigoOf(d.id).nome.toLowerCase()}<br>não come nem produz · carinho dá 2 XP por dia${PET_PRESENTES[d.id] ? ` · de vez em quando deixa ${PET_PRESENTES[d.id][0].nomePl || PET_PRESENTES[d.id][0].nome.toLowerCase()} pra vender` : ''}`, buyBtn(d));
       const pets = state.animals.filter(a => ANIMAL[a.k].tipo === 'pet');
       if (pets.length) {
         html += `<h3>Nomes dos seus bichos</h3>`;
@@ -4894,7 +4953,7 @@ function renderPane() {
     }
   } else if (tab === 'celeiro') {
     html += chaveAviso('celeiro', 'Mostrar a quantidade de itens no botão do Celeiro');
-    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PRODUTOS_CACA.map(p => PRODUCT[p.id]), ...PEIXES.map(p => PRODUCT[p.id]), ...FRUTAS.map(f => PRODUCT[f.id]), ...PRESENTES_GATO.map(p => PRODUCT[p.id]), ...PREMIOS_NIVEL.map(p => PRODUCT[p.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
+    const items = [...Object.values(PRODUCE), ...PRODUCTS, ...PRODUTOS_CACA.map(p => PRODUCT[p.id]), ...PEIXES.map(p => PRODUCT[p.id]), ...FRUTAS.map(f => PRODUCT[f.id]), ...PRESENTES_GATO.map(p => PRODUCT[p.id]), ...PRESENTES_CAVALO.map(p => PRODUCT[p.id]), ...PREMIOS_NIVEL.map(p => PRODUCT[p.id]), ...RECEITAS].filter(it => state.barn[it.id] > 0);
     let total = 0; for (const it of items) total += state.barn[it.id] * it.preco;
     html += `<h3>Celeiro</h3>`;
     if (!items.length) html += `<div class="empty">O celeiro está vazio.<br>Colha na roça e recolha ovos, leite, lã e trufas dos animais.</div>`;
@@ -5108,6 +5167,7 @@ $('#pane').addEventListener('click', e => {
     toast(`Vendeu ${dog.nome}, ${b.nome.toLowerCase()}, por ${price.toLocaleString('pt-BR')} moedas. ${SLOT[slot].A} ficou sem cachorro de guarda.`, 'good');
     done(); return renderPane();
   }
+  if (d.rankModo) { rankModo = d.rankModo; renderPane(); return; }
   if (d.seg) { shopSeg = d.seg; renderPane(); $('#pane').scrollTop = 0; if (d.focus) focusRow('abrigo-' + d.focus); }
   else if (d.abrigo) buyAbrigo(d.abrigo);
   else if (d.seed) { state.seed = d.seed; state.tool = 'seed'; if (!isHome()) goHome(); setScene('roca'); closePanel(); save(); toast(`${CROP[d.seed].nome} na mão: clique na terra arada para plantar.`); }
@@ -5422,6 +5482,8 @@ $('#ctxMenu').addEventListener('click', e => {
   } else if (b.dataset.ctx === 'guardar' && key.startsWith('enf:')) invGuardar(scene, Number(key.slice(4)));
   else if (b.dataset.ctx === 'placa') pedirAjudaFruteira($('#ctxMenu').dataset.sc || scene, Number(key.slice(4)));
   else if (b.dataset.ctx === 'derrubar') derrubarFruteira($('#ctxMenu').dataset.sc || scene, Number(key.slice(4)));
+  else if (b.dataset.ctx === 'colher') harvestAll();
+  else if (b.dataset.ctx === 'limpar') clearAllWithered();
 });
 cv.addEventListener('contextmenu', e => {
   const q = localPos(e), o = objAt(q.x, q.y);
@@ -6832,7 +6894,9 @@ function drawAvatarWalk(sc, t, quem = 'eu') {
   hits.push({ kind: 'avatar', quem, x: q.x, y: q.y - 34 * esc, r: Math.max(26 * esc, 16) });
   if (hover && hover.kind === 'avatar' && (hover.quem || 'eu') === quem) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.17, W * 0.06, 0, 0, 7); ctx.stroke(); }
   ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.13, W * 0.045, 0, 0, 7); ctx.fill();
-  drawAvatar(ctx, q.x, q.y, esc, quem === 'dono' ? view.avatar : state.avatar, t, k < 1, w.dir);
+  // Indo rastelar um monte de folhas: já mostra o rastelo na mão no caminho, não só ao chegar.
+  const avTarefa = quem === 'eu' && w.tarefa ? Object.assign({}, state.avatar, { mao: 'rastelo' }) : state.avatar;
+  drawAvatar(ctx, q.x, q.y, esc, quem === 'dono' ? view.avatar : avTarefa, t, k < 1, w.dir);
 }
 // ---------- Montes de folhas: de vez em quando aparecem no gramado; o avatar vai lá e rastela ----------
 const FOLHAS_MAX = 3;
@@ -7288,35 +7352,77 @@ const PEIXES = [
   { id: 'acara',    nome: 'Cará',        preco: 35,   raro: 'comum',    peso: 22,  nivel: 1,  iscas: ['minhoca'], cor: ['#b9a86a', '#7a6a3a'], tam: 0.7, alto: true, listras: true, pontos: ['casa', 'solte'] },
   { id: 'piau',     nome: 'Piau',        preco: 45,   raro: 'comum',    peso: 20,  nivel: 2,  iscas: ['minhoca', 'milho'], cor: ['#c9c2a0', '#9a8a5a'], tam: 0.85, pintas: true, pontos: ['casa', 'solte'] },
   { id: 'mandi',    nome: 'Mandi',       preco: 40,   raro: 'comum',    peso: 18,  nivel: 2,  iscas: ['minhoca'], cor: ['#d9c79a', '#a88a4a'], tam: 0.8, bigode: true, pontos: ['casa', 'solte'] },
+  { id: 'carpa', nome: 'Carpa', preco: 48, raro: 'comum', peso: 20, nivel: 1, iscas: ['minhoca'], cor: ['#c9d3dc', '#8fa3b5'], tam: 0.80, pontos: ['casa', 'solte'] },
+  { id: 'bagre', nome: 'Bagre', preco: 42, raro: 'comum', peso: 18, nivel: 1, iscas: ['minhoca', 'milho'], cor: ['#9aa88f', '#6f7d64'], tam: 0.88, alto: true, pontos: ['casa', 'solte'] },
+  { id: 'jundia', nome: 'Jundiá', preco: 55, raro: 'comum', peso: 16, nivel: 2, iscas: ['milho'], cor: ['#b9a86a', '#7a6a3a'], tam: 0.96, longo: true, pontos: ['casa', 'solte'] },
+  { id: 'saguiru', nome: 'Saguiru', preco: 38, raro: 'comum', peso: 20, nivel: 1, iscas: ['camarao'], cor: ['#c9c2a0', '#9a8a5a'], tam: 1.04, bigode: true, pontos: ['casa', 'solte'] },
+  { id: 'cascudinho', nome: 'Cascudinho', preco: 60, raro: 'incomum', peso: 14, nivel: 2, iscas: ['camarao', 'artificial'], cor: ['#d9c79a', '#a88a4a'], tam: 1.12, dentes: true, pontos: ['casa', 'solte'] },
   // Córrego Cascavel
   { id: 'traira',   nome: 'Traíra',     preco: 70,   raro: 'comum',    peso: 15,  nivel: 3,  iscas: ['minhoca', 'camarao', 'artificial'], cor: ['#7a6a4a', '#4f4430'], tam: 0.95, pontos: ['riacho'] },
   { id: 'curimba',  nome: 'Curimbatá',   preco: 55,   raro: 'comum',    peso: 16,  nivel: 3,  iscas: ['milho'], cor: ['#b8bcc0', '#8a6a4a'], tam: 0.95, pontos: ['riacho'] },
   { id: 'pacu',     nome: 'Pacu',       preco: 90,   raro: 'incomum',  peso: 12,  nivel: 4,  iscas: ['milho'], cor: ['#8a8f99', '#e07a3a'], tam: 0.95, alto: true, pontos: ['riacho'] },
   { id: 'cascudo',  nome: 'Cascudo',     preco: 80,   raro: 'incomum',  peso: 10,  nivel: 4,  iscas: ['minhoca', 'milho'], cor: ['#5a5040', '#3a3228'], tam: 0.85, armadura: true, pintas: true, pontos: ['riacho'] },
   { id: 'tuvira',   nome: 'Tuvira',      preco: 65,   raro: 'comum',    peso: 14,  nivel: 3,  iscas: ['minhoca'], cor: ['#6a6a52', '#3a3a2a'], tam: 0.8, longo: true, pontos: ['riacho'] },
+  { id: 'lambariamarelo', nome: 'Lambari-do-rabo-amarelo', preco: 75, raro: 'comum', peso: 14, nivel: 3, iscas: ['minhoca', 'camarao'], cor: ['#7a6a4a', '#4f4430'], tam: 0.80, listras: true, pontos: ['riacho'] },
+  { id: 'joana', nome: 'Joana', preco: 85, raro: 'comum', peso: 12, nivel: 4, iscas: ['artificial'], cor: ['#b8bcc0', '#8a6a4a'], tam: 0.88, pintas: true, pontos: ['riacho'] },
+  { id: 'manjuba', nome: 'Manjuba', preco: 65, raro: 'comum', peso: 15, nivel: 3, iscas: ['camarao', 'minhoca', 'milho'], cor: ['#8a8f99', '#e07a3a'], tam: 0.96, armadura: true, pontos: ['riacho'] },
+  { id: 'caraacu', nome: 'Cará-açu', preco: 95, raro: 'incomum', peso: 11, nivel: 4, iscas: ['minhoca'], cor: ['#6a6a52', '#3a3a2a'], tam: 1.04, barriga: '#e0a050', pontos: ['riacho'] },
+  { id: 'cascudopreto', nome: 'Cascudo-preto', preco: 100, raro: 'incomum', peso: 9, nivel: 5, iscas: ['minhoca', 'milho'], cor: ['#9aa0a8', '#6a707a'], tam: 1.12, alto: true, pintas: true, pontos: ['riacho'] },
   // Rio Meia Ponte
   { id: 'piranha',  nome: 'Piranha',     preco: 85,   raro: 'incomum',  peso: 11,  nivel: 5,  iscas: ['minhoca', 'camarao'], cor: ['#9aa0a8', '#6a707a'], tam: 0.8, alto: true, dentes: true, barriga: '#e0503a', pontos: ['represa'] },
   { id: 'tucunare', nome: 'Tucunaré',   preco: 160,  raro: 'raro',     peso: 8,   nivel: 6,  iscas: ['camarao', 'artificial'], cor: ['#e3bf3a', '#4f7a2a'], tam: 1, listras: true, pontos: ['represa'] },
   { id: 'corvina',  nome: 'Corvina',     preco: 110,  raro: 'incomum',  peso: 9,   nivel: 7,  iscas: ['camarao', 'milho'], cor: ['#d9d9cf', '#a8a898'], tam: 1, pontos: ['represa'] },
   { id: 'mandube',  nome: 'Mandubé',     preco: 130,  raro: 'incomum',  peso: 8,   nivel: 7,  iscas: ['minhoca', 'camarao'], cor: ['#c9b98a', '#8a704a'], tam: 0.9, bigode: true, pontos: ['represa'] },
+  { id: 'carpacapim', nome: 'Carpa-capim', preco: 95, raro: 'incomum', peso: 10, nivel: 5, iscas: ['milho'], cor: ['#e3bf3a', '#4f7a2a'], tam: 0.80, longo: true, bigode: true, pontos: ['represa'] },
+  { id: 'bagresapo', nome: 'Bagre-sapo', preco: 105, raro: 'incomum', peso: 9, nivel: 6, iscas: ['camarao'], cor: ['#d9d9cf', '#a8a898'], tam: 0.88, pontos: ['represa'] },
+  { id: 'jacunda', nome: 'Jacundá', preco: 115, raro: 'incomum', peso: 8, nivel: 6, iscas: ['camarao', 'artificial'], cor: ['#c9b98a', '#8a704a'], tam: 0.96, alto: true, pontos: ['represa'] },
+  { id: 'carapeba', nome: 'Carapeba', preco: 125, raro: 'incomum', peso: 7, nivel: 7, iscas: ['minhoca', 'camarao'], cor: ['#c8ccd2', '#3a3a3a'], tam: 1.04, longo: true, pontos: ['represa'] },
+  { id: 'saburim', nome: 'Saburim', preco: 140, raro: 'raro', peso: 6, nivel: 8, iscas: ['artificial'], cor: ['#c7c1b3', '#4a4a4a'], tam: 1.12, bigode: true, pontos: ['represa'] },
+  { id: 'robalo', nome: 'Robalo', preco: 155, raro: 'raro', peso: 6, nivel: 9, iscas: ['camarao', 'minhoca', 'milho'], cor: ['#c9c9c2', '#8a8a80'], tam: 0.80, dentes: true, pontos: ['represa'] },
   // Ribeirão João Leite
   { id: 'matrinxa', nome: 'Matrinxã',    preco: 120,  raro: 'incomum',  peso: 8,   nivel: 8,  iscas: ['milho', 'minhoca'], cor: ['#c8ccd2', '#3a3a3a'], tam: 1, barriga: '#e8c070', pontos: ['rio'] },
   { id: 'pintado',  nome: 'Pintado',    preco: 220,  raro: 'raro',     peso: 6,   nivel: 9,  iscas: ['camarao'], cor: ['#c7c1b3', '#4a4a4a'], tam: 1.1, pintas: true, pontos: ['rio'] },
   { id: 'papaterra', nome: 'Papa-terra', preco: 200,  raro: 'raro',     peso: 6,   nivel: 9,  iscas: ['camarao', 'milho'], cor: ['#c9c9c2', '#8a8a80'], tam: 1, longo: true, pontos: ['rio'] },
   { id: 'cachorra', nome: 'Peixe-cachorra', preco: 190, raro: 'raro',   peso: 6,   nivel: 10, iscas: ['camarao', 'artificial'], cor: ['#d0d4d8', '#e0a040'], tam: 1, longo: true, dentes: true, pontos: ['rio'] },
+  { id: 'trairao', nome: 'Trairão', preco: 130, raro: 'incomum', peso: 8, nivel: 8, iscas: ['minhoca'], cor: ['#d0d4d8', '#e0a040'], tam: 0.88, listras: true, pontos: ['rio'] },
+  { id: 'acaritinga', nome: 'Acari-tinga', preco: 140, raro: 'incomum', peso: 7, nivel: 9, iscas: ['minhoca', 'milho'], cor: ['#c8c090', '#8a8a5a'], tam: 0.96, pintas: true, pontos: ['rio'] },
+  { id: 'cangati', nome: 'Cangati', preco: 150, raro: 'incomum', peso: 7, nivel: 9, iscas: ['milho'], cor: ['#f2b705', '#d9822b'], tam: 1.04, armadura: true, pontos: ['rio'] },
+  { id: 'mandiamarelo', nome: 'Mandi-amarelo', preco: 165, raro: 'raro', peso: 6, nivel: 10, iscas: ['camarao'], cor: ['#b0a898', '#7a7060'], tam: 1.12, barriga: '#e0a050', pontos: ['rio'] },
+  { id: 'cari', nome: 'Cari', preco: 145, raro: 'incomum', peso: 7, nivel: 8, iscas: ['camarao', 'artificial'], cor: ['#c9d3dc', '#8fa3b5'], tam: 0.80, alto: true, pintas: true, pontos: ['rio'] },
+  { id: 'caparari', nome: 'Caparari', preco: 230, raro: 'raro', peso: 6, nivel: 10, iscas: ['minhoca', 'camarao'], cor: ['#9aa88f', '#6f7d64'], tam: 0.88, longo: true, bigode: true, pontos: ['rio'] },
   // Rio dos Bois
   { id: 'aruana',   nome: 'Aruanã',      preco: 240,  raro: 'raro',     peso: 5,   nivel: 11, iscas: ['artificial'], cor: ['#c8c090', '#8a8a5a'], tam: 1.05, longo: true, pontos: ['lagoa'] },
   { id: 'dourado',  nome: 'Dourado',    preco: 400,  raro: 'épico',    peso: 3,   nivel: 12, iscas: ['camarao', 'artificial'], cor: ['#f2b705', '#d9822b'], tam: 1.1, pontos: ['lagoa'] },
   { id: 'barbado',  nome: 'Barbado',     preco: 260,  raro: 'raro',     peso: 5,   nivel: 13, iscas: ['camarao', 'minhoca', 'milho'], cor: ['#b0a898', '#7a7060'], tam: 1.05, bigode: true, pontos: ['lagoa'] },
   { id: 'tambacu',  nome: 'Tambacu',    preco: 350,  raro: 'raro',     peso: 5,   nivel: 13, iscas: ['milho', 'minhoca'], cor: ['#6a6a50', '#3a3a2a'], tam: 1.1, alto: true, barriga: '#d8c060', pontos: ['lagoa'] },
+  { id: 'piraputanga', nome: 'Piraputanga', preco: 230, raro: 'raro', peso: 5, nivel: 11, iscas: ['artificial'], cor: ['#b9a86a', '#7a6a3a'], tam: 0.96, pontos: ['lagoa'] },
+  { id: 'piapara', nome: 'Piapara', preco: 245, raro: 'raro', peso: 5, nivel: 12, iscas: ['camarao', 'minhoca', 'milho'], cor: ['#c9c2a0', '#9a8a5a'], tam: 1.04, alto: true, pontos: ['lagoa'] },
+  { id: 'piava', nome: 'Piava', preco: 215, raro: 'raro', peso: 5, nivel: 11, iscas: ['minhoca'], cor: ['#d9c79a', '#a88a4a'], tam: 1.12, longo: true, pontos: ['lagoa'] },
+  { id: 'bicuda', nome: 'Bicuda', preco: 280, raro: 'raro', peso: 4, nivel: 13, iscas: ['minhoca', 'milho'], cor: ['#7a6a4a', '#4f4430'], tam: 0.80, bigode: true, pontos: ['lagoa'] },
+  { id: 'piacu', nome: 'Piaçu', preco: 260, raro: 'raro', peso: 5, nivel: 12, iscas: ['milho'], cor: ['#b8bcc0', '#8a6a4a'], tam: 0.88, dentes: true, pontos: ['lagoa'] },
+  { id: 'voadeira', nome: 'Voadeira', preco: 300, raro: 'épico', peso: 3, nivel: 14, iscas: ['camarao'], cor: ['#8a8f99', '#e07a3a'], tam: 0.96, listras: true, pontos: ['lagoa'] },
   // Rio Araguaia
   { id: 'tambaqui', nome: 'Tambaqui',    preco: 450,  raro: 'épico',    peso: 3,   nivel: 15, iscas: ['milho', 'minhoca'], cor: ['#6a6a50', '#2a2a22'], tam: 1.15, alto: true, barriga: '#d8c060', pontos: ['araguaia'] },
   { id: 'pirarucu', nome: 'Pirarucu',   preco: 1000, raro: 'lendário', peso: 1,   nivel: 18, iscas: ['artificial'], cor: ['#6b5a4a', '#c8402f'], tam: 1.3, pontos: ['araguaia'] },
   { id: 'pirarara', nome: 'Pirarara',    preco: 600,  raro: 'épico',    peso: 2,   nivel: 20, iscas: ['camarao'], cor: ['#4a4a44', '#e0502a'], tam: 1.2, bigode: true, barriga: '#e8d8a0', pontos: ['araguaia'] },
+  { id: 'piracanjuba', nome: 'Piracanjuba', preco: 420, raro: 'épico', peso: 3, nivel: 15, iscas: ['camarao', 'artificial'], cor: ['#6a6a52', '#3a3a2a'], tam: 1.04, pintas: true, pontos: ['araguaia'] },
+  { id: 'pacumanteiga', nome: 'Pacu-manteiga', preco: 390, raro: 'épico', peso: 3, nivel: 16, iscas: ['minhoca', 'camarao'], cor: ['#9aa0a8', '#6a707a'], tam: 1.12, armadura: true, pontos: ['araguaia'] },
+  { id: 'curimatapioa', nome: 'Curimatã-pioa', preco: 350, raro: 'raro', peso: 4, nivel: 16, iscas: ['artificial'], cor: ['#e3bf3a', '#4f7a2a'], tam: 0.80, barriga: '#e0a050', pontos: ['araguaia'] },
+  { id: 'jatuarana', nome: 'Jatuarana', preco: 440, raro: 'épico', peso: 3, nivel: 17, iscas: ['camarao', 'minhoca', 'milho'], cor: ['#d9d9cf', '#a8a898'], tam: 0.88, alto: true, pintas: true, pontos: ['araguaia'] },
+  { id: 'pirapitinga', nome: 'Pirapitinga', preco: 460, raro: 'épico', peso: 3, nivel: 17, iscas: ['minhoca'], cor: ['#c9b98a', '#8a704a'], tam: 0.96, longo: true, bigode: true, pontos: ['araguaia'] },
+  { id: 'caranha', nome: 'Caranha', preco: 520, raro: 'épico', peso: 2, nivel: 19, iscas: ['minhoca', 'milho'], cor: ['#c8ccd2', '#3a3a3a'], tam: 1.04, pontos: ['araguaia'] },
+  { id: 'cuiucuiu', nome: 'Cuiú-cuiú', preco: 650, raro: 'épico', peso: 2, nivel: 21, iscas: ['milho'], cor: ['#c7c1b3', '#4a4a4a'], tam: 1.12, alto: true, pontos: ['araguaia'] },
   // Rio Amazonas
   { id: 'jau',      nome: 'Jaú',         preco: 1200, raro: 'lendário', peso: 1,   nivel: 24, iscas: ['camarao', 'artificial', 'minhoca'], cor: ['#7a6a4a', '#5a4a30'], tam: 1.3, bigode: true, pintas: true, pontos: ['amazonas'] },
   { id: 'cachara',  nome: 'Cachara',     preco: 1350, raro: 'lendário', peso: 0.8, nivel: 26, iscas: ['camarao', 'artificial'], cor: ['#8a7a5a', '#4a3a28'], tam: 1.3, bigode: true, pintas: true, longo: true, pontos: ['amazonas'] },
   { id: 'piraiba',  nome: 'Piraíba',     preco: 1500, raro: 'lendário', peso: 0.7, nivel: 28, iscas: ['artificial'], cor: ['#8a8e92', '#5a5e62'], tam: 1.4, bigode: true, pontos: ['amazonas'] },
+  { id: 'pirapucu', nome: 'Pirapucu', preco: 900, raro: 'lendário', peso: 1.2, nivel: 23, iscas: ['camarao'], cor: ['#c9c9c2', '#8a8a80'], tam: 0.80, longo: true, pontos: ['amazonas'] },
+  { id: 'sardinhaamazonica', nome: 'Sardinha-amazônica', preco: 850, raro: 'lendário', peso: 1.3, nivel: 23, iscas: ['camarao', 'artificial'], cor: ['#d0d4d8', '#e0a040'], tam: 0.88, bigode: true, pontos: ['amazonas'] },
+  { id: 'acaradisco', nome: 'Acará-disco', preco: 950, raro: 'lendário', peso: 1, nivel: 24, iscas: ['minhoca', 'camarao'], cor: ['#c8c090', '#8a8a5a'], tam: 0.96, dentes: true, pontos: ['amazonas'] },
+  { id: 'pacupeva', nome: 'Pacu-peva', preco: 1000, raro: 'lendário', peso: 1, nivel: 25, iscas: ['artificial'], cor: ['#f2b705', '#d9822b'], tam: 1.04, listras: true, pontos: ['amazonas'] },
+  { id: 'aracu', nome: 'Aracu', preco: 980, raro: 'lendário', peso: 1, nivel: 25, iscas: ['camarao', 'minhoca', 'milho'], cor: ['#b0a898', '#7a7060'], tam: 1.12, pintas: true, pontos: ['amazonas'] },
+  { id: 'surubim', nome: 'Surubim', preco: 1300, raro: 'lendário', peso: 0.8, nivel: 27, iscas: ['minhoca'], cor: ['#c9d3dc', '#8fa3b5'], tam: 0.80, armadura: true, pontos: ['amazonas'] },
+  { id: 'tucunareacu', nome: 'Tucunaré-açu', preco: 1400, raro: 'lendário', peso: 0.7, nivel: 29, iscas: ['minhoca', 'milho'], cor: ['#9aa88f', '#6f7d64'], tam: 0.88, barriga: '#e0a050', pontos: ['amazonas'] },
 ];
 // Peixe grande ou comprido encolhe um pouco para caber no ícone.
 const cabePeixe = p => Math.min(1, 0.95 / ((p.tam || 1) * (p.longo ? 1.3 : 1)));
@@ -7423,8 +7529,7 @@ const SOLTE_MOEDAS = 10, SOLTE_XP = 1;
 const pontoSel = () => { const id = state.pontoSel; return PONTO[id] && temPonto(id) ? id : 'casa'; };
 const faltaPonto = id => Math.max(0, (pontosDe().prox[id] || 0) - Date.now());
 // Cada ponto dá varaPorVez() pescarias de vara; depois descansa (2 horas, menos com o domínio).
-// Começa em 3 e sobe 1 a cada 10 níveis (bate com o nível dos pontos novos: 10, 20, 30), até o máximo de 6.
-const varaPorVez = () => clamp(3 + Math.floor(state.level / 10), 3, 6);
+const varaPorVez = () => 3;
 const restamVara = id => PONTO[id] && PONTO[id].solte ? Infinity : faltaPonto(id) ? 0 : Math.max(0, varaPorVez() - (pontosDe().usos[id] || 0));
 const tarrafaObj = () => (state.tarrafaEm && typeof state.tarrafaEm === 'object' ? state.tarrafaEm : (state.tarrafaEm = {}));
 const faltaTarrafa = (id = pontoSel()) => Math.max(0, (tarrafaObj()[id] || 0) - Date.now());
@@ -7693,6 +7798,10 @@ function livroPeixes() {
 function desenharPesca(t) {
   pescaRaf = 0;
   const c = $('#pescaCv'); if (!c || !pesca || $('#pesca').hidden) return;
+  // Livro de peixes aberto (ou canvas ainda sem tamanho): o canvas fica escondido (clientWidth 0), e
+  // alguns fundos (ex.: Rio Amazonas) têm "for" com passo cw*algo — com cw=0 isso trava num loop infinito.
+  // Só re-agenda o quadro e sai, sem desenhar nada, até a pescaria voltar a aparecer.
+  if (pescaLivro || !c.clientWidth) { pescaRaf = requestAnimationFrame(desenharPesca); return; }
   const dpr = Math.min(2, window.devicePixelRatio || 1), cw = c.clientWidth, ch = c.clientHeight;
   if (c.width !== Math.round(cw * dpr)) { c.width = Math.round(cw * dpr); c.height = Math.round(ch * dpr); }
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -7993,6 +8102,9 @@ function rankAtual() {
 function rankPontos(ev) { const p = PONTOS_RANK[ev]; if (p && state) rankAtual().pts += p; }
 let rankPublicado = '', rankCache = null, rankCacheEm = 0;
 let rankPubEm = 0;
+// Ranking global (todos os jogadores, não só amigos): reaproveita o mesmo documento ranking/{uid} e
+// os mesmos pontos da semana, só que lendo os N com mais pontos no banco todo em vez de uid por uid.
+let rankModo = 'amigos', rankGlobalCache = null, rankGlobalCacheEm = 0;
 function publicarRanking(forcar) {
   if (!user || !Cloud.salvarRanking) return;
   if (!forcar && Date.now() - rankPubEm < 5 * 60e3) return; // no máximo a cada 5 min (poupa gravações)
@@ -8005,6 +8117,12 @@ async function lerRanking(forcar) {
   if (!forcar && rankCache && Date.now() - rankCacheEm < 60e3) return rankCache;
   try { rankCache = await Cloud.lerRanking(state.friends.slice(0, 60)); rankCacheEm = Date.now(); } catch (e) { console.warn(e); }
   return rankCache;
+}
+async function lerRankingGlobal(forcar) {
+  if (!user || !Cloud.lerRankingGlobal) return null;
+  if (!forcar && rankGlobalCache && Date.now() - rankGlobalCacheEm < 60e3) return rankGlobalCache;
+  try { rankGlobalCache = await Cloud.lerRankingGlobal(100); rankGlobalCacheEm = Date.now(); } catch (e) { console.warn(e); }
+  return rankGlobalCache;
 }
 const ptsNaSemana = (d, w) => !d ? 0 : d.w === w ? d.pts || 0 : d.antW === w ? d.antPts || 0 : 0;
 // Na primeira vez que abre o jogo numa semana nova, vê a colocação da semana passada e dá o prêmio.
@@ -8020,20 +8138,34 @@ async function premioRanking() {
   state.coins += pr.moedas; addXP(pr.xp, null); sfx('level'); done();
   toast(`🏆 Ranking da semana passada: você ficou em ${pos}º lugar com ${meus} pontos! +${pr.moedas.toLocaleString('pt-BR')} moedas e +${pr.xp} XP.`, 'good');
 }
-let rankHTMLcache = '';
+let rankHTMLcache = '', rankHTMLcacheGlobal = '';
 function rankingHTML() {
   const r = rankAtual();
   const fim = new Date(); fim.setHours(0, 0, 0, 0); fim.setDate(fim.getDate() + ((8 - fim.getDay()) % 7 || 7));
   const dias = Math.max(0, Math.ceil((fim - Date.now()) / 86400e3));
-  lerRanking().then(docs => { if (docs && tab === 'amigos') { const novo = listaRank(docs, r); if (novo !== rankHTMLcache) { rankHTMLcache = novo; const el = $('#rankLista'); if (el) el.innerHTML = novo; } } });
+  const global = rankModo === 'global';
+  if (global) {
+    lerRankingGlobal().then(docs => { if (docs && tab === 'amigos' && rankModo === 'global') { const novo = listaRankGlobal(docs, r); if (novo !== rankHTMLcacheGlobal) { rankHTMLcacheGlobal = novo; const el = $('#rankLista'); if (el) el.innerHTML = novo; } } });
+  } else {
+    lerRanking().then(docs => { if (docs && tab === 'amigos' && rankModo === 'amigos') { const novo = listaRank(docs, r); if (novo !== rankHTMLcache) { rankHTMLcache = novo; const el = $('#rankLista'); if (el) el.innerHTML = novo; } } });
+  }
+  const lista = global ? (rankHTMLcacheGlobal || listaRankGlobal(rankGlobalCache || {}, r)) : (rankHTMLcache || listaRank(rankCache || {}, r));
   return `<h3>🏆 Ranking da semana</h3><p class="hint">Pontos por colher (1), recolher dos animais (1), fábrica (2), pescar (2), ajudar amigos (3), presentear (3), caminhão (5), pedidos da vila (8). Termina ${dias <= 1 ? 'hoje à meia-noite' : `em ${dias} dias`} (segunda 0h). Prêmios: 🥇 ${PREMIO_RANK[0].moedas} · 🥈 ${PREMIO_RANK[1].moedas} · 🥉 ${PREMIO_RANK[2].moedas} moedas.</p>
-    <div id="rankLista">${rankHTMLcache || listaRank(rankCache || {}, r)}</div>`;
+    <div class="rankmodo"><button type="button" class="btn tiny ${global ? 'ghost' : 'gold'}" data-rank-modo="amigos">Amigos</button><button type="button" class="btn tiny ${global ? 'gold' : 'ghost'}" data-rank-modo="global">🌎 Todos os jogadores</button></div>
+    <div id="rankLista">${lista}</div>`;
 }
 function listaRank(docs, r) {
   const w = r.w, linhas = [{ uid: 'eu', nome: `${meuApelido()} (você)`, pts: r.pts, eu: true }];
   for (const uid of state.friends) { const d = docs[uid], f = friendInfo[uid]; linhas.push({ uid, nome: (d && d.nome) || (f && f.name && !f.erro ? f.name : 'Amigo'), pts: ptsNaSemana(d, w) }); }
   linhas.sort((a, b) => b.pts - a.pts || (a.eu ? -1 : 1));
   return linhas.map((l, k) => `<div class="rankrow ${l.eu ? 'eu' : ''}"><b>${['🥇', '🥈', '🥉'][k] || `${k + 1}º`}</b><span>${esc(l.nome)}</span><strong>${l.pts} pts</strong></div>`).join('');
+}
+// Ranking global: os N de mais pontos no banco todo (reaproveita o mesmo doc/pontuação do ranking de amigos).
+function listaRankGlobal(docs, r) {
+  const w = r.w, meuUid = user && user.uid, linhas = [{ uid: 'eu', nome: `${meuApelido()} (você)`, pts: r.pts, eu: true }];
+  for (const [uid, d] of Object.entries(docs)) { if (uid === meuUid) continue; linhas.push({ uid, nome: (d && d.nome) || 'Jogador', pts: ptsNaSemana(d, w) }); }
+  linhas.sort((a, b) => b.pts - a.pts || (a.eu ? -1 : 1));
+  return linhas.slice(0, 50).map((l, k) => `<div class="rankrow ${l.eu ? 'eu' : ''}"><b>${['🥇', '🥈', '🥉'][k] || `${k + 1}º`}</b><span>${esc(l.nome)}</span><strong>${l.pts} pts</strong></div>`).join('');
 }
 
 // Liga/desliga do número vermelho (aviso de itens) no botão do Celeiro e do Inventário.
@@ -9552,7 +9684,9 @@ function estadoFruteira(o) {
   const restam = o.seca ? 0 : Math.max(0, colheitasDe(e) - (o.colhidas || 0)), morta = restam <= 0, pronto = !morta && agora - ult >= e.tempo * 1000;
   const falta = Math.max(0, ult + e.tempo * 1000 - agora);
   const f = FRUTA[e.fruta], resto = `${restam} colheita${restam > 1 ? 's' : ''} até secar`;
-  const txt = morta ? (o.placa ? 'Secou 🥀 · placa de ajuda posta: esperando um amigo ajudar 🤝' : `Secou 🥀. Ponha a placa de ajuda para um amigo reviver, ou derrube com ${e.fruteira === 'arvore' ? 'a motosserra' : 'a enxada de arrancar'}.`)
+  const txt = morta ? (o.placa ? 'Secou 🥀 · placa de ajuda posta: esperando um amigo ajudar 🤝'
+      : o.ajudada ? `Secou 🥀 de vez: já foi ajudada uma vez antes, não dá mais pra reviver. Derrube com ${e.fruteira === 'arvore' ? 'a motosserra' : 'a enxada de arrancar'}.`
+      : `Secou 🥀. Ponha a placa de ajuda para um amigo reviver, ou derrube com ${e.fruteira === 'arvore' ? 'a motosserra' : 'a enxada de arrancar'}.`)
     : pronto ? `Pronta! ${rendeDe(e)} ${f.nome.toLowerCase()}s para colher · ${resto}`
     : `Próxima colheita em ${fmt(falta / 1000)} · ${resto}`;
   return { morta, pronto, falta, restam, txt };
@@ -9561,7 +9695,7 @@ function estadoFruteira(o) {
 const pedidosAjuda = s => ['roca', 'animais'].reduce((n, sc) => n + (s && s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && o.placa && ENFEITE[o.id] && ENFEITE[o.id].fruteira && (o.seca || (o.colhidas || 0) >= ENFEITE[o.id].colheitas)).length, 0);
 // Põe a placa e avisa todos os amigos (aviso no celular e o botão "Precisa de ajuda" na lista de amigos).
 function pedirAjudaFruteira(sc, i) {
-  const o = objetosDe(state, sc)[i]; if (!o || !estadoFruteira(o).morta || o.placa) return;
+  const o = objetosDe(state, sc)[i]; if (!o || !estadoFruteira(o).morta || o.placa || o.ajudada) return;
   o.placa = Date.now(); o.seca = 1; o.fid = o.fid || newId();
   const e = ENFEITE[o.id];
   for (const uid of state.friends) avisarAmigo(uid, 'ajuda', `${meuApelido()} precisa de ajuda: ${e.nome.toLowerCase()} secou no pomar 🥀 Passe lá para ajudar!`);
@@ -9579,7 +9713,9 @@ function derrubarFruteira(sc, i) {
 function menuFruteira(sc, i) {
   const o = objetosDe(state, sc)[i]; if (!o) return;
   const e = ENFEITE[o.id], fer = e.fruteira === 'arvore' ? 'motosserra' : 'enxada', F = FERR_DERRUBAR[fer], m = $('#ctxMenu'), q = iso(o.u, o.v);
-  m.innerHTML = `<b>${esc(e.nome)} secou 🥀</b>${o.placa ? '<span class="meta" style="display:block;margin:2px 0 6px">Placa posta: esperando um amigo ajudar</span>' : '<button type="button" data-ctx="placa">🪧 Pedir ajuda aos amigos</button>'}<button type="button" data-ctx="derrubar">${ferrEmo(fer)} Derrubar (você tem ${derrubarDe()[fer]})</button><button type="button" data-ctx="fechar">Cancelar</button>`;
+  m.innerHTML = `<b>${esc(e.nome)} secou 🥀</b>${o.placa ? '<span class="meta" style="display:block;margin:2px 0 6px">Placa posta: esperando um amigo ajudar</span>'
+    : o.ajudada ? '<span class="meta" style="display:block;margin:2px 0 6px">Já foi ajudada uma vez: não dá mais pra reviver</span>'
+    : '<button type="button" data-ctx="placa">🪧 Pedir ajuda aos amigos</button>'}<button type="button" data-ctx="derrubar">${ferrEmo(fer)} Derrubar (você tem ${derrubarDe()[fer]})</button><button type="button" data-ctx="fechar">Cancelar</button>`;
   m.dataset.key = 'enf:' + i; m.dataset.sc = sc; m.hidden = false;
   const w = m.offsetWidth, h = m.offsetHeight;
   m.style.left = `${clamp(q.x - w / 2, 6, L.cw - w - 6)}px`; m.style.top = `${clamp(q.y - L.W * 0.5 - h, 6, L.ch - h - 6)}px`;
@@ -9593,16 +9729,17 @@ function actFruteira(sc, i) {
   const o = objetosDe(S(), sc)[i]; if (!o) return;
   const e = ENFEITE[o.id], st = estadoFruteira(o), f = FRUTA[e.fruta];
   if (!isHome()) {
-    if (st.morta && o.placa && view.kind === 'friend') {
-      // ajudar a frutífera do amigo: não conta no limite do dia
+    if (st.morta && o.placa && !o.ajudada && view.kind === 'friend') {
+      // ajudar a frutífera do amigo: não conta no limite do dia. Só pode ser ajudada uma vez na vida:
+      // depois dessa, rende só mais 1 colheita e seca de vez (sem poder pedir ajuda de novo).
       const key = visitKey('fr:' + (o.fid || i) + ':' + o.placa);
       if (state.log[key]) return toast('Você já ajudou esta. Obrigado! 🤝');
       state.log[key] = Date.now();
       const q = iso(o.u, o.v), pos = { x: q.x, y: q.y - L.W * 0.4 };
-      o.placa = 0; o.seca = 0; o.colhidas = 0; o.ult = Date.now();
+      o.placa = 0; o.seca = 0; o.ajudada = 1; o.colhidas = Math.max(0, colheitasDe(e) - 1); o.ult = Date.now();
       help(pos); ganharPomar(1); addXP(3, pos); sfx('level'); popupAt(pos, 'Reviveu! 🌱', '#8fd16a');
       sendVisit({ t: 'help', what: 'fruteira', sc, fid: o.fid || '', idx: i });
-      toast(`🤝 Você ajudou ${view.nome}: ${e.nome.toLowerCase()} voltou a dar frutas!`, 'good');
+      toast(`🤝 Você ajudou ${view.nome}: ${e.nome.toLowerCase()} vai dar fruta mais uma vez antes de secar de vez!`, 'good');
       return done();
     }
     if (st.pronto) {
@@ -9831,9 +9968,8 @@ function comprarFerramenta(id) {
 // recompensa (e carne, no caso do javali). Os bichos nativos só caem na arapuca: são registrados no
 // livro e soltos de volta no mato. O lendário é o Chupa-cabra: aparece na serra e na chapada, mais à noite.
 // ============================================================
-const CACA_NIVEL = 10, CACA_POR_VEZ_MAX = 6, CACA_MS = 2 * 3600e3, ARAPUCA_MS = 4 * 3600e3;
-// Começa com 3 entradas por vez e sobe 1 a cada 6 níveis acima do nível 10 (quando libera a caçada), até 6 no máximo.
-const cacaPorVez = () => clamp(3 + Math.floor(Math.max(0, state.level - CACA_NIVEL) / 6), 3, CACA_POR_VEZ_MAX);
+const CACA_NIVEL = 10, CACA_MS = 2 * 3600e3, ARAPUCA_MS = 4 * 3600e3;
+const cacaPorVez = () => 3;
 const LUGARES_CACA = [
   { id: 'capoeira', nome: 'Capoeira do fundo',     emoji: '🌿', nivel: 10, custo: 0,     sorte: 1,   chao: '#86c050', mato: '#3f8a2a', morro: '#9ccf6a' },
   { id: 'mata',     nome: 'Mata ciliar',           emoji: '🌳', nivel: 12, custo: 2500,  sorte: 1.3, chao: '#6fae44', mato: '#2f6f22', morro: '#7fb85a' },
@@ -9862,6 +9998,46 @@ const CACA_BICHOS = [
   { id: 'paca',       nome: 'Paca',            raro: 'raro',     armas: ['arapuca'], nivel: 12, lug: 2, forma: 'rato',  cor: '#7a5230', tam: 1,    moedas: 35, peso: 3, semRabo: true, pintas: true },
   { id: 'jacu',       nome: 'Jacu',            raro: 'raro',     armas: ['arapuca'], nivel: 14, lug: 2, forma: 'ave',   cor: '#2e2a2a', tam: 0.95, moedas: 35, peso: 3, papo: true },
   { id: 'mutum',      nome: 'Mutum',           raro: 'épico',    armas: ['arapuca'], nivel: 18, lug: 3, forma: 'ave',   cor: '#1e1e22', tam: 1.05, moedas: 70, peso: 1.2, crista: true },
+  // +3 espécies na capoeira/mata/cerrado/serra/chapada (lug 0)
+  { id: 'gamba', nome: 'Gambá', raro: 'incomum', praga: true, armas: ['estilingue'], nivel: 10, lug: 0, forma: 'rato', cor: '#8a8078', tam: 0.75, vel: 1, hp: 1, moedas: 28, peso: 6, semRabo: false },
+  { id: 'sabia', nome: 'Sabiá', raro: 'comum', armas: ['arapuca'], nivel: 10, lug: 0, forma: 'ave', cor: '#9aa3ad', tam: 0.6, moedas: 10, peso: 10 },
+  { id: 'joaodebarro', nome: 'João-de-barro', raro: 'comum', armas: ['arapuca'], nivel: 10, lug: 0, forma: 'ave', cor: '#a07a4a', tam: 0.62, moedas: 10, peso: 9, gorda: true },
+  // +6 espécies na capoeira/mata/cerrado/serra/chapada (lug 1)
+  { id: 'quati', nome: 'Quati', raro: 'incomum', praga: true, armas: ['estilingue', 'espingarda'], nivel: 12, lug: 1, forma: 'rato', cor: '#b08a5a', tam: 0.95, vel: 1.2, hp: 1, moedas: 45, peso: 5, semRabo: false },
+  { id: 'irara', nome: 'Irara', raro: 'raro', praga: true, armas: ['espingarda'], nivel: 12, lug: 1, forma: 'lebre', cor: '#5a4a3a', tam: 0.9, vel: 1.5, hp: 1, moedas: 70, peso: 4 },
+  { id: 'saira', nome: 'Saíra', raro: 'incomum', armas: ['arapuca'], nivel: 12, lug: 1, forma: 'ave', cor: '#7a5a44', tam: 0.6, moedas: 15, peso: 6, voa: true },
+  { id: 'tucano', nome: 'Tucano', raro: 'raro', armas: ['arapuca'], nivel: 12, lug: 1, forma: 'ave', cor: '#c89a7a', tam: 0.85, moedas: 22, peso: 4, voa: true, papo: true },
+  { id: 'veadocatingueiro', nome: 'Veado-catingueiro', raro: 'raro', armas: ['arapuca'], nivel: 12, lug: 1, forma: 'porco', cor: '#8a6a4a', tam: 1.15, moedas: 28, peso: 3 },
+  { id: 'quero-quero', nome: 'Quero-quero', raro: 'comum', armas: ['arapuca'], nivel: 12, lug: 1, forma: 'ave', cor: '#9a7a52', tam: 0.65, moedas: 12, peso: 7 },
+  // +7 espécies na capoeira/mata/cerrado/serra/chapada (lug 2)
+  { id: 'raposa', nome: 'Raposa-do-campo', raro: 'raro', praga: true, armas: ['espingarda'], nivel: 15, lug: 2, forma: 'lebre', cor: '#7a6a4a', tam: 1, vel: 1.4, hp: 2, moedas: 85, peso: 4 },
+  { id: 'queixada', nome: 'Queixada', raro: 'épico', praga: true, armas: ['espingarda'], nivel: 15, lug: 2, forma: 'porco', cor: '#a09080', tam: 1.35, vel: 1.1, hp: 2, moedas: 150, peso: 2.2, pintas: true },
+  { id: 'serieman', nome: 'Seriema', raro: 'incomum', armas: ['arapuca'], nivel: 15, lug: 2, forma: 'ave', cor: '#c8843a', tam: 0.9, moedas: 18, peso: 6, crista: true },
+  { id: 'tamandua', nome: 'Tamanduá-bandeira', raro: 'raro', armas: ['arapuca'], nivel: 15, lug: 2, forma: 'tatu', cor: '#7a5230', tam: 1.1, moedas: 30, peso: 3 },
+  { id: 'emaCampo', nome: 'Ema', raro: 'épico', armas: ['arapuca'], nivel: 15, lug: 2, forma: 'ave', cor: '#2e2a2a', tam: 1.3, moedas: 45, peso: 1.5, gorda: true },
+  { id: 'curica', nome: 'Curicaca', raro: 'incomum', armas: ['arapuca'], nivel: 15, lug: 2, forma: 'ave', cor: '#1e1e22', tam: 0.8, moedas: 16, peso: 6, voa: true },
+  { id: 'lobinho', nome: 'Lobinho-do-cerrado', raro: 'raro', armas: ['arapuca'], nivel: 15, lug: 2, forma: 'lebre', cor: '#6a7a6a', tam: 1, moedas: 32, peso: 3 },
+  // +8 espécies na capoeira/mata/cerrado/serra/chapada (lug 3)
+  { id: 'gatomato', nome: 'Gato-do-mato', raro: 'épico', praga: true, armas: ['espingarda'], nivel: 20, lug: 3, forma: 'lebre', cor: '#8a8078', tam: 1, vel: 1.6, hp: 2, moedas: 180, peso: 2, pintas: true },
+  { id: 'javaliSerra', nome: 'Javali-serrano', raro: 'raro', praga: true, armas: ['espingarda'], nivel: 20, lug: 3, forma: 'porco', cor: '#9aa3ad', tam: 1.4, vel: 1.05, hp: 2, moedas: 170, peso: 3 },
+  { id: 'gaviao', nome: 'Gavião-carijó', raro: 'raro', armas: ['arapuca'], nivel: 20, lug: 3, forma: 'ave', cor: '#a07a4a', tam: 0.95, moedas: 25, peso: 4, voa: true },
+  { id: 'jaguatirica', nome: 'Jaguatirica', raro: 'épico', armas: ['arapuca'], nivel: 20, lug: 3, forma: 'lebre', cor: '#b08a5a', tam: 1.15, moedas: 48, peso: 1.8, pintas: true },
+  { id: 'capivaraSerra', nome: 'Capivara', raro: 'incomum', armas: ['arapuca'], nivel: 20, lug: 3, forma: 'rato', cor: '#5a4a3a', tam: 1.3, moedas: 20, peso: 5 },
+  { id: 'maracana', nome: 'Maracanã', raro: 'raro', armas: ['arapuca'], nivel: 20, lug: 3, forma: 'ave', cor: '#7a5a44', tam: 0.8, moedas: 26, peso: 3.5, voa: true },
+  { id: 'vedetinha', nome: 'Veado-campeiro', raro: 'épico', armas: ['arapuca'], nivel: 20, lug: 3, forma: 'porco', cor: '#c89a7a', tam: 1.2, moedas: 55, peso: 1.6 },
+  { id: 'corujaBuraqueira', nome: 'Coruja-buraqueira', raro: 'incomum', armas: ['arapuca'], nivel: 20, lug: 3, forma: 'ave', cor: '#8a6a4a', tam: 0.7, moedas: 18, peso: 5, voa: true },
+  // +10 espécies na capoeira/mata/cerrado/serra/chapada (lug 4)
+  { id: 'oncepintada', nome: 'Onça-pintada', raro: 'lendário', praga: true, armas: ['espingarda'], nivel: 28, lug: 4, forma: 'lebre', cor: '#9a7a52', tam: 1.5, vel: 1.3, hp: 3, moedas: 700, peso: 0.9, pintas: true },
+  { id: 'lobo-guara', nome: 'Lobo-guará', raro: 'épico', praga: true, armas: ['espingarda'], nivel: 28, lug: 4, forma: 'lebre', cor: '#7a6a4a', tam: 1.25, vel: 1.35, hp: 2, moedas: 220, peso: 1.8 },
+  { id: 'antaChapada', nome: 'Anta', raro: 'épico', praga: true, armas: ['espingarda'], nivel: 28, lug: 4, forma: 'porco', cor: '#a09080', tam: 1.5, vel: 0.95, hp: 3, moedas: 240, peso: 1.7 },
+  { id: 'arara-azul', nome: 'Arara-azul-de-lear', raro: 'lendário', armas: ['arapuca'], nivel: 28, lug: 4, forma: 'ave', cor: '#c8843a', tam: 1, moedas: 90, peso: 0.8, voa: true },
+  { id: 'tatuBola', nome: 'Tatu-bola', raro: 'raro', armas: ['arapuca'], nivel: 28, lug: 4, forma: 'tatu', cor: '#7a5230', tam: 0.95, moedas: 32, peso: 3 },
+  { id: 'gaviaoReal', nome: 'Gavião-real', raro: 'lendário', armas: ['arapuca'], nivel: 28, lug: 4, forma: 'ave', cor: '#2e2a2a', tam: 1.1, moedas: 95, peso: 0.7, voa: true, crista: true },
+  { id: 'suacu', nome: 'Suaçu-veado', raro: 'épico', armas: ['arapuca'], nivel: 28, lug: 4, forma: 'porco', cor: '#1e1e22', tam: 1.25, moedas: 50, peso: 1.6 },
+  { id: 'papagaioChapada', nome: 'Papagaio-chauá', raro: 'raro', armas: ['arapuca'], nivel: 28, lug: 4, forma: 'ave', cor: '#6a7a6a', tam: 0.85, moedas: 35, peso: 3, voa: true, papo: true },
+  { id: 'preaDaChapada', nome: 'Preá-da-chapada', raro: 'incomum', armas: ['arapuca'], nivel: 28, lug: 4, forma: 'rato', cor: '#8a8078', tam: 0.75, moedas: 20, peso: 5, semRabo: true },
+  { id: 'tucanAcu', nome: 'Tucano-açu', raro: 'épico', armas: ['arapuca'], nivel: 28, lug: 4, forma: 'ave', cor: '#9aa3ad', tam: 0.95, moedas: 45, peso: 1.8, voa: true, papo: true },
+
 ];
 const CACA_BICHO = Object.fromEntries(CACA_BICHOS.map(b => [b.id, b]));
 for (const b of CACA_BICHOS) if (b.drop) (BICHO_DO_DROP[b.drop.id] || (BICHO_DO_DROP[b.drop.id] = [])).push(b.id);
@@ -10062,8 +10238,12 @@ function moverBicho(t, cw, ch) {
   const a = caca.a, dt = Math.min(0.05, (t - a.ult) / 1000); a.ult = t;
   if (a.pausa > t || a.esconde > t) return;
   a.x += a.dir * a.vel * dt;
-  // moitas: de vez em quando o bicho de chão para escondido atrás de uma
-  if (!caca.bicho.voa && !a.escondeu) for (const mx of MOITAS) if (Math.abs(a.x - mx * cw) < 6 && Math.random() < 0.45) { a.esconde = t + 500 + Math.random() * 700; a.escondeu = true; }
+  // moitas: de vez em quando o bicho de chão para escondido atrás de uma. Alinha o y do bicho com
+  // o da moita certa (mesma fórmula do desenhaMoitas em desenharCaca) pra ele sumir atrás da planta
+  // de verdade, não numa fileira vazia do gramado.
+  if (!caca.bicho.voa && !a.escondeu) for (const [k, mx] of MOITAS.entries()) if (Math.abs(a.x - mx * cw) < 6 && Math.random() < 0.45) {
+    a.esconde = t + 500 + Math.random() * 700; a.escondeu = true; a.y = ch * (0.6 + (k % 3) * 0.12) + 4;
+  }
   if ((a.dir > 0 && a.x > cw + 50) || (a.dir < 0 && a.x < -50)) {
     a.passes++; a.escondeu = false;
     if (a.passes >= 3) { caca = { fase: 'resultado', msg: `${um(caca.bicho) === 'uma' ? 'A' : 'O'} ${caca.bicho.nome.toLowerCase()} sumiu no mato… 😩 Tente de novo!` }; sfx('error'); return renderCaca(); }
@@ -10783,7 +10963,7 @@ function frame(now) {
     if (!isGated() && L.cw > 20 && now - lastDraw >= DRAW_MS) { draw(now, dt); lastDraw = now; }
     if (now - lastUI > 250) { updateTip(); lastUI = now; }
     if (now - lastInfo > 2000) {
-      tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao(); folhasTick(); invasaoTick(); gatosTick();
+      tickLife(); rollPeriods(); weatherTick(); bancaTick(); rollCaminhao(); folhasTick(); invasaoTick(); petsTick();
       // a fábrica e o caminhão têm relógio: atualiza a janela (menos a banca, que tem formulário)
       if (!$('#panel').hidden && tab === 'fabrica' && fabSeg !== 'banca' && isHome()) { const y = $('#pane').scrollTop; renderPane(); $('#pane').scrollTop = y; } renderTabs(); renderSceneInfo(); root.dataset.tema = timeOfDay() === 'noite' ? 'noite' : 'dia'; lastInfo = now; }
   }
