@@ -1249,6 +1249,7 @@ const NOVIDADES = [
   { v: 198, txt: 'Corrigido: em alguns lugares dentro da área permitida, o canteiro novo sumia ao ser colocado (a trilha da caçada escondia ele). Agora o jogo não deixa mais colocar canteiro em cima dela nem de outras construções fixas.' },
   { v: 199, txt: 'A área onde dá para colocar enfeite é bem maior que a área da terra de canteiros (que fica presa à grade da roça) — agora uma segunda linha pontilhada, mais escura, mostra até onde a terra vai, e a mensagem de erro avisa quando você tenta mover um canteiro pra fora dela.' },
   { v: 200, txt: 'A roça cresceu de 14×14 para 28×28: agora a terra de canteiros ocupa a mesma área onde já dava para colocar enfeite, então dá para espalhar canteiro por praticamente qualquer lugar do mapa. A aba Terreno ganhou mais 6 expansões (até o nível 175) para dar conta do tamanho novo.' },
+  { v: 201, txt: 'Tirei de vez a margem extra que só dava pra enfeite na roça: agora o limite de decoração é exatamente o mesmo limite do mapa da terra de canteiros, um limite só, sem confusão. (No rancho continua havendo uma margem além dos cercados, que não mudam de tamanho.)' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3746,7 +3747,7 @@ function drawLake(x, y, W, t) {
 function drawRoca(s, t, home) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
-  if (home) { drawLimiteItens('roca'); drawLimiteTerra('roca'); drawMatinhos('roca'); }
+  if (home) { drawLimiteItens('roca'); drawMatinhos('roca'); }
   // lago (grande no tema "Lago dos patos"; nos outros, um pesqueiro menor). Na sua roça, clique para pescar.
   if (temaDe(s).lago) { const q = iso(...LAGO_POS); drawLake(q.x, q.y, W * 0.72, t);
     if (home && pescaPronta()) drawBubbleAt(q.x, q.y - W * 0.55, 'pesca', null, t, 99);
@@ -8729,9 +8730,12 @@ function objList(s, sc) {
   return l;
 }
 const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + objetosDe(s, sc).reduce((u, o) => u + ENFEITE[o.id].conforto, 0), 0);
-// Até onde dá para espalhar enfeites/cercas em volta da área principal (canteiros na roça, cercados no
-// rancho). Dobrado (era 6) para sobrar bem mais gramado livre pra decorar nas duas cenas.
+// Até onde dá para espalhar enfeites/cercas além da área principal. No rancho os cercados não crescem,
+// então ainda faz sentido ter uma margem (14 casas) além deles. Na roça não: a terra de canteiros já
+// cresceu pra cobrir a grade toda (28×28), então o limite de decoração é o mesmo limite do mapa — sem
+// sobra nenhuma além da terra, pra não ter mais "dois limites" diferentes e confusos.
 const MARGEM_ITENS = 14;
+const margemPara = sc => sc === 'roca' ? 0 : MARGEM_ITENS;
 // u+v é "quão pra trás" (rumo ao horizonte) um ponto está: iso() sobe na tela conforme u+v cai, e o
 // chão só é pintado até a linha do horizonte — abaixo de 0 o ponto já cai no céu. Vale pros dois eixos
 // juntos (não cada um sozinho), senão um canto como (-14, 0) também ia parar lá em cima.
@@ -8747,36 +8751,31 @@ function validSpot(sc, u, v, ignora, raio = 0.55) {
       if (state.plots[r * COLS + c].s !== 'locked') return false;
     }
   } else if (u > -0.5 && u < B[0] + 0.5 && v > -0.5 && v < B[1] + 0.5) return false; // no rancho, os cercados ocupam tudo
-  if (u < -MARGEM_ITENS || v < -MARGEM_ITENS || u > B[0] + MARGEM_ITENS || v > B[1] + MARGEM_ITENS) return false;
+  const m = margemPara(sc);
+  if (u < -m || v < -m || u > B[0] + m || v > B[1] + m) return false;
   if (u + v < CEU_MIN) return false; // não deixa pôr nada lá em cima, onde já é céu
   if (sc === 'roca' && temaDe(state).lago && Math.hypot(u - LAGO_POS[0], v - LAGO_POS[1]) < 1.4) return false;
   return objList(state, sc).every(o => o.key === ignora || (o.cerca ? distCerca(u, v, o) >= raio * 0.75 : Math.hypot(o.u - u, o.v - v) >= (o.r + raio) * 0.75));
 }
-// Linha pontilhada marcando um limite retangular (com o canto de trás cortado na diagonal u+v=CEU_MIN,
-// pra bater com o céu excluído lá em cima): reaproveitada tanto pro limite de decoração (bem mais largo)
-// quanto pro limite da terra de canteiros (m=0) logo abaixo.
-function drawLimite(sc, m, cor) {
-  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R];
+// Linha pontilhada marcando o limite de onde dá para colocar enfeite/cerca (com o canto de trás cortado
+// na diagonal u+v=CEU_MIN, pra bater com o céu excluído lá em cima). Na roça esse já é o próprio limite
+// da terra de canteiros (margemPara('roca') é 0): um limite só, igual ao limite do mapa.
+function drawLimiteItens(sc) {
+  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R], m = margemPara(sc);
   const pts = [[CEU_MIN + m, -m], [B[0] + m, -m], [B[0] + m, B[1] + m], [-m, B[1] + m], [-m, CEU_MIN + m]].map(([u, v]) => iso(u, v));
   ctx.save();
-  ctx.setLineDash([10, 8]); ctx.strokeStyle = cor; ctx.lineWidth = 2;
+  ctx.setLineDash([10, 8]); ctx.strokeStyle = 'rgba(40,30,20,.3)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
   for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y);
   ctx.closePath(); ctx.stroke();
   ctx.restore();
 }
-const drawLimiteItens = sc => drawLimite(sc, MARGEM_ITENS, 'rgba(40,30,20,.3)');
-// Só na roça: mostra também onde a TERRA (canteiros) acaba — bem mais apertada que o limite de decoração
-// acima, porque canteiro é preso à grade (state.plots) e não pode sair dela, diferente de enfeite/cerca.
-// Cor terrosa pra ficar claro que é um limite diferente (o de "onde dá pra plantar"), sem ser a trama feia
-// que marcava canteiro bloqueado antes (essa foi tirada a pedido).
-const drawLimiteTerra = sc => drawLimite(sc, 0, 'rgba(122,74,34,.55)');
 // Matinhos (touceirinha de 3 bolinhas, igual às moitas da caçada) espalhados por toda a área onde dá
 // pra construir/decorar — reaproveita o validSpot pra só nascer onde realmente pode (sem pisar canteiro,
 // cercado, lago, outro enfeite nem o céu). Posições fixas (mesmo padrão dos TUFTS do gramado).
 const MATINHOS = Array.from({ length: 220 }, () => [Math.random(), Math.random(), Math.random()]);
 function drawMatinhos(sc) {
-  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R], m = MARGEM_ITENS;
+  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R], m = margemPara(sc);
   const u0 = -m, u1 = B[0] + m, v0 = -m, v1 = B[1] + m, { cw, ch } = L;
   for (const [rx, ry, rk] of MATINHOS) {
     const u = u0 + rx * (u1 - u0), v = v0 + ry * (v1 - v0);
@@ -8798,7 +8797,8 @@ function distCerca(u, v, o) {
   return Math.hypot(u - (a + (c - a) * k), v - (b + (d - b) * k));
 }
 function validCerca(u, v, rot, ignora) {
-  if (u < -MARGEM_ITENS || v < -MARGEM_ITENS || u > COLS + MARGEM_ITENS || v > ROWS + MARGEM_ITENS) return false;
+  const m = margemPara('roca');
+  if (u < -m || v < -m || u > COLS + m || v > ROWS + m) return false;
   if (u + v < CEU_MIN) return false; // não deixa pôr cerca lá em cima, onde já é céu
   // não fica no meio de dois canteiros (na beirada de um canteiro pode)
   const dono = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS && state.plots[r * COLS + c].s !== 'locked';
@@ -8954,7 +8954,7 @@ function moveClick(x, y) {
 function salvarMove() {
   if (!moving) return;
   const { u, v } = moving, cerca = movCerca(), agua = movAgua(), abrigoId = movAbrigoId();
-  if (!movOk()) return toast(moving.plot !== undefined ? (celulaMov() < 0 ? 'Aqui não dá: isso já é fora da terra da roça (essa faixa de fora é só para enfeite). O canteiro precisa ficar dentro da área marcada em terra.' : 'Aqui não dá: o canteiro vai para um pedaço de gramado livre (sem enfeite nem folhas).')
+  if (!movOk()) return toast(moving.plot !== undefined ? (celulaMov() < 0 ? 'Aqui não dá: isso já é fora do mapa da roça.' : 'Aqui não dá: o canteiro vai para um pedaço de gramado livre (sem enfeite nem folhas).')
     : cerca ? 'Aqui não dá: a cerca não pode ficar entre dois canteiros nem em cima de outra coisa.'
     : agua ? 'Aqui não dá: o bloco de água precisa de uma casa de gramado livre.'
     : abrigoId ? 'Aqui não dá: o cercado não pode encostar em outro nem ficar longe demais do rancho.'
@@ -9029,7 +9029,7 @@ function renderMoveBar() {
   bar.hidden = !on; document.body.classList.toggle('movendo', on); if (!on) return;
   const ok = movOk();
   const txt = !moving ? (pointer.touch ? 'Toque no item que quer mudar de lugar' : 'Clique no item que quer mudar de lugar')
-    : !ok ? (moving.plot !== undefined ? (celulaMov() < 0 ? 'Aqui não dá: já é fora da terra da roça (só dá pra enfeite aqui fora)' : 'Aqui não dá: escolha um gramado livre') : movCerca() ? 'Aqui não dá: entre canteiros ou em cima de algo' : movAbrigoId() ? 'Aqui não dá: o cercado não pode encostar em outro nem ficar longe demais do rancho' : 'Aqui não dá: fora dos canteiros e cercados')
+    : !ok ? (moving.plot !== undefined ? (celulaMov() < 0 ? 'Aqui não dá: já é fora do mapa' : 'Aqui não dá: escolha um gramado livre') : movCerca() ? 'Aqui não dá: entre canteiros ou em cima de algo' : movAbrigoId() ? 'Aqui não dá: o cercado não pode encostar em outro nem ficar longe demais do rancho' : 'Aqui não dá: fora dos canteiros e cercados')
     : movCerca() ? (pointer.touch ? 'Arraste a cerca e salve (Girar muda o lado)' : 'Clique para pôr a cerca · R gira')
     : movAbrigoId() ? (pointer.touch ? 'Arraste a casinha e salve (Girar muda a casinha de lado)' : 'Clique para soltar · R gira a casinha')
     : pointer.touch ? 'Arraste o item e salve' : 'Clique para soltar aqui';
