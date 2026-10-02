@@ -1283,6 +1283,7 @@ const NOVIDADES = [
   { v: 204, txt: 'O mapa aumentou de novo: a roça (terreno e plantação) ficou com mais espaço ainda (28×84), e o rancho também — a área pra espalhar enfeite e mover os cercados dobrou.' },
   { v: 205, txt: 'O mapa da roça virou quadrado: agora é 64×64, bem maior que antes.' },
   { v: 206, txt: 'Corrigido o zoom/arrastar da roça: a câmera estava se afastando demais pra tentar mostrar todo canteiro que dava pra comprar (o que virou o mapa inteiro depois que ele cresceu), deixando tudo pequeno e o deslize estranho. Agora ela enquadra só a terra que você já tem, do jeito que era antes.' },
+  { v: 207, txt: 'O arrastar da tela na roça agora segue a mesma lógica do rancho: a folga de deslizar bate certinho com o tamanho de verdade do que está na tela (antes ficava sempre do tamanho da janela, sem ligação com o zoom, e o deslize ficava esquisito).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2357,6 +2358,11 @@ function layout(sc) {
     const esq = Math.min(...objs.map(o => (o.u - o.v) / 2)) - 0.45; // o que fica mais à esquerda (casinha, celeiro…)
     const falta = (cw < 700 ? 6 : I.l) - esq * L.W - L.ox, sobra = I.l + aw - (L.ox + (dirU - 0.4) * L.W);
     if (falta > 0 && (sobra > 0 || cw < 700)) L.ox += cw < 700 ? falta : Math.min(falta, sobra);
+    // Igual o rancho faz: registra o tamanho de verdade do que foi enquadrado, pra folga de arrastar
+    // (ovx/ovy lá embaixo) bater com a tela de verdade, não com o tamanho da janela (box.w/h não
+    // eram atualizados aqui antes, então a folga de arrastar da roça não tinha relação com o zoom
+    // dela — por isso o deslize ficava estranho, diferente do rancho).
+    box = { w: (dirU - esqU) * L.W, h: (span / 4 + 1.5) * L.W };
   } else if (sc === 'animais') {
     // O rancho inteiro cabe na tela; no celular fica maior e dá para arrastar. Abrigo movido pra fora
     // da grade original entra na conta, senão o enquadramento não crescia pra mostrar ele.
