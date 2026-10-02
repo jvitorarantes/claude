@@ -688,10 +688,11 @@ function neighbors(i) {
   if (r > 0) out.push(i - COLS); if (r < ROWS - 1) out.push(i + COLS);
   return out;
 }
-const touches = i => state.plots[i].s === 'locked' && neighbors(i).some(j => state.plots[j].s !== 'locked');
 const allowedLots = () => EXPANSOES[state.exp].total;
 const freeLots = () => Math.max(0, allowedLots() - state.owned);
-const canBuy = i => freeLots() > 0 && touches(i) && !objetoNaCelula(i); // lote onde dá para colocar um canteiro agora
+// Lote onde dá para colocar um canteiro agora: qualquer pedaço de terra livre da sua roça, não só o que
+// encosta nos canteiros que você já tem (dá pra escolher o lugar à vontade, contanto que tenha vaga comprada).
+const canBuy = i => freeLots() > 0 && state.plots[i].s === 'locked' && !objetoNaCelula(i);
 // Tem enfeite ou frutífera em cima deste pedaço de terra? (aí não dá para virar canteiro)
 function objetoNaCelula(i) {
   const c = i % COLS + 0.5, r = Math.floor(i / COLS) + 0.5;
@@ -871,7 +872,6 @@ function buyFert(id, n) {
 }
 
 function clickLot(i) {
-  if (!touches(i)) return toast('Os canteiros novos precisam encostar na sua terra.');
   if (!freeLots()) {
     const next = EXPANSOES[state.exp + 1];
     return toast(next ? `Para ter mais canteiros, compre a próxima expansão na aba Terreno (nível ${next.nivel}).` : 'Sua roça já está no tamanho máximo.');
@@ -1220,6 +1220,7 @@ const NOVIDADES = [
   { v: 191, txt: 'Mais espaço pra decorar: dá pra espalhar enfeite e cerca bem mais longe dos canteiros (na roça) e dos cercados (no rancho), com uma linha pontilhada mostrando até onde vai. E a Terreno ganhou mais 2 expansões (níveis 80 e 90), até dar pra ocupar a roça inteira.' },
   { v: 192, txt: 'Corrigido: não dá mais para colocar enfeite ou cerca lá em cima, onde já é céu. E a área onde dá para construir/decorar (na roça e no rancho) ganhou matinhos espalhados, pra ficar mais bonita e mostrar bem onde é gramado de verdade.' },
   { v: 193, txt: 'Cavalo e pavão: o presentinho deles (ferradura e pena) já era de hora certa (a cada 12h), mas o texto dava a entender que era de vez em quando ou vinha do carinho. Agora mostra direitinho "produzindo · falta Xh" no abrigo, igual aos outros animais, sem misturar com o carinho (que continua dando XP à parte).' },
+  { v: 194, txt: 'Canteiro novo não precisa mais encostar nos que você já tem: agora dá para escolher qualquer pedaço livre da sua terra, contanto que tenha vaga comprada na aba Terreno.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3603,7 +3604,7 @@ function drawPlot(i, p, t, home) {
       ctx.fillText('Colocar', m.x, m.y - W * 0.405);
       ctx.fillText('aqui?', m.x, m.y - W * 0.29);
     } else if (home) {
-      // Terra que ainda não dá pra construir (fora da expansão comprada, ou não encosta na sua terra):
+      // Terra que ainda não dá pra construir (sem vaga de expansão sobrando, ou tem enfeite em cima):
       // uma leve trama escura marca bem a diferença do gramado livre, sem confundir com canteiro comprável.
       quad(p1, p2, p3, p4, 'rgba(40,30,20,.16)');
       ctx.save(); ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath(); ctx.clip();
@@ -5283,7 +5284,7 @@ function tipPlot(i) {
   const p = S().plots[i], home = isHome();
   if (p.s === 'locked') {
     if (home && canBuy(i)) return `<b>Espaço livre</b><br>Clique duas vezes para colocar um canteiro aqui.<br>Você tem ${freeLots()} para colocar.`;
-    if (home && touches(i)) return '<b>Pasto</b><br>Compre uma expansão na aba Terreno para ter mais canteiros.';
+    if (home && !freeLots()) return '<b>Pasto</b><br>Compre uma expansão na aba Terreno para ter mais canteiros.';
     return home ? 'Pasto.' : null;
   }
   if (p.s === 'plowed') return home ? `<b>Terra arada</b><br>${state.tool === 'seed' ? `Clique para plantar ${CROP[state.seed].nome}.` : 'Clique para escolher uma semente na Loja.'}` : '<b>Terra arada</b>';
