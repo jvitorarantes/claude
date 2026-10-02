@@ -377,27 +377,21 @@ const ORDER = orderFor(COLS, ROWS);
 
 // XP pra subir de nível: dobrado (era 100 + 50 por nível) pra alongar a progressão, mesma forma linear de antes.
 const need = l => 200 + 100 * (l - 1);
-// Expansões: cada uma libera mais canteiros, que você coloca onde quiser (encostados na sua terra).
-// Cada canteiro novo custa sempre 1000 moedas, não importa o nível (preco = 1000 × canteiros ganhos na expansão).
+// Expansões: cada uma libera mais canteiros, que você coloca onde quiser dentro da área da roça.
+// Cada canteiro novo custa sempre 1000 moedas, não importa o nível (preco = 1000 × canteiros ganhos na
+// expansão). Limite de 80 canteiros no total — progressão organizada pra chegar lá até o nível 50, num
+// ritmo parecido do início ao fim (sempre uns +10 a +14 canteiros por expansão).
+// Quem já tinha comprado mais que 80 (de uma versão antiga, quando não tinha esse teto) não perde
+// nenhum: freeLots() nunca fica negativo, só para de liberar canteiro novo até esse limite valer de novo.
 const EXPANSOES = [
   { nivel: 1,  preco: 0,     total: 6 },
   { nivel: 5,  preco: 6000,  total: 12 },
   { nivel: 10, preco: 8000,  total: 20 },
   { nivel: 15, preco: 10000, total: 30 },
   { nivel: 20, preco: 12000, total: 42 },
-  { nivel: 30, preco: 18000, total: 60 },
-  { nivel: 40, preco: 20000, total: 80 },
-  { nivel: 50, preco: 20000, total: 100 },
-  { nivel: 60, preco: 30000, total: 130 },
-  { nivel: 70, preco: 30000, total: 160 },
-  { nivel: 80, preco: 20000, total: 180 },
-  { nivel: 90, preco: 16000, total: 196 },
-  { nivel: 100, preco: 54000, total: 250 },
-  { nivel: 115, preco: 70000, total: 320 },
-  { nivel: 130, preco: 80000, total: 400 },
-  { nivel: 145, preco: 100000, total: 500 },
-  { nivel: 160, preco: 120000, total: 620 },
-  { nivel: 175, preco: 164000, total: 784 },
+  { nivel: 30, preco: 14000, total: 56 },
+  { nivel: 40, preco: 14000, total: 70 },
+  { nivel: 50, preco: 10000, total: 80 },
 ];
 const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganhar XP infinito com o feijão)
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -1250,6 +1244,7 @@ const NOVIDADES = [
   { v: 199, txt: 'A área onde dá para colocar enfeite é bem maior que a área da terra de canteiros (que fica presa à grade da roça) — agora uma segunda linha pontilhada, mais escura, mostra até onde a terra vai, e a mensagem de erro avisa quando você tenta mover um canteiro pra fora dela.' },
   { v: 200, txt: 'A roça cresceu de 14×14 para 28×28: agora a terra de canteiros ocupa a mesma área onde já dava para colocar enfeite, então dá para espalhar canteiro por praticamente qualquer lugar do mapa. A aba Terreno ganhou mais 6 expansões (até o nível 175) para dar conta do tamanho novo.' },
   { v: 201, txt: 'Tirei de vez a margem extra que só dava pra enfeite na roça: agora o limite de decoração é exatamente o mesmo limite do mapa da terra de canteiros, um limite só, sem confusão. (No rancho continua havendo uma margem além dos cercados, que não mudam de tamanho.)' },
+  { v: 202, txt: 'Reorganizei as expansões de terreno: agora o máximo é 80 canteiros, numa progressão mais equilibrada (sempre uns +10 a +14 por expansão) até o nível 50. Quem já tinha mais que 80 não perde nenhum canteiro — só para de liberar vaga nova até o limite valer de novo.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -4662,7 +4657,7 @@ function renderSceneInfo() {
   if (scene === 'roca') { atualizarRastelo(); atualizarColher(); }
   const s = S(), el = $('#sceneInfo');
   const est = estacao(), owner = `${est.icone} ${est.nome}${raining() ? (est.neve ? ' · nevando' : ' · chovendo') : ''} · ` + (isHome() ? `${minhaFazenda()} · ` : `${deQuem(view)} (nível ${view.nivel}) · `);
-  if (scene === 'roca') el.textContent = owner + `${s.plots.filter(p => p.s !== 'locked').length}${isHome() ? ` de ${allowedLots()}` : ''} canteiros`;
+  if (scene === 'roca') { const n = s.plots.filter(p => p.s !== 'locked').length; el.textContent = owner + `${n}${isHome() ? ` de ${Math.max(n, allowedLots())}` : ''} canteiros`; }
   else if (scene === 'animais') {
     const cap = ABRIGOS.reduce((t, b) => t + ABRIGO_CAP[abrigoLv(s, b.id)], 0);
     el.textContent = owner + `${s.animals.filter(inPen).length}${isHome() ? ` de ${cap}` : ''} animais`;
@@ -4997,7 +4992,7 @@ function renderPane() {
     }
   } else if (tab === 'terreno') {
     html += `<h3>Terreno</h3><div class="kv">
-      <span>Canteiros</span><span>${state.owned} de ${allowedLots()}</span>
+      <span>Canteiros</span><span>${state.owned} de ${Math.max(state.owned, allowedLots())}</span>
       <span>Animais</span><span>${state.animals.length}</span>
       <span>Abrigos</span><span>${Object.keys(state.abrigos).length} de ${ABRIGOS.length}</span>
       <span>Decorações</span><span>${Object.keys(state.decorTem).length} de ${MODELOS.length} modelos</span>
