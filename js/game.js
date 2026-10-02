@@ -1250,6 +1250,7 @@ const NOVIDADES = [
   { v: 204, txt: 'O mapa aumentou de novo: a roça (terreno e plantação) ficou com mais espaço ainda (28×84), e o rancho também — a área pra espalhar enfeite e mover os cercados dobrou.' },
   { v: 205, txt: 'O mapa da roça virou quadrado: agora é 64×64, bem maior que antes.' },
   { v: 206, txt: 'Corrigido o zoom/arrastar da roça: a câmera estava se afastando demais pra tentar mostrar todo canteiro que dava pra comprar (o que virou o mapa inteiro depois que ele cresceu), deixando tudo pequeno e o deslize estranho. Agora ela enquadra só a terra que você já tem, do jeito que era antes.' },
+  { v: 209, txt: 'Agora dá pra girar 90° as construções (casa, celeiro, casinha do cachorro, pesqueiro, árvores) e as decorações: no modo Mover, pegue o item e toque em Girar (ou aperte R). As casas dos bichos já giravam; as cercas continuam como estavam. E a placa de expansão de terrenos agora tem tamanho fixo: não aumenta nem diminui mais com o zoom.' },
   { v: 208, txt: 'A área da roça agora tem o mesmo formato da do rancho: a fazenda fica lá no alto, no meio, e o terreno abre pros dois lados e pra frente, cortado reto pelo céu. E o arrastar foi refeito: com qualquer zoom dá pra ir até a beirada da área (esquerda, direita, frente e até o céu), e ao mudar de direção a tela responde na hora, sem ficar presa.' },
   { v: 207, txt: 'O arrastar da tela na roça agora segue a mesma lógica do rancho: a folga de deslizar bate certinho com o tamanho de verdade do que está na tela (antes ficava sempre do tamanho da janela, sem ligação com o zoom, e o deslize ficava esquisito).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
@@ -3707,7 +3708,8 @@ function landSignText() {
 // A placa fica no lugar dela (dá para mudar no modo Mover), sem depender de onde estão os canteiros.
 function drawLandSign(x, y, fantasma) {
   const txt = landSignText(); if (!txt) return;
-  const W = L.W;
+  // Tamanho fixo em pixels: a placa não cresce nem encolhe com o zoom (só a posição acompanha o chão).
+  const W = 80;
   const hov = hover && hover.kind === 'land';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, W * 0.18, W * 0.05, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - W * 0.035, y - W * 0.5, W * 0.07, W * 0.5);
@@ -8742,6 +8744,14 @@ const POS_PADRAO = {
 };
 const LAGO_POS = [3.55, -1.95];
 const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 }, placa: { nome: 'Placa de terras', r: 0.45 }, mata: { nome: 'Trilha da caçada', r: 1.0 }, armadilha: { nome: 'Armadilha de pragas', r: 0.45 } };
+// Giro de 90°: os desenhos são vistos de um ângulo só (isométrico), então virar o item 90° mostra o lado
+// de lá — o mesmo que espelhar a imagem em volta do ponto dele. rot 0/1 (1 = virado).
+const comGiro = (x, rot, fn) => {
+  if (!rot) return fn();
+  ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0);
+  try { fn(); } finally { ctx.restore(); }
+};
+const giravel = key => !!key && !['placa', 'mata', 'armadilha'].includes(key);
 function posOf(s, sc, key) {
   const p = s.pos && s.pos[sc] && s.pos[sc][key];
   if (Array.isArray(p)) return p;
@@ -8750,9 +8760,9 @@ function posOf(s, sc, key) {
 }
 const objetosDe = (s, sc) => (s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && ENFEITE[o.id]);
 function objList(s, sc) {
-  const l = Object.keys(POS_PADRAO[sc]).filter(key => key !== 'armadilha' || s.armadilha).map(key => { const [u, v] = posOf(s, sc, key); return { key, u, v, r: OBJ_INFO[key].r }; });
+  const l = Object.keys(POS_PADRAO[sc]).filter(key => key !== 'armadilha' || s.armadilha).map(key => { const [u, v] = posOf(s, sc, key); return { key, u, v, r: OBJ_INFO[key].r, rot: s.rotPos && s.rotPos[sc] && s.rotPos[sc][key] ? 1 : 0 }; });
   objetosDe(s, sc).forEach((o, i) => l.push(ehCerca(o.id) ? { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: 0.3, obj: o, cerca: true, rot: o.rot ? 1 : 0 }
-    : { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: ENFEITE[o.id].fruteira === 'arvore' ? 0.65 : 0.55, obj: o }));
+    : { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: ENFEITE[o.id].fruteira === 'arvore' ? 0.65 : 0.55, obj: o, rot: o.rot ? 1 : 0 }));
   return l;
 }
 const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + objetosDe(s, sc).reduce((u, o) => u + ENFEITE[o.id].conforto, 0), 0);
@@ -8910,6 +8920,16 @@ function movOk() {
   if (movAbrigoId()) return validYardPos(movAbrigoId(), moving.u, moving.v);
   return validSpot(scene, moving.u, moving.v, moving.key, raioMov());
 }
+// Gira 90° o que não é cerca nem casinha do rancho: construções (casa, celeiro, casinha do cachorro,
+// pesqueiro, árvores) e enfeites. Bloco de água é quadradinho igual dos 4 lados, então não gira.
+const movGiravel = () => !!moving && moving.plot === undefined && !movCerca() && !movAgua() && !movAbrigoId() && (moving.novo || giravel(moving.key));
+function girarItem() {
+  if (!movGiravel()) return;
+  moving.rot = moving.rot ? 0 : 1;
+  sfx('click'); renderMoveBar();
+}
+const girarMovendo = () => { if (movAbrigoId()) girarAbrigo(); else if (movCerca()) girarCerca(); else girarItem(); };
+const movQualquerGiro = () => movCerca() || movAbrigoId() || movGiravel();
 function girarCerca() {
   if (!movCerca()) return;
   moving.rot = moving.rot ? 0 : 1; [moving.u, moving.v] = encaixaCerca(moving.u + (moving.rot ? 0.5 : -0.5), moving.v + (moving.rot ? -0.5 : 0.5), moving.rot);
@@ -9024,13 +9044,14 @@ function salvarMove() {
   if (moving.novo) {
     if (!(state.enfeites[moving.novo] > 0)) { moving = null; return; }
     const novo = { id: moving.novo, u, v };
+    if (moving.rot) novo.rot = 1;
     if (ENFEITE[moving.novo].fruteira) { novo.t0 = Date.now(); novo.ult = Date.now(); novo.colhidas = 0; novo.fid = newId(); } // frutífera: começa a contar ao plantar
     (state.objetos[scene] = objetosDe(state, scene)).push(novo);
     state.enfeites[moving.novo]--;
     toast(`${ENFEITE[moving.novo].nome} colocado! +${ENFEITE[moving.novo].conforto}% de XP.`, 'good');
     moveMode = false; renderMoveBtn(); // pôr um item do inventário termina o modo
   } else if (moving.key.startsWith('enf:')) {
-    const o = objetosDe(state, scene)[Number(moving.key.slice(4))]; if (o) { o.u = u; o.v = v; if (cerca) o.rot = moving.rot || 0; }
+    const o = objetosDe(state, scene)[Number(moving.key.slice(4))]; if (o) { o.u = u; o.v = v; if (cerca) o.rot = moving.rot || 0; else if (!agua) { if (moving.rot) o.rot = 1; else delete o.rot; } }
   } else if (abrigoId) {
     const antes = yardOf(abrigoId);
     state.animPos = state.animPos || {}; state.animPos[abrigoId] = [u - YARD_W / 2, v - YARD_D / 2];
@@ -9040,6 +9061,7 @@ function salvarMove() {
     if (du || dv) for (const a of livesIn(state, abrigoId)) { const m = amb[a.id]; if (m) { m.u += du; m.v += dv; m.tu += du; m.tv += dv; } }
   } else {
     state.pos = state.pos || {}; (state.pos[scene] = state.pos[scene] || {})[moving.key] = [u, v];
+    if (giravel(moving.key)) { state.rotPos = state.rotPos || {}; (state.rotPos[scene] = state.rotPos[scene] || {})[moving.key] = moving.rot ? 1 : 0; }
   }
   if (moving.uma) { moveMode = false; renderMoveBtn(); }
   moving = null; sfx('buy'); done(); renderMoveBar();
@@ -9060,10 +9082,11 @@ function renderMoveBar() {
     : !ok ? (moving.plot !== undefined ? (celulaMov() < 0 ? 'Aqui não dá: já é fora do mapa' : 'Aqui não dá: escolha um gramado livre') : movCerca() ? 'Aqui não dá: entre canteiros ou em cima de algo' : movAbrigoId() ? 'Aqui não dá: o cercado não pode encostar em outro nem ficar longe demais do rancho' : 'Aqui não dá: fora dos canteiros e cercados')
     : movCerca() ? (pointer.touch ? 'Arraste a cerca e salve (Girar muda o lado)' : 'Clique para pôr a cerca · R gira')
     : movAbrigoId() ? (pointer.touch ? 'Arraste a casinha e salve (Girar muda a casinha de lado)' : 'Clique para soltar · R gira a casinha')
+    : movGiravel() ? (pointer.touch ? 'Arraste o item e salve (Girar vira 90°)' : 'Clique para soltar · R gira 90°')
     : pointer.touch ? 'Arraste o item e salve' : 'Clique para soltar aqui';
   if (bar.dataset.txt !== txt) { bar.dataset.txt = txt; $('#moveMsg').textContent = txt; }
   $('#moveOk').hidden = !moving; $('#moveOk').disabled = !ok;
-  const gira = $('#moveRot'); if (gira) gira.hidden = !movCerca() && !movAbrigoId();
+  const gira = $('#moveRot'); if (gira) gira.hidden = !movQualquerGiro();
   const guarda = $('#moveGuardar'); if (guarda) guarda.hidden = !(moving && moving.key && moving.key.startsWith('enf:'));
   const limpa = $('#moveClear'); if (limpa) limpa.hidden = !!moving;
   const layoutsBtn = $('#moveLayouts'); if (layoutsBtn) layoutsBtn.hidden = !!moving;
@@ -9077,11 +9100,11 @@ function guardarMovendo() {
   moving = null; renderMoveBar();
 }
 $('#moveOk')?.addEventListener('click', salvarMove);
-$('#moveRot')?.addEventListener('click', () => { if (movAbrigoId()) girarAbrigo(); else girarCerca(); });
+$('#moveRot')?.addEventListener('click', girarMovendo);
 $('#moveGuardar')?.addEventListener('click', guardarMovendo);
 $('#moveClear')?.addEventListener('click', () => removerTudoEnfeites(scene));
 $('#moveLayouts')?.addEventListener('click', abrirLayouts);
-window.addEventListener('keydown', e => { if ((e.key === 'r' || e.key === 'R') && moveMode && (movCerca() || movAbrigoId()) && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { if (movAbrigoId()) girarAbrigo(); else girarCerca(); } });
+window.addEventListener('keydown', e => { if ((e.key === 'r' || e.key === 'R') && moveMode && movQualquerGiro() && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) girarMovendo(); });
 $('#moveCancel')?.addEventListener('click', cancelarMove);
 // Desenha os objetos da cena. "tras": os que ficam atrás da cerca (u ou v negativos); "frente": o resto.
 // d0/d1 (opcional): só os que estão nessa faixa de profundidade (u + v), para intercalar com os canteiros.
@@ -9125,23 +9148,25 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       continue;
     }
     if (o.key === 'casa') {
-      drawHouse(q.x, q.y, W * 0.95, home ? '#f1dcae' : view.casa, s.skin);
+      comGiro(q.x, o.rot, () => drawHouse(q.x, q.y, W * 0.95, home ? '#f1dcae' : view.casa, s.skin));
       if (!moveMode) {
         if (hover && hover.kind === 'casa') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.6, W * 0.16, 0, 0, 7); ctx.stroke(); }
         hits.push({ kind: 'casa', x: q.x, y: q.y - W * 0.35, r: W * 0.45 });
       }
     } else if (o.key === 'celeiro') {
-      drawBarn(q.x, q.y, W * 1.15, s.skin);
+      comGiro(q.x, o.rot, () => drawBarn(q.x, q.y, W * 1.15, s.skin));
       if (!moveMode) {
         if (hover && hover.kind === 'celeiro') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.7, W * 0.18, 0, 0, 7); ctx.stroke(); }
         hits.push({ kind: 'celeiro', x: q.x, y: q.y - W * 0.4, r: W * 0.5 });
       }
     } else if (o.key === 'pesqueiro') {
       // pesqueiro: laguinho com uma plaquinha. Na sua roça, clique para pescar.
-      drawLake(q.x, q.y, W * 0.48, t);
-      ctx.fillStyle = '#7a4a22'; ctx.fillRect(q.x + W * 0.4, q.y - W * 0.34, W * 0.035, W * 0.3);
-      ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(q.x + W * 0.28, q.y - W * 0.46, W * 0.28, W * 0.14, 3); ctx.fill(); ctx.stroke();
-      ctx.font = `${Math.round(W * 0.1)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎣', q.x + W * 0.42, q.y - W * 0.39);
+      comGiro(q.x, o.rot, () => {
+        drawLake(q.x, q.y, W * 0.48, t);
+        ctx.fillStyle = '#7a4a22'; ctx.fillRect(q.x + W * 0.4, q.y - W * 0.34, W * 0.035, W * 0.3);
+        ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(q.x + W * 0.28, q.y - W * 0.46, W * 0.28, W * 0.14, 3); ctx.fill(); ctx.stroke();
+      });
+      ctx.font = `${Math.round(W * 0.1)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎣', q.x + (o.rot ? -1 : 1) * W * 0.42, q.y - W * 0.39);
       if (home && pescaPronta()) drawBubbleAt(q.x, q.y - W * 0.75, 'pesca', null, t, 99);
       if (!moveMode && home) {
         if (hover && hover.kind === 'lago') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.52, W * 0.21, 0, 0, 7); ctx.stroke(); }
@@ -9150,10 +9175,10 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
     } else if (o.key === 'canil') {
       const slot = sc === 'roca' ? 'roca' : 'animais';
       if (view.kind === 'npc') { const d = DOG_AT(); drawDog(d.x, d.y, W * 0.7, t); hits.push({ kind: 'dog', slot, x: d.x, y: d.y - W * 0.2, r: W * 0.4 }); continue; }
-      drawKennelSpot(slot, s, home);
+      { const kk = KENNEL_AT(); comGiro(kk.x, o.rot, () => drawKennelSpot(slot, s, home)); }
       if (stage === 'tras' && sc === 'roca') cachorroDepois = true; // o cachorro vai na frente da cerca
       else drawDogSpot(slot, s, t, home);
-    } else if (o.key === 'arv1' || o.key === 'arv2') drawTree(q.x, q.y, W * (sc === 'roca' ? (o.key === 'arv1' ? 1.0 : 0.8) : (o.key === 'arv1' ? 1.0 : 1.1)), t, sc === 'roca' && tm.coqueiro);
+    } else if (o.key === 'arv1' || o.key === 'arv2') comGiro(q.x, o.rot, () => drawTree(q.x, q.y, W * (sc === 'roca' ? (o.key === 'arv1' ? 1.0 : 0.8) : (o.key === 'arv1' ? 1.0 : 1.1)), t, sc === 'roca' && tm.coqueiro));
     else if (ENFEITE[o.id].agua) {
       drawAgua(s, sc, o, t);
       const hov = !moveMode && hover && hover.kind === 'enfeite' && hover.sc === sc && hover.key === o.key;
@@ -9163,8 +9188,10 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
     else if (o.id) {
       const hov = !moveMode && hover && hover.kind === 'enfeite' && hover.sc === sc && hover.key === o.key;
       if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.35, W * 0.12, 0, 0, 7); ctx.stroke(); }
-      if (ENFEITE[o.id].fruteira && o.obj) drawFruteira(o.obj, q.x, q.y, W / 100, t, home);
-      else drawEnfeite(o.id, q.x, q.y, W / 100, t);
+      comGiro(q.x, o.rot, () => {
+        if (ENFEITE[o.id].fruteira && o.obj) drawFruteira(o.obj, q.x, q.y, W / 100, t, home);
+        else drawEnfeite(o.id, q.x, q.y, W / 100, t);
+      });
       if (!moveMode) hits.push({ kind: 'enfeite', sc, key: o.key, id: o.id, x: q.x, y: q.y - W * (ENFEITE[o.id].fruteira === 'arvore' ? 0.45 : 0.25), r: W * (ENFEITE[o.id].fruteira === 'arvore' ? 0.45 : 0.32) });
     }
   }
@@ -9223,16 +9250,17 @@ function drawMoving(sc, t) {
   ctx.beginPath(); ctx.ellipse(q.x, q.y, W * raio * 0.6, W * raio * 0.25, 0, 0, 7); ctx.fill();
   ctx.globalAlpha = 0.75;
   const k = moving.key, s = state;
-  if (moving.novo) drawEnfeite(moving.novo, q.x, q.y, W / 100, t);
-  else if (k.startsWith('enf:')) { const o = objetosDe(s, sc)[Number(k.slice(4))]; if (o) drawEnfeite(o.id, q.x, q.y, W / 100, t); }
-  else if (k === 'casa') drawHouse(q.x, q.y, W * 0.95, '#f1dcae', s.skin);
-  else if (k === 'celeiro') drawBarn(q.x, q.y, W * 1.15, s.skin);
-  else if (k === 'canil') drawKennel(q.x, q.y, L.W * 0.85, s.skin);
-  else if (k === 'pesqueiro') drawLake(q.x, q.y, W * 0.48, t);
+  const gr = moving.rot ? 1 : 0;
+  if (moving.novo) comGiro(q.x, gr, () => drawEnfeite(moving.novo, q.x, q.y, W / 100, t));
+  else if (k.startsWith('enf:')) { const o = objetosDe(s, sc)[Number(k.slice(4))]; if (o) comGiro(q.x, gr, () => drawEnfeite(o.id, q.x, q.y, W / 100, t)); }
+  else if (k === 'casa') comGiro(q.x, gr, () => drawHouse(q.x, q.y, W * 0.95, '#f1dcae', s.skin));
+  else if (k === 'celeiro') comGiro(q.x, gr, () => drawBarn(q.x, q.y, W * 1.15, s.skin));
+  else if (k === 'canil') comGiro(q.x, gr, () => drawKennel(q.x, q.y, L.W * 0.85, s.skin));
+  else if (k === 'pesqueiro') comGiro(q.x, gr, () => drawLake(q.x, q.y, W * 0.48, t));
   else if (k === 'placa') drawLandSign(q.x, q.y, true);
   else if (k === 'mata') drawMataCaca(q.x, q.y, W);
   else if (k === 'armadilha') drawArmadilha(q.x, q.y, W, true, t);
-  else drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro);
+  else comGiro(q.x, gr, () => drawTree(q.x, q.y, W * 0.9, t, sc === 'roca' && temaDe(s).coqueiro));
   ctx.globalAlpha = 1;
 }
 // Seletor de quantidade (− n +) para vender ou guardar mais de um de uma vez. Só de tela, não salva.
