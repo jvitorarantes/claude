@@ -1221,6 +1221,7 @@ const NOVIDADES = [
   { v: 192, txt: 'Corrigido: não dá mais para colocar enfeite ou cerca lá em cima, onde já é céu. E a área onde dá para construir/decorar (na roça e no rancho) ganhou matinhos espalhados, pra ficar mais bonita e mostrar bem onde é gramado de verdade.' },
   { v: 193, txt: 'Cavalo e pavão: o presentinho deles (ferradura e pena) já era de hora certa (a cada 12h), mas o texto dava a entender que era de vez em quando ou vinha do carinho. Agora mostra direitinho "produzindo · falta Xh" no abrigo, igual aos outros animais, sem misturar com o carinho (que continua dando XP à parte).' },
   { v: 194, txt: 'Canteiro novo não precisa mais encostar nos que você já tem: agora dá para escolher qualquer pedaço livre da sua terra, contanto que tenha vaga comprada na aba Terreno.' },
+  { v: 195, txt: 'Tirei a trama escura que marcava a terra sem vaga comprada: agora o gramado fica igual em qualquer lugar da roça.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3603,15 +3604,6 @@ function drawPlot(i, p, t, home) {
       ctx.fillStyle = '#4a2a10'; ctx.font = `800 ${Math.round(clamp(W * 0.11, 9, 15))}px 'Baloo 2', sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('Colocar', m.x, m.y - W * 0.405);
       ctx.fillText('aqui?', m.x, m.y - W * 0.29);
-    } else if (home) {
-      // Terra que ainda não dá pra construir (sem vaga de expansão sobrando, ou tem enfeite em cima):
-      // uma leve trama escura marca bem a diferença do gramado livre, sem confundir com canteiro comprável.
-      quad(p1, p2, p3, p4, 'rgba(40,30,20,.16)');
-      ctx.save(); ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath(); ctx.clip();
-      ctx.strokeStyle = 'rgba(40,30,20,.3)'; ctx.lineWidth = 1;
-      const x0 = Math.min(p1.x, p2.x, p3.x, p4.x), x1 = Math.max(p1.x, p2.x, p3.x, p4.x), y0 = Math.min(p1.y, p2.y, p3.y, p4.y), y1 = Math.max(p1.y, p2.y, p3.y, p4.y);
-      for (let lx = x0 - (y1 - y0); lx < x1; lx += 6) { ctx.beginPath(); ctx.moveTo(lx, y0); ctx.lineTo(lx + (y1 - y0), y1); ctx.stroke(); }
-      ctx.restore();
     }
     if (hov) quad(p1, p2, p3, p4, null, 'rgba(255,255,255,.9)', 2);
     return;
