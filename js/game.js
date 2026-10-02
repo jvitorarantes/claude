@@ -1282,6 +1282,7 @@ const NOVIDADES = [
   { v: 203, txt: 'A área de construção da roça dobrou de tamanho (28×56, não mais quadrada) — bem mais espaço pra espalhar canteiro e enfeite, sem chegar perto do céu.' },
   { v: 204, txt: 'O mapa aumentou de novo: a roça (terreno e plantação) ficou com mais espaço ainda (28×84), e o rancho também — a área pra espalhar enfeite e mover os cercados dobrou.' },
   { v: 205, txt: 'O mapa da roça virou quadrado: agora é 64×64, bem maior que antes.' },
+  { v: 206, txt: 'Corrigido o zoom/arrastar da roça: a câmera estava se afastando demais pra tentar mostrar todo canteiro que dava pra comprar (o que virou o mapa inteiro depois que ele cresceu), deixando tudo pequeno e o deslize estranho. Agora ela enquadra só a terra que você já tem, do jeito que era antes.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2315,11 +2316,14 @@ function layout(sc) {
   const aw = Math.max(80, cw - I.l - I.r), ah = Math.max(80, ch - I.t - I.b), cx = I.l + aw / 2, cy = I.t + ah / 2;
   let box = { w: aw, h: ah }; // tamanho do que precisa aparecer, no zoom normal
   if (sc === 'roca') {
-    // A câmera enquadra só a terra em uso (mais o lote à venda) e se afasta conforme a roça cresce.
-    const plots = S().plots, home = isHome();
+    // A câmera enquadra só a terra em uso e se afasta conforme a roça cresce. Não conta mais os lotes só
+    // "compráveis" (canBuy): desde que o canteiro ficou livre pra ir em qualquer canto da roça (não só
+    // encostado no que já tinha), isso virava praticamente a grade inteira sempre que sobrava vaga
+    // comprada, e a câmera zoom-ava pra longe sem necessidade, atrapalhando o arrastar.
+    const plots = S().plots;
     let c0 = COLS, c1 = 0, r0 = ROWS, r1 = 0;
     plots.forEach((p, i) => {
-      if (p.s === 'locked' && !(home && canBuy(i))) return;
+      if (p.s === 'locked') return;
       const c = i % COLS, r = Math.floor(i / COLS);
       c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1);
     });
