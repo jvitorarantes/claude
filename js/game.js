@@ -1222,6 +1222,7 @@ const NOVIDADES = [
   { v: 193, txt: 'Cavalo e pavão: o presentinho deles (ferradura e pena) já era de hora certa (a cada 12h), mas o texto dava a entender que era de vez em quando ou vinha do carinho. Agora mostra direitinho "produzindo · falta Xh" no abrigo, igual aos outros animais, sem misturar com o carinho (que continua dando XP à parte).' },
   { v: 194, txt: 'Canteiro novo não precisa mais encostar nos que você já tem: agora dá para escolher qualquer pedaço livre da sua terra, contanto que tenha vaga comprada na aba Terreno.' },
   { v: 195, txt: 'Tirei a trama escura que marcava a terra sem vaga comprada: agora o gramado fica igual em qualquer lugar da roça.' },
+  { v: 196, txt: 'Com o celular em pé, agora dá para dar bem mais zoom. E em qualquer tela, dá para arrastar bem mais para os lados.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -2232,10 +2233,13 @@ window.addEventListener('orientationchange', () => {
   // no celular a tela às vezes só assenta no tamanho novo um instante depois de girar
   pedeResize(); setTimeout(pedeResize, 100); setTimeout(pedeResize, 400);
 });
-const ZOOM_MIN = 0.6, ZOOM_MAX = 2.5;
-const zoomOf = sc => clamp(Number(settings.zoom && settings.zoom[sc]) || 1, ZOOM_MIN, ZOOM_MAX);
+const ZOOM_MIN = 0.6;
+// Celular em pé (tela estreita e mais alta que larga) permite mais zoom: a largura já limita bem mais
+// o tamanho da fazenda do que no modo deitado, então precisa de um teto maior para aproximar igual.
+const zoomMax = () => (L.cw < 700 && L.ch > L.cw) ? 3.6 : 2.5;
+const zoomOf = sc => clamp(Number(settings.zoom && settings.zoom[sc]) || 1, ZOOM_MIN, zoomMax());
 function setZoom(z, sc = scene) {
-  const old = zoomOf(sc), nz = clamp(Math.round(z * 100) / 100, ZOOM_MIN, ZOOM_MAX);
+  const old = zoomOf(sc), nz = clamp(Math.round(z * 100) / 100, ZOOM_MIN, zoomMax());
   settings.zoom = Object.assign({}, settings.zoom, { [sc]: nz });
   L.pan.x *= nz / old; L.pan.y *= nz / old;
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* sem armazenamento */ }
@@ -2244,7 +2248,7 @@ function setZoom(z, sc = scene) {
 function renderZoom() {
   const z = zoomOf(scene);
   if (!$('#zoomIn')) return;
-  $('#zoomIn').disabled = z >= ZOOM_MAX; $('#zoomOut').disabled = z <= ZOOM_MIN;
+  $('#zoomIn').disabled = z >= zoomMax(); $('#zoomOut').disabled = z <= ZOOM_MIN;
   $('#zoomReset').textContent = `${Math.round(z * 100)}%`;
 }
 // Espaço da tela que os botões por cima do jogo cobrem.
@@ -2317,7 +2321,8 @@ function layout(sc) {
   L.W *= z; L.ox = cx + (L.ox - cx) * z; L.oy = cy + (L.oy - cy) * z;
   // sempre dá para arrastar para os lados (e mais, se a cena não couber). A folga também depende do
   // tamanho da fazenda (L.W = uma casa da grade), senão com o celular em pé (tela estreita) quase não arrastava.
-  const ovx = Math.max(aw * 0.35, L.W * 4, (box.w * z - aw) / 2 + Math.max(aw * 0.1, L.W * 1.5));
+  // Pros lados (ovx) a folga é bem maior, pra dar pra passear por toda a extensão da roça/rancho sem travar.
+  const ovx = Math.max(aw * 0.6, L.W * 7, (box.w * z - aw) / 2 + Math.max(aw * 0.2, L.W * 2.5));
   const ovy = Math.max(ah * 0.25, L.W * 2.5, (box.h * z - ah) / 2 + Math.max(ah * 0.1, L.W));
   L.pan.x = clamp(L.pan.x, -ovx, ovx); L.pan.y = clamp(L.pan.y, -ovy, ovy);
   L.ox += L.pan.x; L.oy += L.pan.y;
