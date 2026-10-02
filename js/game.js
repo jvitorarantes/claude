@@ -390,6 +390,8 @@ const EXPANSOES = [
   { nivel: 50, preco: 20000, total: 100 },
   { nivel: 60, preco: 30000, total: 130 },
   { nivel: 70, preco: 30000, total: 160 },
+  { nivel: 80, preco: 20000, total: 180 },
+  { nivel: 90, preco: 16000, total: 196 },
 ];
 const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganhar XP infinito com o feijão)
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -1215,6 +1217,7 @@ const NOVIDADES = [
   { v: 188, txt: 'O bônus de moedas ao subir de nível dobrou: agora é nível × 100 (antes era × 50).' },
   { v: 189, txt: 'Atualização grande: ranking global 🌎 (além do de amigos), pena do pavão e ferradura do cavalo pra vender, mais espécies de peixe e de caça (10 em cada lago/mato), mapa maior (14×14, com a terra fora da área comprada marcada visualmente), mais XP pra subir de nível, e o botão 🚜 agora oferece colheita automática e limpeza automática de terra seca. Corrigido o travamento no Rio Amazonas ao abrir o livro de peixes, a animação do rastelo ao ir limpar folhas, e o esconderijo dos bichos na caçada. Frutífera ajudada por um amigo agora rende só mais uma colheita e seca de vez.' },
   { v: 190, txt: 'Negócios › Fábrica: agora toda máquina tem 6 espaços (antes, Laticínios, Suqueira e Artesanato tinham só 2, e Conservas 3). O 1º continua liberando de graça no nível certo; os outros 5 se compram subindo de nível, igual já era.' },
+  { v: 191, txt: 'Mais espaço pra decorar: dá pra espalhar enfeite e cerca bem mais longe dos canteiros (na roça) e dos cercados (no rancho), com uma linha pontilhada mostrando até onde vai. E a Terreno ganhou mais 2 expansões (níveis 80 e 90), até dar pra ocupar a roça inteira.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1337,7 +1340,7 @@ function abrigoHTML() {
   for (const k of b.bichos) {
     const d = ANIMAL[k], locked = d.nivel > state.level, cheio = moram.length >= cap;
     const info = d.tipo === 'prod' ? `ração ${d.racao} · ${PRODUCT[d.prod] ? PRODUCT[d.prod].nome.toLowerCase() : 'leitões'} a cada ${fmt(d.tempo)} · vive ${d.periodo} dias`
-      : d.tipo === 'cria' ? `cresce em ${fmt(d.tempo)} e vende por ${d.venda.toLocaleString('pt-BR')}` : 'companhia · carinho dá XP';
+      : d.tipo === 'cria' ? `cresce em ${fmt(d.tempo)} e vende por ${d.venda.toLocaleString('pt-BR')}` : `companhia · carinho dá XP${PET_PRESENTES[k] ? ` · de vez em quando deixa ${PET_PRESENTES[k][0].nomePl || PET_PRESENTES[k][0].nome.toLowerCase()} pra vender` : ''}`;
     html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${animalIcon(k)}"><div><div class="name">${d.nome}</div><div class="meta">${info}</div></div>
       ${locked ? `<button class="btn" disabled>Nível ${d.nivel}</button>` : cheio ? '<button class="btn ghost" disabled>Cheio</button>' : `<button class="btn" data-buy-animal="${k}" ${state.coins < d.custo ? 'disabled' : ''}>${moeda(d.custo)}</button>`}</div>`;
   }
@@ -3721,6 +3724,7 @@ function drawLake(x, y, W, t) {
 function drawRoca(s, t, home) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
+  if (home) drawLimiteItens('roca');
   // lago (grande no tema "Lago dos patos"; nos outros, um pesqueiro menor). Na sua roça, clique para pescar.
   if (temaDe(s).lago) { const q = iso(...LAGO_POS); drawLake(q.x, q.y, W * 0.72, t);
     if (home && pescaPronta()) drawBubbleAt(q.x, q.y - W * 0.55, 'pesca', null, t, 99);
@@ -3931,6 +3935,7 @@ function drawYard(b, s, t, home, dt, bubbles) {
 function drawPen(s, t, home, dt) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
+  if (home) drawLimiteItens('animais');
   drawObjetos(s, 'animais', t, home, 'tras');
   const bubbles = [];
   const order = ABRIGOS.slice().sort((a, b) => { const p = yardOf(a.id), q = yardOf(b.id); return (p.u0 + p.v0) - (q.u0 + q.v0); });
@@ -8686,6 +8691,9 @@ function objList(s, sc) {
   return l;
 }
 const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + objetosDe(s, sc).reduce((u, o) => u + ENFEITE[o.id].conforto, 0), 0);
+// Até onde dá para espalhar enfeites/cercas em volta da área principal (canteiros na roça, cercados no
+// rancho). Dobrado (era 6) para sobrar bem mais gramado livre pra decorar nas duas cenas.
+const MARGEM_ITENS = 14;
 // Dá para pôr fora dos canteiros e dos cercados, sem encostar em outra coisa.
 function validSpot(sc, u, v, ignora, raio = 0.55) {
   const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R];
@@ -8697,9 +8705,21 @@ function validSpot(sc, u, v, ignora, raio = 0.55) {
       if (state.plots[r * COLS + c].s !== 'locked') return false;
     }
   } else if (u > -0.5 && u < B[0] + 0.5 && v > -0.5 && v < B[1] + 0.5) return false; // no rancho, os cercados ocupam tudo
-  if (u < -6 || v < -6 || u > B[0] + 6 || v > B[1] + 6) return false;
+  if (u < -MARGEM_ITENS || v < -MARGEM_ITENS || u > B[0] + MARGEM_ITENS || v > B[1] + MARGEM_ITENS) return false;
   if (sc === 'roca' && temaDe(state).lago && Math.hypot(u - LAGO_POS[0], v - LAGO_POS[1]) < 1.4) return false;
   return objList(state, sc).every(o => o.key === ignora || (o.cerca ? distCerca(u, v, o) >= raio * 0.75 : Math.hypot(o.u - u, o.v - v) >= (o.r + raio) * 0.75));
+}
+// Linha pontilhada marcando o limite de onde dá para colocar enfeite/cerca (a mesma borda do validSpot
+// acima): mesma ideia da trama escura dos canteiros bloqueados, só que para a área bem maior de decoração.
+function drawLimiteItens(sc) {
+  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R], m = MARGEM_ITENS;
+  const pts = [iso(-m, -m), iso(B[0] + m, -m), iso(B[0] + m, B[1] + m), iso(-m, B[1] + m)];
+  ctx.save();
+  ctx.setLineDash([10, 8]); ctx.strokeStyle = 'rgba(40,30,20,.3)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y);
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
 }
 // ---------- Cercas: cada pedaço tem uma casa de comprimento e encaixa na beirada da grade ----------
 const ehCerca = id => !!(ENFEITE[id] && ENFEITE[id].cerca);
@@ -8711,7 +8731,7 @@ function distCerca(u, v, o) {
   return Math.hypot(u - (a + (c - a) * k), v - (b + (d - b) * k));
 }
 function validCerca(u, v, rot, ignora) {
-  if (u < -6 || v < -6 || u > COLS + 6 || v > ROWS + 6) return false;
+  if (u < -MARGEM_ITENS || v < -MARGEM_ITENS || u > COLS + MARGEM_ITENS || v > ROWS + MARGEM_ITENS) return false;
   // não fica no meio de dois canteiros (na beirada de um canteiro pode)
   const dono = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS && state.plots[r * COLS + c].s !== 'locked';
   if (rot ? dono(u - 1, Math.floor(v)) && dono(u, Math.floor(v)) : dono(Math.floor(u), v - 1) && dono(Math.floor(u), v)) return false;
