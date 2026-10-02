@@ -79,7 +79,7 @@ const PRODUTOS_CACA = [
   { id: 'presa',       nome: 'Presa de chupa-cabra', nomePl: 'presas de chupa-cabra', preco: 300 },
 ];
 for (const p of PRODUTOS_CACA) PRODUCT[p.id] = { ...p, caca: true };
-// Presentinhos que cada gato traz de vez em quando (a cada 12h): vende no celeiro que nem qualquer produto.
+// Presentinhos que cada gato traz a cada 12h (hora certa, não é sorteio): vende no celeiro que nem qualquer produto.
 const GATO_PRESENTE_MS = 12 * 3600e3;
 const PRESENTES_GATO = [
   { id: 'novelo',             nome: 'Novelo de lã',        nomePl: 'novelos de lã',         preco: 220, peso: 10 },
@@ -89,7 +89,7 @@ const PRESENTES_GATO = [
   { id: 'presentemisterioso', nome: 'Presente misterioso', nomePl: 'presentes misteriosos', preco: 480, peso: 2 },
 ];
 for (const p of PRESENTES_GATO) PRODUCT[p.id] = { ...p, gato: true };
-// Pavão e cavalo também deixam um item de vez em quando, no mesmo ritmo dos gatos (reaproveita o sistema acima).
+// Pavão e cavalo também produzem a cada 12h (igual aos outros animais, hora certa — não é carinho nem sorteio), reaproveitando o relógio dos gatos acima.
 const PRESENTES_PAVAO = [PRODUCT.pena];
 const PRESENTES_CAVALO = [{ id: 'ferradura', nome: 'Ferradura', nomePl: 'ferraduras', preco: 90, peso: 1 }];
 for (const p of PRESENTES_CAVALO) PRODUCT[p.id] = { ...p, pet: true };
@@ -1219,6 +1219,7 @@ const NOVIDADES = [
   { v: 190, txt: 'Negócios › Fábrica: agora toda máquina tem 6 espaços (antes, Laticínios, Suqueira e Artesanato tinham só 2, e Conservas 3). O 1º continua liberando de graça no nível certo; os outros 5 se compram subindo de nível, igual já era.' },
   { v: 191, txt: 'Mais espaço pra decorar: dá pra espalhar enfeite e cerca bem mais longe dos canteiros (na roça) e dos cercados (no rancho), com uma linha pontilhada mostrando até onde vai. E a Terreno ganhou mais 2 expansões (níveis 80 e 90), até dar pra ocupar a roça inteira.' },
   { v: 192, txt: 'Corrigido: não dá mais para colocar enfeite ou cerca lá em cima, onde já é céu. E a área onde dá para construir/decorar (na roça e no rancho) ganhou matinhos espalhados, pra ficar mais bonita e mostrar bem onde é gramado de verdade.' },
+  { v: 193, txt: 'Cavalo e pavão: o presentinho deles (ferradura e pena) já era de hora certa (a cada 12h), mas o texto dava a entender que era de vez em quando ou vinha do carinho. Agora mostra direitinho "produzindo · falta Xh" no abrigo, igual aos outros animais, sem misturar com o carinho (que continua dando XP à parte).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1331,7 +1332,8 @@ function abrigoHTML() {
   for (const a of moram) {
     const d = ANIMAL[a.k];
     const st = d.tipo === 'prod' ? (a.ready ? 'produto pronto!' : a.fed ? 'produzindo' : 'com fome') + ` · vive mais ${vida(lifeLeft(a))}`
-      : d.tipo === 'cria' ? (isAdult(a) ? 'adulto, pronto para vender' : `crescendo · falta ${fmt(d.tempo - a.g)}`) : 'companhia';
+      : d.tipo === 'cria' ? (isAdult(a) ? 'adulto, pronto para vender' : `crescendo · falta ${fmt(d.tempo - a.g)}`)
+      : PET_PRESENTES[a.k] ? (a.presenteProx && a.presenteProx <= Date.now() ? 'presente pronto! 🎁' : `produzindo · falta ${fmt(((a.presenteProx || Date.now() + GATO_PRESENTE_MS) - Date.now()) / 1000)}`) : 'companhia';
     const armed = buyPending && buyPending.i === 'venda' + a.id && performance.now() < buyPending.until;
     html += `<div class="row"><img alt="" src="${animalIcon(d.id)}"><div><div class="name">${esc(a.nome || d.nome)}</div><div class="meta">${d.nome} · ${st}</div></div>
       <div class="stack"><button class="btn ghost" data-renomear="${a.id}">Nome<br><small>${moeda(CUSTO_NOME_BICHO)}</small></button>
@@ -1341,7 +1343,8 @@ function abrigoHTML() {
   for (const k of b.bichos) {
     const d = ANIMAL[k], locked = d.nivel > state.level, cheio = moram.length >= cap;
     const info = d.tipo === 'prod' ? `ração ${d.racao} · ${PRODUCT[d.prod] ? PRODUCT[d.prod].nome.toLowerCase() : 'leitões'} a cada ${fmt(d.tempo)} · vive ${d.periodo} dias`
-      : d.tipo === 'cria' ? `cresce em ${fmt(d.tempo)} e vende por ${d.venda.toLocaleString('pt-BR')}` : `companhia · carinho dá XP${PET_PRESENTES[k] ? ` · de vez em quando deixa ${PET_PRESENTES[k][0].nomePl || PET_PRESENTES[k][0].nome.toLowerCase()} pra vender` : ''}`;
+      : d.tipo === 'cria' ? `cresce em ${fmt(d.tempo)} e vende por ${d.venda.toLocaleString('pt-BR')}`
+      : PET_PRESENTES[k] ? `dá ${PET_PRESENTES[k][0].nomePl || PET_PRESENTES[k][0].nome.toLowerCase()} a cada ${fmt(GATO_PRESENTE_MS / 1000)} para vender · companhia (carinho dá XP à parte)` : 'companhia · carinho dá XP';
     html += `<div class="row ${locked ? 'locked' : ''}"><img alt="" src="${animalIcon(k)}"><div><div class="name">${d.nome}</div><div class="meta">${info}</div></div>
       ${locked ? `<button class="btn" disabled>Nível ${d.nivel}</button>` : cheio ? '<button class="btn ghost" disabled>Cheio</button>' : `<button class="btn" data-buy-animal="${k}" ${state.coins < d.custo ? 'disabled' : ''}>${moeda(d.custo)}</button>`}</div>`;
   }
@@ -4870,7 +4873,7 @@ function renderPane() {
         html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · ração ${d.racao} por dia<br>cresce em ${fmt(d.tempo)} e vende por ${d.venda.toLocaleString('pt-BR')}<br>lucro ${(d.venda - d.custo - d.racao * Math.ceil(d.tempo / (24 * HOUR))).toLocaleString('pt-BR')} · ${d.xp} XP na venda`, buyBtn(d));
       }
       html += `<h3>Companhia</h3>`;
-      for (const d of visible('pet')) html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · mora ${d.lugar === 'casa' ? 'dentro de casa' : (abrigoOf(d.id).o === 'a' ? 'na ' : 'no ') + abrigoOf(d.id).nome.toLowerCase()}<br>não come nem produz · carinho dá 2 XP por dia${PET_PRESENTES[d.id] ? ` · de vez em quando deixa ${PET_PRESENTES[d.id][0].nomePl || PET_PRESENTES[d.id][0].nome.toLowerCase()} pra vender` : ''}`, buyBtn(d));
+      for (const d of visible('pet')) html += row(d, `${d.custo.toLocaleString('pt-BR')} moedas · mora ${d.lugar === 'casa' ? 'dentro de casa' : (abrigoOf(d.id).o === 'a' ? 'na ' : 'no ') + abrigoOf(d.id).nome.toLowerCase()}<br>${PET_PRESENTES[d.id] ? `dá ${PET_PRESENTES[d.id][0].nomePl || PET_PRESENTES[d.id][0].nome.toLowerCase()} a cada ${fmt(GATO_PRESENTE_MS / 1000)} para vender · não come` : 'não come nem produz'} · carinho dá 2 XP por dia`, buyBtn(d));
       const pets = state.animals.filter(a => ANIMAL[a.k].tipo === 'pet');
       if (pets.length) {
         html += `<h3>Nomes dos seus bichos</h3>`;
