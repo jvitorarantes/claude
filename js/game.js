@@ -1214,6 +1214,7 @@ const NOVIDADES = [
   { v: 187, txt: 'Subir de nível ficou mais festivo: além das moedas de sempre, agora aparece um cartão no meio da tela mostrando os prêmios — moedas, alguns trevos 🍀 (mais conforme o nível sobe) e uma medalha ou troféu que dá pra vender no celeiro.' },
   { v: 188, txt: 'O bônus de moedas ao subir de nível dobrou: agora é nível × 100 (antes era × 50).' },
   { v: 189, txt: 'Atualização grande: ranking global 🌎 (além do de amigos), pena do pavão e ferradura do cavalo pra vender, mais espécies de peixe e de caça (10 em cada lago/mato), mapa maior (14×14, com a terra fora da área comprada marcada visualmente), mais XP pra subir de nível, e o botão 🚜 agora oferece colheita automática e limpeza automática de terra seca. Corrigido o travamento no Rio Amazonas ao abrir o livro de peixes, a animação do rastelo ao ir limpar folhas, e o esconderijo dos bichos na caçada. Frutífera ajudada por um amigo agora rende só mais uma colheita e seca de vez.' },
+  { v: 190, txt: 'Negócios › Fábrica: agora toda máquina tem 6 espaços (antes, Laticínios, Suqueira e Artesanato tinham só 2, e Conservas 3). O 1º continua liberando de graça no nível certo; os outros 5 se compram subindo de nível, igual já era.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -8254,25 +8255,26 @@ for (const r of RECEITAS) {
 }
 // Cada máquina tem sua receitas e seus próprios espaços: o 1º libera sozinho no nível,
 // os seguintes se compram (nível + moedas). Todos os espaços de uma máquina produzem ao mesmo tempo.
+// Todas as máquinas têm 6 espaços (o 1º de graça no nível, os outros 5 compram-se subindo de nível).
 const MAQUINAS = [
   { id: 'padaria',    nome: 'Moinho & Padaria', emoji: '🌾',
     receitas: ['farinha', 'farofa', 'pipoca', 'pao', 'bolo', 'arrozfeijao', 'pacoca', 'rapadura'],
-    slots: [{ nivel: 2, custo: 0 }, { nivel: 4, custo: 300 }, { nivel: 8, custo: 900 }, { nivel: 15, custo: 2200 }] },
+    slots: [{ nivel: 2, custo: 0 }, { nivel: 4, custo: 300 }, { nivel: 8, custo: 900 }, { nivel: 15, custo: 2200 }, { nivel: 24, custo: 4500 }, { nivel: 35, custo: 8000 }] },
   { id: 'cozinha',    nome: 'Cozinha do Rio', emoji: '🐟',
     receitas: ['peixefrito', 'caldo', 'moqueca', 'pintadoass', 'douradobr', 'casaca'],
-    slots: [{ nivel: 3, custo: 0 }, { nivel: 7, custo: 400 }, { nivel: 13, custo: 1300 }, { nivel: 20, custo: 2800 }] },
+    slots: [{ nivel: 3, custo: 0 }, { nivel: 7, custo: 400 }, { nivel: 13, custo: 1300 }, { nivel: 20, custo: 2800 }, { nivel: 30, custo: 5600 }, { nivel: 42, custo: 10000 }] },
   { id: 'conservas',  nome: 'Conservas', emoji: '🍯',
     receitas: ['molho', 'geleia', 'novelo'],
-    slots: [{ nivel: 5, custo: 0 }, { nivel: 10, custo: 500 }, { nivel: 16, custo: 1300 }] },
+    slots: [{ nivel: 5, custo: 0 }, { nivel: 10, custo: 500 }, { nivel: 16, custo: 1300 }, { nivel: 24, custo: 3000 }, { nivel: 34, custo: 6000 }, { nivel: 46, custo: 11000 }] },
   { id: 'laticinios', nome: 'Laticínios', emoji: '🧀',
     receitas: ['manteiga', 'queijo'],
-    slots: [{ nivel: 10, custo: 0 }, { nivel: 14, custo: 650 }] },
+    slots: [{ nivel: 10, custo: 0 }, { nivel: 14, custo: 650 }, { nivel: 20, custo: 1500 }, { nivel: 28, custo: 3000 }, { nivel: 38, custo: 6000 }, { nivel: 50, custo: 11000 }] },
   { id: 'suqueira',   nome: 'Suqueira', emoji: '🧃',
     receitas: ['sucouva', 'sucolar'],
-    slots: [{ nivel: 15, custo: 0 }, { nivel: 20, custo: 900 }] },
+    slots: [{ nivel: 15, custo: 0 }, { nivel: 20, custo: 900 }, { nivel: 26, custo: 2000 }, { nivel: 34, custo: 4000 }, { nivel: 44, custo: 7200 }, { nivel: 56, custo: 12000 }] },
   { id: 'artesanato', nome: 'Artesanato da caçada', emoji: '🪶',
     receitas: ['cocar', 'amuleto', 'colar'],
-    slots: [{ nivel: 10, custo: 0 }, { nivel: 20, custo: 800 }] },
+    slots: [{ nivel: 10, custo: 0 }, { nivel: 20, custo: 800 }, { nivel: 28, custo: 1800 }, { nivel: 36, custo: 3600 }, { nivel: 46, custo: 7000 }, { nivel: 58, custo: 12000 }] },
 ];
 const MAQUINA = Object.fromEntries(MAQUINAS.map(m => [m.id, m]));
 const MAQUINA_DE = Object.fromEntries(MAQUINAS.flatMap(m => m.receitas.map(r => [r, m.id])));
