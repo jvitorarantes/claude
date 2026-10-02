@@ -4,8 +4,9 @@
 // ============================================================
 // Dados do jogo
 // ============================================================
-// Mapa da roça: 14×14 (era 10×10) pra caber as expansões novas até 160 canteiros.
-const COLS = 14, ROWS = 14, N = COLS * ROWS;
+// Mapa da roça: 28×28 (era 14×14) — a mesma área onde já dava para espalhar enfeite (MARGEM_ITENS),
+// agora também dá para colocar canteiro, não só decoração.
+const COLS = 28, ROWS = 28, N = COLS * ROWS;
 const START_LOTS = [0, 1, 2, COLS, COLS + 1, COLS + 2]; // os 6 canteiros iniciais, no canto perto do celeiro (2 linhas de 3)
 const ROOM = 5;
 const HOUR = 3600, DAY = 86400e3; // HOUR em segundos (tempos de produção), DAY em milissegundos (idades)
@@ -391,6 +392,12 @@ const EXPANSOES = [
   { nivel: 70, preco: 30000, total: 160 },
   { nivel: 80, preco: 20000, total: 180 },
   { nivel: 90, preco: 16000, total: 196 },
+  { nivel: 100, preco: 54000, total: 250 },
+  { nivel: 115, preco: 70000, total: 320 },
+  { nivel: 130, preco: 80000, total: 400 },
+  { nivel: 145, preco: 100000, total: 500 },
+  { nivel: 160, preco: 120000, total: 620 },
+  { nivel: 175, preco: 164000, total: 784 },
 ];
 const XP_CAP = 50; // colheitas por planta por dia que ainda dão XP (evita ganhar XP infinito com o feijão)
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -453,6 +460,17 @@ function migrate(s) {
     const novos = Array.from({ length: N }, () => emptyPlot());
     for (let i = 0; i < OLD_N; i++) {
       const c = i % OLD_COLS, r = Math.floor(i / OLD_COLS);
+      if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
+    }
+    s.plots = novos;
+  }
+  // A roça cresceu de novo, de 14×14 pra 28×28 (a área de canteiro passou a ser do tamanho da área de
+  // decoração). Mesmo esquema de remapeio: cada canteiro vai pra mesma linha/coluna na grade nova.
+  const OLD_COLS2 = 14, OLD_ROWS2 = 14, OLD_N2 = OLD_COLS2 * OLD_ROWS2;
+  if (s.v === 3 && Array.isArray(s.plots) && s.plots.length === OLD_N2 && N !== OLD_N2) {
+    const novos = Array.from({ length: N }, () => emptyPlot());
+    for (let i = 0; i < OLD_N2; i++) {
+      const c = i % OLD_COLS2, r = Math.floor(i / OLD_COLS2);
       if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
     }
     s.plots = novos;
@@ -1230,6 +1248,7 @@ const NOVIDADES = [
   { v: 197, txt: 'Agora dá para pegar um pouquinho de qualquer quantidade de amigos por dia, não só de 5. E chegou a amizade ❤️ entre vocês: ajude ou presenteie seus amigos para ela subir, e os presentes que você manda ficam melhores (mais moedas, mais fertilizante, mais ração) a cada nível.' },
   { v: 198, txt: 'Corrigido: em alguns lugares dentro da área permitida, o canteiro novo sumia ao ser colocado (a trilha da caçada escondia ele). Agora o jogo não deixa mais colocar canteiro em cima dela nem de outras construções fixas.' },
   { v: 199, txt: 'A área onde dá para colocar enfeite é bem maior que a área da terra de canteiros (que fica presa à grade da roça) — agora uma segunda linha pontilhada, mais escura, mostra até onde a terra vai, e a mensagem de erro avisa quando você tenta mover um canteiro pra fora dela.' },
+  { v: 200, txt: 'A roça cresceu de 14×14 para 28×28: agora a terra de canteiros ocupa a mesma área onde já dava para colocar enfeite, então dá para espalhar canteiro por praticamente qualquer lugar do mapa. A aba Terreno ganhou mais 6 expansões (até o nível 175) para dar conta do tamanho novo.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
