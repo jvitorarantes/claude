@@ -1218,6 +1218,7 @@ const NOVIDADES = [
   { v: 189, txt: 'Atualização grande: ranking global 🌎 (além do de amigos), pena do pavão e ferradura do cavalo pra vender, mais espécies de peixe e de caça (10 em cada lago/mato), mapa maior (14×14, com a terra fora da área comprada marcada visualmente), mais XP pra subir de nível, e o botão 🚜 agora oferece colheita automática e limpeza automática de terra seca. Corrigido o travamento no Rio Amazonas ao abrir o livro de peixes, a animação do rastelo ao ir limpar folhas, e o esconderijo dos bichos na caçada. Frutífera ajudada por um amigo agora rende só mais uma colheita e seca de vez.' },
   { v: 190, txt: 'Negócios › Fábrica: agora toda máquina tem 6 espaços (antes, Laticínios, Suqueira e Artesanato tinham só 2, e Conservas 3). O 1º continua liberando de graça no nível certo; os outros 5 se compram subindo de nível, igual já era.' },
   { v: 191, txt: 'Mais espaço pra decorar: dá pra espalhar enfeite e cerca bem mais longe dos canteiros (na roça) e dos cercados (no rancho), com uma linha pontilhada mostrando até onde vai. E a Terreno ganhou mais 2 expansões (níveis 80 e 90), até dar pra ocupar a roça inteira.' },
+  { v: 192, txt: 'Corrigido: não dá mais para colocar enfeite ou cerca lá em cima, onde já é céu. E a área onde dá para construir/decorar (na roça e no rancho) ganhou matinhos espalhados, pra ficar mais bonita e mostrar bem onde é gramado de verdade.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -3724,7 +3725,7 @@ function drawLake(x, y, W, t) {
 function drawRoca(s, t, home) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
-  if (home) drawLimiteItens('roca');
+  if (home) { drawLimiteItens('roca'); drawMatinhos('roca'); }
   // lago (grande no tema "Lago dos patos"; nos outros, um pesqueiro menor). Na sua roça, clique para pescar.
   if (temaDe(s).lago) { const q = iso(...LAGO_POS); drawLake(q.x, q.y, W * 0.72, t);
     if (home && pescaPronta()) drawBubbleAt(q.x, q.y - W * 0.55, 'pesca', null, t, 99);
@@ -3935,7 +3936,7 @@ function drawYard(b, s, t, home, dt, bubbles) {
 function drawPen(s, t, home, dt) {
   const tod = timeOfDay(), W = L.W;
   drawSky(t, tod); drawGround();
-  if (home) drawLimiteItens('animais');
+  if (home) { drawLimiteItens('animais'); drawMatinhos('animais'); }
   drawObjetos(s, 'animais', t, home, 'tras');
   const bubbles = [];
   const order = ABRIGOS.slice().sort((a, b) => { const p = yardOf(a.id), q = yardOf(b.id); return (p.u0 + p.v0) - (q.u0 + q.v0); });
@@ -8694,6 +8695,10 @@ const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + objetosD
 // Até onde dá para espalhar enfeites/cercas em volta da área principal (canteiros na roça, cercados no
 // rancho). Dobrado (era 6) para sobrar bem mais gramado livre pra decorar nas duas cenas.
 const MARGEM_ITENS = 14;
+// u+v é "quão pra trás" (rumo ao horizonte) um ponto está: iso() sobe na tela conforme u+v cai, e o
+// chão só é pintado até a linha do horizonte — abaixo de 0 o ponto já cai no céu. Vale pros dois eixos
+// juntos (não cada um sozinho), senão um canto como (-14, 0) também ia parar lá em cima.
+const CEU_MIN = 0;
 // Dá para pôr fora dos canteiros e dos cercados, sem encostar em outra coisa.
 function validSpot(sc, u, v, ignora, raio = 0.55) {
   const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R];
@@ -8706,20 +8711,39 @@ function validSpot(sc, u, v, ignora, raio = 0.55) {
     }
   } else if (u > -0.5 && u < B[0] + 0.5 && v > -0.5 && v < B[1] + 0.5) return false; // no rancho, os cercados ocupam tudo
   if (u < -MARGEM_ITENS || v < -MARGEM_ITENS || u > B[0] + MARGEM_ITENS || v > B[1] + MARGEM_ITENS) return false;
+  if (u + v < CEU_MIN) return false; // não deixa pôr nada lá em cima, onde já é céu
   if (sc === 'roca' && temaDe(state).lago && Math.hypot(u - LAGO_POS[0], v - LAGO_POS[1]) < 1.4) return false;
   return objList(state, sc).every(o => o.key === ignora || (o.cerca ? distCerca(u, v, o) >= raio * 0.75 : Math.hypot(o.u - u, o.v - v) >= (o.r + raio) * 0.75));
 }
 // Linha pontilhada marcando o limite de onde dá para colocar enfeite/cerca (a mesma borda do validSpot
 // acima): mesma ideia da trama escura dos canteiros bloqueados, só que para a área bem maior de decoração.
+// É um retângulo com o canto de trás cortado reto (a diagonal u+v=CEU_MIN), pra bater com o céu excluído ali em cima.
 function drawLimiteItens(sc) {
   const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R], m = MARGEM_ITENS;
-  const pts = [iso(-m, -m), iso(B[0] + m, -m), iso(B[0] + m, B[1] + m), iso(-m, B[1] + m)];
+  const pts = [[CEU_MIN + m, -m], [B[0] + m, -m], [B[0] + m, B[1] + m], [-m, B[1] + m], [-m, CEU_MIN + m]].map(([u, v]) => iso(u, v));
   ctx.save();
   ctx.setLineDash([10, 8]); ctx.strokeStyle = 'rgba(40,30,20,.3)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
   for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y);
   ctx.closePath(); ctx.stroke();
   ctx.restore();
+}
+// Matinhos (touceirinha de 3 bolinhas, igual às moitas da caçada) espalhados por toda a área onde dá
+// pra construir/decorar — reaproveita o validSpot pra só nascer onde realmente pode (sem pisar canteiro,
+// cercado, lago, outro enfeite nem o céu). Posições fixas (mesmo padrão dos TUFTS do gramado).
+const MATINHOS = Array.from({ length: 220 }, () => [Math.random(), Math.random(), Math.random()]);
+function drawMatinhos(sc) {
+  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R], m = MARGEM_ITENS;
+  const u0 = -m, u1 = B[0] + m, v0 = -m, v1 = B[1] + m, { cw, ch } = L;
+  for (const [rx, ry, rk] of MATINHOS) {
+    const u = u0 + rx * (u1 - u0), v = v0 + ry * (v1 - v0);
+    const q = iso(u, v);
+    if (q.x < -20 || q.x > cw + 20 || q.y < -20 || q.y > ch + 20) continue;
+    if (!validSpot(sc, u, v, null, 0.3)) continue;
+    const s = L.W * (0.055 + rk * 0.04);
+    ctx.fillStyle = `rgba(47,111,34,${0.4 + rk * 0.2})`;
+    for (const [dx, dy, rr] of [[-s * 0.7, 0, s * 0.8], [s * 0.7, 0, s * 0.8], [0, -s * 0.5, s]]) { ctx.beginPath(); ctx.arc(q.x + dx, q.y + dy, rr, 0, 7); ctx.fill(); }
+  }
 }
 // ---------- Cercas: cada pedaço tem uma casa de comprimento e encaixa na beirada da grade ----------
 const ehCerca = id => !!(ENFEITE[id] && ENFEITE[id].cerca);
@@ -8732,6 +8756,7 @@ function distCerca(u, v, o) {
 }
 function validCerca(u, v, rot, ignora) {
   if (u < -MARGEM_ITENS || v < -MARGEM_ITENS || u > COLS + MARGEM_ITENS || v > ROWS + MARGEM_ITENS) return false;
+  if (u + v < CEU_MIN) return false; // não deixa pôr cerca lá em cima, onde já é céu
   // não fica no meio de dois canteiros (na beirada de um canteiro pode)
   const dono = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS && state.plots[r * COLS + c].s !== 'locked';
   if (rot ? dono(u - 1, Math.floor(v)) && dono(u, Math.floor(v)) : dono(Math.floor(u), v - 1) && dono(Math.floor(u), v)) return false;
@@ -8788,6 +8813,7 @@ function validYardPos(id, cu, cv) {
   const u0 = cu - YARD_W / 2, v0 = cv - YARD_D / 2, u1 = u0 + YARD_W, v1 = v0 + YARD_D;
   const folga = 3;
   if (u0 < -YARD_W * folga || v0 < -YARD_D * folga || u1 > RANCH_C + YARD_W * folga || v1 > RANCH_R + YARD_D * folga) return false;
+  if (u0 + v0 < CEU_MIN) return false; // não deixa levar o cercado lá em cima, onde já é céu
   for (const b of ABRIGOS) {
     if (b.id === id) continue;
     const y = yardOf(b.id);
