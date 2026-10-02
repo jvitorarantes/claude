@@ -693,10 +693,14 @@ const freeLots = () => Math.max(0, allowedLots() - state.owned);
 // Lote onde dá para colocar um canteiro agora: qualquer pedaço de terra livre da sua roça, não só o que
 // encosta nos canteiros que você já tem (dá pra escolher o lugar à vontade, contanto que tenha vaga comprada).
 const canBuy = i => freeLots() > 0 && state.plots[i].s === 'locked' && !objetoNaCelula(i);
-// Tem enfeite ou frutífera em cima deste pedaço de terra? (aí não dá para virar canteiro)
+// Tem algo em cima deste pedaço de terra — enfeite/frutífera do jogador OU uma construção fixa (casa,
+// celeiro, canil, pesqueiro, placa de terras, trilha da caçada, armadilha)? Aí não dá para virar canteiro.
+// Antes só olhava os enfeites do jogador; a trilha da caçada (mata) fica dentro da grade (as outras
+// construções ficam fora), então sem isso dava para "comprar" um canteiro bem em cima dela e ele sumia,
+// escondido atrás do desenho da trilha.
 function objetoNaCelula(i) {
   const c = i % COLS + 0.5, r = Math.floor(i / COLS) + 0.5;
-  return objetosDe(state, 'roca').some(o => !ehCerca(o.id) && Math.abs(o.u - c) < 0.5 + 0.35 && Math.abs(o.v - r) < 0.5 + 0.35);
+  return objList(state, 'roca').some(o => !o.cerca && Math.abs(o.u - c) < o.r + 0.35 && Math.abs(o.v - r) < o.r + 0.35);
 }
 let buyPending = null; // lote clicado uma vez, esperando o segundo clique para confirmar
 const sfx = name => { if (window.RFAudio) window.RFAudio.play(name); };
@@ -1224,6 +1228,7 @@ const NOVIDADES = [
   { v: 195, txt: 'Tirei a trama escura que marcava a terra sem vaga comprada: agora o gramado fica igual em qualquer lugar da roça.' },
   { v: 196, txt: 'Com o celular em pé, agora dá para dar bem mais zoom. E em qualquer tela, dá para arrastar bem mais para os lados.' },
   { v: 197, txt: 'Agora dá para pegar um pouquinho de qualquer quantidade de amigos por dia, não só de 5. E chegou a amizade ❤️ entre vocês: ajude ou presenteie seus amigos para ela subir, e os presentes que você manda ficam melhores (mais moedas, mais fertilizante, mais ração) a cada nível.' },
+  { v: 198, txt: 'Corrigido: em alguns lugares dentro da área permitida, o canteiro novo sumia ao ser colocado (a trilha da caçada escondia ele). Agora o jogo não deixa mais colocar canteiro em cima dela nem de outras construções fixas.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
