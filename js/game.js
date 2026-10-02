@@ -4,10 +4,15 @@
 // ============================================================
 // Dados do jogo
 // ============================================================
-// Mapa da roça: 64×64 (era 28×84) — virou quadrado, bem maior (ambos os eixos crescem só "pra frente",
-// u e v aumentando, então nunca esbarra no corte do céu).
-const COLS = 64, ROWS = 64, N = COLS * ROWS;
-const START_LOTS = [0, 1, 2, COLS, COLS + 1, COLS + 2]; // os 6 canteiros iniciais, no canto perto do celeiro (2 linhas de 3)
+// Mapa da roça: mesmo formato da área do rancho — a casa/celeiro ficam no meio, lá em cima, e a terra
+// se abre pros dois lados e pra frente (u ∈ [-28, 44), v ∈ [-28, 36), igual ao rancho com a margem dele).
+// A grade de canteiros guarda o índice a partir do canto (RU0, RV0) do mundo; o que fica atrás da linha
+// do horizonte (u+v < 0) é céu e não vira canteiro.
+const RU0 = -28, RV0 = -28, COLS = 72, ROWS = 64, N = COLS * ROWS;
+const plotU = i => i % COLS + RU0, plotV = i => Math.floor(i / COLS) + RV0;
+const plotAt = (u, v) => { const c = Math.floor(u) - RU0, r = Math.floor(v) - RV0; return c >= 0 && r >= 0 && c < COLS && r < ROWS ? r * COLS + c : -1; };
+const plotCeu = i => plotU(i) + plotV(i) < 0; // célula atrás do horizonte (céu)
+const START_LOTS = [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]].map(([u, v]) => plotAt(u, v)); // os 6 canteiros iniciais, perto do celeiro
 const ROOM = 5;
 const HOUR = 3600, DAY = 86400e3; // HOUR em segundos (tempos de produção), DAY em milissegundos (idades)
 const SAVE_KEY = 'roca-feliz-v3', OLD_SAVE_KEYS = ['roca-feliz-v2', 'roca-feliz-v1'], SETTINGS_KEY = 'roca-feliz-config';
@@ -446,60 +451,21 @@ function migrate(s) {
     s = Object.assign(newState(), keep);
     s.news = [{ at: Date.now(), msg: 'A Roça Feliz foi renovada! Tem 27 plantações novas, árvores frutíferas e expansões. Você recomeça com 2.000 moedas.' }].concat(Array.isArray(s.news) ? s.news : []);
   }
-  // O mapa da roça cresceu de 10×10 pra 14×14 (mais área pra construir). Quem já jogava tem o save
-  // com 100 canteiros na grade antiga: remapeia cada um pra mesma linha/coluna na grade nova (o
-  // resto da terra nova fica bloqueado, do jeitinho que já era antes de qualquer expansão).
-  const OLD_COLS = 10, OLD_ROWS = 10, OLD_N = OLD_COLS * OLD_ROWS;
-  if (s.v === 3 && Array.isArray(s.plots) && s.plots.length === OLD_N && N !== OLD_N) {
-    const novos = Array.from({ length: N }, () => emptyPlot());
-    for (let i = 0; i < OLD_N; i++) {
-      const c = i % OLD_COLS, r = Math.floor(i / OLD_COLS);
-      if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
-    }
-    s.plots = novos;
-  }
-  // A roça cresceu de novo, de 14×14 pra 28×28 (a área de canteiro passou a ser do tamanho da área de
-  // decoração). Mesmo esquema de remapeio: cada canteiro vai pra mesma linha/coluna na grade nova.
-  const OLD_COLS2 = 14, OLD_ROWS2 = 14, OLD_N2 = OLD_COLS2 * OLD_ROWS2;
-  if (s.v === 3 && Array.isArray(s.plots) && s.plots.length === OLD_N2 && N !== OLD_N2) {
-    const novos = Array.from({ length: N }, () => emptyPlot());
-    for (let i = 0; i < OLD_N2; i++) {
-      const c = i % OLD_COLS2, r = Math.floor(i / OLD_COLS2);
-      if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
-    }
-    s.plots = novos;
-  }
-  // A roça dobrou de área de novo, de 28×28 pra 28×56 (mesmas colunas, o dobro de linhas). Mesmo
-  // esquema de remapeio: cada canteiro vai pra mesma linha/coluna na grade nova.
-  const OLD_COLS3 = 28, OLD_ROWS3 = 28, OLD_N3 = OLD_COLS3 * OLD_ROWS3;
-  if (s.v === 3 && Array.isArray(s.plots) && s.plots.length === OLD_N3 && N !== OLD_N3) {
-    const novos = Array.from({ length: N }, () => emptyPlot());
-    for (let i = 0; i < OLD_N3; i++) {
-      const c = i % OLD_COLS3, r = Math.floor(i / OLD_COLS3);
-      if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
-    }
-    s.plots = novos;
-  }
-  // Área da roça aumentou de novo, de 28×56 pra 28×84 (mesmas colunas, mais linhas). Mesmo esquema de
-  // remapeio: cada canteiro vai pra mesma linha/coluna na grade nova.
-  const OLD_COLS4 = 28, OLD_ROWS4 = 56, OLD_N4 = OLD_COLS4 * OLD_ROWS4;
-  if (s.v === 3 && Array.isArray(s.plots) && s.plots.length === OLD_N4 && N !== OLD_N4) {
-    const novos = Array.from({ length: N }, () => emptyPlot());
-    for (let i = 0; i < OLD_N4; i++) {
-      const c = i % OLD_COLS4, r = Math.floor(i / OLD_COLS4);
-      if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
-    }
-    s.plots = novos;
-  }
-  // Área da roça virou quadrada, de 28×84 pra 64×64 (mais larga, um pouco menos funda). Mesmo esquema
-  // de remapeio: cada canteiro vai pra mesma linha/coluna na grade nova (quem tinha algo bem no fundo,
-  // além da linha 64, é bem raro — o jogo tinha acabado de ganhar essa profundidade).
-  const OLD_COLS5 = 28, OLD_ROWS5 = 84, OLD_N5 = OLD_COLS5 * OLD_ROWS5;
-  if (s.v === 3 && Array.isArray(s.plots) && s.plots.length === OLD_N5 && N !== OLD_N5) {
-    const novos = Array.from({ length: N }, () => emptyPlot());
-    for (let i = 0; i < OLD_N5; i++) {
-      const c = i % OLD_COLS5, r = Math.floor(i / OLD_COLS5);
-      if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
+  // Grades antigas da roça (todas começavam no canto (0,0) do mundo): remapeia cada canteiro pra mesma
+  // posição do mundo na grade nova. Se algum cair fora dela ou no céu, vai pro lugar livre mais perto
+  // da casa — ninguém perde canteiro.
+  const GRADES_ANTIGAS = { 100: 10, 196: 14, 784: 28, 1568: 28, 2352: 28, 4096: 64 };
+  if (s.v === 3 && Array.isArray(s.plots) && s.plots.length !== N && GRADES_ANTIGAS[s.plots.length]) {
+    const oc = GRADES_ANTIGAS[s.plots.length], novos = Array.from({ length: N }, () => emptyPlot()), sobra = [];
+    s.plots.forEach((p, i) => {
+      if (!p || p.s === 'locked') return;
+      const j = plotAt(i % oc, Math.floor(i / oc));
+      if (j >= 0 && !plotCeu(j)) novos[j] = p; else sobra.push(p);
+    });
+    if (sobra.length) {
+      const livres = [...Array(N).keys()].filter(j => novos[j].s === 'locked' && !plotCeu(j))
+        .sort((a, b) => Math.hypot(plotU(a), plotV(a)) - Math.hypot(plotU(b), plotV(b)));
+      sobra.forEach((p, k) => { if (livres[k] !== undefined) novos[livres[k]] = p; });
     }
     s.plots = novos;
   }
@@ -738,14 +704,14 @@ const allowedLots = () => EXPANSOES[state.exp].total;
 const freeLots = () => Math.max(0, allowedLots() - state.owned);
 // Lote onde dá para colocar um canteiro agora: qualquer pedaço de terra livre da sua roça, não só o que
 // encosta nos canteiros que você já tem (dá pra escolher o lugar à vontade, contanto que tenha vaga comprada).
-const canBuy = i => freeLots() > 0 && state.plots[i].s === 'locked' && !objetoNaCelula(i);
+const canBuy = i => freeLots() > 0 && state.plots[i].s === 'locked' && !plotCeu(i) && !objetoNaCelula(i);
 // Tem algo em cima deste pedaço de terra — enfeite/frutífera do jogador OU uma construção fixa (casa,
 // celeiro, canil, pesqueiro, placa de terras, trilha da caçada, armadilha)? Aí não dá para virar canteiro.
 // Antes só olhava os enfeites do jogador; a trilha da caçada (mata) fica dentro da grade (as outras
 // construções ficam fora), então sem isso dava para "comprar" um canteiro bem em cima dela e ele sumia,
 // escondido atrás do desenho da trilha.
 function objetoNaCelula(i) {
-  const c = i % COLS + 0.5, r = Math.floor(i / COLS) + 0.5;
+  const c = plotU(i) + 0.5, r = plotV(i) + 0.5;
   return objList(state, 'roca').some(o => !o.cerca && Math.abs(o.u - c) < o.r + 0.35 && Math.abs(o.v - r) < o.r + 0.35);
 }
 let buyPending = null; // lote clicado uma vez, esperando o segundo clique para confirmar
@@ -926,6 +892,7 @@ function clickLot(i) {
     const next = EXPANSOES[state.exp + 1];
     return toast(next ? `Para ter mais canteiros, compre a próxima expansão na aba Terreno (nível ${next.nivel}).` : 'Sua roça já está no tamanho máximo.');
   }
+  if (!canBuy(i)) return;
   if (buyPending && buyPending.i === i && performance.now() < buyPending.until) {
     buyPending = null;
     state.plots[i] = emptyPlot('plowed'); state.owned++;
@@ -1283,6 +1250,7 @@ const NOVIDADES = [
   { v: 204, txt: 'O mapa aumentou de novo: a roça (terreno e plantação) ficou com mais espaço ainda (28×84), e o rancho também — a área pra espalhar enfeite e mover os cercados dobrou.' },
   { v: 205, txt: 'O mapa da roça virou quadrado: agora é 64×64, bem maior que antes.' },
   { v: 206, txt: 'Corrigido o zoom/arrastar da roça: a câmera estava se afastando demais pra tentar mostrar todo canteiro que dava pra comprar (o que virou o mapa inteiro depois que ele cresceu), deixando tudo pequeno e o deslize estranho. Agora ela enquadra só a terra que você já tem, do jeito que era antes.' },
+  { v: 208, txt: 'A área da roça agora tem o mesmo formato da do rancho: a fazenda fica lá no alto, no meio, e o terreno abre pros dois lados e pra frente, cortado reto pelo céu. E o arrastar foi refeito: com qualquer zoom dá pra ir até a beirada da área (esquerda, direita, frente e até o céu), e ao mudar de direção a tela responde na hora, sem ficar presa.' },
   { v: 207, txt: 'O arrastar da tela na roça agora segue a mesma lógica do rancho: a folga de deslizar bate certinho com o tamanho de verdade do que está na tela (antes ficava sempre do tamanho da janela, sem ligação com o zoom, e o deslize ficava esquisito).' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
@@ -1607,7 +1575,7 @@ function visitNpc(id) {
   const nb = NEIGHBORS.find(n => n.id === id);
   telaCarregando(`Indo até ${nb.fazenda} de ${nb.nome}…`, CARREGA_MS, nb.fazenda);
   const cur = state.nb[id];
-  if (!cur || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry)) || !cur.plots.some(p => 'podre' in p) || !cur.banca) state.nb[id] = genNeighbor();
+  if (!cur || !Array.isArray(cur.plots) || cur.plots.length !== N || Date.now() > cur.refreshAt || !cur.animals || cur.animals.some(a => !a.born) || !cur.abrigos || cur.plots.some(p => p.w || (p.b && p.dry)) || !cur.plots.some(p => 'podre' in p) || !cur.banca) state.nb[id] = genNeighbor();
   view = { kind: 'npc', id, nome: nb.nome, fazenda: nb.fazenda, cao: nb.cao, pega: nb.pega, casa: nb.casa, data: state.nb[id], nivel: state.level + nb.acima, avatar: avatarOk(nb.avatar) };
   afterVisit();
   save();
@@ -2021,7 +1989,7 @@ function drawGateArt() {
     for (let sum = 0; sum <= 3; sum++) for (let c = 0; c < 3; c++) {
       const r = sum - c; if (r < 0 || r > 1) continue;
       const crop = CROP[crops[r * 3 + c]];
-      drawPlot(r * COLS + c, Object.assign(emptyPlot('growing'), { c: crop.id, g: crop.tempo, id: 'g' }), 0, true);
+      drawPlot(plotAt(c, r), Object.assign(emptyPlot('growing'), { c: crop.id, g: crop.tempo, id: 'g' }), 0, true);
     }
     const q1 = iso(3.4, 1.2), q3 = iso(3.0, 2.0);
     drawAnimal('vaca', 150, 256, 1.15, 0, 1, false);
@@ -2322,17 +2290,17 @@ function layout(sc) {
     // encostado no que já tinha), isso virava praticamente a grade inteira sempre que sobrava vaga
     // comprada, e a câmera zoom-ava pra longe sem necessidade, atrapalhando o arrastar.
     const plots = S().plots;
-    let c0 = COLS, c1 = 0, r0 = ROWS, r1 = 0;
+    let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
     plots.forEach((p, i) => {
       if (p.s === 'locked') return;
-      const c = i % COLS, r = Math.floor(i / COLS);
+      const c = plotU(i), r = plotV(i);
       c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1);
     });
-    if (c0 > c1) { c0 = 0; c1 = COLS; r0 = 0; r1 = ROWS; }
+    if (c0 > c1) { c0 = 0; c1 = 3; r0 = 0; r1 = 2; }
     // os enfeites colocados também entram no enquadramento
     const objs = objList(S(), 'roca');
     for (const o of objs) if (o.u >= 0 && o.v >= 0) { c1 = Math.max(c1, Math.ceil(o.u)); r1 = Math.max(r1, Math.ceil(o.v)); }
-    c0 = Math.max(0, c0 - 1); c1 = Math.min(COLS, c1 + 1); r0 = Math.max(0, r0 - 1); r1 = Math.min(ROWS, r1 + 1);
+    c0 = Math.max(RU0, c0 - 1); c1 = Math.min(RU0 + COLS, c1 + 1); r0 = Math.max(RV0, r0 - 1); r1 = Math.min(RV0 + ROWS, r1 + 1);
     const span = (c1 - c0) + (r1 - r0);
     // No celular os botões do lado ficam por cima da grama: a roça usa a largura toda.
     const rw = cw < 700 ? cw - 12 : aw;
@@ -2382,25 +2350,39 @@ function layout(sc) {
   // Zoom em volta do meio da tela; arrastar anda pela parte que ficou de fora.
   const z = zoomOf(sc);
   L.W *= z; L.ox = cx + (L.ox - cx) * z; L.oy = cy + (L.oy - cy) * z;
-  // sempre dá para arrastar para os lados (e mais, se a cena não couber). A folga também depende do
-  // tamanho da fazenda (L.W = uma casa da grade), senão com o celular em pé (tela estreita) quase não arrastava.
-  // Pros lados (ovx) a folga é bem maior, pra dar pra passear por toda a extensão da roça/rancho sem travar.
-  const ovx = Math.max(aw * 0.6, L.W * 7, (box.w * z - aw) / 2 + Math.max(aw * 0.2, L.W * 2.5));
-  const ovy = Math.max(ah * 0.25, L.W * 2.5, (box.h * z - ah) / 2 + Math.max(ah * 0.1, L.W));
-  L.pan.x = clamp(L.pan.x, -ovx, ovx); L.pan.y = clamp(L.pan.y, -ovy, ovy);
+  if (sc === 'roca' || sc === 'animais') {
+    // Arrastar anda pela área inteira de construir (a mesma da linha pontilhada), em qualquer zoom.
+    // Antes a folga era um tanto fixo em volta do meio do enquadramento: com zoom grande metade da área
+    // ficava fora de alcance e o arrastar travava "do nada". Agora os limites vêm das pontas da área na
+    // tela: dá pra ir até a beirada esquerda/direita, até a frente e, pra trás, até o céu.
+    const [a0, b0, a1, b1] = areaDe(sc), mg = Math.max(L.W * 1.5, 40);
+    const xMin = iso(a0, b1).x - mg, xMax = iso(a1, b0).x + mg;
+    const yMax = iso(a1, b1).y + mg, yCeu = iso(CEU_MIN / 2, CEU_MIN / 2).y;
+    const loX = Math.min(I.l + aw - xMax, 0), hiX = Math.max(I.l - xMin, 0);
+    // pra trás para quando o horizonte chega lá pelo meio da área visível
+    const loY = Math.min(I.t + ah - yMax, 0), hiY = Math.max(I.t + ah * 0.45 - yCeu, 0);
+    const px = clamp(L.pan.x, loX, hiX), py = clamp(L.pan.y, loY, hiY);
+    // passou do limite arrastando? o "ponto de partida" do dedo acompanha, pra voltar na hora que
+    // mudar de direção (antes ficava uma zona morta: tinha que desfazer todo o excesso antes de mexer)
+    if (drag && drag.moved && !drag.item && drag.px !== undefined) { drag.px += px - L.pan.x; drag.py += py - L.pan.y; }
+    L.pan.x = px; L.pan.y = py;
+    L.canPan = true;
+  } else {
+    const ovx = Math.max(aw * 0.6, L.W * 7, (box.w * z - aw) / 2 + Math.max(aw * 0.2, L.W * 2.5));
+    const ovy = Math.max(ah * 0.25, L.W * 2.5, (box.h * z - ah) / 2 + Math.max(ah * 0.1, L.W));
+    L.pan.x = clamp(L.pan.x, -ovx, ovx); L.pan.y = clamp(L.pan.y, -ovy, ovy);
+    L.canPan = ovx > 0 || ovy > 0;
+  }
   L.ox += L.pan.x; L.oy += L.pan.y;
-  L.canPan = ovx > 0 || ovy > 0;
   L.horizon = Math.max(ch * 0.08, L.oy - L.W * 0.9);
 }
 function iso(c, r) { return { x: L.ox + (c - r) * L.W / 2, y: L.oy + (c + r) * L.W / 4 }; }
 function P(c, r, h = 0) { const q = iso(c, r); return { x: q.x, y: q.y - h * L.W }; }
 function cellAt(x, y) {
   const a = (x - L.ox) / (L.W / 2), b = (y - L.oy) / (L.W / 4);
-  const c = Math.floor((a + b) / 2), r = Math.floor((b - a) / 2);
-  if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return -1;
-  return r * COLS + c;
+  return plotAt((a + b) / 2, (b - a) / 2);
 }
-function cellCenter(i) { const c = i % COLS, r = Math.floor(i / COLS); return iso(c + .5, r + .5); }
+function cellCenter(i) { return iso(plotU(i) + .5, plotV(i) + .5); }
 function animalPos(id) { const m = amb[id]; return m ? iso(m.u, m.v) : null; }
 
 function poly(pts) { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y); ctx.closePath(); }
@@ -3648,7 +3630,7 @@ const BIG_SPOTS = [[0.62, 0.34], [0.36, 0.64]];
 const WEED_SPOTS = [[0.5, 0.16], [0.86, 0.55], [0.16, 0.86]];
 
 function drawPlot(i, p, t, home) {
-  const c = i % COLS, r = Math.floor(i / COLS), W = L.W;
+  const c = plotU(i), r = plotV(i), W = L.W;
   const [p1, p2, p3, p4] = diamond(c, r, 0.05);
   const hov = hover && hover.kind === 'plot' && hover.i === i;
   if (p.s === 'locked') {
@@ -3803,12 +3785,13 @@ function drawRoca(s, t, home) {
   const mov = home && moveMode && moving && moving.plot !== undefined ? moving.plot : -1;
   let d0 = -Infinity;
   for (let sum = 0; sum <= COLS + ROWS - 2; sum++) {
-    drawObjetos(s, 'roca', t, home, 'frente', d0, sum + 1); d0 = sum + 1;
+    const prof = sum + RU0 + RV0 + 1; // u+v (do mundo) da frente dessa diagonal de canteiros
+    drawObjetos(s, 'roca', t, home, 'frente', d0, prof); d0 = prof;
     for (let c = 0; c < COLS; c++) {
       const r = sum - c, i = r * COLS + c; if (r < 0 || r >= ROWS) continue;
       if (i === mov) continue; // está na mão do jogador
       drawPlot(i, s.plots[i], t, home);
-      if (home && moveMode && !moving && s.plots[i].s !== 'locked') { const [p1, p2, p3, p4] = diamond(c, r, 0.05); ctx.setLineDash([5, 5]); quad(p1, p2, p3, p4, null, 'rgba(255,255,255,.85)', 2); ctx.setLineDash([]); }
+      if (home && moveMode && !moving && s.plots[i].s !== 'locked') { const [p1, p2, p3, p4] = diamond(plotU(i), plotV(i), 0.05); ctx.setLineDash([5, 5]); quad(p1, p2, p3, p4, null, 'rgba(255,255,255,.85)', 2); ctx.setLineDash([]); }
     }
   }
   if (home) drawFolhas(t);
@@ -5514,7 +5497,7 @@ function objAt(x, y) {
     if (d < bd) { best = o; bd = d; }
   }
   // sem casa/enfeite ali: um canteiro seu também tem o menu (para mudar de lugar)
-  if (!best && scene === 'roca') { const i = cellAt(x, y); if (i >= 0 && state.plots[i].s !== 'locked') return { key: 'plot:' + i, plot: i, u: i % COLS + 0.5, v: Math.floor(i / COLS) + 0.5 }; }
+  if (!best && scene === 'roca') { const i = cellAt(x, y); if (i >= 0 && state.plots[i].s !== 'locked') return { key: 'plot:' + i, plot: i, u: plotU(i) + 0.5, v: plotV(i) + 0.5 }; }
   // sem nada ali: uma casinha construída do rancho também tem o menu (segurar em cima pra mover)
   if (!best && scene === 'animais') {
     const [wu, wv] = screenToWorld(x, y);
@@ -5541,7 +5524,7 @@ $('#ctxMenu').addEventListener('click', e => {
   const key = $('#ctxMenu').dataset.key; fecharMenuObj();
   if (b.dataset.ctx === 'mover' && key.startsWith('plot:')) {
     const i = Number(key.slice(5));
-    moveMode = true; moving = { plot: i, uma: true, u: i % COLS + 0.5, v: Math.floor(i / COLS) + 0.5 }; renderMoveBtn(); renderTools();
+    moveMode = true; moving = { plot: i, uma: true, u: plotU(i) + 0.5, v: plotV(i) + 0.5 }; renderMoveBtn(); renderTools();
     toast(moveDica('Canteiro'));
   } else if (b.dataset.ctx === 'mover' && key.startsWith('abrigo:')) {
     const id = key.slice(7), y0 = yardOf(id);
@@ -6546,7 +6529,7 @@ const critters = {};
 function critterHome(sc) {
   if (sc === 'roca') {
     const livres = [];
-    S().plots.forEach((p, i) => { if (p.s === 'locked') livres.push([i % COLS + 0.5, Math.floor(i / COLS) + 0.5]); });
+    S().plots.forEach((p, i) => { if (p.s === 'locked' && !plotCeu(i)) livres.push([plotU(i) + 0.5, plotV(i) + 0.5]); });
     if (livres.length) return livres[Math.floor(Math.random() * livres.length)];
     return [-1.5, 2 + Math.random() * 6];
   }
@@ -6949,14 +6932,15 @@ function drawAvatar(g, x, y, s, av, t, andando, dir = 1) {
 const avWalk = {};
 function avatarArea(sc) {
   if (sc === 'animais') return { u0: 0.3, u1: RANCH_C - 0.3, v0: RANCH_R + 0.35, v1: RANCH_R + 1.3 };
-  let c0 = COLS, c1 = 0, r0 = ROWS, r1 = 0;
-  S().plots.forEach((p, i) => { if (p.s !== 'locked') { const c = i % COLS, r = Math.floor(i / COLS); c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1); } });
+  let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
+  S().plots.forEach((p, i) => { if (p.s !== 'locked') { const c = plotU(i), r = plotV(i); c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1); } });
   if (c1 <= c0) { c0 = 0; c1 = 3; r0 = 0; r1 = 3; }
   // o avatar passeia numa faixa de grama fora das terras (na frente; se não couber, do lado; senão, fora da cerca)
   // (longe o bastante para o corpo dele não ficar na frente das terras)
-  if (ROWS - r1 >= 2.8) return { u0: c0 + 0.8, u1: Math.min(COLS - 0.3, Math.max(c0 + 1.2, c1 + 0.8)), v0: r1 + 1.8, v1: Math.min(ROWS - 0.25, r1 + 2.6) };
-  if (COLS - c1 >= 2.8) return { u0: c1 + 1.8, u1: Math.min(COLS - 0.25, c1 + 2.6), v0: r0 + 0.6, v1: Math.min(ROWS - 0.3, Math.max(r0 + 1, r1 + 0.6)) };
-  return { u0: 0.5, u1: COLS - 0.5, v0: ROWS + 0.5, v1: ROWS + 1.1 };
+  const U1 = RU0 + COLS, V1 = RV0 + ROWS;
+  if (V1 - r1 >= 2.8) return { u0: c0 + 0.8, u1: Math.min(U1 - 0.3, Math.max(c0 + 1.2, c1 + 0.8)), v0: r1 + 1.8, v1: Math.min(V1 - 0.25, r1 + 2.6) };
+  if (U1 - c1 >= 2.8) return { u0: c1 + 1.8, u1: Math.min(U1 - 0.25, c1 + 2.6), v0: r0 + 0.6, v1: Math.min(V1 - 0.3, Math.max(r0 + 1, r1 + 0.6)) };
+  return { u0: c0, u1: c1, v0: r1 + 0.5, v1: r1 + 1.1 };
 }
 // quem: 'eu' (o seu avatar, que vai junto nas visitas) ou 'dono' (o avatar do dono da roça visitada).
 function drawAvatarWalk(sc, t, quem = 'eu') {
@@ -7004,12 +6988,12 @@ function folhasTick() {
 }
 // Um lugar livre no gramado da roça, dentro da cerca (fora dos canteiros e sem encostar em nada).
 function novaFolha() {
-  let c0 = COLS, c1 = 0, r0 = ROWS, r1 = 0;
-  state.plots.forEach((p, i) => { if (p.s !== 'locked') { const c = i % COLS, r = Math.floor(i / COLS); c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1); } });
+  let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
+  state.plots.forEach((p, i) => { if (p.s !== 'locked') { const c = plotU(i), r = plotV(i); c0 = Math.min(c0, c); c1 = Math.max(c1, c + 1); r0 = Math.min(r0, r); r1 = Math.max(r1, r + 1); } });
   if (c1 <= c0) { c0 = 0; c1 = 3; r0 = 0; r1 = 3; }
   for (let k = 0; k < 60; k++) {
     const u = Math.round((c0 - 1.5 + Math.random() * (c1 - c0 + 3.5)) * 20) / 20, v = Math.round((r0 - 1.5 + Math.random() * (r1 - r0 + 3.5)) * 20) / 20;
-    if (u < 0.5 || v < 0.5 || u > COLS - 0.5 || v > ROWS - 0.5 || !validSpot('roca', u, v, null, 0.45)) continue; // só dentro da cerca
+    if (u < RU0 + 0.5 || v < RV0 + 0.5 || u > RU0 + COLS - 0.5 || v > RV0 + ROWS - 0.5 || !validSpot('roca', u, v, null, 0.45)) continue; // só dentro da cerca
     if (folhasDe().some(f => Math.hypot(f.u - u, f.v - v) < 1)) continue;
     folhasDe().push({ id: Math.random().toString(36).slice(2, 8), u, v, at: Date.now() });
     return true;
@@ -7358,8 +7342,8 @@ function drawCritters(t, tod) {
   const W = L.W, est = estacao(), chuva = raining(), cena = crittersOf(scene), s = W / 100 * (scene === 'animais' ? 1.5 : 1.1);
   // Se o lote onde o bichinho morava virou canteiro, ele muda para outro pedaço de grama.
   if (scene === 'roca') for (const c of cena.list) {
-    const i = Math.floor(c.hv) * COLS + Math.floor(c.hu);
-    if (c.hu >= 0 && c.hu < COLS && c.hv >= 0 && c.hv < ROWS && S().plots[i].s !== 'locked') {
+    const i = plotAt(c.hu, c.hv);
+    if (i >= 0 && S().plots[i].s !== 'locked') {
       const [u, v] = critterHome('roca'); Object.assign(c, { u, v, hu: u, hv: v, fu: u, fv: v, tu: u, tv: v });
     }
   }
@@ -8777,34 +8761,37 @@ const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + objetosD
 // no rancho também, não só na roça. Na roça a margem continua 0: a terra de canteiros já cobre a grade
 // toda, então o limite de decoração é o mesmo limite do mapa — sem "dois limites" diferentes e confusos.
 const MARGEM_ITENS = 28;
-const margemPara = sc => sc === 'roca' ? 0 : MARGEM_ITENS;
 // u+v é "quão pra trás" (rumo ao horizonte) um ponto está: iso() sobe na tela conforme u+v cai, e o
 // chão só é pintado até a linha do horizonte — abaixo de 0 o ponto já cai no céu. Vale pros dois eixos
 // juntos (não cada um sozinho), senão um canto como (-14, 0) também ia parar lá em cima.
 const CEU_MIN = 0;
+// Retângulo [u0, v0, u1, v1] onde dá para construir/decorar. A roça e o rancho têm o mesmo formato:
+// a fazenda lá no alto, no meio, e a área abrindo pros dois lados e pra frente, cortada reto pelo céu.
+const areaDe = sc => sc === 'roca' ? [RU0, RV0, RU0 + COLS, RV0 + ROWS]
+  : [-MARGEM_ITENS, -MARGEM_ITENS, RANCH_C + MARGEM_ITENS, RANCH_R + MARGEM_ITENS];
 // Dá para pôr fora dos canteiros e dos cercados, sem encostar em outra coisa.
 function validSpot(sc, u, v, ignora, raio = 0.55) {
-  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R];
+  const B = [RANCH_C, RANCH_R];
   if (sc === 'roca') {
     // na roça dá para pôr em qualquer lugar do gramado, desde que não encoste em canteiro
     const m = raio * 0.7;
     for (let c = Math.floor(u - m); c <= Math.floor(u + m); c++) for (let r = Math.floor(v - m); r <= Math.floor(v + m); r++) {
-      if (c < 0 || r < 0 || c >= COLS || r >= ROWS) continue;
-      if (state.plots[r * COLS + c].s !== 'locked') return false;
+      const i = plotAt(c, r);
+      if (i >= 0 && state.plots[i].s !== 'locked') return false;
     }
   } else if (u > -0.5 && u < B[0] + 0.5 && v > -0.5 && v < B[1] + 0.5) return false; // no rancho, os cercados ocupam tudo
-  const m = margemPara(sc);
-  if (u < -m || v < -m || u > B[0] + m || v > B[1] + m) return false;
+  const [a0, b0, a1, b1] = areaDe(sc);
+  if (u < a0 || v < b0 || u > a1 || v > b1) return false;
   if (u + v < CEU_MIN) return false; // não deixa pôr nada lá em cima, onde já é céu
   if (sc === 'roca' && temaDe(state).lago && Math.hypot(u - LAGO_POS[0], v - LAGO_POS[1]) < 1.4) return false;
   return objList(state, sc).every(o => o.key === ignora || (o.cerca ? distCerca(u, v, o) >= raio * 0.75 : Math.hypot(o.u - u, o.v - v) >= (o.r + raio) * 0.75));
 }
 // Linha pontilhada marcando o limite de onde dá para colocar enfeite/cerca (com o canto de trás cortado
 // na diagonal u+v=CEU_MIN, pra bater com o céu excluído lá em cima). Na roça esse já é o próprio limite
-// da terra de canteiros (margemPara('roca') é 0): um limite só, igual ao limite do mapa.
+// da terra de canteiros: um limite só, igual ao limite do mapa (mesmo formato do rancho).
 function drawLimiteItens(sc) {
-  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R], m = margemPara(sc);
-  const pts = [[CEU_MIN + m, -m], [B[0] + m, -m], [B[0] + m, B[1] + m], [-m, B[1] + m], [-m, CEU_MIN + m]].map(([u, v]) => iso(u, v));
+  const [a0, b0, a1, b1] = areaDe(sc);
+  const pts = [[CEU_MIN - b0, b0], [a1, b0], [a1, b1], [a0, b1], [a0, CEU_MIN - a0]].map(([u, v]) => iso(u, v));
   ctx.save();
   ctx.setLineDash([10, 8]); ctx.strokeStyle = 'rgba(40,30,20,.3)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
@@ -8817,8 +8804,7 @@ function drawLimiteItens(sc) {
 // cercado, lago, outro enfeite nem o céu). Posições fixas (mesmo padrão dos TUFTS do gramado).
 const MATINHOS = Array.from({ length: 220 }, () => [Math.random(), Math.random(), Math.random()]);
 function drawMatinhos(sc) {
-  const B = sc === 'roca' ? [COLS, ROWS] : [RANCH_C, RANCH_R], m = margemPara(sc);
-  const u0 = -m, u1 = B[0] + m, v0 = -m, v1 = B[1] + m, { cw, ch } = L;
+  const [u0, v0, u1, v1] = areaDe(sc), { cw, ch } = L;
   for (const [rx, ry, rk] of MATINHOS) {
     const u = u0 + rx * (u1 - u0), v = v0 + ry * (v1 - v0);
     const q = iso(u, v);
@@ -8839,11 +8825,11 @@ function distCerca(u, v, o) {
   return Math.hypot(u - (a + (c - a) * k), v - (b + (d - b) * k));
 }
 function validCerca(u, v, rot, ignora) {
-  const m = margemPara('roca');
-  if (u < -m || v < -m || u > COLS + m || v > ROWS + m) return false;
+  const [a0, b0, a1, b1] = areaDe('roca');
+  if (u < a0 || v < b0 || u > a1 || v > b1) return false;
   if (u + v < CEU_MIN) return false; // não deixa pôr cerca lá em cima, onde já é céu
   // não fica no meio de dois canteiros (na beirada de um canteiro pode)
-  const dono = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS && state.plots[r * COLS + c].s !== 'locked';
+  const dono = (c, r) => { const i = plotAt(c, r); return i >= 0 && state.plots[i].s !== 'locked'; };
   if (rot ? dono(u - 1, Math.floor(v)) && dono(u, Math.floor(v)) : dono(Math.floor(u), v - 1) && dono(Math.floor(u), v)) return false;
   if (temaDe(state).lago && Math.hypot(u - LAGO_POS[0], v - LAGO_POS[1]) < 1.3) return false;
   const [a, b] = pontasCerca(u, v, rot);
@@ -8885,9 +8871,8 @@ const ehAgua = id => !!(ENFEITE[id] && ENFEITE[id].agua);
 const movAgua = () => moving && (moving.novo ? ehAgua(moving.novo) : moving.key && moving.key.startsWith('enf:') && ehAgua((objetosDe(state, scene)[Number(moving.key.slice(4))] || {}).id));
 const encaixaAgua = (u, v) => [Math.floor(u) + 0.5, Math.floor(v) + 0.5];
 function validAgua(u, v) {
-  const c = Math.floor(u), r = Math.floor(v);
-  if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return false;
-  const i = r * COLS + c;
+  const i = plotAt(u, v);
+  if (i < 0 || plotCeu(i)) return false;
   return state.plots[i].s === 'locked' && !objetoNaCelula(i);
 }
 // Uma casa do rancho sendo movida? moving.u/v é o centro do cercado (4 × 3,8), não um pontinho.
@@ -8909,11 +8894,11 @@ function validYardPos(id, cu, cv) {
   return !(kx > u0 - 0.8 && kx < u1 + 0.8 && kv > v0 - 0.8 && kv < v1 + 0.8);
 }
 // Um canteiro só vai para um pedaço de terra livre (sem canteiro, enfeite ou folhas em cima).
-const celulaMov = () => { const c = Math.floor(moving.u), r = Math.floor(moving.v); return c >= 0 && r >= 0 && c < COLS && r < ROWS ? r * COLS + c : -1; };
+const celulaMov = () => { const j = plotAt(moving.u, moving.v); return j >= 0 && !plotCeu(j) ? j : -1; };
 function validCanteiro(i, j) {
   if (j < 0) return false;
   if (j === i) return true;
-  const c = j % COLS + 0.5, r = Math.floor(j / COLS) + 0.5;
+  const c = plotU(j) + 0.5, r = plotV(j) + 0.5;
   return state.plots[j].s === 'locked' && !objetoNaCelula(j) && !folhasDe().some(f => Math.abs(f.u - c) < 0.75 && Math.abs(f.v - r) < 0.75);
 }
 // O lugar onde está o item na mão serve?
@@ -8977,7 +8962,7 @@ function moveClick(x, y) {
     }
     if ((!alvo || alvo.kind !== 'obj') && cel >= 0 && state.plots[cel].s !== 'locked') {
       // canteiro: vai inteiro para outro pedaço de terra, com o que estiver plantado
-      moving = { plot: cel, u: cel % COLS + 0.5, v: Math.floor(cel / COLS) + 0.5 };
+      moving = { plot: cel, u: plotU(cel) + 0.5, v: plotV(cel) + 0.5 };
       renderMoveBar();
       return toast(moveDica('Canteiro'));
     }
@@ -9103,7 +9088,10 @@ $('#moveCancel')?.addEventListener('click', cancelarMove);
 function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
   const W = L.W, tm = temaDe(s);
   let cachorroDepois = false;
-  const l = objList(s, sc).filter(o => (o.u < 0 || o.v < 0) === (stage === 'tras') && o.u + o.v >= d0 && o.u + o.v < d1).sort((a, b) => (a.u + a.v) - (b.u + b.v));
+  // Na roça a terra agora se estende pros dois lados da casa (u ou v negativos também têm canteiro),
+  // então tudo entra na ordem de profundidade junto com os canteiros ('tras' não desenha nada lá).
+  const atras = o => sc !== 'roca' && (o.u < 0 || o.v < 0);
+  const l = objList(s, sc).filter(o => atras(o) === (stage === 'tras') && o.u + o.v >= d0 && o.u + o.v < d1).sort((a, b) => (a.u + a.v) - (b.u + b.v));
   for (const o of l) {
     if (moving && !moving.novo && moving.key === o.key) continue; // está na mão do jogador
     if (o.key === 'placa' && !(home && landSignText())) continue; // só aparece na sua roça, com terra para comprar
@@ -9194,7 +9182,7 @@ function drawMoving(sc, t) {
     // canteiro: o pedaço de terra de destino fica verde (pode) ou vermelho (não pode)
     const j = celulaMov(), ok = validCanteiro(moving.plot, j);
     if (j < 0) return;
-    const [p1, p2, p3, p4] = diamond(j % COLS, Math.floor(j / COLS), 0.02);
+    const [p1, p2, p3, p4] = diamond(plotU(j), plotV(j), 0.02);
     ctx.globalAlpha = 0.8; drawPlot(j, state.plots[moving.plot], t, false); ctx.globalAlpha = 1;
     quad(p1, p2, p3, p4, ok ? 'rgba(80,200,80,.3)' : 'rgba(220,60,50,.35)', ok ? 'rgba(255,255,255,.9)' : 'rgba(255,200,200,.9)', 2.5);
     return;
@@ -9410,11 +9398,11 @@ function fecharLayouts() { $('#layouts').hidden = true; }
 function layoutPreviewIcon(sc, L) {
   const key = 'layout:' + sc + ':' + L.objetos.map(o => `${o.id}@${o.u},${o.v}`).join('|');
   return makeIcon(key, () => {
-    const B = sc === 'animais' ? [RANCH_C, RANCH_R] : [COLS, ROWS];
+    const [a0, b0, a1, b1] = areaDe(sc === 'animais' ? 'animais' : 'roca');
     ctx.fillStyle = '#bfe08a'; ctx.fillRect(3, 3, 90, 90);
     ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 2; ctx.strokeRect(3, 3, 90, 90);
     for (const o of L.objetos) {
-      const px = 3 + clamp(o.u / B[0], 0, 1) * 90, py = 3 + clamp(o.v / B[1], 0, 1) * 90;
+      const px = 3 + clamp((o.u - a0) / (a1 - a0), 0, 1) * 90, py = 3 + clamp((o.v - b0) / (b1 - b0), 0, 1) * 90;
       const cor = ehAgua(o.id) ? '#4f95d8' : ehCerca(o.id) ? '#8a5a33' : (ENFEITE[o.id] && ENFEITE[o.id].fruteira) ? '#4f9a2f' : '#e0a800';
       ctx.fillStyle = cor; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(px, py, 3.4, 0, 7); ctx.fill(); ctx.stroke();
     }
@@ -10720,7 +10708,7 @@ function invasaoTick(forca) {
   if (!alvos.length) return;
   state.invasaoUlt = agora; save();
   const tipo = state.level >= 12 && Math.random() < 0.35 ? 'javali' : 'rato', i = alvos[Math.floor(Math.random() * alvos.length)];
-  const u = i % COLS + 0.5, v = Math.floor(i / COLS) + 0.5, lado = Math.random() < 0.5 ? 1 : -1;
+  const u = plotU(i) + 0.5, v = plotV(i) + 0.5, lado = Math.random() < 0.5 ? 1 : -1;
   const d = state.dogs && state.dogs.roca;
   invasor = { tipo, i, u, v, fase: 'chegando', t0: performance.now(), de: [u + 4 * lado, v + 3.5], dir: lado > 0 ? -1 : 1,
     destino: armadilhaPronta() ? 'armadilha' : d && dogAwake(d) && Math.random() < 0.75 ? 'cachorro' : 'espera' };
