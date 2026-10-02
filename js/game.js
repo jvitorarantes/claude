@@ -1250,6 +1250,7 @@ const NOVIDADES = [
   { v: 204, txt: 'O mapa aumentou de novo: a roça (terreno e plantação) ficou com mais espaço ainda (28×84), e o rancho também — a área pra espalhar enfeite e mover os cercados dobrou.' },
   { v: 205, txt: 'O mapa da roça virou quadrado: agora é 64×64, bem maior que antes.' },
   { v: 206, txt: 'Corrigido o zoom/arrastar da roça: a câmera estava se afastando demais pra tentar mostrar todo canteiro que dava pra comprar (o que virou o mapa inteiro depois que ele cresceu), deixando tudo pequeno e o deslize estranho. Agora ela enquadra só a terra que você já tem, do jeito que era antes.' },
+  { v: 210, txt: 'Agora o giro dá a volta completa: 4 posições, de 90° em 90°. Casa, celeiro e casinha do cachorro mostram os fundos (sem a porta e as janelas da frente) nos giros 2 e 3; árvores e decorações viram para o outro lado.' },
   { v: 209, txt: 'Agora dá pra girar 90° as construções (casa, celeiro, casinha do cachorro, pesqueiro, árvores) e as decorações: no modo Mover, pegue o item e toque em Girar (ou aperte R). As casas dos bichos já giravam; as cercas continuam como estavam. E a placa de expansão de terrenos agora tem tamanho fixo: não aumenta nem diminui mais com o zoom.' },
   { v: 208, txt: 'A área da roça agora tem o mesmo formato da do rancho: a fazenda fica lá no alto, no meio, e o terreno abre pros dois lados e pra frente, cortado reto pelo céu. E o arrastar foi refeito: com qualquer zoom dá pra ir até a beirada da área (esquerda, direita, frente e até o céu), e ao mudar de direção a tela responde na hora, sem ficar presa.' },
   { v: 207, txt: 'O arrastar da tela na roça agora segue a mesma lógica do rancho: a folga de deslizar bate certinho com o tamanho de verdade do que está na tela (antes ficava sempre do tamanho da janela, sem ligação com o zoom, e o deslize ficava esquisito).' },
@@ -2551,7 +2552,7 @@ function temaCasa(skin, cor) {
   const tm = TEMA_CASA[skin] && skin !== 'classico' ? TEMA_CASA[skin] : TEMA_CASA.classico;
   return cor && !TEMA_CASA[skin] ? Object.assign({}, tm, { parede: cor }) : tm;
 }
-function drawHouse(x, y, s, cor, skin) {
+function drawHouse(x, y, s, cor, skin, costas) {
   const tm = temaCasa(skin, cor), fw = s * 0.66, fh = s * 0.4, rh = s * 0.3, dx = s * 0.34, dy = -s * 0.17, ov = s * 0.05;
   const X0 = x - (fw + dx) / 2, Y = y - dy / 2;
   ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.62, s * 0.12, 0, 0, 7); ctx.fill();
@@ -2578,23 +2579,25 @@ function drawHouse(x, y, s, cor, skin) {
   // janelinha redonda na empena
   ctx.fillStyle = tm.moldura; ctx.beginPath(); ctx.arc(cume[0], Y - fh - rh * 0.4, s * 0.045, 0, 7); ctx.fill();
   ctx.fillStyle = '#ffe9a8'; ctx.beginPath(); ctx.arc(cume[0], Y - fh - rh * 0.4, s * 0.03, 0, 7); ctx.fill();
+  if (!costas) {
   // porta com arco, degrau e maçaneta
   const pw = fw * 0.24, ph = fh * 0.66, px = X0 + fw * 0.5 - pw / 2;
   ctx.fillStyle = tomCor(tm.parede, -0.35); ctx.fillRect(px - s * 0.02, Y - s * 0.02, pw + s * 0.04, s * 0.03);
   ctx.fillStyle = tm.porta; ctx.beginPath(); ctx.moveTo(px, Y); ctx.lineTo(px, Y - ph + pw / 2); ctx.arc(px + pw / 2, Y - ph + pw / 2, pw / 2, Math.PI, 0); ctx.lineTo(px + pw, Y); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#e8c35a'; ctx.beginPath(); ctx.arc(px + pw * 0.78, Y - ph * 0.45, s * 0.012, 0, 7); ctx.fill();
+  }
   // janelas da frente e da lateral
   const jw = fw * 0.18, jh = fh * 0.3;
-  janelaCasa(X0 + fw * 0.08, Y - fh * 0.72, jw, jh, tm); janelaCasa(X0 + fw * 0.74, Y - fh * 0.72, jw, jh, tm);
+  if (!costas) janelaCasa(X0 + fw * 0.08, Y - fh * 0.72, jw, jh, tm), janelaCasa(X0 + fw * 0.74, Y - fh * 0.72, jw, jh, tm);
   // floreira embaixo das janelas
-  for (const jx of [X0 + fw * 0.08, X0 + fw * 0.74]) { ctx.fillStyle = '#8a5a33'; ctx.fillRect(jx - 1, Y - fh * 0.72 + jh + 2, jw + 2, s * 0.025); for (let k = 0; k < 3; k++) { ctx.fillStyle = ['#e0503a', '#f2c14e', '#e86aa0'][k]; ctx.beginPath(); ctx.arc(jx + jw * (0.2 + k * 0.3), Y - fh * 0.72 + jh + 1, s * 0.014, 0, 7); ctx.fill(); } }
+  if (!costas) for (const jx of [X0 + fw * 0.08, X0 + fw * 0.74]) { ctx.fillStyle = '#8a5a33'; ctx.fillRect(jx - 1, Y - fh * 0.72 + jh + 2, jw + 2, s * 0.025); for (let k = 0; k < 3; k++) { ctx.fillStyle = ['#e0503a', '#f2c14e', '#e86aa0'][k]; ctx.beginPath(); ctx.arc(jx + jw * (0.2 + k * 0.3), Y - fh * 0.72 + jh + 1, s * 0.014, 0, 7); ctx.fill(); } }
   ctx.save(); ctx.transform(1, dy / dx, 0, 1, 0, 0);
   const lx = X0 + fw + dx * 0.35, ly = (Y - fh * 0.72) - (dy / dx) * (X0 + fw + dx * 0.35) + dy * 0.35;
   janelaCasa(lx, ly, dx * 0.32, jh, tm); ctx.restore();
   if (tm.estrela) star(cume[0], Y - fh - rh * 0.4, s * 0.04);
   if (tm.icone === 'trevo') desenhaTrevo(ctx, cume[0], Y - fh - rh * 0.42, s * 0.035);
 }
-function drawBarn(x, y, s, skin) {
+function drawBarn(x, y, s, skin, costas) {
   const tm = temaCasa(skin), fw = s * 0.72, fh = s * 0.44, rh = s * 0.34, dx = s * 0.36, dy = -s * 0.18, ov = s * 0.05;
   const X0 = x - (fw + dx) / 2, Y = y - dy / 2;
   ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.64, s * 0.12, 0, 0, 7); ctx.fill();
@@ -2614,9 +2617,11 @@ function drawBarn(x, y, s, skin) {
   // porta grande com X e a janela do feno
   ctx.lineWidth = Math.max(1.5, s * 0.025);
   const dw = fw * 0.44, dh = fh * 0.72, dxp = X0 + fw / 2 - dw / 2;
-  ctx.fillStyle = tomCor(tm.celeiro, -0.3); ctx.fillRect(dxp, Y - dh, dw, dh);
-  ctx.strokeRect(dxp, Y - dh, dw, dh);
-  ctx.beginPath(); ctx.moveTo(dxp, Y - dh); ctx.lineTo(dxp + dw, Y); ctx.moveTo(dxp + dw, Y - dh); ctx.lineTo(dxp, Y); ctx.moveTo(dxp + dw / 2, Y - dh); ctx.lineTo(dxp + dw / 2, Y); ctx.stroke();
+  if (!costas) {
+    ctx.fillStyle = tomCor(tm.celeiro, -0.3); ctx.fillRect(dxp, Y - dh, dw, dh);
+    ctx.strokeRect(dxp, Y - dh, dw, dh);
+    ctx.beginPath(); ctx.moveTo(dxp, Y - dh); ctx.lineTo(dxp + dw, Y); ctx.moveTo(dxp + dw, Y - dh); ctx.lineTo(dxp, Y); ctx.moveTo(dxp + dw / 2, Y - dh); ctx.lineTo(dxp + dw / 2, Y); ctx.stroke();
+  }
   const hw = fw * 0.2, hh = rh * 0.34, hy = Y - fh - rh * 0.5;
   ctx.fillStyle = '#5a3a1f'; ctx.fillRect(cume[0] - hw / 2, hy, hw, hh); ctx.strokeRect(cume[0] - hw / 2, hy, hw, hh);
   ctx.fillStyle = '#e8c35a'; ctx.fillRect(cume[0] - hw / 2 + 2, hy + hh * 0.55, hw - 4, hh * 0.4); // feno
@@ -2717,7 +2722,7 @@ function drawDog(x, y, s, t, raca = 'caramelo', sleeping = false) {
   ctx.lineCap = 'butt';
 }
 // Casinha de cachorro, com a base centrada em (x, y).
-function drawKennel(x, y, s, skin) {
+function drawKennel(x, y, s, skin, costas) {
   // casinha em "2,5D": frente com empena, lateral mais escura, telhado com beiral, plaquinha e tigela.
   // Com tema de casa, usa as cores do celeiro do tema.
   const fw = s * 0.5, fh = s * 0.3, rh = s * 0.22, dx = s * 0.26, dy = -s * 0.13, ov = s * 0.04;
@@ -2735,10 +2740,12 @@ function drawKennel(x, y, s, skin) {
   ctx.beginPath(); ctx.moveTo(X0 - ov, Y - fh + ov); ctx.lineTo(cume[0], cume[1]); ctx.lineTo(bD[0], bD[1]); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(cume[0], cume[1]); ctx.lineTo(cume[0] + dx, cume[1] + dy); ctx.stroke(); ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
   if (estacao().neve) forma([cume, [cume[0] + (bD[0] - cume[0]) * 0.5, cume[1] + (bD[1] - cume[1]) * 0.5], [cume[0] + (bD[0] - cume[0]) * 0.5 + dx, cume[1] + (bD[1] - cume[1]) * 0.5 + dy], [cume[0] + dx, cume[1] + dy]], '#ffffff');
+  if (!costas) {
   // porta em arco com moldura clara
   const pw = fw * 0.44, ph = fh * 0.8, px = X0 + fw / 2;
   ctx.fillStyle = '#f3e3c0'; ctx.beginPath(); ctx.moveTo(px - pw / 2 - 2, Y); ctx.lineTo(px - pw / 2 - 2, Y - ph + pw / 2); ctx.arc(px, Y - ph + pw / 2, pw / 2 + 2, Math.PI, 0); ctx.lineTo(px + pw / 2 + 2, Y); ctx.fill();
   ctx.fillStyle = '#3a2412'; ctx.beginPath(); ctx.moveTo(px - pw / 2, Y); ctx.lineTo(px - pw / 2, Y - ph + pw / 2); ctx.arc(px, Y - ph + pw / 2, pw / 2, Math.PI, 0); ctx.lineTo(px + pw / 2, Y); ctx.fill();
+  }
   // plaquinha com osso
   ctx.fillStyle = '#f3e3c0'; ctx.beginPath(); ctx.roundRect(cume[0] - s * 0.07, Y - fh - rh * 0.55, s * 0.14, s * 0.06, 2); ctx.fill();
   ctx.fillStyle = '#b88350'; ctx.fillRect(cume[0] - s * 0.035, Y - fh - rh * 0.55 + s * 0.022, s * 0.07, s * 0.016);
@@ -2757,11 +2764,11 @@ function dogPos(slot) {
 }
 // Casinha + cachorro (ou o lugar vazio) na sua roça ou na de um amigo.
 // A casinha vai atrás da cerca; o cachorro, na frente, para aparecer bem.
-function drawKennelSpot(slot, s, home) {
+function drawKennelSpot(slot, s, home, costas) {
   const d = s.dogs && s.dogs[slot];
   if (!home && !dogAlive(d)) return;
   const k = KENNEL_AT();
-  drawKennel(k.x, k.y, L.W * 0.85, s.skin);
+  drawKennel(k.x, k.y, L.W * 0.85, s.skin, costas);
 }
 function tipCanil(slot) {
   const c = S().dogs && S().dogs[slot]; if (!c) return null;
@@ -8744,10 +8751,12 @@ const POS_PADRAO = {
 };
 const LAGO_POS = [3.55, -1.95];
 const OBJ_INFO = { casa: { nome: 'Casa', r: 1.1 }, celeiro: { nome: 'Celeiro', r: 1.2 }, canil: { nome: 'Casinha do cachorro', r: 0.8 }, arv1: { nome: 'Árvore', r: 0.7 }, arv2: { nome: 'Árvore', r: 0.7 }, pesqueiro: { nome: 'Pesqueiro', r: 0.9 }, placa: { nome: 'Placa de terras', r: 0.45 }, mata: { nome: 'Trilha da caçada', r: 1.0 }, armadilha: { nome: 'Armadilha de pragas', r: 0.45 } };
-// Giro de 90°: os desenhos são vistos de um ângulo só (isométrico), então virar o item 90° mostra o lado
-// de lá — o mesmo que espelhar a imagem em volta do ponto dele. rot 0/1 (1 = virado).
+// Giro de 90° em 90° (rot 0..3, sentido contrário ao relógio visto de cima): os desenhos são 2,5D, vistos
+// de um ângulo só. Nos giros ímpares a imagem fica espelhada (as faces trocam de lado); nos giros 2 e 3
+// as construções (casa, celeiro, casinha) mostram os fundos, sem porta nem janelas da frente. Itens sem
+// "costas" (árvores, enfeites) ficam iguais no giro 2 ao giro 0.
 const comGiro = (x, rot, fn) => {
-  if (!rot) return fn();
+  if (!(rot % 2)) return fn();
   ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0);
   try { fn(); } finally { ctx.restore(); }
 };
@@ -8760,9 +8769,9 @@ function posOf(s, sc, key) {
 }
 const objetosDe = (s, sc) => (s.objetos && Array.isArray(s.objetos[sc]) ? s.objetos[sc] : []).filter(o => o && ENFEITE[o.id]);
 function objList(s, sc) {
-  const l = Object.keys(POS_PADRAO[sc]).filter(key => key !== 'armadilha' || s.armadilha).map(key => { const [u, v] = posOf(s, sc, key); return { key, u, v, r: OBJ_INFO[key].r, rot: s.rotPos && s.rotPos[sc] && s.rotPos[sc][key] ? 1 : 0 }; });
+  const l = Object.keys(POS_PADRAO[sc]).filter(key => key !== 'armadilha' || s.armadilha).map(key => { const [u, v] = posOf(s, sc, key); return { key, u, v, r: OBJ_INFO[key].r, rot: (s.rotPos && s.rotPos[sc] && s.rotPos[sc][key]) | 0 }; });
   objetosDe(s, sc).forEach((o, i) => l.push(ehCerca(o.id) ? { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: 0.3, obj: o, cerca: true, rot: o.rot ? 1 : 0 }
-    : { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: ENFEITE[o.id].fruteira === 'arvore' ? 0.65 : 0.55, obj: o, rot: o.rot ? 1 : 0 }));
+    : { key: 'enf:' + i, id: o.id, u: o.u, v: o.v, r: ENFEITE[o.id].fruteira === 'arvore' ? 0.65 : 0.55, obj: o, rot: (o.rot | 0) % 4 }));
   return l;
 }
 const confortoEnfeites = s => ['roca', 'animais'].reduce((t, sc) => t + objetosDe(s, sc).reduce((u, o) => u + ENFEITE[o.id].conforto, 0), 0);
@@ -8925,7 +8934,7 @@ function movOk() {
 const movGiravel = () => !!moving && moving.plot === undefined && !movCerca() && !movAgua() && !movAbrigoId() && (moving.novo || giravel(moving.key));
 function girarItem() {
   if (!movGiravel()) return;
-  moving.rot = moving.rot ? 0 : 1;
+  moving.rot = ((moving.rot | 0) + 1) % 4;
   sfx('click'); renderMoveBar();
 }
 const girarMovendo = () => { if (movAbrigoId()) girarAbrigo(); else if (movCerca()) girarCerca(); else girarItem(); };
@@ -9044,14 +9053,14 @@ function salvarMove() {
   if (moving.novo) {
     if (!(state.enfeites[moving.novo] > 0)) { moving = null; return; }
     const novo = { id: moving.novo, u, v };
-    if (moving.rot) novo.rot = 1;
+    if (moving.rot) novo.rot = moving.rot | 0;
     if (ENFEITE[moving.novo].fruteira) { novo.t0 = Date.now(); novo.ult = Date.now(); novo.colhidas = 0; novo.fid = newId(); } // frutífera: começa a contar ao plantar
     (state.objetos[scene] = objetosDe(state, scene)).push(novo);
     state.enfeites[moving.novo]--;
     toast(`${ENFEITE[moving.novo].nome} colocado! +${ENFEITE[moving.novo].conforto}% de XP.`, 'good');
     moveMode = false; renderMoveBtn(); // pôr um item do inventário termina o modo
   } else if (moving.key.startsWith('enf:')) {
-    const o = objetosDe(state, scene)[Number(moving.key.slice(4))]; if (o) { o.u = u; o.v = v; if (cerca) o.rot = moving.rot || 0; else if (!agua) { if (moving.rot) o.rot = 1; else delete o.rot; } }
+    const o = objetosDe(state, scene)[Number(moving.key.slice(4))]; if (o) { o.u = u; o.v = v; if (cerca) o.rot = moving.rot || 0; else if (!agua) { if (moving.rot) o.rot = moving.rot | 0; else delete o.rot; } }
   } else if (abrigoId) {
     const antes = yardOf(abrigoId);
     state.animPos = state.animPos || {}; state.animPos[abrigoId] = [u - YARD_W / 2, v - YARD_D / 2];
@@ -9061,7 +9070,7 @@ function salvarMove() {
     if (du || dv) for (const a of livesIn(state, abrigoId)) { const m = amb[a.id]; if (m) { m.u += du; m.v += dv; m.tu += du; m.tv += dv; } }
   } else {
     state.pos = state.pos || {}; (state.pos[scene] = state.pos[scene] || {})[moving.key] = [u, v];
-    if (giravel(moving.key)) { state.rotPos = state.rotPos || {}; (state.rotPos[scene] = state.rotPos[scene] || {})[moving.key] = moving.rot ? 1 : 0; }
+    if (giravel(moving.key)) { state.rotPos = state.rotPos || {}; (state.rotPos[scene] = state.rotPos[scene] || {})[moving.key] = moving.rot | 0; }
   }
   if (moving.uma) { moveMode = false; renderMoveBtn(); }
   moving = null; sfx('buy'); done(); renderMoveBar();
@@ -9082,7 +9091,7 @@ function renderMoveBar() {
     : !ok ? (moving.plot !== undefined ? (celulaMov() < 0 ? 'Aqui não dá: já é fora do mapa' : 'Aqui não dá: escolha um gramado livre') : movCerca() ? 'Aqui não dá: entre canteiros ou em cima de algo' : movAbrigoId() ? 'Aqui não dá: o cercado não pode encostar em outro nem ficar longe demais do rancho' : 'Aqui não dá: fora dos canteiros e cercados')
     : movCerca() ? (pointer.touch ? 'Arraste a cerca e salve (Girar muda o lado)' : 'Clique para pôr a cerca · R gira')
     : movAbrigoId() ? (pointer.touch ? 'Arraste a casinha e salve (Girar muda a casinha de lado)' : 'Clique para soltar · R gira a casinha')
-    : movGiravel() ? (pointer.touch ? 'Arraste o item e salve (Girar vira 90°)' : 'Clique para soltar · R gira 90°')
+    : movGiravel() ? (pointer.touch ? 'Arraste o item e salve (Girar dá 90° a cada toque)' : 'Clique para soltar · R gira 90°')
     : pointer.touch ? 'Arraste o item e salve' : 'Clique para soltar aqui';
   if (bar.dataset.txt !== txt) { bar.dataset.txt = txt; $('#moveMsg').textContent = txt; }
   $('#moveOk').hidden = !moving; $('#moveOk').disabled = !ok;
@@ -9148,13 +9157,13 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       continue;
     }
     if (o.key === 'casa') {
-      comGiro(q.x, o.rot, () => drawHouse(q.x, q.y, W * 0.95, home ? '#f1dcae' : view.casa, s.skin));
+      comGiro(q.x, o.rot, () => drawHouse(q.x, q.y, W * 0.95, home ? '#f1dcae' : view.casa, s.skin, o.rot >= 2));
       if (!moveMode) {
         if (hover && hover.kind === 'casa') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.6, W * 0.16, 0, 0, 7); ctx.stroke(); }
         hits.push({ kind: 'casa', x: q.x, y: q.y - W * 0.35, r: W * 0.45 });
       }
     } else if (o.key === 'celeiro') {
-      comGiro(q.x, o.rot, () => drawBarn(q.x, q.y, W * 1.15, s.skin));
+      comGiro(q.x, o.rot, () => drawBarn(q.x, q.y, W * 1.15, s.skin, o.rot >= 2));
       if (!moveMode) {
         if (hover && hover.kind === 'celeiro') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.7, W * 0.18, 0, 0, 7); ctx.stroke(); }
         hits.push({ kind: 'celeiro', x: q.x, y: q.y - W * 0.4, r: W * 0.5 });
@@ -9166,7 +9175,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
         ctx.fillStyle = '#7a4a22'; ctx.fillRect(q.x + W * 0.4, q.y - W * 0.34, W * 0.035, W * 0.3);
         ctx.fillStyle = '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(q.x + W * 0.28, q.y - W * 0.46, W * 0.28, W * 0.14, 3); ctx.fill(); ctx.stroke();
       });
-      ctx.font = `${Math.round(W * 0.1)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎣', q.x + (o.rot ? -1 : 1) * W * 0.42, q.y - W * 0.39);
+      ctx.font = `${Math.round(W * 0.1)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎣', q.x + (o.rot % 2 ? -1 : 1) * W * 0.42, q.y - W * 0.39);
       if (home && pescaPronta()) drawBubbleAt(q.x, q.y - W * 0.75, 'pesca', null, t, 99);
       if (!moveMode && home) {
         if (hover && hover.kind === 'lago') { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.52, W * 0.21, 0, 0, 7); ctx.stroke(); }
@@ -9175,7 +9184,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
     } else if (o.key === 'canil') {
       const slot = sc === 'roca' ? 'roca' : 'animais';
       if (view.kind === 'npc') { const d = DOG_AT(); drawDog(d.x, d.y, W * 0.7, t); hits.push({ kind: 'dog', slot, x: d.x, y: d.y - W * 0.2, r: W * 0.4 }); continue; }
-      { const kk = KENNEL_AT(); comGiro(kk.x, o.rot, () => drawKennelSpot(slot, s, home)); }
+      { const kk = KENNEL_AT(); comGiro(kk.x, o.rot, () => drawKennelSpot(slot, s, home, o.rot >= 2)); }
       if (stage === 'tras' && sc === 'roca') cachorroDepois = true; // o cachorro vai na frente da cerca
       else drawDogSpot(slot, s, t, home);
     } else if (o.key === 'arv1' || o.key === 'arv2') comGiro(q.x, o.rot, () => drawTree(q.x, q.y, W * (sc === 'roca' ? (o.key === 'arv1' ? 1.0 : 0.8) : (o.key === 'arv1' ? 1.0 : 1.1)), t, sc === 'roca' && tm.coqueiro));
@@ -9250,12 +9259,12 @@ function drawMoving(sc, t) {
   ctx.beginPath(); ctx.ellipse(q.x, q.y, W * raio * 0.6, W * raio * 0.25, 0, 0, 7); ctx.fill();
   ctx.globalAlpha = 0.75;
   const k = moving.key, s = state;
-  const gr = moving.rot ? 1 : 0;
+  const gr = moving.rot | 0;
   if (moving.novo) comGiro(q.x, gr, () => drawEnfeite(moving.novo, q.x, q.y, W / 100, t));
   else if (k.startsWith('enf:')) { const o = objetosDe(s, sc)[Number(k.slice(4))]; if (o) comGiro(q.x, gr, () => drawEnfeite(o.id, q.x, q.y, W / 100, t)); }
-  else if (k === 'casa') comGiro(q.x, gr, () => drawHouse(q.x, q.y, W * 0.95, '#f1dcae', s.skin));
-  else if (k === 'celeiro') comGiro(q.x, gr, () => drawBarn(q.x, q.y, W * 1.15, s.skin));
-  else if (k === 'canil') comGiro(q.x, gr, () => drawKennel(q.x, q.y, L.W * 0.85, s.skin));
+  else if (k === 'casa') comGiro(q.x, gr, () => drawHouse(q.x, q.y, W * 0.95, '#f1dcae', s.skin, gr >= 2));
+  else if (k === 'celeiro') comGiro(q.x, gr, () => drawBarn(q.x, q.y, W * 1.15, s.skin, gr >= 2));
+  else if (k === 'canil') comGiro(q.x, gr, () => drawKennel(q.x, q.y, L.W * 0.85, s.skin, gr >= 2));
   else if (k === 'pesqueiro') comGiro(q.x, gr, () => drawLake(q.x, q.y, W * 0.48, t));
   else if (k === 'placa') drawLandSign(q.x, q.y, true);
   else if (k === 'mata') drawMataCaca(q.x, q.y, W);
