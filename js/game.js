@@ -299,7 +299,6 @@ const DOG_NAMES = ['Totó', 'Rex', 'Pipoca', 'Thor', 'Mel', 'Bidu', 'Paçoca', '
 // Nome de cada lugar com o artigo certo ("a roça", "o rancho"…)
 const SLOT = { roca: { a: 'a roça', aSua: 'a sua roça', daSua: 'da sua roça', A: 'A roça' }, animais: { a: 'o rancho', aSua: 'o seu rancho', daSua: 'do seu rancho', A: 'O rancho' } };
 const STEAL_MAX = { roca: 4, animais: 3 }; // itens por amigo por dia (roca conta plantação e pomar juntos)
-const STEAL_FARMS = 5;                       // roças diferentes onde dá para pegar por dia
 // Dia pelo relógio do aparelho: os limites voltam à meia-noite.
 const localDay = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / DAY);
 
@@ -425,7 +424,7 @@ function newState() {
     animals: [], decor: {}, abrigos: { galinheiro: 1 }, racaoEsp: 0,
     enfeites: { cerca: 40 }, cercaDada: 1, objetos: { roca: [], animais: [] }, pos: {}, invNovos: 0, skins: {}, skin: null,
     missions: null, gift: { i: 0, ciclo: 0, last: -1 }, owe: {}, col: {}, stamps: {}, temas: { classico: true }, tema: 'classico', helpDay: -1,
-    friends: [], sent: {}, code: null, owner: null, log: {},
+    friends: [], sent: {}, code: null, owner: null, log: {}, amizade: {},
     fert: { basico: 2 }, fertSel: 'basico',
     dogs: { roca: null, animais: null }, dogFood: 0, news: [], newsSeen: 0, limits: {},
     stats: { colheitas: 0, coletas: 0, vendido: 0, roubado: 0, ajudas: 0 },
@@ -466,6 +465,7 @@ function migrate(s) {
   const obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   s.gift = Object.assign({ i: 0, ciclo: 0, last: -1 }, obj(s.gift));
   s.owe = obj(s.owe); s.col = obj(s.col); s.stamps = obj(s.stamps); s.avatar = avatarOk(s.avatar);
+  s.amizade = obj(s.amizade);
   s.temas = Object.assign({ classico: true }, obj(s.temas));
   if (!s.temas[s.tema]) s.tema = 'classico';
   if (!s.missions || !Array.isArray(s.missions.dia) || !Array.isArray(s.missions.semana)) s.missions = null;
@@ -1223,6 +1223,7 @@ const NOVIDADES = [
   { v: 194, txt: 'Canteiro novo não precisa mais encostar nos que você já tem: agora dá para escolher qualquer pedaço livre da sua terra, contanto que tenha vaga comprada na aba Terreno.' },
   { v: 195, txt: 'Tirei a trama escura que marcava a terra sem vaga comprada: agora o gramado fica igual em qualquer lugar da roça.' },
   { v: 196, txt: 'Com o celular em pé, agora dá para dar bem mais zoom. E em qualquer tela, dá para arrastar bem mais para os lados.' },
+  { v: 197, txt: 'Agora dá para pegar um pouquinho de qualquer quantidade de amigos por dia, não só de 5. E chegou a amizade ❤️ entre vocês: ajude ou presenteie seus amigos para ela subir, e os presentes que você manda ficam melhores (mais moedas, mais fertilizante, mais ração) a cada nível.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
@@ -1606,19 +1607,15 @@ function goHome() {
 }
 
 const visitKey = id => (view.kind === 'friend' ? view.uid : view.id) + ':' + id;
-function help(pos) { state.stats.ajudas++; addXP(2, pos); addCoins(2, pos); track('ajudar'); helpBack(pos); }
-// Limite de itens por amigo por dia: 4 da plantação (conta o pomar junto) e 3 dos animais, em até 5 roças.
+function help(pos) { state.stats.ajudas++; addXP(2, pos); addCoins(2, pos); track('ajudar'); helpBack(pos); if (view.kind === 'friend') ganharAmizade(view.uid); }
+// Limite de itens por amigo por dia: 4 da plantação (conta o pomar junto) e 3 dos animais — sem limite
+// de quantas roças diferentes, dá para pegar de todos os amigos que tiver.
 function stealLimit() {
   const today = localDay(), key = (view.kind === 'friend' ? view.uid : view.id) + ':' + today;
   return state.limits[key] || (state.limits[key] = { d: today, roca: 0, animais: 0 });
 }
-// Em quantas roças você já pegou algo hoje.
+// Em quantas roças você já pegou algo hoje (só para mostrar na dica, não limita mais nada).
 const farmsToday = () => Object.values(state.limits).filter(l => l && l.d === localDay() && l.roca + l.animais > 0).length;
-function farmBlocked(lim) {
-  if (lim.roca + lim.animais > 0 || farmsToday() < STEAL_FARMS) return false;
-  toast(`Você já pegou de ${STEAL_FARMS} vizinhos hoje. À meia-noite libera de novo!`);
-  return true;
-}
 // O cachorro do dono pode espantar (e às vezes morder) quem tenta pegar.
 // Nos vizinhos da vila o cachorro está sempre acordado; nos amigos, só se tiver comida.
 function guarded(slot, pos, visit) {
@@ -1665,7 +1662,6 @@ function awayPlot(i, p) {
     const key = visitKey(p.id), lim = stealLimit();
     if (alreadyTook(p, key)) return toast('Você já pegou daqui. Não exagere!');
     if (lim.roca >= STEAL_MAX.roca) return toast(`Você já pegou ${STEAL_MAX.roca} itens da plantação e do pomar de ${view.nome} hoje. À meia-noite libera de novo!`);
-    if (farmBlocked(lim)) return;
     p.stolen = true; state.log[key] = Date.now(); lim.roca++;
     if (guarded('roca', pos, { t: 'steal', plot: i, pid: p.id, qty: 0 })) return done();
     const crop = CROP[p.c];
@@ -1685,7 +1681,6 @@ function awayAnimal(a, def, prod, pos) {
     const key = visitKey(a.id + ':' + a.n), lim = stealLimit();
     if (alreadyTook(a, key)) return toast('Você já pegou deste bicho. Não exagere!');
     if (lim.animais >= STEAL_MAX.animais) return toast(`Você já pegou ${STEAL_MAX.animais} itens dos animais de ${view.nome} hoje. À meia-noite libera de novo!`);
-    if (farmBlocked(lim)) return;
     a.stolen = true; state.log[key] = Date.now(); lim.animais++;
     if (guarded('animais', pos, { t: 'stealA', animal: a.id })) return done();
     sfx('collect');
@@ -1743,8 +1738,8 @@ function applyVisits(list) {
       const sl = (state.banca || []).find(x => x.id === v.slot && x.item === v.item && x.qtd === v.qtd && x.preco === v.preco);
       if (sl) bancaVendeu(sl, who);
     } else if (v.t === 'gift' && PRESENTE_AMIGO.some(g => g.id === v.gift)) {
-      const g = PRESENTE_AMIGO.find(x => x.id === v.gift);
-      g.dar(state); note(`mandou um presente para você: ${g.nome}`);
+      const g = PRESENTE_AMIGO.find(x => x.id === v.gift), lvl = clamp(Number(v.nivel) || 0, 0, AMIZADE_NIVEL_MAX);
+      g.dar(state, lvl); note(`mandou um presente para você: ${g.nome(lvl)}`);
     } else if (v.t === 'feed' && a && ANIMAL[a.k].tipo === 'prod' && isHungry(a)) {
       a.fed = true; note('alimentou seus animais'); helpedBy(v.from, who);
     } else if (v.t === 'stealA' && a && ANIMAL[a.k].tipo === 'prod' && a.ready) {
@@ -5046,7 +5041,8 @@ function renderPane() {
         const name = f ? f.name : 'Amigo';
         const armed = unfriendArmed === uid;
         html += `<div class="row ${here ? 'sel' : ''}">${avatar(f && f.photo, name, '#7aa35a', f && f.moldura)}
-          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${bolinhaStatus(uid)} · ${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `${esc(f.fazenda || 'Roça Feliz')} · nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div></div>
+          <div><div class="name">${esc(name)}${owes(uid) ? '<span class="tag">ajudou você</span>' : ''}</div><div class="meta">${bolinhaStatus(uid)} · ${f && f.erro ? 'Não deu para ver a roça: toque em Reatar' : f ? `${esc(f.fazenda || 'Roça Feliz')} · nível ${f.level}` : 'Ainda não entrou no jogo'}${owes(uid) ? ` · ajude de volta: +${AJUDA_BONUS.moedas} moedas` : ''}</div>
+          <div class="meta" title="Amizade: ajude ou presenteie para subir">${'❤️'.repeat(nivelAmizade(uid))}${'🤍'.repeat(AMIZADE_NIVEL_MAX - nivelAmizade(uid))} · presentes ${nivelAmizade(uid) ? 'melhores' : 'melhoram com a amizade'}</div></div>
           <div class="stack">${here ? `<button class="btn ghost" data-home>Voltar</button>` : (f && f.erro ? `<button class="btn" data-reatar="${esc(uid)}">Reatar</button>` : `<button class="btn" data-visit-friend="${esc(uid)}" ${f ? '' : 'disabled'}>Visitar</button>`)}
           ${here ? '' : `<button class="btn ${pedeAjuda(uid) ? 'socorro' : 'ghost'}" data-ajudar-friend="${esc(uid)}" ${pedeAjuda(uid) ? '' : 'disabled title="Nenhuma frutífera pedindo ajuda agora"'}>🆘 Precisa de ajuda${pedeAjuda(uid) > 1 ? ` (${pedeAjuda(uid)})` : ''}</button>`}
           <button class="btn" data-chat="${esc(uid)}" ${f && !f.erro ? '' : 'disabled'}>💬 Conversar${naoLidas(uid) ? ` <span class="badge" aria-label="${naoLidas(uid)} mensagens novas">${naoLidas(uid)}</span>` : ''}</button>
@@ -5064,7 +5060,7 @@ function renderPane() {
         }
       }
     }
-    html += `<p class="hint">Hoje você pegou coisas em ${farmsToday()} de ${STEAL_FARMS} roças. Em cada uma dá para pegar ${STEAL_MAX.roca} itens da plantação e do pomar, e ${STEAL_MAX.animais} dos animais. Tudo volta à meia-noite.</p>`;
+    html += `<p class="hint">Hoje você já pegou coisas em ${farmsToday()} ${farmsToday() === 1 ? 'roça' : 'roças'} (sem limite de quantas). Em cada uma dá para pegar ${STEAL_MAX.roca} itens da plantação e do pomar, e ${STEAL_MAX.animais} dos animais. Tudo volta à meia-noite.</p>`;
     html += `<h3>Vizinhos da vila</h3><p class="hint">Sempre tem alguém em casa por aqui. Cada vizinho tem um cachorro de guarda.</p>`;
     for (const n of NEIGHBORS) {
       const here = view.kind === 'npc' && view.id === n.id;
@@ -6097,15 +6093,30 @@ const giftIcon = g => g.fert && !g.moedas ? fertIcon(g.fert) : g.racao ? bowlIco
 function showGift() { renderGift(); $('#gift').hidden = false; $('#giftOpen').focus(); }
 function closeGift() { $('#gift').hidden = true; }
 
+// ---------- Amizade com cada amigo ----------
+// Sobe 1 ponto por dia, por amigo, toda vez que você ajuda (rega, tira praga, cura planta, alimenta
+// animal) ou manda presente para essa pessoa. A cada AMIZADE_POR_NIVEL pontos sobe um nível de amizade
+// (até o máximo), e os presentes que você manda pra ela ficam melhores — igual a amizade da vila, mas
+// entre jogadores de verdade.
+const AMIZADE_POR_NIVEL = 3, AMIZADE_NIVEL_MAX = 4;
+const nivelAmizade = uid => clamp(Math.floor((state.amizade[uid] || 0) / AMIZADE_POR_NIVEL), 0, AMIZADE_NIVEL_MAX);
+function ganharAmizade(uid) {
+  if (!uid) return;
+  const key = 'amz:' + uid + ':' + localDay();
+  if (state.log[key]) return;
+  state.log[key] = Date.now();
+  state.amizade[uid] = (state.amizade[uid] || 0) + 1;
+}
 // ---------- Presentes para os amigos ----------
-// Um presente por amigo por dia, para até 5 amigos. Não custa nada para quem manda.
+// Um presente por amigo por dia, para até 5 amigos. Não custa nada para quem manda. Cada opção melhora
+// (mais moedas, mais quantidade) conforme o nível de amizade com quem vai receber.
 const PRESENTE_AMIGO = [
-  { id: 'moedas', nome: '100 moedas', dar: s => { s.coins += 100; } },
-  { id: 'basico', nome: '1 fertilizante básico', dar: s => { s.fert.basico = (s.fert.basico || 0) + 1; } },
-  { id: 'racao', nome: '1 ração especial', dar: s => { s.racaoEsp += 1; } },
-  { id: 'racaoCao', nome: '2 rações de cachorro', dar: s => { s.dogFood += 2; } },
-  { id: 'enxada', nome: '1 enxada de arrancar', dar: s => { (s.derrubar = s.derrubar || {}).enxada = (s.derrubar.enxada || 0) + 1; } },
-  { id: 'motosserra', nome: '1 motosserra', dar: s => { (s.derrubar = s.derrubar || {}).motosserra = (s.derrubar.motosserra || 0) + 1; } },
+  { id: 'moedas', nome: lvl => `${100 + lvl * 50} moedas`, dar: (s, lvl) => { s.coins += 100 + lvl * 50; } },
+  { id: 'basico', nome: lvl => `${1 + Math.floor(lvl / 2)} fertilizante${lvl >= 2 ? 's' : ''} básico${lvl >= 2 ? 's' : ''}`, dar: (s, lvl) => { s.fert.basico = (s.fert.basico || 0) + 1 + Math.floor(lvl / 2); } },
+  { id: 'racao', nome: lvl => { const n = 1 + Math.floor(lvl / 2); return n > 1 ? `${n} rações especiais` : '1 ração especial'; }, dar: (s, lvl) => { s.racaoEsp += 1 + Math.floor(lvl / 2); } },
+  { id: 'racaoCao', nome: lvl => `${2 + lvl} rações de cachorro`, dar: (s, lvl) => { s.dogFood += 2 + lvl; } },
+  { id: 'enxada', nome: () => '1 enxada de arrancar', dar: s => { (s.derrubar = s.derrubar || {}).enxada = (s.derrubar.enxada || 0) + 1; } },
+  { id: 'motosserra', nome: () => '1 motosserra', dar: s => { (s.derrubar = s.derrubar || {}).motosserra = (s.derrubar.motosserra || 0) + 1; } },
 ];
 const PRESENTE_MAX = 5;
 function giftsToday() {
@@ -6119,10 +6130,10 @@ function escolherPresente(uid) {
   if (g.to.includes(uid)) return toast('Você já mandou um presente para essa pessoa hoje.');
   if (g.to.length >= PRESENTE_MAX) return toast(`Você já mandou ${PRESENTE_MAX} presentes hoje. À meia-noite libera de novo!`);
   presenteParaUid = uid;
-  const f = friendInfo[uid];
-  $('#presTxt').textContent = `Escolha o presente para ${firstName(f && f.name ? f.name : 'seu amigo')}. Não custa nada!`;
+  const f = friendInfo[uid], lvl = nivelAmizade(uid);
+  $('#presTxt').textContent = `Escolha o presente para ${firstName(f && f.name ? f.name : 'seu amigo')}. Não custa nada!${lvl ? ` Amizade nível ${lvl}: presentes melhores!` : ''}`;
   const icon = { basico: fertIcon('basico'), racao: bowlIcon(), racaoCao: dogIcon('caramelo'), enxada: ferramentaIcon('enxada'), motosserra: ferramentaIcon('motosserra') };
-  $('#presOpcoes').innerHTML = PRESENTE_AMIGO.map(p => `<button type="button" class="presopt" data-pres="${p.id}"><img alt="" src="${p.id === 'moedas' ? giftIcon({ moedas: 100 }) : icon[p.id]}"><span>${p.nome}</span></button>`).join('');
+  $('#presOpcoes').innerHTML = PRESENTE_AMIGO.map(p => `<button type="button" class="presopt" data-pres="${p.id}"><img alt="" src="${p.id === 'moedas' ? giftIcon({ moedas: 100 + lvl * 50 }) : icon[p.id]}"><span>${p.nome(lvl)}</span></button>`).join('');
   $('#presente').hidden = false;
   $('#presOpcoes button').focus();
 }
@@ -6142,16 +6153,16 @@ async function reatarAmizade(uid, silencioso) {
 }
 async function sendFriendGift(uid, escolha) {
   if (!user) return;
-  const g = giftsToday(), pick = PRESENTE_AMIGO.find(p => p.id === escolha) || PRESENTE_AMIGO[0];
+  const g = giftsToday(), pick = PRESENTE_AMIGO.find(p => p.id === escolha) || PRESENTE_AMIGO[0], lvl = nivelAmizade(uid);
   if (g.to.includes(uid)) return toast('Você já mandou um presente para essa pessoa hoje.');
   if (g.to.length >= PRESENTE_MAX) return toast(`Você já mandou ${PRESENTE_MAX} presentes hoje. À meia-noite libera de novo!`);
   g.to.push(uid); renderPane();
   try {
-    await Cloud.sendVisit(uid, { t: 'gift', gift: pick.id, from: user.uid, fromName: meuApelido(), at: Date.now() });
+    await Cloud.sendVisit(uid, { t: 'gift', gift: pick.id, nivel: lvl, from: user.uid, fromName: meuApelido(), at: Date.now() });
     avisarAmigo(uid, 'presente', `🎁 ${meuApelido()} te mandou um presente!`);
-    sfx('buy'); addXP(2, null); track('presentear');
+    sfx('buy'); addXP(2, null); track('presentear'); ganharAmizade(uid);
     const f = friendInfo[uid];
-    toast(`Presente enviado para ${firstName(f && f.name ? f.name : 'seu amigo')}: ${pick.nome}!`, 'good');
+    toast(`Presente enviado para ${firstName(f && f.name ? f.name : 'seu amigo')}: ${pick.nome(lvl)}!`, 'good');
     done();
   } catch (e) {
     console.warn(e);
@@ -9795,7 +9806,6 @@ function actFruteira(sc, i) {
       const key = visitKey('fr:' + (o.fid || i)), lim = stealLimit();
       if (alreadyTook(o, key)) return toast('Você já pegou daqui. Não exagere!');
       if (lim.roca >= STEAL_MAX.roca) return toast(`Você já pegou ${STEAL_MAX.roca} itens da plantação e do pomar de ${view.nome} hoje. À meia-noite libera de novo!`);
-      if (farmBlocked(lim)) return;
       const q = iso(o.u, o.v), pos = { x: q.x, y: q.y - L.W * 0.4 };
       lim.roca++; state.log[key] = Date.now();
       if (guarded(sc, pos, { t: 'stealF', sc, fid: o.fid || '', idx: i })) return done();
