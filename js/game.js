@@ -4,9 +4,9 @@
 // ============================================================
 // Dados do jogo
 // ============================================================
-// Mapa da roça: 28×84 (era 28×56) — mais espaço de terreno e plantação, de novo crescendo só na
-// direção das linhas (ROWS), sempre "pra frente" (u+v aumenta), nunca na direção do horizonte/céu.
-const COLS = 28, ROWS = 84, N = COLS * ROWS;
+// Mapa da roça: 64×64 (era 28×84) — virou quadrado, bem maior (ambos os eixos crescem só "pra frente",
+// u e v aumentando, então nunca esbarra no corte do céu).
+const COLS = 64, ROWS = 64, N = COLS * ROWS;
 const START_LOTS = [0, 1, 2, COLS, COLS + 1, COLS + 2]; // os 6 canteiros iniciais, no canto perto do celeiro (2 linhas de 3)
 const ROOM = 5;
 const HOUR = 3600, DAY = 86400e3; // HOUR em segundos (tempos de produção), DAY em milissegundos (idades)
@@ -487,6 +487,18 @@ function migrate(s) {
     const novos = Array.from({ length: N }, () => emptyPlot());
     for (let i = 0; i < OLD_N4; i++) {
       const c = i % OLD_COLS4, r = Math.floor(i / OLD_COLS4);
+      if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
+    }
+    s.plots = novos;
+  }
+  // Área da roça virou quadrada, de 28×84 pra 64×64 (mais larga, um pouco menos funda). Mesmo esquema
+  // de remapeio: cada canteiro vai pra mesma linha/coluna na grade nova (quem tinha algo bem no fundo,
+  // além da linha 64, é bem raro — o jogo tinha acabado de ganhar essa profundidade).
+  const OLD_COLS5 = 28, OLD_ROWS5 = 84, OLD_N5 = OLD_COLS5 * OLD_ROWS5;
+  if (s.v === 3 && Array.isArray(s.plots) && s.plots.length === OLD_N5 && N !== OLD_N5) {
+    const novos = Array.from({ length: N }, () => emptyPlot());
+    for (let i = 0; i < OLD_N5; i++) {
+      const c = i % OLD_COLS5, r = Math.floor(i / OLD_COLS5);
       if (c < COLS && r < ROWS) novos[r * COLS + c] = s.plots[i];
     }
     s.plots = novos;
@@ -1269,6 +1281,7 @@ const NOVIDADES = [
   { v: 202, txt: 'Reorganizei as expansões de terreno: agora o máximo é 80 canteiros, numa progressão mais equilibrada (sempre uns +10 a +14 por expansão) até o nível 50. Quem já tinha mais que 80 não perde nenhum canteiro — só para de liberar vaga nova até o limite valer de novo.' },
   { v: 203, txt: 'A área de construção da roça dobrou de tamanho (28×56, não mais quadrada) — bem mais espaço pra espalhar canteiro e enfeite, sem chegar perto do céu.' },
   { v: 204, txt: 'O mapa aumentou de novo: a roça (terreno e plantação) ficou com mais espaço ainda (28×84), e o rancho também — a área pra espalhar enfeite e mover os cercados dobrou.' },
+  { v: 205, txt: 'O mapa da roça virou quadrado: agora é 64×64, bem maior que antes.' },
   { v: 115, txt: 'Plantações mais brasileiras 🇧🇷: o nabo virou FEIJÃO (quem tinha nabo agora tem feijão) e a pera virou SOJA. Chegaram arroz, couve, amendoim, cana-de-açúcar e algodão, e as receitas Arroz com feijão, Paçoca e Rapadura. Cada planta agora tem o seu broto enquanto cresce. No pomar, a pitangueira virou árvore e chegou a framboeseira, e cada frutífera ganhou o seu jeito.' },
   { v: 114, txt: 'Cercas e porteiras 🚪: na Loja › Enfeites agora tem vários tipos de cerca (arame farpado, branca, bambu, azul, com roseiras e muro de pedra) e porteiras (de madeira, branca e portão de ferro). A porteira ocupa um pedaço da cerca e gira igual.' },
   { v: 113, txt: 'Loja mais esperta 📦: se você já tem o enfeite, a cerca ou a frutífera no Inventário, a Loja mostra quantos tem e o botão usa o do inventário primeiro (dá para comprar mais no botãozinho +).' },
