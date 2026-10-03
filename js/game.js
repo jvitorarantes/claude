@@ -1250,7 +1250,7 @@ const NOVIDADES = [
   { v: 204, txt: 'O mapa aumentou de novo: a roça (terreno e plantação) ficou com mais espaço ainda (28×84), e o rancho também — a área pra espalhar enfeite e mover os cercados dobrou.' },
   { v: 205, txt: 'O mapa da roça virou quadrado: agora é 64×64, bem maior que antes.' },
   { v: 206, txt: 'Corrigido o zoom/arrastar da roça: a câmera estava se afastando demais pra tentar mostrar todo canteiro que dava pra comprar (o que virou o mapa inteiro depois que ele cresceu), deixando tudo pequeno e o deslize estranho. Agora ela enquadra só a terra que você já tem, do jeito que era antes.' },
-  { v: 213, txt: 'O banco de madeira agora gira de verdade: de frente, de lado, de costas e do outro lado (no modo Mover, toque em Girar).' },
+  { v: 214, txt: 'O banco de madeira agora gira de verdade: de frente, de lado, de costas e do outro lado, visto de perfil (no modo Mover, toque em Girar).' },
   { v: 212, txt: 'A placa de expansão de terrenos agora cresce e diminui junto com a roça no zoom, igual ao celeiro e à casa: fica sempre do mesmo tamanho em relação ao terreno.' },
   { v: 210, txt: 'Agora o giro dá a volta completa: 4 posições, de 90° em 90°. Casa, celeiro e casinha do cachorro mostram os fundos (sem a porta e as janelas da frente) nos giros 2 e 3; árvores e decorações viram para o outro lado.' },
   { v: 209, txt: 'Agora dá pra girar 90° as construções (casa, celeiro, casinha do cachorro, pesqueiro, árvores) e as decorações: no modo Mover, pegue o item e toque em Girar (ou aperte R). As casas dos bichos já giravam; as cercas continuam como estavam. E a placa de expansão de terrenos agora tem tamanho fixo: não aumenta nem diminui mais com o zoom.' },
@@ -9654,16 +9654,18 @@ function drawEnfeite(id, x, y, s, t, rot) {
     // fica na frente do assento); ímpares = de lado, na diagonal (o comGiro espelha o 3).
     const giro = (rot | 0) % 4;
     if (giro % 2) {
-      // de lado, na diagonal: a = ao longo do banco, d = profundidade (assento virado pra frente-direita), h = altura
-      const P3 = (a, d, h) => ({ x: x + (a + d) * 0.8 * s, y: y + (d - a) * 0.4 * s - h * s });
-      const placa = (a0, a1, d0, d1, h0, h1, cor) => { ctx.fillStyle = cor; poly(d0 === d1 ? [P3(a0, d0, h0), P3(a1, d0, h0), P3(a1, d0, h1), P3(a0, d0, h1)] : [P3(a0, d0, h1), P3(a1, d0, h1), P3(a1, d1, h1), P3(a0, d1, h1)]); ctx.fill(); };
-      const perna = (a, d, h) => { const b = P3(a, d, 0), c = P3(a, d, h); ctx.fillStyle = '#3a3e43'; ctx.fillRect(b.x - 1.5 * s, c.y, 3 * s, b.y - c.y); };
-      const encosto = (d, cor) => { for (const a of [-20, 18]) perna(a, d, 31); for (const h of [17, 22, 27]) placa(-25, 25, d - Math.sign(d) * 0.5, d - Math.sign(d) * 0.5, h, h + 3.5, cor); };
-      const assento = () => { placa(-25, 25, 5, 5, 12, 15, '#a8743f'); placa(-25, 25, -5, -0.4, 0, 15, '#c08a55'); placa(-25, 25, 0.4, 5, 0, 15, '#c08a55'); };
-      for (const a of [-20, 18]) perna(a, -4, 13);
-      // giro 1: encosto atrás, assento virado pra quem olha; giro 3: visto por trás, encosto na frente
-      if (giro === 1) { encosto(-5, '#b07a44'); assento(); for (const a of [-20, 18]) perna(a, 4, 13); }
-      else { assento(); for (const a of [-20, 18]) perna(a, 4, 13); encosto(5, '#9a6a3a'); }
+      // de lado (perfil): só a ponta do banco — pé da frente, pé de trás subindo no encosto e as pontas das
+      // ripas. Giro 1 com o encosto à esquerda, giro 3 à direita (o comGiro ainda espelha os dois).
+      const f = giro === 1 ? 1 : -1, X = dx => x + dx * f * s;
+      const ret = (a, b, y0, y1, cor) => { ctx.fillStyle = cor; ctx.fillRect(Math.min(X(a), X(b)), y - y1 * s, Math.abs(X(b) - X(a)), (y1 - y0) * s); };
+      const ripa = (dx, h, cor) => { ctx.fillStyle = cor; ctx.beginPath(); ctx.roundRect(X(dx) - 2.2 * s, y - (h + 3.5) * s, 4.4 * s, 3.5 * s, 1.2 * s); ctx.fill(); };
+      // perna da frente, pé de trás + encosto inclinado, barra do assento
+      ret(7, 10, 0, 13, '#3a3e43'); ret(6, 11, 0, 1.5, '#3a3e43');
+      ctx.fillStyle = '#3a3e43'; poly([{ x: X(-9), y }, { x: X(-6), y }, { x: X(-8.5), y: y - 31 * s }, { x: X(-11.5), y: y - 31 * s }]); ctx.fill();
+      ret(-11, -5, 0, 1.5, '#3a3e43'); ret(-8, 10, 11, 13, '#3a3e43');
+      // pontas das ripas do assento e do encosto
+      for (const dx of [-3, 2.5, 7.5]) ripa(dx, 12.5, '#c08a55');
+      for (const [dx, h] of [[-10.6, 17], [-11.4, 22], [-12.2, 27]]) ripa(dx + 3.2, h, '#b07a44');
       return;
     }
     ctx.save();
