@@ -1250,6 +1250,7 @@ const NOVIDADES = [
   { v: 204, txt: 'O mapa aumentou de novo: a roça (terreno e plantação) ficou com mais espaço ainda (28×84), e o rancho também — a área pra espalhar enfeite e mover os cercados dobrou.' },
   { v: 205, txt: 'O mapa da roça virou quadrado: agora é 64×64, bem maior que antes.' },
   { v: 206, txt: 'Corrigido o zoom/arrastar da roça: a câmera estava se afastando demais pra tentar mostrar todo canteiro que dava pra comprar (o que virou o mapa inteiro depois que ele cresceu), deixando tudo pequeno e o deslize estranho. Agora ela enquadra só a terra que você já tem, do jeito que era antes.' },
+  { v: 213, txt: 'O banco de madeira agora gira de verdade: de frente, de lado, de costas e do outro lado (no modo Mover, toque em Girar).' },
   { v: 212, txt: 'A placa de expansão de terrenos agora cresce e diminui junto com a roça no zoom, igual ao celeiro e à casa: fica sempre do mesmo tamanho em relação ao terreno.' },
   { v: 210, txt: 'Agora o giro dá a volta completa: 4 posições, de 90° em 90°. Casa, celeiro e casinha do cachorro mostram os fundos (sem a porta e as janelas da frente) nos giros 2 e 3; árvores e decorações viram para o outro lado.' },
   { v: 209, txt: 'Agora dá pra girar 90° as construções (casa, celeiro, casinha do cachorro, pesqueiro, árvores) e as decorações: no modo Mover, pegue o item e toque em Girar (ou aperte R). As casas dos bichos já giravam; as cercas continuam como estavam. E a placa de expansão de terrenos agora tem tamanho fixo: não aumenta nem diminui mais com o zoom.' },
@@ -9200,7 +9201,7 @@ function drawObjetos(s, sc, t, home, stage, d0 = -Infinity, d1 = Infinity) {
       if (hov) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(q.x, q.y, W * 0.35, W * 0.12, 0, 0, 7); ctx.stroke(); }
       comGiro(q.x, o.rot, () => {
         if (ENFEITE[o.id].fruteira && o.obj) drawFruteira(o.obj, q.x, q.y, W / 100, t, home);
-        else drawEnfeite(o.id, q.x, q.y, W / 100, t);
+        else drawEnfeite(o.id, q.x, q.y, W / 100, t, o.rot);
       });
       if (!moveMode) hits.push({ kind: 'enfeite', sc, key: o.key, id: o.id, x: q.x, y: q.y - W * (ENFEITE[o.id].fruteira === 'arvore' ? 0.45 : 0.25), r: W * (ENFEITE[o.id].fruteira === 'arvore' ? 0.45 : 0.32) });
     }
@@ -9261,8 +9262,8 @@ function drawMoving(sc, t) {
   ctx.globalAlpha = 0.75;
   const k = moving.key, s = state;
   const gr = moving.rot | 0;
-  if (moving.novo) comGiro(q.x, gr, () => drawEnfeite(moving.novo, q.x, q.y, W / 100, t));
-  else if (k.startsWith('enf:')) { const o = objetosDe(s, sc)[Number(k.slice(4))]; if (o) comGiro(q.x, gr, () => drawEnfeite(o.id, q.x, q.y, W / 100, t)); }
+  if (moving.novo) comGiro(q.x, gr, () => drawEnfeite(moving.novo, q.x, q.y, W / 100, t, gr));
+  else if (k.startsWith('enf:')) { const o = objetosDe(s, sc)[Number(k.slice(4))]; if (o) comGiro(q.x, gr, () => drawEnfeite(o.id, q.x, q.y, W / 100, t, gr)); }
   else if (k === 'casa') comGiro(q.x, gr, () => drawHouse(q.x, q.y, W * 0.95, '#f1dcae', s.skin, gr >= 2));
   else if (k === 'celeiro') comGiro(q.x, gr, () => drawBarn(q.x, q.y, W * 1.15, s.skin, gr >= 2));
   else if (k === 'canil') comGiro(q.x, gr, () => drawKennel(q.x, q.y, L.W * 0.85, s.skin, gr >= 2));
@@ -9577,7 +9578,7 @@ function drawPeixesRoca(s, t) {
   }
 }
 // Desenho dos enfeites, com a base em (x, y). s = escala (1 = casa de 100px).
-function drawEnfeite(id, x, y, s, t) {
+function drawEnfeite(id, x, y, s, t, rot) {
   if (ENFEITE[id] && ENFEITE[id].fruteira) return drawFruteira({ id }, x, y, s, t, false);
   if (ENFEITE[id] && ENFEITE[id].cerca && id !== 'cerca') {
     // ícone: um pedaço de frente, no estilo do item
@@ -9649,11 +9650,37 @@ function drawEnfeite(id, x, y, s, t) {
       ctx.fillStyle = '#f2a900'; ctx.beginPath(); ctx.arc(fx, fy, 1.3 * s, 0, 7); ctx.fill();
     }
   } else if (id === 'banco') {
-    // banco de praça: pés de ferro, ripas arredondadas
-    ctx.fillStyle = '#3a3e43'; for (const dx of [-19, 16]) { ctx.fillRect(x + dx * s, y - 13 * s, 3 * s, 13 * s); ctx.fillRect(x + dx * s - 1 * s, y - 1.5 * s, 5 * s, 1.5 * s); }
-    ctx.fillStyle = '#3a3e43'; for (const dx of [-21, 18]) ctx.fillRect(x + dx * s, y - 31 * s, 3 * s, 18 * s);
-    for (const [yy, hh] of [[-16, 4], [-12, 3]]) { ctx.fillStyle = '#c08a55'; ctx.beginPath(); ctx.roundRect(x - 25 * s, y + yy * s, 50 * s, hh * s, 1.5 * s); ctx.fill(); }
-    for (const yy of [-31, -26, -21]) { ctx.fillStyle = '#b07a44'; ctx.beginPath(); ctx.roundRect(x - 25 * s, y + yy * s, 50 * s, 3.5 * s, 1.5 * s); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(x - 24 * s, y + yy * s + 0.5 * s, 48 * s, 1 * s); }
+    // banco de praça: pés de ferro, ripas arredondadas. Giro 0 = de frente; 2 = de costas (o encosto
+    // fica na frente do assento); ímpares = de lado, na diagonal (o comGiro espelha o 3).
+    const giro = (rot | 0) % 4;
+    if (giro % 2) {
+      // de lado, na diagonal: a = ao longo do banco, d = profundidade (assento virado pra frente-direita), h = altura
+      const P3 = (a, d, h) => ({ x: x + (a + d) * 0.8 * s, y: y + (d - a) * 0.4 * s - h * s });
+      const placa = (a0, a1, d0, d1, h0, h1, cor) => { ctx.fillStyle = cor; poly(d0 === d1 ? [P3(a0, d0, h0), P3(a1, d0, h0), P3(a1, d0, h1), P3(a0, d0, h1)] : [P3(a0, d0, h1), P3(a1, d0, h1), P3(a1, d1, h1), P3(a0, d1, h1)]); ctx.fill(); };
+      const perna = (a, d, h) => { const b = P3(a, d, 0), c = P3(a, d, h); ctx.fillStyle = '#3a3e43'; ctx.fillRect(b.x - 1.5 * s, c.y, 3 * s, b.y - c.y); };
+      const encosto = (d, cor) => { for (const a of [-20, 18]) perna(a, d, 31); for (const h of [17, 22, 27]) placa(-25, 25, d - Math.sign(d) * 0.5, d - Math.sign(d) * 0.5, h, h + 3.5, cor); };
+      const assento = () => { placa(-25, 25, 5, 5, 12, 15, '#a8743f'); placa(-25, 25, -5, -0.4, 0, 15, '#c08a55'); placa(-25, 25, 0.4, 5, 0, 15, '#c08a55'); };
+      for (const a of [-20, 18]) perna(a, -4, 13);
+      // giro 1: encosto atrás, assento virado pra quem olha; giro 3: visto por trás, encosto na frente
+      if (giro === 1) { encosto(-5, '#b07a44'); assento(); for (const a of [-20, 18]) perna(a, 4, 13); }
+      else { assento(); for (const a of [-20, 18]) perna(a, 4, 13); encosto(5, '#9a6a3a'); }
+      return;
+    }
+    ctx.save();
+    const pes = () => { ctx.fillStyle = '#3a3e43'; for (const dx of [-19, 16]) { ctx.fillRect(x + dx * s, y - 13 * s, 3 * s, 13 * s); ctx.fillRect(x + dx * s - 1 * s, y - 1.5 * s, 5 * s, 1.5 * s); } };
+    const assento = dy => { for (const [yy, hh] of [[-16, 4], [-12, 3]]) { ctx.fillStyle = '#c08a55'; ctx.beginPath(); ctx.roundRect(x - 25 * s, y + (yy + dy) * s, 50 * s, hh * s, 1.5 * s); ctx.fill(); } };
+    if (giro === 2) {
+      pes(); assento(-3);
+      ctx.fillStyle = '#3a3e43'; for (const dx of [-21, 18]) ctx.fillRect(x + dx * s, y - 31 * s, 3 * s, 31 * s);
+      for (const yy of [-31, -26, -21]) { ctx.fillStyle = '#9a6a3a'; ctx.beginPath(); ctx.roundRect(x - 25 * s, y + yy * s, 50 * s, 3.5 * s, 1.5 * s); ctx.fill(); }
+      ctx.fillStyle = '#2c3034'; ctx.fillRect(x - 23 * s, y - 24 * s, 46 * s, 1.5 * s);
+    } else {
+      pes();
+      ctx.fillStyle = '#3a3e43'; for (const dx of [-21, 18]) ctx.fillRect(x + dx * s, y - 31 * s, 3 * s, 18 * s);
+      assento(0);
+      for (const yy of [-31, -26, -21]) { ctx.fillStyle = '#b07a44'; ctx.beginPath(); ctx.roundRect(x - 25 * s, y + yy * s, 50 * s, 3.5 * s, 1.5 * s); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(x - 24 * s, y + yy * s + 0.5 * s, 48 * s, 1 * s); }
+    }
+    ctx.restore();
   } else if (id === 'espantalho') {
     ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - 2 * s, y - 48 * s, 4 * s, 48 * s); ctx.fillRect(x - 21 * s, y - 36 * s, 42 * s, 3.5 * s);
     // camisa xadrez com remendo e palha saindo
