@@ -1250,6 +1250,7 @@ const NOVIDADES = [
   { v: 204, txt: 'O mapa aumentou de novo: a roça (terreno e plantação) ficou com mais espaço ainda (28×84), e o rancho também — a área pra espalhar enfeite e mover os cercados dobrou.' },
   { v: 205, txt: 'O mapa da roça virou quadrado: agora é 64×64, bem maior que antes.' },
   { v: 206, txt: 'Corrigido o zoom/arrastar da roça: a câmera estava se afastando demais pra tentar mostrar todo canteiro que dava pra comprar (o que virou o mapa inteiro depois que ele cresceu), deixando tudo pequeno e o deslize estranho. Agora ela enquadra só a terra que você já tem, do jeito que era antes.' },
+  { v: 212, txt: 'A placa de expansão de terrenos agora cresce e diminui junto com a roça no zoom, igual ao celeiro e à casa: fica sempre do mesmo tamanho em relação ao terreno.' },
   { v: 210, txt: 'Agora o giro dá a volta completa: 4 posições, de 90° em 90°. Casa, celeiro e casinha do cachorro mostram os fundos (sem a porta e as janelas da frente) nos giros 2 e 3; árvores e decorações viram para o outro lado.' },
   { v: 209, txt: 'Agora dá pra girar 90° as construções (casa, celeiro, casinha do cachorro, pesqueiro, árvores) e as decorações: no modo Mover, pegue o item e toque em Girar (ou aperte R). As casas dos bichos já giravam; as cercas continuam como estavam. E a placa de expansão de terrenos agora tem tamanho fixo: não aumenta nem diminui mais com o zoom.' },
   { v: 208, txt: 'A área da roça agora tem o mesmo formato da do rancho: a fazenda fica lá no alto, no meio, e o terreno abre pros dois lados e pra frente, cortado reto pelo céu. E o arrastar foi refeito: com qualquer zoom dá pra ir até a beirada da área (esquerda, direita, frente e até o céu), e ao mudar de direção a tela responde na hora, sem ficar presa.' },
@@ -3715,18 +3716,18 @@ function landSignText() {
 // A placa fica no lugar dela (dá para mudar no modo Mover), sem depender de onde estão os canteiros.
 function drawLandSign(x, y, fantasma) {
   const txt = landSignText(); if (!txt) return;
-  // Tamanho fixo em pixels: a placa não cresce nem encolhe com o zoom (só a posição acompanha o chão).
-  const W = 80;
+  // Tudo proporcional ao chão (sem travar a letra): a placa mantém sempre o mesmo tamanho em relação à roça.
+  const W = L.W;
   const hov = hover && hover.kind === 'land';
   ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y, W * 0.18, W * 0.05, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - W * 0.035, y - W * 0.5, W * 0.07, W * 0.5);
-  const fs = Math.round(clamp(W * 0.13, 11, 16));
+  const fs = W * 0.1;
   ctx.font = `800 ${fs}px 'Baloo 2', sans-serif`;
   const bw = Math.max(ctx.measureText(txt[0]).width, ctx.measureText(txt[1]).width) + fs * 1.6, bh = fs * 2.9, top = y - W * 0.5 - bh * 0.7;
   const bx = x + Math.max(0, bw / 2 - W * 0.3); // a tábua fica para a direita, longe do celeiro
-  ctx.fillStyle = hov ? '#e8b273' : '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.roundRect(bx - bw / 2, top, bw, bh, 7); ctx.fill(); ctx.stroke();
-  line({ x: bx - bw / 2 + 5, y: top + bh / 2 }, { x: bx + bw / 2 - 5, y: top + bh / 2 }, 'rgba(122,74,34,.35)', 1);
+  ctx.fillStyle = hov ? '#e8b273' : '#d39a5c'; ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = fs * 0.2;
+  ctx.beginPath(); ctx.roundRect(bx - bw / 2, top, bw, bh, fs * 0.55); ctx.fill(); ctx.stroke();
+  line({ x: bx - bw / 2 + fs * 0.4, y: top + bh / 2 }, { x: bx + bw / 2 - fs * 0.4, y: top + bh / 2 }, 'rgba(122,74,34,.35)', 1);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = '#4a2a10'; ctx.fillText(txt[0], bx, top + bh * 0.3);
   ctx.fillStyle = txt[2]; ctx.fillText(txt[1], bx, top + bh * 0.72);
